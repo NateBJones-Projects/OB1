@@ -1,0 +1,71 @@
+name: Recipe / Contribution Idea
+description: Propose a new recipe, schema, dashboard, or integration
+labels: ["contribution-idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have something you've built on Open Brain, or an idea for something that should exist? Tell us about it. You don't need to have code ready — ideas are welcome.
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: Where would this contribution live?
+      options:
+        - Recipe (step-by-step build)
+        - Schema (database extension)
+        - Dashboard (frontend template)
+        - Integration (MCP extension, webhook, capture source)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: A short name for the contribution
+      placeholder: "Gmail label import"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What does it do?
+      description: 1-3 sentences. What capability does this add to Open Brain?
+    validations:
+      required: true
+
+  - type: textarea
+    id: requirements
+    attributes:
+      label: What does it need?
+      description: External services, tools, or APIs required (if you know)
+      placeholder: "Gmail API, Node.js 18+"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: Estimated difficulty
+      options:
+        - Beginner (< 30 min, mostly copy-paste)
+        - Intermediate (30-60 min, some configuration)
+        - Advanced (1+ hours, custom code)
+        - Not sure
+    validations:
+      required: false
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Do you have this working already?
+      options:
+        - "Yes — I've built it and can submit a PR"
+        - "Partially — I have a working prototype"
+        - "No — this is an idea I'd like to see built"
+    validations:
+      required: true

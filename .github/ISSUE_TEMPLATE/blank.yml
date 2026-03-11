@@ -1,0 +1,10 @@
+name: Blank Issue
+description: Open a blank issue — use this if nothing else fits
+labels: []
+body:
+  - type: textarea
+    id: content
+    attributes:
+      label: What's on your mind?
+    validations:
+      required: true

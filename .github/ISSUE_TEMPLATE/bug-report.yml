@@ -1,0 +1,58 @@
+name: Bug Report
+description: Something isn't working as documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please fill out the details below so we can help.
+
+  - type: input
+    id: contribution
+    attributes:
+      label: Which contribution?
+      description: The name and category (e.g., "recipes/email-history-import")
+      placeholder: recipes/email-history-import
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe what went wrong. Include any error messages you saw.
+      placeholder: "I followed step 3 but got an error saying..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: How can we see the same problem?
+      placeholder: |
+        1. Go to '...'
+        2. Run '...'
+        3. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Any relevant details about your setup.
+      placeholder: |
+        - Supabase plan: Free
+        - OS: macOS 15
+        - Node version: 22
+    validations:
+      required: false

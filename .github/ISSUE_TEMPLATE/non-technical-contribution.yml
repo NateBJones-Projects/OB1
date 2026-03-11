@@ -1,0 +1,39 @@
+name: Non-Technical Contribution
+description: Share knowledge, workflows, or ideas without writing code
+labels: ["non-technical", "help-wanted"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        You don't need to be a developer to contribute to Open Brain. If you have a workflow, an idea, or knowledge that would help others — we want to hear it. A community mentor will help turn your idea into a contribution with full credit to you.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like to share?
+      description: Describe your idea, workflow, or knowledge. Be as detailed as you'd like — the more context, the easier it is for a mentor to help shape it into a contribution.
+      placeholder: |
+        Example: "I use Open Brain to track every restaurant recommendation I get from friends. Each morning I check what's nearby for lunch. Here's how I organize it..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: What kind of contribution is this?
+      options:
+        - A workflow or use case I want to document
+        - An idea for something that should exist
+        - Feedback on an existing contribution
+        - Documentation improvement
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Any additional context?
+      description: Screenshots, links, or anything else that helps explain your idea.
+    validations:
+      required: false
