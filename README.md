@@ -1,16 +1,13 @@
-# OB1 — Open Brain Community Extensions
+# OB1 — Open Brain Community
 
-OB1 is where people share what they've built on top of [Open Brain](docs/getting-started.md). Not core infrastructure — extensions, integrations, and tools that make your brain do more. Browse what's here, grab what you need, contribute what you've built.
+OB1 is the community home for [Open Brain](https://natesnewsletter.substack.com/) — the open-source personal memory layer for AI. Set up your brain, learn how to use it, and find extensions other people have built on top of it.
 
 ## Getting Started
 
-New to Open Brain? The complete setup guide is in this repo:
+Never built an Open Brain? Start here:
 
-**[Build Your Open Brain: Complete Setup Guide](docs/getting-started.md)**
-
-It walks you through the full setup — database, AI gateway, Slack capture, MCP server — in about 45 minutes. No coding experience needed.
-
-After setup, grab the **[Companion Prompts](docs/companion-prompts.md)** to build your capture habit.
+1. **[Setup Guide](docs/getting-started.md)** — Build the full system (database, AI gateway, Slack capture, MCP server) in about 45 minutes. No coding experience needed.
+2. **[Companion Prompts](docs/companion-prompts.md)** — Five prompts that help you migrate your memories, discover use cases, and build the capture habit.
 
 ## What's Inside
 
@@ -67,4 +64,4 @@ Built and maintained by Nate B. Jones's team. Matt Hallett is the first communit
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE.md)
