@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/NateBJones-Projects/OB1/blob/main/metadata.schema.json",
+  "title": "Open Brain Source Contribution Metadata",
+  "description": "Schema for metadata.json files in OB1 contributions (recipes, schemas, dashboards, integrations).",
+  "type": "object",
+  "required": [
+    "name",
+    "description",
+    "category",
+    "author",
+    "version",
+    "requires",
+    "tags",
+    "difficulty",
+    "estimated_time"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable name of the contribution."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Brief description of what this contribution does."
+    },
+    "category": {
+      "type": "string",
+      "enum": ["recipes", "schemas", "dashboards", "integrations"],
+      "description": "Which contribution directory this belongs to."
+    },
+    "author": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Author's display name."
+        },
+        "github": {
+          "type": "string",
+          "description": "Author's GitHub username (without @)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version (e.g., 1.0.0)."
+    },
+    "requires": {
+      "type": "object",
+      "required": ["open_brain"],
+      "properties": {
+        "open_brain": {
+          "type": "boolean",
+          "const": true,
+          "description": "Must be true. All contributions require an Open Brain setup."
+        },
+        "services": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "External services needed (e.g., Gmail API, OpenRouter)."
+        },
+        "tools": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tools or runtimes needed (e.g., Node.js 18+, Python 3.10+)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Tags for browsing by use case."
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["beginner", "intermediate", "advanced"],
+      "description": "Difficulty level for contributors."
+    },
+    "estimated_time": {
+      "type": "string",
+      "minLength": 1,
+      "description": "How long the setup takes (e.g., 15 minutes, 1 hour)."
+    },
+    "created": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the contribution was first published (YYYY-MM-DD)."
+    },
+    "updated": {
+      "type": "string",
+      "format": "date",
+      "description": "Date of the last update (YYYY-MM-DD)."
+    }
+  },
+  "additionalProperties": false
+}
