@@ -1,0 +1,25 @@
+{
+  // Permissive config: catch real problems, don't block on style nits
+  "default": true,
+
+  // Allow any line length — READMEs with tables and URLs get long
+  "MD013": false,
+
+  // Allow duplicate headings (common in contribution READMEs)
+  "MD024": false,
+
+  // Allow inline HTML (badges, images, comments)
+  "MD033": false,
+
+  // Allow bare URLs
+  "MD034": false,
+
+  // Allow trailing punctuation in headings
+  "MD026": false,
+
+  // Allow multiple top-level headings (some files have them)
+  "MD025": false,
+
+  // Allow non-blank lines before/after lists (common in quick docs)
+  "MD032": false
+}
