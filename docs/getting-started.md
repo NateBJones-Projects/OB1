@@ -22,7 +22,7 @@ A two-part system:
 ## Cost
 
 | Service | Cost |
-|---------|------|
+| ------- | ---- |
 | Slack | Free |
 | Supabase | $0 (free tier) |
 | Embeddings (text-embedding-3-small) | ~$0.02 per million tokens |
@@ -34,7 +34,7 @@ A two-part system:
 Keep this filled in as you go. You'll need these values across multiple steps.
 
 | Credential | Where to find it | Your value |
-|------------|-----------------|------------|
+| ---------- | ---------------- | ---------- |
 | Supabase Project Ref | Dashboard URL: `https://supabase.com/dashboard/project/YOUR_REF` | |
 | Supabase Project URL | Settings → API | |
 | Supabase Service Role Key | Settings → API (secret key) | |
@@ -226,13 +226,13 @@ Save the **Edge Function URL** from the deploy output to your credential tracker
 
 Go to your `#capture` channel in Slack and type:
 
-```
+```text
 Sarah mentioned she's thinking about leaving her job to start a consulting business
 ```
 
 Within a few seconds, you should see a reply from the bot:
 
-```
+```text
 Captured as person_note — career, consulting | People: Sarah | Action items: Check in with Sarah about consulting plans
 ```
 
@@ -274,7 +274,7 @@ supabase functions deploy open-brain-mcp --no-verify-jwt
 The MCP server exposes four tools to any connected AI:
 
 | Tool | What it does |
-|------|-------------|
+| ---- | ------------ |
 | `search_thoughts` | Semantic search — find thoughts by meaning |
 | `list_thoughts` | Browse recent thoughts with optional filters |
 | `thought_stats` | Statistics on your captured content |
@@ -286,7 +286,7 @@ Save the **MCP Function URL** to your credential tracker.
 
 Your MCP Connection URL follows this pattern:
 
-```
+```text
 https://YOUR_REF.supabase.co/functions/v1/open-brain-mcp/mcp?key=YOUR_MCP_ACCESS_KEY
 ```
 
@@ -309,11 +309,13 @@ claude mcp add --transport http open-brain https://YOUR_REF.supabase.co/function
 **Other MCP-compatible clients:**
 
 Use the URL with a query parameter:
-```
+
+```text
 https://YOUR_REF.supabase.co/functions/v1/open-brain-mcp/mcp?key=YOUR_MCP_ACCESS_KEY
 ```
 
 For clients that only support local stdio servers, use the `mcp-remote` bridge:
+
 ```bash
 npx mcp-remote https://YOUR_REF.supabase.co/functions/v1/open-brain-mcp/mcp --header "x-brain-key: YOUR_MCP_ACCESS_KEY"
 ```
@@ -340,6 +342,7 @@ Verify both event types (`message.channels` and `message.groups`) are subscribed
 
 **Duplicate database entries**
 Slack retries if it doesn't get a response within 3 seconds. If your function is slow, duplicates can appear. Delete them manually from the SQL Editor:
+
 ```sql
 delete from thoughts where id in (
   select id from (
@@ -357,6 +360,7 @@ Verify your access key matches exactly — check `supabase secrets list` and com
 
 **Search returns no results**
 Make sure you have captured thoughts first. If you do, try lowering the match threshold:
+
 ```sql
 select * from search_thoughts(
   (select embedding from thoughts order by created_at desc limit 1),

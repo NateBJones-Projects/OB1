@@ -21,5 +21,8 @@
   "MD025": false,
 
   // Allow non-blank lines before/after lists (common in quick docs)
-  "MD032": false
+  "MD032": false,
+
+  // Allow files to start without a top-level heading (PR templates start with ##)
+  "MD041": false
 }

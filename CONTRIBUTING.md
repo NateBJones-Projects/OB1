@@ -23,7 +23,7 @@ This is a first-class path, not a workaround. Some of the best contributions com
 ## What Goes Where
 
 | Category | What belongs here | Examples |
-|----------|-------------------|----------|
+| -------- | ----------------- | -------- |
 | `recipes/` | Step-by-step builds that add a new capability | Email import, ChatGPT import, daily digest, new capture workflows |
 | `schemas/` | Database table extensions and metadata schemas | CRM contacts table, taste tracker, reading list schema |
 | `dashboards/` | Frontend templates for Vercel/Netlify hosting | Knowledge dashboard, weekly review, mobile capture UI |
@@ -114,7 +114,7 @@ Every contribution needs a `metadata.json` file. Here's the template:
 As you contribute, you'll progress through these levels. Every level is achievable through technical or non-technical contributions.
 
 | Level | What it means | How you get here |
-|-------|---------------|------------------|
+| ----- | ------------- | ---------------- |
 | **Community Member** | You use Open Brain and participate in discussions | Show up — ask questions, report bugs, share ideas |
 | **Contributor** | You've had at least one contribution merged (code or non-code) | Submit a PR (or have a mentor submit one with your attribution) that gets merged |
 | **Regular** | You're a consistent, trusted contributor | 3+ merged contributions, or sustained help reviewing/testing others' work |

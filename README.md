@@ -13,24 +13,28 @@ It walks you through the full setup — database, AI gateway, Slack capture, MCP
 ## What's Inside
 
 ### [`/recipes`](recipes/) — Step-by-step builds
+
 Each recipe teaches you how to add a new capability to your Open Brain. Follow the instructions, run the code, get a new feature.
 - Email history import (pull your Gmail archive into searchable thoughts)
 - ChatGPT conversation import (ingest your ChatGPT data export)
 - Daily digest generator (automated summary of recent thoughts via email or Slack)
 
 ### [`/schemas`](schemas/) — Database extensions
+
 New tables, metadata schemas, and column extensions for your Supabase database. Drop them in alongside your existing `thoughts` table.
 - CRM contact layer (track people, interactions, and relationship context)
 - Taste preferences tracker
 - Reading list with rating metadata
 
 ### [`/dashboards`](dashboards/) — Frontend templates
+
 Host these on Vercel or Netlify, pointed at your Supabase backend. Instant UI for your brain.
 - Personal knowledge dashboard
 - Weekly review view
 - Mobile-friendly capture UI
 
 ### [`/integrations`](integrations/) — New connections
+
 MCP server extensions, webhook receivers, and capture sources beyond Slack.
 - Discord capture bot
 - Email forwarding handler

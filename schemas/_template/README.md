@@ -15,9 +15,11 @@
 
 1. Open your Supabase SQL Editor
 2. Run the SQL migration:
+
    ```sql
    -- Paste the SQL here or reference the file
    ```
+
 3. Verify the table/columns were created
 4. ...
 
