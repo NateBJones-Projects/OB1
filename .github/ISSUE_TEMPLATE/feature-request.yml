@@ -1,0 +1,37 @@
+name: Feature Request
+description: Suggest an improvement to an existing contribution or to the repo itself
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make something better? We'd love to hear it.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: What area does this relate to?
+      options:
+        - An existing contribution (recipe, schema, dashboard, integration)
+        - Repo structure or templates
+        - CI/CD or automation
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What would you like to see?
+      description: Describe the improvement. What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried any workarounds or considered other approaches?
+    validations:
+      required: false
