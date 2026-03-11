@@ -1,6 +1,6 @@
 # Build Your Open Brain: Complete Setup Guide
 
-> **Credit:** This guide is based on [Nate B. Jones's original Substack guide](https://natebjones.substack.com/). It has been adapted for the OB1 repo with his permission. Visit the Substack for discussion, community updates, and the companion prompt pack.
+> **Credit:** This guide is based on [Nate B. Jones's original guide](https://promptkit.natebjones.com/20260224_uq1_guide_main). It has been adapted for the OB1 repo with his permission. Visit the [Substack](https://natebjones.substack.com/) for discussion, community updates, and the companion prompt pack.
 
 The infrastructure layer for your thinking. One database, one AI gateway, one chat channel. Any AI tool can access shared persistent memory — Claude, ChatGPT, Cursor, and anything that supports MCP — through a unified database with vector search and open protocol architecture.
 
