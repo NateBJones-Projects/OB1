@@ -2,7 +2,7 @@
 
 ## Complete Setup Guide
 
-> **Credit:** This guide is adapted from [Nate B. Jones's original guide](https://promptkit.natebjones.com/20260224_uq1_guide_main) with his permission. Visit the [Substack](https://natebjones.substack.com/) for discussion, community updates, and the companion prompt pack.
+> **Credit:** This guide is adapted from [Nate B. Jones's original guide](https://promptkit.natebjones.com/20260224_uq1_guide_main) with his permission. Visit the [Substack](https://natesnewsletter.substack.com/) for discussion, community updates, and the companion prompt pack.
 
 The infrastructure layer for your thinking. One database, one AI gateway, one chat channel. Any AI you use can plug in. No middleware, no SaaS chains, no Zapier.
 
@@ -796,7 +796,7 @@ You just built AI infrastructure using AI. That pattern doesn't stop here.
 
 ## Your Next Step
 
-Your Open Brain is live. Now make it work for you. The companion prompt pack — **[Open Brain: Companion Prompts](https://promptkit.natebjones.com/20260224_uq1_promptkit_1)** — covers the full lifecycle from here:
+Your Open Brain is live. Now make it work for you. The **[Companion Prompts](companion-prompts.md)** cover the full lifecycle from here:
 
 - **Memory Migration** — Pull everything your AI already knows about you into your brain so every tool starts with context instead of zero
 - **Second Brain Migration** — Bring your existing notes from Notion, Obsidian, or any other system into your Open Brain without starting over

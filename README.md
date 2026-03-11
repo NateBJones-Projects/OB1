@@ -10,6 +10,8 @@ New to Open Brain? The complete setup guide is in this repo:
 
 It walks you through the full setup — database, AI gateway, Slack capture, MCP server — in about 45 minutes. No coding experience needed.
 
+After setup, grab the **[Companion Prompts](docs/companion-prompts.md)** to build your capture habit.
+
 ## What's Inside
 
 ### [`/recipes`](recipes/) — Step-by-step builds
@@ -57,7 +59,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
 
 ## Community
 
-Questions, ideas, help with contributions — the [Substack community chat](https://natebjones.substack.com/) is where it happens.
+Questions, ideas, help with contributions — the [Substack community chat](https://natesnewsletter.substack.com/) is where it happens.
 
 ## Who Maintains This
 
