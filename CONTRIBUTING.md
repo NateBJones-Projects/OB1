@@ -4,6 +4,22 @@
 
 You need a working Open Brain setup. If you haven't built one yet, start with the [Open Brain guide](https://promptkit.natebjones.com/20260224_uq1_guide_main). Every contribution you submit should be tested against your own instance first — don't submit something you haven't run yourself.
 
+## Not a Developer? You Can Still Contribute.
+
+You don't need to write code to contribute to Open Brain. If you have a workflow, a use case, or an idea — that's a contribution. Here's how it works:
+
+1. **Open a [Non-Technical Contribution](../../issues/new?template=non-technical-contribution.yml) issue.** Describe your idea, workflow, or knowledge in plain language. Screenshots and examples help.
+2. **A community mentor picks it up.** They'll work with you to shape your idea into a contribution — writing the code, structuring the README, filling in the metadata.
+3. **You get full credit.** Your name goes in the `author` field of `metadata.json` and in CONTRIBUTORS.md. The mentor is credited as a co-author in the PR.
+
+This is a first-class path, not a workaround. Some of the best contributions come from people who use Open Brain daily but don't code.
+
+**Other ways to contribute without code:**
+- Report bugs or unclear documentation
+- Suggest improvements to existing contributions
+- Test someone else's recipe and confirm it works (or report what broke)
+- Share use cases that could become future contributions
+
 ## What Goes Where
 
 | Category | What belongs here | Examples |
@@ -92,6 +108,19 @@ Every contribution needs a `metadata.json` file. Here's the template:
 - Poorly documented (missing README sections, unclear instructions)
 - Duplicates an existing contribution without meaningful improvement
 - Modifies core Open Brain infrastructure (the `thoughts` table structure, the core MCP server) — that's upstream, not here
+
+## Contributor Ladder
+
+As you contribute, you'll progress through these levels. Every level is achievable through technical or non-technical contributions.
+
+| Level | What it means | How you get here |
+|-------|---------------|------------------|
+| **Community Member** | You use Open Brain and participate in discussions | Show up — ask questions, report bugs, share ideas |
+| **Contributor** | You've had at least one contribution merged (code or non-code) | Submit a PR (or have a mentor submit one with your attribution) that gets merged |
+| **Regular** | You're a consistent, trusted contributor | 3+ merged contributions, or sustained help reviewing/testing others' work |
+| **Maintainer** | You help review PRs, mentor new contributors, and shape the project | Invited by existing maintainers based on sustained, quality involvement |
+
+Non-code contributions count at every level. Testing recipes, mentoring non-technical contributors, improving documentation, and triaging issues all count toward progression.
 
 ## The 10 Automated Review Rules
 
