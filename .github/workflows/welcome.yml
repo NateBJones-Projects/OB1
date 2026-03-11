@@ -1,0 +1,79 @@
+name: Welcome New Contributors
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  welcome:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if first-time contributor
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const creator = context.payload.sender.login;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            // Check for previous issues
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner, repo,
+              creator,
+              state: 'all',
+              per_page: 2,
+            });
+
+            // Check for previous PRs
+            const { data: prs } = await github.rest.pulls.list({
+              owner, repo,
+              state: 'all',
+              per_page: 100,
+            });
+            const userPRs = prs.filter(pr => pr.user.login === creator);
+
+            const isFirstIssue = context.eventName === 'issues' && issues.length <= 1;
+            const isFirstPR = context.eventName === 'pull_request_target' && userPRs.length <= 1;
+
+            core.setOutput('is_first', isFirstIssue || isFirstPR ? 'true' : 'false');
+            core.setOutput('event_type', context.eventName === 'issues' ? 'issue' : 'pr');
+
+      - name: Welcome message
+        if: steps.check.outputs.is_first == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const eventType = '${{ steps.check.outputs.event_type }}';
+            const creator = context.payload.sender.login;
+
+            let body;
+            if (eventType === 'pr') {
+              body = `Hey @${creator} — welcome to Open Brain Source! 👋
+
+Thanks for submitting your first PR. The automated review will run shortly and check things like metadata, folder structure, and README completeness. If anything needs fixing, the review comment will tell you exactly what.
+
+Once the automated checks pass, a human admin will review for quality and clarity. Expect a response within a few days.
+
+If you have questions, check out [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) or open an issue.`;
+            } else {
+              body = `Hey @${creator} — welcome to Open Brain Source! 👋
+
+Thanks for opening your first issue. Someone from the community will take a look soon.
+
+If you're interested in contributing (code or not), check out [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) — we have paths for developers and non-developers alike.`;
+            }
+
+            const issueNumber = context.issue?.number || context.payload.pull_request?.number;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+              body: body,
+            });
