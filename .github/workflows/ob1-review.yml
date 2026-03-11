@@ -62,19 +62,22 @@ jobs:
             fail_count=$((fail_count + 1))
           }
 
-          # If no contribution directories found, check if this is a docs-only PR
-          if [ -z "$CONTRIB_DIRS" ]; then
-            # Allow PRs that only touch top-level files or templates
-            docs_only=$(echo "$CHANGED_FILES" | grep -vE '^(recipes|schemas|dashboards|integrations)/' | grep -vE '^\s*$' || true)
-            template_only=$(echo "$CHANGED_FILES" | grep '/_template/' || true)
-            if [ -n "$docs_only" ] || [ -n "$template_only" ]; then
-              results="## OB1 Automated Review\n\nThis PR modifies top-level files or templates only. Contribution checks skipped.\n\n✅ No issues found.\n"
-              echo "comment<<EOF" >> $GITHUB_OUTPUT
-              echo -e "$results" >> $GITHUB_OUTPUT
-              echo "EOF" >> $GITHUB_OUTPUT
-              echo "failed=false" >> $GITHUB_OUTPUT
-              exit 0
-            fi
+          # Skip contribution checks for docs/governance PRs.
+          # Detected by PR title prefix OR by no contribution dirs being touched.
+          is_docs_pr=false
+          if echo "$PR_TITLE" | grep -qiE '^\[docs\]'; then
+            is_docs_pr=true
+          elif [ -z "$CONTRIB_DIRS" ]; then
+            is_docs_pr=true
+          fi
+
+          if [ "$is_docs_pr" = true ]; then
+            results="This PR modifies docs or repo governance files. Contribution checks skipped.\n\n✅ No issues found."
+            echo "comment<<EOF" >> $GITHUB_OUTPUT
+            echo -e "## OB1 Automated Review\n\n${results}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
+            echo "failed=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
           # ─── Rule 1: Folder structure ───
@@ -293,10 +296,10 @@ jobs:
           fi
 
           # ─── Rule 7: PR format ───
-          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations)\] '; then
+          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|docs)\] '; then
             pass_check "PR format" "Title follows \`[category] Description\` format"
           else
-            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, or \`[integrations]\` followed by a space and description"
+            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, or \`[docs]\` followed by a space and description"
           fi
 
           # ─── Rule 8: No binary blobs ───
@@ -381,9 +384,11 @@ jobs:
 
       - name: Post review comment
         uses: actions/github-script@v7
+        env:
+          REVIEW_COMMENT: ${{ steps.review.outputs.comment }}
         with:
           script: |
-            const body = `${{ steps.review.outputs.comment }}`;
+            const body = process.env.REVIEW_COMMENT;
 
             // Find existing bot comment to update (avoid spam)
             const { data: comments } = await github.rest.issues.listComments({
