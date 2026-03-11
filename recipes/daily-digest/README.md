@@ -8,7 +8,7 @@ A Supabase Edge Function that runs on a cron schedule, queries your most recent 
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](https://promptkit.natebjones.com/20260224_uq1_guide_main))
+- Working Open Brain setup ([guide](../../docs/getting-started.md))
 - Supabase CLI installed (`npm i -g supabase`)
 - OpenRouter API key (for generating the summary)
 - One of: email sending service (Resend, SendGrid free tier) OR existing Slack webhook

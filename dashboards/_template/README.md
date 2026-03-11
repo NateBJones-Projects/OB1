@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](https://promptkit.natebjones.com/20260224_uq1_guide_main))
+- Working Open Brain setup ([guide](../../docs/getting-started.md))
 - Vercel or Netlify account (free tier works)
 - List any additional requirements (Node.js version, etc.)
 

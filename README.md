@@ -1,6 +1,14 @@
 # OB1 — Open Brain Community Extensions
 
-OB1 is where people share what they've built on top of [Open Brain](https://promptkit.natebjones.com/20260224_uq1_guide_main). Not core infrastructure — extensions, integrations, and tools that make your brain do more. Browse what's here, grab what you need, contribute what you've built.
+OB1 is where people share what they've built on top of [Open Brain](docs/getting-started.md). Not core infrastructure — extensions, integrations, and tools that make your brain do more. Browse what's here, grab what you need, contribute what you've built.
+
+## Getting Started
+
+New to Open Brain? The complete setup guide is in this repo:
+
+**[Build Your Open Brain: Complete Setup Guide](docs/getting-started.md)**
+
+It walks you through the full setup — database, AI gateway, Slack capture, MCP server — in about 45 minutes. No coding experience needed.
 
 ## What's Inside
 

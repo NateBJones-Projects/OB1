@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](https://promptkit.natebjones.com/20260224_uq1_guide_main))
+- Working Open Brain setup ([guide](../../docs/getting-started.md))
 - List any additional requirements (API keys, tools, services)
 
 ## Steps
