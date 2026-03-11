@@ -315,7 +315,7 @@ Format:
 
 **Output feeds into:** N/A — reference tool.
 
-**These are not prompts to paste into AI. These are templates for what you type into your Open Brain capture channel or say directly to any MCP-connected AI using "save this" or "remember this."**
+> **No prompt block below.** Unlike the other four, this isn't something you paste into AI. These are templates for what *you* type into your capture channel or say directly to any MCP-connected AI using "save this" or "remember this."
 
 ### 1. Decision Capture
 
