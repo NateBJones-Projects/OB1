@@ -4,6 +4,8 @@ The infrastructure layer for your thinking. One database, one AI gateway, one ch
 
 This isn't a notes app. It's a database with vector search and an open protocol — built so that every AI tool you use shares the same persistent memory of you. Claude, ChatGPT, Cursor, Claude Code, whatever ships next month. One brain. All of them.
 
+> **Credit:** Adapted from [Nate B. Jones's original guide](https://promptkit.natebjones.com/20260224_uq1_guide_main) with his permission. Visit the [Substack](https://natesnewsletter.substack.com/) for discussion, community updates, and the companion prompt pack.
+
 ## Getting Started
 
 Never built an Open Brain? Start here:
