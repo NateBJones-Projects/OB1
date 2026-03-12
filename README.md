@@ -64,4 +64,4 @@ Built and maintained by Nate B. Jones's team. Matt Hallett is the first communit
 
 ## License
 
-[MIT](help/LICENSE.md)
+[FSL-1.1-MIT](help/LICENSE.md)
