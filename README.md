@@ -48,7 +48,7 @@ MCP server extensions, webhook receivers, and capture sources beyond Slack.
 
 ## Contributing
 
-Read [CONTRIBUTING.md](help/CONTRIBUTING.md) for the full details. The short version:
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
 
 - Every PR runs through an automated review agent that checks 10 rules (file structure, no secrets, SQL safety, etc.)
 - If the agent passes, a human admin reviews for quality and clarity
@@ -64,4 +64,4 @@ Built and maintained by Nate B. Jones's team. Matt Hallett is the first communit
 
 ## License
 
-[FSL-1.1-MIT](help/LICENSE.md)
+[FSL-1.1-MIT](LICENSE.md)
