@@ -10,6 +10,7 @@ See the [Contributor Ladder](CONTRIBUTING.md#contributor-ladder) for how progres
 | ---- | ------------- |
 | **Nate Jones** | Founder, project vision |
 | **Matt Hallett** | Community admin, contribution standards, repo governance |
+| **Jonathan Edwards** | Content, companion prompts, FAQ, community |
 | **Kaleab** | Initial repo scaffold, CI workflow, seed contributions |
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
