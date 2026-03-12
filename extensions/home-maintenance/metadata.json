@@ -1,0 +1,22 @@
+{
+  "name": "Home Maintenance Tracker",
+  "description": "Track recurring maintenance tasks, log completed work, and surface upcoming items before they become emergencies.",
+  "category": "extensions",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_primitives": [],
+  "learning_order": 2,
+  "tags": ["home", "maintenance", "scheduling", "tracking"],
+  "difficulty": "beginner",
+  "estimated_time": "30 minutes",
+  "created": "2026-03-12",
+  "updated": "2026-03-12"
+}

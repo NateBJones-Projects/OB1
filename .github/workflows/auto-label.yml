@@ -35,6 +35,8 @@ jobs:
               'schemas/': 'schema',
               'dashboards/': 'dashboard',
               'integrations/': 'integration',
+              'primitives/': 'primitive',
+              'extensions/': 'extension',
             };
 
             for (const file of files) {

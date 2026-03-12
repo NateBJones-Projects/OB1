@@ -1,0 +1,22 @@
+{
+  "name": "Kid Logistics / Family Calendar",
+  "description": "Multi-person family scheduling — activities, important dates, and conflict detection across the whole household.",
+  "category": "extensions",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_primitives": [],
+  "learning_order": 3,
+  "tags": ["family", "calendar", "scheduling", "kids", "logistics"],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-03-12",
+  "updated": "2026-03-12"
+}

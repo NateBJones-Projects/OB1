@@ -27,5 +27,11 @@
   "MD041": false,
 
   // Allow bold text as pseudo-headings (used in troubleshooting sections)
-  "MD036": false
+  "MD036": false,
+
+  // Allow fenced code blocks without language specifier (common in templates)
+  "MD040": false,
+
+  // Allow flexible table column spacing
+  "MD060": false
 }

@@ -1,0 +1,22 @@
+{
+  "name": "Meal Planning",
+  "description": "Recipes, weekly meal plans, and shared shopping lists with RLS and a dedicated shared MCP server for household access.",
+  "category": "extensions",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_primitives": ["rls", "shared-mcp"],
+  "learning_order": 4,
+  "tags": ["meal-planning", "recipes", "shopping", "sharing", "rls"],
+  "difficulty": "intermediate",
+  "estimated_time": "1 hour",
+  "created": "2026-03-12",
+  "updated": "2026-03-12"
+}

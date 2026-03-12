@@ -36,7 +36,7 @@ jobs:
 
           # Identify contribution folders (e.g., recipes/email-import/)
           # Exclude _template folders and top-level files
-          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
+          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations|primitives|extensions)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
           echo "contrib_dirs<<EOF" >> $GITHUB_OUTPUT
           echo "$contrib_dirs" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -83,7 +83,7 @@ jobs:
           # ─── Rule 1: Folder structure ───
           rule1_pass=true
           bad_files=""
-          allowed_pattern='^(recipes|schemas|dashboards|integrations|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
+          allowed_pattern='^(recipes|schemas|dashboards|integrations|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             if ! echo "$f" | grep -qE "$allowed_pattern"; then
@@ -286,6 +286,29 @@ jobs:
                   rule6_pass=false
                 fi
                 ;;
+              primitives)
+                # Primitives must have substantial README (200+ words)
+                if [ -f "$dir/README.md" ]; then
+                  word_count=$(wc -w < "$dir/README.md" 2>/dev/null || echo "0")
+                  if [ "$word_count" -lt 200 ]; then
+                    rule6_detail="${rule6_detail}  - \`$dir\`: primitive README must be substantial (200+ words, found ${word_count})\n"
+                    rule6_pass=false
+                  fi
+                fi
+                ;;
+              extensions)
+                # Extensions must have both SQL and code files
+                has_sql=$(echo "$dir_files" | grep -E '\.sql$' || true)
+                has_code=$(echo "$dir_files" | grep -E '\.(ts|js|py)$' || true)
+                if [ -z "$has_sql" ]; then
+                  rule6_detail="${rule6_detail}  - \`$dir\`: extensions must contain at least one .sql file\n"
+                  rule6_pass=false
+                fi
+                if [ -z "$has_code" ]; then
+                  rule6_detail="${rule6_detail}  - \`$dir\`: extensions must contain code files (.ts/.js/.py)\n"
+                  rule6_pass=false
+                fi
+                ;;
             esac
           done <<< "$CONTRIB_DIRS"
 
@@ -296,10 +319,10 @@ jobs:
           fi
 
           # ─── Rule 7: PR format ───
-          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|docs)\] '; then
+          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|primitives|extensions|docs)\] '; then
             pass_check "PR format" "Title follows \`[category] Description\` format"
           else
-            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, or \`[docs]\` followed by a space and description"
+            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, \`[primitives]\`, \`[extensions]\`, or \`[docs]\` followed by a space and description"
           fi
 
           # ─── Rule 8: No binary blobs ───
@@ -361,7 +384,44 @@ jobs:
             fail_check "README completeness" "Incomplete READMEs:\n${rule9_detail}"
           fi
 
-          # ─── Rule 10: LLM clarity review (stub) ───
+          # ─── Rule 10: Primitive dependency validation ───
+          rule10_pass=true
+          rule10_detail=""
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            [ ! -f "$dir/metadata.json" ] && continue
+
+            # Check if this contribution declares requires_primitives
+            primitives=$(jq -r '.requires_primitives // [] | .[]' "$dir/metadata.json" 2>/dev/null || true)
+            [ -z "$primitives" ] && continue
+
+            readme="$dir/README.md"
+            while IFS= read -r prim; do
+              [ -z "$prim" ] && continue
+
+              # (a) Check that the primitive directory exists in the repo
+              if [ ! -d "primitives/$prim" ]; then
+                rule10_detail="${rule10_detail}  - \`$dir\`: requires primitive \`$prim\` but \`primitives/$prim/\` does not exist\n"
+                rule10_pass=false
+              fi
+
+              # (b) Check that the README links to the primitive
+              if [ -f "$readme" ]; then
+                if ! grep -q "primitives/$prim" "$readme"; then
+                  rule10_detail="${rule10_detail}  - \`$dir/README.md\`: declares dependency on primitive \`$prim\` but does not link to it\n"
+                  rule10_pass=false
+                fi
+              fi
+            done <<< "$primitives"
+          done <<< "$CONTRIB_DIRS"
+
+          if [ "$rule10_pass" = true ]; then
+            pass_check "Primitive dependencies" "All declared primitive dependencies exist and are linked in README"
+          else
+            fail_check "Primitive dependencies" "Primitive dependency issues:\n${rule10_detail}"
+          fi
+
+          # ─── Rule 11: LLM clarity review (stub) ───
           # TODO: LLM clarity review — planned for v2. Requires API key secret.
           # Will send contribution READMEs to an LLM API to check if instructions
           # are clear and complete. For now, always passes.

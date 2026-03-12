@@ -1,0 +1,18 @@
+{
+  "name": "Primitive Name",
+  "description": "Brief description of this reusable concept.",
+  "category": "primitives",
+  "author": {
+    "name": "Your Name",
+    "github": "your-github-username"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["tag1", "tag2"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Shared MCP Server",
+  "description": "Guide to building scoped MCP servers that give other people limited access to specific parts of your Open Brain.",
+  "category": "primitives",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "tags": ["mcp", "sharing", "multi-user", "collaboration"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes"
+}

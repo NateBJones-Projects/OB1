@@ -1,0 +1,89 @@
+name: Extension Proposal
+description: Propose a new extension for the learning path
+labels: ["extension-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Extensions are curated, practical builds that form a progressive learning path. Each extension teaches new concepts through real use cases.
+
+        **Important:** Extensions are curated by maintainers. Please discuss your idea here before submitting a PR. We want to make sure it fits the learning path and doesn't duplicate existing extensions.
+
+  - type: input
+    id: name
+    attributes:
+      label: Extension Name
+      description: A short, descriptive name
+      placeholder: "Pet Care Tracker"
+    validations:
+      required: true
+
+  - type: textarea
+    id: pain_point
+    attributes:
+      label: Why does this matter?
+      description: What real-life pain point does this solve? Lead with the human scenario, not the tech spec.
+      placeholder: "You can never remember when the dog's last vet visit was, what vaccines are due, or what brand of food the cat is on..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_it_does
+    attributes:
+      label: What does it do?
+      description: 1-3 sentences on the practical capability.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_it_teaches
+    attributes:
+      label: What new concepts does it teach?
+      description: What will users learn that they haven't encountered in existing extensions?
+      placeholder: |
+        - Recurring event scheduling
+        - Multi-pet data models
+        - Vet visit history logging
+    validations:
+      required: true
+
+  - type: textarea
+    id: tables
+    attributes:
+      label: Proposed tables
+      description: What database tables would this extension create?
+      placeholder: |
+        - pets (name, species, breed, birth_date, vet, notes)
+        - vet_visits (pet_id, date, type, notes, next_due)
+    validations:
+      required: false
+
+  - type: textarea
+    id: primitives
+    attributes:
+      label: Required primitives
+      description: Does this extension need any primitives (e.g., RLS, Shared MCP)? List existing ones or propose new ones.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: Estimated difficulty
+      options:
+        - Beginner
+        - Intermediate
+        - Advanced
+    validations:
+      required: true
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Do you have this working?
+      options:
+        - "Yes — I've built it and can submit a PR after discussion"
+        - "Partially — I have a working prototype"
+        - "No — this is an idea I'd like to see built"
+    validations:
+      required: true

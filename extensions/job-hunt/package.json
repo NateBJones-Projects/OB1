@@ -1,0 +1,35 @@
+{
+  "name": "job-hunt-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for job hunt pipeline - track companies, applications, interviews, and contacts",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "job-hunt-mcp": "build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "job-hunt",
+    "career",
+    "applications",
+    "interviews"
+  ],
+  "author": "Nate B. Jones",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@supabase/supabase-js": "^2.48.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

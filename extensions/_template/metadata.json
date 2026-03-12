@@ -1,0 +1,20 @@
+{
+  "name": "Extension Name",
+  "description": "Brief description of what this extension does.",
+  "category": "extensions",
+  "author": {
+    "name": "Your Name",
+    "github": "your-github-username"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_primitives": [],
+  "learning_order": 1,
+  "tags": ["tag1", "tag2"],
+  "difficulty": "beginner",
+  "estimated_time": "45 minutes"
+}

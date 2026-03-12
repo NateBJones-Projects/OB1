@@ -22,12 +22,20 @@ This is a first-class path, not a workaround. Some of the best contributions com
 
 ## What Goes Where
 
-| Category | What belongs here | Examples |
-| -------- | ----------------- | -------- |
-| `recipes/` | Step-by-step builds that add a new capability | Email import, ChatGPT import, daily digest, new capture workflows |
-| `schemas/` | Database table extensions and metadata schemas | CRM contacts table, taste tracker, reading list schema |
-| `dashboards/` | Frontend templates for Vercel/Netlify hosting | Knowledge dashboard, weekly review, mobile capture UI |
-| `integrations/` | MCP extensions, webhooks, capture sources | Discord bot, email handler, browser extension, calendar sync |
+| Category | What belongs here | Examples | Open or Curated? |
+| -------- | ----------------- | -------- | ---------------- |
+| `extensions/` | Progressive builds that replace SaaS tools with agent-powered infrastructure | Household Knowledge Base, Meal Planning, Professional CRM | **Curated** — discuss with maintainers first |
+| `primitives/` | Reusable concept guides referenced by multiple extensions | Row Level Security, Shared MCP Server | **Curated** — must be used by 2+ extensions |
+| `recipes/` | Step-by-step builds that add a new capability | Email import, ChatGPT import, daily digest, new capture workflows | Open |
+| `schemas/` | Database table extensions and metadata schemas | CRM contacts table, taste tracker, reading list schema | Open |
+| `dashboards/` | Frontend templates for Vercel/Netlify hosting | Knowledge dashboard, weekly review, mobile capture UI | Open |
+| `integrations/` | MCP extensions, webhooks, capture sources | Discord bot, email handler, browser extension, calendar sync | Open |
+
+### Extensions vs Primitives vs Recipes
+
+- **Extensions** are curated, ordered builds that form a progressive learning path. Each teaches new concepts through practical use. They include database schemas, MCP server code, and step-by-step instructions. If you want to propose a new extension, [open an issue](../../issues/new?template=extension-submission.yml) first.
+- **Primitives** are reusable concept guides that get referenced by multiple extensions. They teach a pattern (like RLS or shared access) once, so extensions can link to them instead of re-explaining. A primitive should be referenced by at least 2 extensions. [Propose one here](../../issues/new?template=primitive-submission.yml).
+- **Recipes** are standalone builds — they add a capability without being part of the learning path. No ordering, no prerequisites beyond a working Open Brain. Open for community contributions.
 
 Not sure where yours fits? Open a discussion issue first.
 
@@ -49,6 +57,16 @@ Your contribution's README must include these sections:
 3. **Step-by-step instructions** — Numbered steps, copy-paste ready where possible. Don't skip steps. Don't assume knowledge that isn't in the prerequisites.
 4. **Expected outcome** — What should the user see when it's working? Be specific.
 5. **Troubleshooting** — At least 2-3 common issues and how to fix them.
+
+**Extensions** additionally require:
+- **"Why This Matters"** section leading with the human pain point
+- **"Learning Path"** table showing position in the 6-extension sequence
+- **"What You'll Learn"** listing new concepts introduced
+- **"Cross-Extension Integration"** prominently documenting connections to other extensions
+- **"Next Steps"** linking to the next extension
+
+**Primitives** additionally require:
+- **"Extensions That Use This"** section listing which extensions reference this primitive
 
 Check the `_template/` folder in each category for a starter README.
 
@@ -83,11 +101,44 @@ Every contribution needs a `metadata.json` file. Here's the template:
 
 **Optional fields:** `author.github`, `requires.services`, `requires.tools`, `created`, `updated`
 
+**Extension/primitive-specific fields:**
+- `requires_primitives` — array of primitive slugs this contribution depends on (e.g., `["rls", "shared-mcp"]`)
+- `learning_order` — integer position in the extension learning path (1-6)
+
+Example for an extension:
+
+```json
+{
+  "name": "Meal Planning",
+  "description": "Recipes, weekly meal plans, and shared shopping lists with RLS and a dedicated shared MCP server.",
+  "category": "extensions",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_primitives": ["rls", "shared-mcp"],
+  "learning_order": 4,
+  "tags": ["meal-planning", "recipes", "shopping", "sharing", "rls"],
+  "difficulty": "intermediate",
+  "estimated_time": "1 hour",
+  "created": "2026-03-12",
+  "updated": "2026-03-12"
+}
+```
+
 ## PR Format
 
 **Title:** `[category] Short description`
 - Example: `[recipes] Email history import via Gmail API`
 - Example: `[schemas] CRM contacts table with interaction tracking`
+- Example: `[extensions] Household Knowledge Base`
+- Example: `[primitives] Row Level Security guide`
 
 **Description must include:**
 - What the contribution does
@@ -97,7 +148,7 @@ Every contribution needs a `metadata.json` file. Here's the template:
 ## The Review Process
 
 1. You submit a PR
-2. An automated GitHub Action checks 10 machine-readable rules (see below)
+2. An automated GitHub Action checks 11 machine-readable rules (see below)
 3. If the automated check passes, a human admin reviews for quality, clarity, and safety
 4. Expect 2-5 business days for human review
 
@@ -122,17 +173,18 @@ As you contribute, you'll progress through these levels. Every level is achievab
 
 Non-code contributions count at every level. Testing recipes, mentoring non-technical contributors, improving documentation, and triaging issues all count toward progression.
 
-## The 10 Automated Review Rules
+## The 11 Automated Review Rules
 
 Every PR is checked against these rules. All must pass before human review.
 
-1. **Folder structure** — Contribution is in the correct category directory (`recipes/`, `schemas/`, `dashboards/`, `integrations/`)
+1. **Folder structure** — Contribution is in the correct category directory (`recipes/`, `schemas/`, `dashboards/`, `integrations/`, `primitives/`, `extensions/`)
 2. **Required files** — Both `README.md` and `metadata.json` exist in the contribution folder
 3. **Metadata valid** — `metadata.json` parses as valid JSON and contains all required fields
 4. **No credentials** — No API keys, tokens, passwords, or secrets in any file
 5. **SQL safety** — No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`. No modifications to core `thoughts` table columns (adding columns is fine, altering/dropping existing ones is not)
-6. **Category-specific artifacts** — `recipes/` have code or detailed instructions, `schemas/` have SQL files, `dashboards/` have frontend code or `package.json`, `integrations/` have code files
-7. **PR format** — Title starts with `[recipes]`, `[schemas]`, `[dashboards]`, or `[integrations]`
+6. **Category-specific artifacts** — `recipes/` have code or detailed instructions, `schemas/` have SQL files, `dashboards/` have frontend code or `package.json`, `integrations/` have code files, `primitives/` have substantial READMEs (200+ words), `extensions/` have both SQL and code files
+7. **PR format** — Title starts with `[recipes]`, `[schemas]`, `[dashboards]`, `[integrations]`, `[primitives]`, or `[extensions]`
 8. **No binary blobs** — No files over 1MB, no `.exe`, `.dmg`, `.zip`, `.tar.gz`
 9. **README completeness** — Contribution README includes Prerequisites, step-by-step instructions, and expected outcome sections
-10. **LLM clarity review** — *(Planned for v2)* Automated check that instructions are clear and complete
+10. **Primitive dependencies** — If a contribution declares `requires_primitives`, the primitives must exist in the repo and be linked in the README
+11. **LLM clarity review** — *(Planned for v2)* Automated check that instructions are clear and complete

@@ -1,0 +1,62 @@
+name: Primitive Proposal
+description: Propose a new reusable concept guide (primitive)
+labels: ["primitive-proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Primitives are reusable concept guides that get referenced by multiple extensions. They teach foundational patterns (like Row Level Security or Shared MCP Servers) that users learn once and apply everywhere.
+
+        Before proposing, check if a similar primitive already exists in the `/primitives` directory.
+
+  - type: input
+    id: name
+    attributes:
+      label: Primitive Name
+      description: A short, descriptive name
+      placeholder: "Row Level Security"
+    validations:
+      required: true
+
+  - type: textarea
+    id: concept
+    attributes:
+      label: What concept does this teach?
+      description: 1-3 sentences. What reusable pattern or technique does this primitive cover?
+    validations:
+      required: true
+
+  - type: textarea
+    id: extensions
+    attributes:
+      label: Which extensions would use this?
+      description: List the extensions (existing or proposed) that would reference this primitive. A primitive should be referenced by at least 2 extensions to justify extraction.
+      placeholder: |
+        - Meal Planning (for shared access patterns)
+        - Professional CRM (for data isolation)
+    validations:
+      required: true
+
+  - type: textarea
+    id: outline
+    attributes:
+      label: Content outline
+      description: What sections or topics would this primitive cover?
+      placeholder: |
+        - What it is and why it matters
+        - How it works (with examples)
+        - Common patterns
+        - Troubleshooting
+    validations:
+      required: false
+
+  - type: dropdown
+    id: status
+    attributes:
+      label: Do you have a draft?
+      options:
+        - "Yes — I can submit a PR with the full guide"
+        - "Partially — I have notes but need help structuring it"
+        - "No — I'm proposing the concept for someone else to write"
+    validations:
+      required: true
