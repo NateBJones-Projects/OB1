@@ -1,4 +1,8 @@
-# Open Brain
+<p align="center">
+  <img src=".github/ob1-logo.svg" alt="Open Brain" width="300">
+</p>
+
+<h1 align="center">Open Brain</h1>
 
 The infrastructure layer for your thinking. One database, one AI gateway, one chat channel. Any AI you use can plug in. No middleware, no SaaS chains, no Zapier.
 
