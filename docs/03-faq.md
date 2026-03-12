@@ -1,7 +1,5 @@
 # Open Brain FAQ
 
-> **Credit:** Compiled from community questions by [Jon Edwards](https://github.com/limitededitionjonathan) and [Nate B. Jones](https://natesnewsletter.substack.com/) — Substack chat, YouTube comments, March 2026.
-
 If you hit a wall during setup, you're not on your own. We created dedicated AI assistants that know this system inside and out, one for each major platform: a [Claude Skill](https://www.notion.so/product-templates/Open-Brain-Companion-Claude-Skill-31a5a2ccb526802797caeb37df3ba3cb?source=copy_link), a [ChatGPT Custom GPT](https://chatgpt.com/g/g-69a892b6a7708191b00e48ff655d5597-nate-jones-open-brain-assistant), and a [Gemini GEM](https://gemini.google.com/gem/1fDsAENjhdku-3RufY7ystbS1Md8MtDCg?usp=sharing). Use whichever one matches the AI tool you already use.
 
 ---
