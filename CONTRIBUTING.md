@@ -2,7 +2,7 @@
 
 ## Before You Contribute
 
-You need a working Open Brain setup. If you haven't built one yet, start with the [Open Brain guide](docs/getting-started.md). Every contribution you submit should be tested against your own instance first — don't submit something you haven't run yourself.
+You need a working Open Brain setup. If you haven't built one yet, start with the [Open Brain guide](docs/01-getting-started.md). Every contribution you submit should be tested against your own instance first — don't submit something you haven't run yourself.
 
 ## Not a Developer? You Can Still Contribute.
 

@@ -4,7 +4,7 @@
 
 Your Open Brain is built. Now make it work for you. These five prompts cover the full lifecycle: migrate your existing AI memories into the system, bring over your existing second brain, discover how it fits your specific workflow, build the daily capture habit, and run a weekly review that surfaces patterns you'd never catch on your own.
 
-**If you hit a wall:** We built a [FAQ](faq.md) that covers the most common questions and gotchas. And if you need real-time help, we created dedicated AI assistants that know this system inside and out: a [Claude Skill](https://www.notion.so/product-templates/Open-Brain-Companion-Claude-Skill-31a5a2ccb526802797caeb37df3ba3cb?source=copy_link), a [ChatGPT Custom GPT](https://chatgpt.com/g/g-69a892b6a7708191b00e48ff655d5597-nate-jones-open-brain-assistant), and a [Gemini GEM](https://gemini.google.com/gem/1fDsAENjhdku-3RufY7ystbS1Md8MtDCg?usp=sharing). Use whichever one matches the AI tool you already use.
+**If you hit a wall:** We built a [FAQ](03-faq.md) that covers the most common questions and gotchas. And if you need real-time help, we created dedicated AI assistants that know this system inside and out: a [Claude Skill](https://www.notion.so/product-templates/Open-Brain-Companion-Claude-Skill-31a5a2ccb526802797caeb37df3ba3cb?source=copy_link), a [ChatGPT Custom GPT](https://chatgpt.com/g/g-69a892b6a7708191b00e48ff655d5597-nate-jones-open-brain-assistant), and a [Gemini GEM](https://gemini.google.com/gem/1fDsAENjhdku-3RufY7ystbS1Md8MtDCg?usp=sharing). Use whichever one matches the AI tool you already use.
 
 **What's included:**
 
@@ -22,7 +22,7 @@ Your Open Brain is built. Now make it work for you. These five prompts cover the
 
 **Job:** Extracts everything your AI already knows about you and saves it to your Open Brain, so every other AI you connect starts with that foundation instead of zero.
 
-**When to use:** Right after you finish the [setup guide](getting-started.md). Run this once per AI platform that has memory about you (Claude, ChatGPT, etc.).
+**When to use:** Right after you finish the [setup guide](01-getting-started.md). Run this once per AI platform that has memory about you (Claude, ChatGPT, etc.).
 
 **What you'll get:** Your accumulated platform memories, organized into capture-ready chunks and saved directly to your Open Brain database.
 
@@ -461,4 +461,4 @@ Your Open Brain is infrastructure. These prompts are the habits that make it com
 
 ---
 
-*Built by [Nate B. Jones](https://natesnewsletter.substack.com/) — companion to [Build Your Open Brain](getting-started.md).*
+*Built by [Nate B. Jones](https://natesnewsletter.substack.com/) — companion to [Build Your Open Brain](01-getting-started.md).*

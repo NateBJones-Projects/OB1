@@ -8,7 +8,7 @@ Adds a `contacts` table and a `contact_interactions` table to your Supabase data
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](../../docs/getting-started.md))
+- Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - Access to your Supabase SQL Editor
 
 ## Steps

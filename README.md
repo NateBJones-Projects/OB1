@@ -6,8 +6,8 @@ OB1 is the community home for [Open Brain](https://natesnewsletter.substack.com/
 
 Never built an Open Brain? Start here:
 
-1. **[Setup Guide](docs/getting-started.md)** — Build the full system (database, AI gateway, Slack capture, MCP server) in about 45 minutes. No coding experience needed.
-2. **[Companion Prompts](docs/companion-prompts.md)** — Five prompts that help you migrate your memories, discover use cases, and build the capture habit.
+1. **[Setup Guide](docs/01-getting-started.md)** — Build the full system (database, AI gateway, Slack capture, MCP server) in about 45 minutes. No coding experience needed.
+2. **[Companion Prompts](docs/02-companion-prompts.md)** — Five prompts that help you migrate your memories, discover use cases, and build the capture habit.
 
 ## What's Inside
 

@@ -83,7 +83,7 @@ jobs:
           # ─── Rule 1: Folder structure ───
           rule1_pass=true
           bad_files=""
-          allowed_pattern='^(recipes|schemas|dashboards|integrations|docs|help|\.github|\.gitkeep|\.gitignore|\.husky|\.markdownlint|package)'
+          allowed_pattern='^(recipes|schemas|dashboards|integrations|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             if ! echo "$f" | grep -qE "$allowed_pattern"; then

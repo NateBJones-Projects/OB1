@@ -8,7 +8,7 @@ The infrastructure layer for your thinking. One database, one AI gateway, one ch
 
 This isn't a notes app. It's a database with vector search and an open protocol — built so that every AI tool you use shares the same persistent memory of you. Claude, ChatGPT, Cursor, Claude Code, whatever ships next month. One brain. All of them.
 
-**Before you start:** If you hit a wall during setup, you're not on your own. We built a [FAQ](faq.md) that covers the most common questions and gotchas people run into. And if you need real-time help, we created dedicated AI assistants that know this system inside and out, one for each major platform: a [Claude Skill](https://www.notion.so/product-templates/Open-Brain-Companion-Claude-Skill-31a5a2ccb526802797caeb37df3ba3cb?source=copy_link), a [ChatGPT Custom GPT](https://chatgpt.com/g/g-69a892b6a7708191b00e48ff655d5597-nate-jones-open-brain-assistant), and a [Gemini GEM](https://gemini.google.com/gem/1fDsAENjhdku-3RufY7ystbS1Md8MtDCg?usp=sharing). They can walk you through any step, troubleshoot connection issues, and answer questions specific to your setup. Use whichever one matches the AI tool you already use.
+**Before you start:** If you hit a wall during setup, you're not on your own. We built a [FAQ](03-faq.md) that covers the most common questions and gotchas people run into. And if you need real-time help, we created dedicated AI assistants that know this system inside and out, one for each major platform: a [Claude Skill](https://www.notion.so/product-templates/Open-Brain-Companion-Claude-Skill-31a5a2ccb526802797caeb37df3ba3cb?source=copy_link), a [ChatGPT Custom GPT](https://chatgpt.com/g/g-69a892b6a7708191b00e48ff655d5597-nate-jones-open-brain-assistant), and a [Gemini GEM](https://gemini.google.com/gem/1fDsAENjhdku-3RufY7ystbS1Md8MtDCg?usp=sharing). They can walk you through any step, troubleshoot connection issues, and answer questions specific to your setup. Use whichever one matches the AI tool you already use.
 
 ---
 
@@ -796,7 +796,7 @@ You just built AI infrastructure using AI. That pattern doesn't stop here.
 
 ## Your Next Step
 
-Your Open Brain is live. Now make it work for you. The **[Companion Prompts](companion-prompts.md)** cover the full lifecycle from here:
+Your Open Brain is live. Now make it work for you. The **[Companion Prompts](02-companion-prompts.md)** cover the full lifecycle from here:
 
 - **Memory Migration** — Pull everything your AI already knows about you into your brain so every tool starts with context instead of zero
 - **Second Brain Migration** — Bring your existing notes from Notion, Obsidian, or any other system into your Open Brain without starting over

@@ -26,7 +26,7 @@ This is an OpenAI requirement, not a bug. Enabling Developer Mode (required to a
 
 ### "How do I migrate my ChatGPT memories/conversations into the Open Brain?"
 
-The Memory Migration prompt in the [companion prompts](companion-prompts.md) handles pulling out what your current AI already knows about you. But if you want your full ChatGPT conversation history, you'll need the data export: Settings → Data controls → Export data. You'll get JSON files of every conversation you've had.
+The Memory Migration prompt in the [companion prompts](02-companion-prompts.md) handles pulling out what your current AI already knows about you. But if you want your full ChatGPT conversation history, you'll need the data export: Settings → Data controls → Export data. You'll get JSON files of every conversation you've had.
 
 From there, use Claude (or whatever AI you prefer) to process those exports — pull out the key insights, decisions, and context that matter, and push them into your Open Brain through the capture tool. It's a one-time migration cost but you end up with everything in a system that works across all your tools instead of being locked inside one.
 
@@ -50,7 +50,7 @@ Most likely culprits: the vector extension isn't enabled (run `create extension 
 
 Quickest diagnosis: Supabase dashboard → Edge Functions → click on the search function → check the Logs tab.
 
-And don't forget the Supabase AI assistant covered in the [setup guide](getting-started.md). Paste your edge function code and the error logs right into it — it's surprisingly good at diagnosing Supabase-specific issues since it has direct context on their APIs.
+And don't forget the Supabase AI assistant covered in the [setup guide](01-getting-started.md). Paste your edge function code and the error logs right into it — it's surprisingly good at diagnosing Supabase-specific issues since it has direct context on their APIs.
 
 ---
 
@@ -60,7 +60,7 @@ Short answer: it doesn't, and it's not supposed to.
 
 Obsidian is a note-taking app. The Open Brain is a database with vector search. They're not in the same category. You don't need a middleman between your AI and your data — that's the whole point. Your AI talks directly to the database where your thoughts live.
 
-If you have an existing Obsidian vault you want to bring over, the Second Brain Migration prompt in the [companion prompts](companion-prompts.md) is built for exactly that. It moves your content INTO the Open Brain. But Obsidian doesn't sit alongside it or on top of it.
+If you have an existing Obsidian vault you want to bring over, the Second Brain Migration prompt in the [companion prompts](02-companion-prompts.md) is built for exactly that. It moves your content INTO the Open Brain. But Obsidian doesn't sit alongside it or on top of it.
 
 ### "But I want to edit and organize my content like I did in Obsidian"
 
