@@ -66,7 +66,7 @@ Questions, ideas, help with contributions — the [Substack community chat](http
 
 ## Who Maintains This
 
-Built by Nate B. Jones's team. Matt Hallett is the first community admin and repo manager.
+Built by Nate B. Jones's team. Matt Hallett is the first community admin and repo manager. PRs are reviewed by the automated agent + human admins.
 
 ## License
 
