@@ -23,6 +23,8 @@ Two kids, two parents, overlapping schedules. Soccer practice conflicts with the
 - Nullable foreign keys (activities can belong to one person or the whole family)
 - Querying across date ranges
 
+> **Note:** This extension doesn't use Row Level Security. RLS is introduced in Extension 4 (Meal Planning), where shared household access makes it necessary. Extensions 1-3 are single-user systems.
+
 ## What It Does
 
 A multi-person family scheduling system. Track activities, important dates, and family members so your agent can spot conflicts, surface upcoming events, and make sure nothing gets forgotten.

@@ -4,7 +4,7 @@
 -- Family members in your household
 CREATE TABLE family_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     name TEXT NOT NULL,
     relationship TEXT, -- e.g. 'self', 'spouse', 'child', 'parent'
     birth_date DATE,
@@ -15,7 +15,7 @@ CREATE TABLE family_members (
 -- Scheduled events and recurring activities
 CREATE TABLE activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     family_member_id UUID REFERENCES family_members, -- null means whole family
     title TEXT NOT NULL,
     activity_type TEXT, -- e.g. 'sports', 'medical', 'school', 'social'
@@ -32,7 +32,7 @@ CREATE TABLE activities (
 -- Birthdays, anniversaries, deadlines
 CREATE TABLE important_dates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     family_member_id UUID REFERENCES family_members, -- null for family-wide dates
     title TEXT NOT NULL,
     date_value DATE NOT NULL,

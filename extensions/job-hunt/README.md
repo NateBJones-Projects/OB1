@@ -139,7 +139,7 @@ A recruiter you're talking to during the job search is also a professional conta
 
 **How it works technically:**
 
-The tool takes a `job_contact_id` from the `job_contacts` table. It retrieves the contact details and creates a corresponding record in Extension 5's `professional_contacts` table. The `professional_crm_contact_id` field stores the link. This means:
+The tool takes a `job_contact_id` from the `job_contacts` table. It retrieves the contact details and creates a corresponding record in Extension 5's `professional_contacts` table. The `professional_crm_contact_id` field stores the link — this is application-managed rather than a database foreign key, because the two extensions live in separate table domains and you might install one without the other. This means:
 
 - Future interactions in the job hunt also appear in the CRM context
 - You can track the relationship long-term in Extension 5

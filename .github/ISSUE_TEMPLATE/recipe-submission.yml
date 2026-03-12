@@ -17,6 +17,8 @@ body:
         - Schema (database extension)
         - Dashboard (frontend template)
         - Integration (MCP extension, webhook, capture source)
+        - Primitive (reusable concept guide)
+        - Extension (curated learning path build)
         - Not sure
     validations:
       required: true
