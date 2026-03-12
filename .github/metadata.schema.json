@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/NateBJones-Projects/OB1/blob/main/metadata.schema.json",
+  "$id": "https://github.com/NateBJones-Projects/OB1/blob/main/.github/metadata.schema.json",
   "title": "Open Brain Source Contribution Metadata",
   "description": "Schema for metadata.json files in OB1 contributions (recipes, schemas, dashboards, integrations).",
   "type": "object",

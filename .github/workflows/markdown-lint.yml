@@ -26,4 +26,4 @@ jobs:
         run: npm install -g markdownlint-cli2
 
       - name: Run markdownlint
-        run: markdownlint-cli2 "**/*.md" "#node_modules"
+        run: markdownlint-cli2 --config .github/.markdownlint.jsonc "**/*.md" "#node_modules"
