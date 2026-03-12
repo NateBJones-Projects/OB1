@@ -61,13 +61,13 @@ Thanks for submitting your first PR. The automated review will run shortly and c
 
 Once the automated checks pass, a human admin will review for quality and clarity. Expect a response within a few days.
 
-If you have questions, check out [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) or open an issue.`;
+If you have questions, check out [CONTRIBUTING.md](../blob/main/help/CONTRIBUTING.md) or open an issue.`;
             } else {
               body = `Hey @${creator} — welcome to Open Brain Source! 👋
 
 Thanks for opening your first issue. Someone from the community will take a look soon.
 
-If you're interested in contributing (code or not), check out [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) — we have paths for developers and non-developers alike.`;
+If you're interested in contributing (code or not), check out [CONTRIBUTING.md](../blob/main/help/CONTRIBUTING.md) — we have paths for developers and non-developers alike.`;
             }
 
             const issueNumber = context.issue?.number || context.payload.pull_request?.number;

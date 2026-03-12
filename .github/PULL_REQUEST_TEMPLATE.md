@@ -17,7 +17,7 @@
 
 ## Checklist
 
-- [ ] I've read [CONTRIBUTING.md](../CONTRIBUTING.md)
+- [ ] I've read [CONTRIBUTING.md](../help/CONTRIBUTING.md)
 - [ ] My contribution has a `README.md` with prerequisites, step-by-step instructions, and expected outcome
 - [ ] My `metadata.json` has all required fields
 - [ ] I tested this on my own Open Brain instance

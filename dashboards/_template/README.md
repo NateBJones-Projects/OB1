@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](https://promptkit.natebjones.com/20260224_uq1_guide_main))
+- Working Open Brain setup ([guide](../../docs/getting-started.md))
 - Vercel or Netlify account (free tier works)
 - List any additional requirements (Node.js version, etc.)
 
@@ -16,10 +16,12 @@
 
 1. Clone this folder or copy the files
 2. Set your environment variables:
-   ```
+
+   ```text
    SUPABASE_URL=your-project-url
    SUPABASE_ANON_KEY=your-anon-key
    ```
+
 3. Deploy to Vercel/Netlify
 4. ...
 

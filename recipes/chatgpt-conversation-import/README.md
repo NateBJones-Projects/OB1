@@ -8,7 +8,7 @@ Takes the JSON file from ChatGPT's "Export your data" feature and converts each 
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](https://promptkit.natebjones.com/20260224_uq1_guide_main))
+- Working Open Brain setup ([guide](../../docs/getting-started.md))
 - Your ChatGPT data export (Settings → Data Controls → Export Data in ChatGPT)
 - Node.js 18+
 - Your Supabase project URL and service role key

@@ -8,7 +8,7 @@ Pulls your Gmail history via the Gmail API and loads each email into Open Brain 
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](https://promptkit.natebjones.com/20260224_uq1_guide_main))
+- Working Open Brain setup ([guide](../../docs/getting-started.md))
 - Google Cloud project with Gmail API enabled
 - Gmail API OAuth credentials (Client ID + Client Secret)
 - Node.js 18+

@@ -7,17 +7,17 @@ See the [Contributor Ladder](CONTRIBUTING.md#contributor-ladder) for how progres
 <!-- ALL-CONTRIBUTORS-LIST:START -->
 
 | Name | Contributions |
-|------|---------------|
+| ---- | ------------- |
 | **Nate Jones** | Founder, project vision |
 | **Matt Hallett** | Community admin, contribution standards, repo governance |
-| **Caleb** | Initial repo scaffold, CI workflow, seed contributions |
+| **Kaleab** | Initial repo scaffold, CI workflow, seed contributions |
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ## Contribution Types
 
 | Emoji | Type | Description |
-|-------|------|-------------|
+| ----- | ---- | ----------- |
 | 💻 | code | Code contributions (recipes, schemas, dashboards, integrations) |
 | 📖 | docs | Documentation |
 | 💡 | ideas | Ideas and use cases |

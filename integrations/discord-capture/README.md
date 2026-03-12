@@ -8,7 +8,7 @@ A Discord bot that monitors designated channels and captures messages into Open 
 
 ## Prerequisites
 
-- Working Open Brain setup ([guide](https://promptkit.natebjones.com/20260224_uq1_guide_main))
+- Working Open Brain setup ([guide](../../docs/getting-started.md))
 - A Discord account with permission to add bots to your server
 - Discord Developer Portal access (free)
 - Supabase CLI installed (`npm i -g supabase`)
