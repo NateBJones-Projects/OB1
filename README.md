@@ -6,33 +6,33 @@ OB1 is the community home for [Open Brain](https://natesnewsletter.substack.com/
 
 Never built an Open Brain? Start here:
 
-1. **[Setup Guide](../docs/getting-started.md)** — Build the full system (database, AI gateway, Slack capture, MCP server) in about 45 minutes. No coding experience needed.
-2. **[Companion Prompts](../docs/companion-prompts.md)** — Five prompts that help you migrate your memories, discover use cases, and build the capture habit.
+1. **[Setup Guide](docs/getting-started.md)** — Build the full system (database, AI gateway, Slack capture, MCP server) in about 45 minutes. No coding experience needed.
+2. **[Companion Prompts](docs/companion-prompts.md)** — Five prompts that help you migrate your memories, discover use cases, and build the capture habit.
 
 ## What's Inside
 
-### [`/recipes`](../recipes/) — Step-by-step builds
+### [`/recipes`](recipes/) — Step-by-step builds
 
 Each recipe teaches you how to add a new capability to your Open Brain. Follow the instructions, run the code, get a new feature.
 - Email history import (pull your Gmail archive into searchable thoughts)
 - ChatGPT conversation import (ingest your ChatGPT data export)
 - Daily digest generator (automated summary of recent thoughts via email or Slack)
 
-### [`/schemas`](../schemas/) — Database extensions
+### [`/schemas`](schemas/) — Database extensions
 
 New tables, metadata schemas, and column extensions for your Supabase database. Drop them in alongside your existing `thoughts` table.
 - CRM contact layer (track people, interactions, and relationship context)
 - Taste preferences tracker
 - Reading list with rating metadata
 
-### [`/dashboards`](../dashboards/) — Frontend templates
+### [`/dashboards`](dashboards/) — Frontend templates
 
 Host these on Vercel or Netlify, pointed at your Supabase backend. Instant UI for your brain.
 - Personal knowledge dashboard
 - Weekly review view
 - Mobile-friendly capture UI
 
-### [`/integrations`](../integrations/) — New connections
+### [`/integrations`](integrations/) — New connections
 
 MCP server extensions, webhook receivers, and capture sources beyond Slack.
 - Discord capture bot
@@ -48,7 +48,7 @@ MCP server extensions, webhook receivers, and capture sources beyond Slack.
 
 ## Contributing
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
+Read [CONTRIBUTING.md](help/CONTRIBUTING.md) for the full details. The short version:
 
 - Every PR runs through an automated review agent that checks 10 rules (file structure, no secrets, SQL safety, etc.)
 - If the agent passes, a human admin reviews for quality and clarity
@@ -64,4 +64,4 @@ Built and maintained by Nate B. Jones's team. Matt Hallett is the first communit
 
 ## License
 
-[MIT](LICENSE.md)
+[MIT](help/LICENSE.md)
