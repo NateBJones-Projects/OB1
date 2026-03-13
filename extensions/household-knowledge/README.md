@@ -35,6 +35,23 @@ A database and MCP server for storing and retrieving household facts — paint c
 - Node.js 18+ installed
 - Basic understanding of SQL and TypeScript
 
+## Credential Tracker
+
+You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
+
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+
+```text
+HOUSEHOLD KNOWLEDGE -- CREDENTIAL TRACKER
+--------------------------------------
+
+SUPABASE (from your Open Brain setup)
+  Project URL:           ____________
+  Secret key:            ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 ### 1. Set Up the Database Schema

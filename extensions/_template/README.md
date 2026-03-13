@@ -33,6 +33,26 @@ Lead with the human pain point. What real-life scenario makes this extension wor
 - List any earlier extensions that must be completed first
 - List any required primitives with links
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+
+```text
+EXTENSION NAME -- CREDENTIAL TRACKER
+--------------------------------------
+
+SUPABASE (from your Open Brain setup)
+  Project URL:           ____________
+  Secret key:            ____________
+
+GENERATED DURING SETUP
+  (list any extension-specific values)
+
+--------------------------------------
+```
+
 ## Steps
 
 ### 1. Create the Database Tables

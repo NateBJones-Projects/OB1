@@ -36,6 +36,23 @@ A maintenance scheduling and history system. Track recurring tasks, log complete
 - Basic understanding of SQL and TypeScript
 - Extension 1 recommended but not required
 
+## Credential Tracker
+
+You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
+
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+
+```text
+HOME MAINTENANCE -- CREDENTIAL TRACKER
+--------------------------------------
+
+SUPABASE (from your Open Brain setup)
+  Project URL:           ____________
+  Secret key:            ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 ### 1. Set Up the Database Schema

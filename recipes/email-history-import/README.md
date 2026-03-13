@@ -14,6 +14,26 @@ Pulls your Gmail history via the Gmail API and loads each email into Open Brain 
 - Node.js 18+
 - Your Supabase project URL and service role key
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+EMAIL HISTORY IMPORT -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  Supabase Project URL:  ____________
+  Supabase Secret key:   ____________
+
+GENERATED DURING SETUP
+  Google Cloud Project ID:     ____________
+  Gmail OAuth Client ID:       ____________.apps.googleusercontent.com
+  Gmail OAuth Client Secret:   ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 <!-- TODO: Matt Hallett to fill in step-by-step instructions -->

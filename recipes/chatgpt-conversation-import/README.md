@@ -14,6 +14,25 @@ Takes the JSON file from ChatGPT's "Export your data" feature and converts each 
 - Your Supabase project URL and service role key
 - OpenRouter API key (for generating embeddings)
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+CHATGPT CONVERSATION IMPORT -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  Supabase Project URL:  ____________
+  Supabase Secret key:   ____________
+  OpenRouter API key:    ____________
+
+FILE LOCATION
+  Path to conversations.json:  ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 <!-- TODO: Matt Hallett to fill in step-by-step instructions -->

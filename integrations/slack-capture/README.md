@@ -15,6 +15,31 @@ Slack is free. The Edge Function uses the same OpenRouter credits from your main
 
 ---
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+SLACK CAPTURE -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  OpenRouter API key:    ____________
+
+SLACK WORKSPACE INFO
+  Workspace name/URL:    ____________
+
+GENERATED DURING SETUP
+  Channel name:          ____________
+  Channel ID (Step 1):   C____________
+  Bot OAuth Token:       xoxb-____________
+  Edge Function URL:     https://____________.supabase.co/functions/v1/ingest-thought
+
+--------------------------------------
+```
+
+---
+
 ## Step 1: Create Your Slack Capture Channel
 
 1. If you don't have a Slack workspace, create one at slack.com (free tier works)

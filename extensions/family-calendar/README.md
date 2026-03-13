@@ -48,6 +48,23 @@ A multi-person family scheduling system. Track activities, important dates, and 
 - Extensions 1-2 recommended but not required
 - Node.js 18+ and npm installed
 
+## Credential Tracker
+
+You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
+
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+
+```text
+FAMILY CALENDAR -- CREDENTIAL TRACKER
+--------------------------------------
+
+SUPABASE (from your Open Brain setup)
+  Project URL:           ____________
+  Secret key:            ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 ### 1. Create the Database Schema

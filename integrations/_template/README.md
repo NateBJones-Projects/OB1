@@ -11,6 +11,25 @@
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - List any additional requirements (API keys, bot tokens, service accounts)
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+INTEGRATION NAME -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  Project URL:           ____________
+  Secret key:            ____________
+  OpenRouter API key:    ____________
+
+GENERATED DURING SETUP
+  (list service-specific values: bot tokens, channel IDs, webhook URLs, etc.)
+
+--------------------------------------
+```
+
 ## Steps
 
 1. Set up the external service (API key, bot token, webhook URL, etc.)

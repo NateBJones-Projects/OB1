@@ -11,6 +11,21 @@
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - List any additional requirements
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+SCHEMA NAME -- CREDENTIAL TRACKER
+--------------------------------------
+
+SUPABASE (from your Open Brain setup)
+  Project URL:           ____________
+  Secret key:            ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 1. Open your Supabase SQL Editor

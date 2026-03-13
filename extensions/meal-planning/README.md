@@ -54,6 +54,30 @@ A complete meal planning system with recipes, weekly meal plans, and auto-genera
 - **Required reading:** [Row Level Security](../../primitives/rls/) primitive
 - **Required reading:** [Shared MCP Server](../../primitives/shared-mcp/) primitive
 
+## Credential Tracker
+
+You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
+
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+
+```text
+MEAL PLANNING -- CREDENTIAL TRACKER
+--------------------------------------
+
+SUPABASE (from your Open Brain setup)
+  Project URL:           ____________
+  Secret key:            ____________
+
+GENERATED DURING SETUP (for shared server)
+  Household key:         ____________
+
+NOTE: This extension uses TWO MCP servers:
+  1. Primary server (meal-planning) — uses Project URL + Secret key
+  2. Shared server (meal-planning-shared) — uses Project URL + Household key
+
+--------------------------------------
+```
+
 ## Steps
 
 ### 1. Create the Database Schema

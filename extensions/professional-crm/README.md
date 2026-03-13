@@ -35,6 +35,23 @@ A professional contact management system with interaction logging, opportunity t
 - Node.js 18+ installed
 - **Required reading:** [Row Level Security](../../primitives/rls/) primitive
 
+## Credential Tracker
+
+You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
+
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+
+```text
+PROFESSIONAL CRM -- CREDENTIAL TRACKER
+--------------------------------------
+
+SUPABASE (from your Open Brain setup)
+  Project URL:           ____________
+  Secret key:            ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 ### 1. Set Up the Database Schema

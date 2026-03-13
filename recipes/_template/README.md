@@ -11,6 +11,25 @@
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - List any additional requirements (API keys, tools, services)
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+RECIPE NAME -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  Project URL:           ____________
+  Secret key:            ____________
+  OpenRouter API key:    ____________
+
+GENERATED DURING SETUP
+  (list recipe-specific values: API keys, file paths, etc.)
+
+--------------------------------------
+```
+
 ## Steps
 
 1. First step — be specific and copy-paste ready

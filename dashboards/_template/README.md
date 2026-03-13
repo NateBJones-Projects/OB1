@@ -12,6 +12,24 @@
 - Vercel or Netlify account (free tier works)
 - List any additional requirements (Node.js version, etc.)
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+DASHBOARD NAME -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  Project URL:           ____________
+  Anon key:              ____________
+
+HOSTING
+  Deploy URL:            ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 1. Clone this folder or copy the files

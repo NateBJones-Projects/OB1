@@ -14,6 +14,30 @@ A Discord bot that monitors designated channels and captures messages into Open 
 - Supabase CLI installed (`npm i -g supabase`)
 - OpenRouter API key (for generating embeddings)
 
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+DISCORD CAPTURE -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  OpenRouter API key:    ____________
+
+DISCORD INFO
+  Server name:           ____________
+
+GENERATED DURING SETUP
+  Discord Bot Token:     ____________
+  Channel IDs to monitor:
+    - ____________
+    - ____________
+    - ____________
+
+--------------------------------------
+```
+
 ## Steps
 
 <!-- TODO: Fill in step-by-step instructions -->
