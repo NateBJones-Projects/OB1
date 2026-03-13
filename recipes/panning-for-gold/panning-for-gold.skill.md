@@ -55,7 +55,7 @@ File naming: `docs/brainstorming/YYYY-MM-DD-{source}-transcript.md` or `docs/bra
 
 1. **If a summary/notes file exists alongside the transcript:** Read the summary FIRST. Extract all threads from it. This covers 80-90% of content in roughly 200 lines instead of 900.
 2. **Then targeted transcript reads:** For each summary thread, pull ONE exact quote from the transcript (use Grep to find it, do not read the whole file).
-3. **Second pass verification:** Read the last 30% of the transcript (conversations front-load business, end with personal/relationship threads that summaries often skip).
+3. **Second pass verification:** For transcripts over 100 lines, read the last 30% (conversations front-load business, end with personal/relationship threads that summaries often skip). For shorter transcripts (under 100 lines), do a full read on the second pass since the token cost is minimal.
 
 ### Extraction Rules
 
@@ -94,7 +94,7 @@ NOT every thread needs a full evaluation agent. Categorize threads:
 
 ### Evaluation Approach (Efficiency-Ranked)
 
-1. **Inline evaluation (preferred for 1-3 threads):** Write the evaluation yourself in the gold-found file. Fastest, no agent overhead, no risk of lost work.
+1. **Inline evaluation (preferred for 1-3 threads):** Write the evaluation directly into the gold-found file's ACT NOW section. No separate file needed. Fastest, no agent overhead, no risk of lost work.
 2. **Background agents (for 4+ ACT NOW threads):** Dispatch agents BUT require them to write to permanent files.
 3. **NEVER dispatch more than 5 background evaluators.** If you have more than 5 ACT NOW candidates, you miscategorized. Re-triage.
 
@@ -204,6 +204,8 @@ capture_thought({
 ```
 
 This ensures that future sessions can find these insights with `search_thoughts`, even if the original files are in a different project or directory.
+
+**If Open Brain MCP is not connected:** Skip the capture step. The gold-found file is the primary output and contains everything. You can manually capture key items later once your MCP connection is configured. The recipe works without Open Brain, it just works better with it.
 
 ## Phase 4: Self-Improvement
 
