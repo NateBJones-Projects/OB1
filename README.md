@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/ob1-logo.svg" alt="Open Brain" width="300">
+  <img src=".github/ob1-logo.png" alt="Open Brain" width="300">
 </p>
 
 <h1 align="center">Open Brain</h1>
