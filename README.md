@@ -10,10 +10,6 @@ This isn't a notes app. It's a database with vector search and an open protocol 
 
 > Open Brain was created by [Nate B. Jones](https://natesnewsletter.substack.com/). Follow the [Substack](https://natesnewsletter.substack.com/) for updates, discussion, and the companion prompt pack.
 
-<p align="center">
-  <em>The Open Brain Philosophy (25 sec)</em>
-</p>
-
 https://github.com/user-attachments/assets/0b961acb-89da-4bb8-8587-c59c6efed0a1
 
 ## Getting Started
