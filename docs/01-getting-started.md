@@ -1,22 +1,23 @@
 # Build Your Open Brain
 
+https://github.com/user-attachments/assets/85208d73-112b-4204-82fd-d03b6c397a8b
+
 ## Complete Setup Guide
 
 ---
 
 ## What You're Building
 
-A Slack channel where you type a thought — it automatically gets embedded, classified, and stored in your database — you get a confirmation reply showing what was captured. Then an MCP server that lets any AI assistant search your brain by meaning — and write to it directly.
+A database that stores your thoughts with vector embeddings, plus an MCP server that lets any AI assistant search and write to your brain. No Slack required — capture happens from whatever AI tool you're already using (Claude Desktop, ChatGPT, Claude Code, Cursor).
 
 ## What You Need
 
-About 45 minutes and zero coding experience. You'll copy and paste everything.
+About 30 minutes and zero coding experience. You'll copy and paste everything.
 
 ### Services (All Free Tier)
 
 - **Supabase** — Your database — stores everything
 - **OpenRouter** — Your AI gateway — understands everything
-- **Slack** — Your capture interface — where you type thoughts
 
 ### If You Get Stuck
 
@@ -34,11 +35,9 @@ Things it's good at:
 
 It can't see your screen or run commands for you, but if you paste what you're seeing, it can tell you what to do next.
 
-## Two Parts
+## How This Works
 
-**Part 1 — Capture** (Steps 1–9): Slack → Edge Function → Supabase. Type a thought, it gets embedded and classified automatically.
-
-**Part 2 — Retrieval** (Steps 10–13): Hosted MCP Server → Any AI. Connect Claude, ChatGPT, or any MCP client to your brain with a URL. Read and write from any tool.
+You'll set up your database, connect it to an AI gateway for embeddings, then deploy an MCP server that gives any AI assistant the ability to search and write to your brain. One progressive setup: database → AI gateway → MCP server → connect your AI.
 
 ### After You're Done
 
@@ -48,7 +47,6 @@ This guide builds the system. The companion prompt pack — **[Open Brain: Compa
 
 | Service | Cost |
 | ------- | ---- |
-| Slack | Free |
 | Supabase (free tier) | $0 |
 | Embeddings (text-embedding-3-small) | ~$0.02 / million tokens |
 | Metadata extraction (gpt-4o-mini) | ~$0.15 / million input tokens |
@@ -82,29 +80,19 @@ OPENROUTER
   Account password:   ____________
   API key:            ____________ <- Step 4
 
-SLACK
-  Workspace name:     ____________
-  Workspace URL:      ____________
-  Channel name:       ____________
-  Channel ID:         ____________ <- Step 5
-  Bot OAuth Token:    ____________ <- Step 6
-
 GENERATED DURING SETUP
-  Edge Function URL:  ____________ <- Step 7
-  MCP Access Key:     ____________ <- Step 10
-  MCP Server URL:     ____________ <- Step 11
-  MCP Connection URL: ____________ <- Step 11 (server URL + ?key=your-access-key)
+  MCP Access Key:     ____________ <- Step 5
+  MCP Server URL:     ____________ <- Step 6
+  MCP Connection URL: ____________ <- Step 6 (server URL + ?key=your-access-key)
 
 --------------------------------------
 ```
 
-> Seriously — copy that now. You'll thank yourself at Step 7.
+> Seriously — copy that now. You'll need these credentials later.
 
 ---
 
-## Part 1 — Capture
-
-### Step 1: Create Your Supabase Project
+## Step 1: Create Your Supabase Project
 
 Supabase is your database. It stores your thoughts as raw text, vector embeddings, and structured metadata. It also gives you a REST API automatically.
 
@@ -120,7 +108,7 @@ Supabase is your database. It stores your thoughts as raw text, vector embedding
 
 ---
 
-### Step 2: Set Up the Database
+## Step 2: Set Up the Database
 
 Three SQL commands, pasted one at a time. This creates your storage table, your search function, and your security policy.
 
@@ -227,7 +215,7 @@ Table Editor should show the `thoughts` table with columns: id, content, embeddi
 
 ---
 
-### Step 3: Save Your Connection Details
+## Step 3: Save Your Connection Details
 
 In the left sidebar: **Settings** (gear icon) → **API**. Copy these into your credential tracker:
 
@@ -238,7 +226,7 @@ In the left sidebar: **Settings** (gear icon) → **API**. Copy these into your 
 
 ---
 
-### Step 4: Get an OpenRouter API Key
+## Step 4: Get an OpenRouter API Key
 
 OpenRouter is a universal AI API gateway — one account gives you access to every major model. We're using it for embeddings and lightweight LLM metadata extraction.
 
@@ -252,48 +240,35 @@ Why OpenRouter instead of OpenAI directly? One account, one key, one billing rel
 
 ---
 
-### Step 5: Create Your Slack Capture Channel
+## Step 5: Create an Access Key
 
-1. If you don't have a Slack workspace, create one at slack.com (free tier works)
-2. Click the **+** next to Channels → **Create new channel**
-3. Name it "capture" (or brain, inbox, whatever feels natural)
-4. Make it **Private** (recommended — this is personal)
-5. Get the Channel ID: right-click channel → View channel details → scroll to bottom (starts with C)
-6. Paste the Channel ID into your credential tracker
-
----
-
-### Step 6: Create the Slack App
-
-This is the bridge between Slack and your database.
-
-#### Create the App
-
-1. Go to api.slack.com/apps → **Create New App** → **From scratch**
-2. App Name: "Open Brain", select your workspace
-3. Click **Create App**
-
-#### Set Permissions
-
-1. Left sidebar → **OAuth & Permissions**
-2. Scroll to **Scopes → Bot Token Scopes**
-3. Add: `channels:history`, `groups:history`, `chat:write`
-4. Scroll up → **Install to Workspace** → Allow
-5. Copy the **Bot User OAuth Token** (starts with `xoxb-`) into credential tracker
-
-#### Add App to Channel
-
-In Slack, open your capture channel and type: `/invite @Open Brain`
-
-> Don't set up Event Subscriptions yet — you need the Edge Function URL first (Step 7).
-
----
-
-### Step 7: Deploy the Edge Function
-
-This is the brains of the operation. One function receives messages from Slack, generates an embedding, extracts metadata, stores everything in Supabase, and replies with a confirmation.
+Your MCP server will be a public URL. The Supabase project ref in that URL is random enough that nobody will stumble onto it, but let's close the gap entirely. You'll generate a simple access key that the server checks on every request. Takes 30 seconds.
 
 > **New to the terminal?** The "terminal" is the text-based command line on your computer. On Mac, open the app called **Terminal** (search for it in Spotlight). On Windows, open **PowerShell**. Everything below gets typed there, not in your browser.
+
+In your terminal, generate a random key:
+
+```bash
+# Mac/Linux
+openssl rand -hex 32
+
+# Windows (PowerShell)
+-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
+```
+
+Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters). Paste it into your credential tracker under MCP Access Key.
+
+Set it as a Supabase secret:
+
+```bash
+supabase secrets set MCP_ACCESS_KEY=your-generated-key-here
+```
+
+---
+
+## Step 6: Deploy the MCP Server
+
+One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stats, and capture. This gives any MCP-connected AI the ability to read and write to your brain.
 
 #### Install the Supabase CLI
 
@@ -331,219 +306,13 @@ supabase link --project-ref YOUR_PROJECT_REF
 
 Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1).
 
-#### Create the Function
-
-```bash
-supabase functions new ingest-thought
-```
-
-Open `supabase/functions/ingest-thought/index.ts` and replace its entire contents with:
-
-```typescript
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
-const SLACK_BOT_TOKEN = Deno.env.get("SLACK_BOT_TOKEN")!;
-const SLACK_CAPTURE_CHANNEL = Deno.env.get("SLACK_CAPTURE_CHANNEL")!;
-
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-async function getEmbedding(text: string): Promise<number[]> {
-  const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
-  });
-  const d = await r.json();
-  return d.data[0].embedding;
-}
-
-async function extractMetadata(text: string): Promise<Record<string, unknown>> {
-  const r = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: `Extract metadata from the user's captured thought. Return JSON with:
-- "people": array of people mentioned (empty if none)
-- "action_items": array of implied to-dos (empty if none)
-- "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
-- "topics": array of 1-3 short topic tags (always at least one)
-- "type": one of "observation", "task", "idea", "reference", "person_note"
-Only extract what's explicitly there.` },
-        { role: "user", content: text },
-      ],
-    }),
-  });
-  const d = await r.json();
-  try { return JSON.parse(d.choices[0].message.content); }
-  catch { return { topics: ["uncategorized"], type: "observation" }; }
-}
-
-async function replyInSlack(channel: string, threadTs: string, text: string): Promise<void> {
-  await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${SLACK_BOT_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ channel, thread_ts: threadTs, text }),
-  });
-}
-
-Deno.serve(async (req: Request): Promise<Response> => {
-  try {
-    const body = await req.json();
-    if (body.type === "url_verification") {
-      return new Response(JSON.stringify({ challenge: body.challenge }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    const event = body.event;
-    if (!event || event.type !== "message" || event.subtype || event.bot_id
-        || event.channel !== SLACK_CAPTURE_CHANNEL) {
-      return new Response("ok", { status: 200 });
-    }
-    const messageText: string = event.text;
-    const channel: string = event.channel;
-    const messageTs: string = event.ts;
-    if (!messageText || messageText.trim() === "") return new Response("ok", { status: 200 });
-
-    const [embedding, metadata] = await Promise.all([
-      getEmbedding(messageText),
-      extractMetadata(messageText),
-    ]);
-
-    const { error } = await supabase.from("thoughts").insert({
-      content: messageText,
-      embedding,
-      metadata: { ...metadata, source: "slack", slack_ts: messageTs },
-    });
-
-    if (error) {
-      console.error("Supabase insert error:", error);
-      await replyInSlack(channel, messageTs, `Failed to capture: ${error.message}`);
-      return new Response("error", { status: 500 });
-    }
-
-    const meta = metadata as Record<string, unknown>;
-    let confirmation = `Captured as *${meta.type || "thought"}*`;
-    if (Array.isArray(meta.topics) && meta.topics.length > 0)
-      confirmation += ` - ${meta.topics.join(", ")}`;
-    if (Array.isArray(meta.people) && meta.people.length > 0)
-      confirmation += `\nPeople: ${meta.people.join(", ")}`;
-    if (Array.isArray(meta.action_items) && meta.action_items.length > 0)
-      confirmation += `\nAction items: ${meta.action_items.join("; ")}`;
-
-    await replyInSlack(channel, messageTs, confirmation);
-    return new Response("ok", { status: 200 });
-  } catch (err) {
-    console.error("Function error:", err);
-    return new Response("error", { status: 500 });
-  }
-});
-```
-
-#### Set Your Secrets
+#### Set Your OpenRouter Secret
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
-supabase secrets set SLACK_BOT_TOKEN=xoxb-your-slack-bot-token-here
-supabase secrets set SLACK_CAPTURE_CHANNEL=C0your-channel-id-here
 ```
 
 > SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are automatically available inside Edge Functions — you don't need to set them.
-
-#### Deploy
-
-```bash
-supabase functions deploy ingest-thought --no-verify-jwt
-```
-
-> Copy the Edge Function URL immediately after deployment! It looks like: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/ingest-thought`
-
----
-
-### Step 8: Connect Slack to the Edge Function
-
-1. Go to api.slack.com/apps → select your Open Brain app
-2. Left sidebar → **Event Subscriptions** → toggle **Enable Events ON**
-3. Paste your Edge Function URL in the **Request URL** field
-4. Wait for the green checkmark — Verified
-5. Under **Subscribe to bot events**, add both: `message.channels` and `message.groups`
-6. Click **Save Changes** (reinstall if prompted)
-
-> **You need both events.** Slack treats public and private channels as separate entity types. Public channels fire `message.channels`, private channels fire `message.groups`. If you only add one, messages in the other channel type will silently fail — no error, just nothing happens. Add both so you're covered regardless of how your capture channel is configured.
-
----
-
-### Step 9: Test It
-
-Go to your capture channel in Slack and type:
-
-```text
-Sarah mentioned she's thinking about leaving her job to start a consulting business
-```
-
-Wait 5–10 seconds. You should see a threaded reply:
-
-```text
-Captured as person_note — career, consulting
-People: Sarah
-Action items: Check in with Sarah about consulting plans
-```
-
-Then open Supabase dashboard → Table Editor → thoughts. You should see one row with your message, an embedding, and metadata.
-
-> If that works, Part 1 is done. You have a working capture system.
-
----
-
-## Part 2 — Retrieval
-
-### A Quick Note on Architecture
-
-MCP servers can run two ways: locally on your computer, or hosted in the cloud.
-
-The local approach means installing Node.js, building a TypeScript project, and running a server process on your machine. Every AI client you connect needs the full path to that server plus your database credentials pasted into a config file. If your laptop is closed, your brain is offline. If you switch computers, you set it up again.
-
-We're not doing that.
-
-Your capture system already runs on Supabase — the Edge Function you deployed in Part 1 handles Slack messages without anything running on your computer. The MCP server works the same way. One more Edge Function, deployed to the same project, reachable from anywhere. Your AI clients connect with a URL. No build steps, no local dependencies, no credentials on your machine.
-
-If you want to run locally — maybe you're a developer who prefers that, or you want to customize beyond what Edge Functions allow — the MCP TypeScript SDK with StdioServerTransport works great. The [Supabase docs on deploying MCP servers](https://supabase.com/docs/guides/getting-started/byo-mcp) cover both approaches. Everything below uses hosted.
-
----
-
-### Step 10: Create an Access Key
-
-Your MCP server will be a public URL. The Supabase project ref in that URL is random enough that nobody will stumble onto it, but let's close the gap entirely. You'll generate a simple access key that the server checks on every request. Takes 30 seconds.
-
-In your terminal, generate a random key:
-
-```bash
-# Mac/Linux
-openssl rand -hex 32
-
-# Windows (PowerShell)
--join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
-```
-
-Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters). Paste it into your credential tracker under MCP Access Key.
-
-Set it as a Supabase secret:
-
-```bash
-supabase secrets set MCP_ACCESS_KEY=your-generated-key-here
-```
-
----
-
-### Step 11: Deploy the MCP Server
-
-One Edge Function. Four tools: semantic search, browse recent thoughts, stats, and capture. Same deployment process as the capture function.
 
 #### Create the Function
 
@@ -597,7 +366,7 @@ Paste this into your credential tracker as the MCP Connection URL. This is what 
 
 ---
 
-### Step 12: Connect to Your AI
+## Step 7: Connect to Your AI
 
 You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end.
 
@@ -675,64 +444,44 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 ---
 
-### Step 13: Use It
+## Step 8: Use It
 
 Ask your AI naturally. It picks the right tool automatically:
 
 | Prompt | Tool Used |
 | ------ | --------- |
+| "Save this: decided to move the launch to March 15 because of the QA blockers" | Capture thought |
+| "Remember that Marcus wants to move to the platform team" | Capture thought |
 | "What did I capture about career changes?" | Semantic search |
 | "What did I capture this week?" | Browse recent |
 | "How many thoughts do I have?" | Stats overview |
 | "Find my notes about the API redesign" | Semantic search |
 | "Show me my recent ideas" | Browse + filter |
 | "Who do I mention most?" | Stats |
-| "Save this: decided to move the launch to March 15 because of the QA blockers" | Capture thought |
-| "Remember that Marcus wants to move to the platform team" | Capture thought |
 
-> The capture tool means you're not limited to Slack for input. Any MCP-connected AI can write directly to your brain — Claude Desktop, ChatGPT, Claude Code, Cursor. Wherever you're working, you can save a thought without switching apps.
+Start by capturing a test thought. In your connected AI, say:
+
+```text
+Remember this: Sarah mentioned she's thinking about leaving her job to start a consulting business
+```
+
+Wait a few seconds. Your AI should confirm the capture and show you the extracted metadata (type, topics, people, action items). Then open Supabase dashboard → Table Editor → thoughts. You should see one row with your message, an embedding, and metadata.
+
+Now try searching:
+
+```text
+What did I capture about Sarah?
+```
+
+Your AI should retrieve the thought you just saved.
+
+> The capture tool works from any MCP-connected AI — Claude Desktop, ChatGPT, Claude Code, Cursor. Wherever you're working, you can save a thought without switching apps.
 
 ---
 
 ## Troubleshooting
 
 If the specific suggestions below don't solve your issue, remember: the Supabase AI assistant (chat icon, bottom-right of your dashboard) can help diagnose problems with anything Supabase-related. Paste the error message and tell it what step you're on.
-
-### Capture Issues (Part 1)
-
-**Slack says "Request URL not verified"**
-
-Your Edge Function isn't deployed or isn't reachable. Run the deploy command again and check the output for errors.
-
-```bash
-supabase functions deploy ingest-thought --no-verify-jwt
-```
-
-**Messages aren't triggering the function**
-
-Check Event Subscriptions — make sure both `message.channels` and `message.groups` are listed (public channels use the first, private channels use the second — you need both). Verify the app is invited to the channel. Confirm the channel ID in your secrets matches the actual channel.
-
-**Slack creates duplicate database entries**
-
-Slack retries webhook delivery if it doesn't get a response within 3 seconds. If your Edge Function takes longer than that (embedding + metadata extraction can take 4-5 seconds), Slack sends the event again, and you get two rows. This is a known edge case. The captures are identical, so it doesn't affect search — but if it bothers you, you can delete the duplicate row in the Supabase Table Editor.
-
-**Function runs but nothing in the database**
-
-Check Edge Function logs: Supabase dashboard → Edge Functions → ingest-thought → Logs. Most likely the OpenRouter key is wrong or has no credits.
-
-```bash
-supabase secrets list
-```
-
-**No confirmation reply in Slack**
-
-The bot token might be wrong, or `chat:write` scope wasn't added. Go to your Slack app → OAuth & Permissions and verify. If you added the scope after installing, you need to reinstall the app.
-
-**Metadata extraction seems off**
-
-That's normal — the LLM is making its best guess with limited context. The metadata is a convenience layer on top of semantic search, not the primary retrieval mechanism. The embedding handles fuzzy matching regardless.
-
-### Retrieval Issues (Part 2)
 
 **Claude Desktop tools don't appear**
 
@@ -748,7 +497,7 @@ The access key doesn't match what's stored in Supabase secrets. Double-check tha
 
 **Search returns no results**
 
-Make sure you sent test messages in Part 1 first. Try asking the AI to "search with threshold 0.3" for a wider net. If that still returns nothing, check the Edge Function logs in the Supabase dashboard for errors.
+Make sure you've captured at least one thought first (see Step 8). Try asking the AI to "search with threshold 0.3" for a wider net. If that still returns nothing, check the Edge Function logs in the Supabase dashboard for errors.
 
 **Tools work but responses are slow**
 
@@ -756,17 +505,15 @@ First search on a cold function takes a few seconds — the Edge Function is wak
 
 **Capture tool saves but metadata is wrong**
 
-Same as Slack capture — the metadata extraction is best-effort. The embedding is what powers semantic search, and that works regardless of how the metadata gets classified. If you consistently want a specific classification, use the capture templates from the prompt kit to give the LLM clearer signals.
+The metadata extraction is best-effort — the LLM is making its best guess with limited context. The embedding is what powers semantic search, and that works regardless of how the metadata gets classified. If you consistently want a specific classification, use the capture templates from the prompt kit to give the LLM clearer signals.
 
 ---
 
 ## How It Works Under the Hood
 
-When you type a message in Slack: Slack sends it to your Edge Function → the function generates an embedding (1536-dimensional vector of meaning) AND extracts metadata via LLM in parallel → both get stored as a single row in Supabase → the function replies in your Slack thread with a summary.
+**When you capture from any AI via MCP:** your AI client sends the text to the `capture_thought` tool → the MCP server generates an embedding (1536-dimensional vector of meaning) AND extracts metadata via LLM in parallel → both get stored as a single row in Supabase → confirmation returned to your AI.
 
-When you capture from any AI via MCP: your AI client sends the text to the capture_thought tool → the MCP server generates an embedding AND extracts metadata in parallel (same pipeline as Slack) → stored as a single row → confirmation returned to your AI.
-
-When you ask your AI about it: your AI client sends the query to the MCP Edge Function → the function generates an embedding of your question → Supabase matches it against every stored thought by vector similarity → results come back ranked by meaning, not keywords.
+**When you search your brain:** your AI client sends the query to the MCP Edge Function → the function generates an embedding of your question → Supabase matches it against every stored thought by vector similarity → results come back ranked by meaning, not keywords.
 
 The embedding is what makes retrieval powerful. "Sarah's thinking about leaving" and "What did I note about career changes?" match semantically even though they share zero keywords. The metadata is a bonus layer for structured filtering on top.
 
@@ -776,13 +523,22 @@ Because you're using OpenRouter, you can swap models by editing the model string
 
 ---
 
+## Optional: Add Capture Sources
+
+Your MCP server handles both reading and writing. But if you want a quick-capture channel outside your AI tools:
+
+- **[Slack Capture](../integrations/slack-capture/)** — Type thoughts in a Slack channel, automatically embedded and stored
+- More integrations in [`/integrations`](../integrations/)
+
+---
+
 ## What You Just Built — And What You Can Build Next
 
-You just used three free services, some copy-pasted code, and a built-in AI assistant to build a personal knowledge system with semantic search, an open write protocol, and an open read protocol. No CS degree. No local servers. No monthly SaaS fee.
+You just used two free services, some copy-pasted code, and a built-in AI assistant to build a personal knowledge system with semantic search, an open write protocol, and an open read protocol. No CS degree. No local servers. No monthly SaaS fee.
 
 Here's the thing worth noticing: that Supabase AI assistant that helped you through the setup? It has access to all of Supabase's documentation, understands your project structure, and can help you build on top of what you've created. That's not a one-time trick for getting unstuck during setup. That's a permanent building partner.
 
-Want to add a new capture source beyond Slack? Ask it how to create another Edge Function. Want to add a new field to your thoughts table? Ask it to help you write the SQL migration. Want to understand how to add authentication so you can share your brain with a teammate? It knows the docs better than you ever will.
+Want to add a new capture source? Ask it how to create another Edge Function. Want to add a new field to your thoughts table? Ask it to help you write the SQL migration. Want to understand how to add authentication so you can share your brain with a teammate? It knows the docs better than you ever will.
 
 You just built AI infrastructure using AI. That pattern doesn't stop here.
 

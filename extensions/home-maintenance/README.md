@@ -15,6 +15,8 @@ The HVAC tech mentioned the pump was showing wear 18 months ago. The warranty on
 | 5 | Professional CRM | Not started |
 | 6 | Job Hunt Pipeline | Not started |
 
+https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60
+
 ## What It Does
 
 A maintenance scheduling and history system. Track recurring tasks, log completed work, and let your agent surface what needs attention before it becomes an emergency.

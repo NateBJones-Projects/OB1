@@ -15,6 +15,8 @@ Two kids, two parents, overlapping schedules. Soccer practice conflicts with the
 | 5 | Professional CRM | Not started |
 | 6 | Job Hunt Pipeline | Not started |
 
+https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60
+
 ## What You'll Learn
 
 - Multi-entity data models (family members → activities relationship)

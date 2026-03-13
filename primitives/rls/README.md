@@ -2,6 +2,8 @@
 
 Row Level Security (RLS) is PostgreSQL's built-in mechanism for controlling which rows in a table are visible or modifiable by different users. Instead of managing access control in your application code, you define policies directly on the database — so security is enforced at the data layer regardless of how you connect (MCP, REST API, direct SQL).
 
+https://github.com/user-attachments/assets/f488e495-fe2a-4ccc-a834-fc6ab5a0ed41
+
 ## Why RLS Matters for Open Brain Extensions
 
 When you build an Open Brain extension that stores personal data (recipes, contacts, job applications), you need a way to ensure:
