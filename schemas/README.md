@@ -8,7 +8,7 @@ Database table extensions and metadata schemas for your Supabase database. Drop 
 | ------ | ------------ |
 | [CRM Contacts](crm-contacts/) | Track people, interactions, and relationship context |
 
-### Ideas
+## Ideas
 
 - Taste preferences tracker
 - Reading list with rating metadata
