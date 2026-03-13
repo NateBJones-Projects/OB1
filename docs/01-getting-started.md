@@ -112,11 +112,11 @@ Supabase is your database. It stores your thoughts as raw text, vector embedding
 
 Three SQL commands, pasted one at a time. This creates your storage table, your search function, and your security policy.
 
-#### Enable the Vector Extension
+### Enable the Vector Extension
 
 In the left sidebar: **Database → Extensions** → search for "vector" → flip **pgvector ON**.
 
-#### Create the Thoughts Table
+### Create the Thoughts Table
 
 In the left sidebar: **SQL Editor → New query** → paste and Run:
 
@@ -156,7 +156,7 @@ create trigger thoughts_updated_at
   execute function update_updated_at();
 ```
 
-#### Create the Search Function
+### Create the Search Function
 
 New query → paste and Run:
 
@@ -194,7 +194,7 @@ end;
 $$;
 ```
 
-#### Lock Down Security
+### Lock Down Security
 
 One more new query:
 
@@ -209,7 +209,7 @@ create policy "Service role full access"
   using (auth.role() = 'service_role');
 ```
 
-#### Quick Verification
+### Quick Verification
 
 Table Editor should show the `thoughts` table with columns: id, content, embedding, metadata, created_at, updated_at. Database → Functions should show `match_thoughts`.
 
@@ -270,7 +270,7 @@ supabase secrets set MCP_ACCESS_KEY=your-generated-key-here
 
 One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stats, and capture. This gives any MCP-connected AI the ability to read and write to your brain.
 
-#### Install the Supabase CLI
+### Install the Supabase CLI
 
 > **Mac users:** If you already have Homebrew installed (you'll know — it's the thing you install with `brew`), use the first option. **Windows users:** use Scoop — Supabase recommends it over npm for Windows because it handles PATH and permissions cleanly. **Linux or Mac without Homebrew:** use npm.
 
@@ -297,7 +297,7 @@ Verify it worked:
 supabase --version
 ```
 
-#### Log In and Link
+### Log In and Link
 
 ```bash
 supabase login
@@ -306,7 +306,7 @@ supabase link --project-ref YOUR_PROJECT_REF
 
 Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1).
 
-#### Set Your OpenRouter Secret
+### Set Your OpenRouter Secret
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
@@ -314,13 +314,13 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 > SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are automatically available inside Edge Functions — you don't need to set them.
 
-#### Create the Function
+### Create the Function
 
 ```bash
 supabase functions new open-brain-mcp
 ```
 
-#### Add Dependencies
+### Add Dependencies
 
 Create `supabase/functions/open-brain-mcp/deno.json`:
 
@@ -336,11 +336,11 @@ Create `supabase/functions/open-brain-mcp/deno.json`:
 }
 ```
 
-#### Write the Server
+### Write the Server
 
 Open `supabase/functions/open-brain-mcp/index.ts` and replace its entire contents with the MCP server code from the [original guide](https://promptkit.natebjones.com/20260224_uq1_guide_main).
 
-#### Deploy
+### Deploy
 
 ```bash
 supabase functions deploy open-brain-mcp --no-verify-jwt
@@ -370,7 +370,7 @@ Paste this into your credential tracker as the MCP Connection URL. This is what 
 
 You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end.
 
-#### Claude Desktop
+### Claude Desktop
 
 1. Open Claude Desktop → **Settings** → **Connectors**
 2. Click **Add custom connector**
@@ -382,7 +382,7 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 
 > No JSON config files. No Node.js. No terminal. If you had trouble with earlier versions of this guide, this is the fix.
 
-#### ChatGPT
+### ChatGPT
 
 Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works on the web at chatgpt.com. Not available on mobile.
 
@@ -405,7 +405,7 @@ Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works
 
 **Using it:** Start a new conversation and make sure the Open Brain connector is enabled — check the tools/apps panel at the top of the chat. ChatGPT is less intuitive than Claude at picking the right MCP tool automatically. If it doesn't use your brain on its own, be explicit: "Use the Open Brain search_thoughts tool to find my notes about project planning." After it gets the pattern once or twice in a conversation, it usually picks up the habit.
 
-#### Claude Code
+### Claude Code
 
 ```bash
 claude mcp add --transport http open-brain \
@@ -413,7 +413,7 @@ claude mcp add --transport http open-brain \
   --header "x-brain-key: your-access-key-from-step-10"
 ```
 
-#### Other Clients (Cursor, VS Code Copilot, Windsurf)
+### Other Clients (Cursor, VS Code Copilot, Windsurf)
 
 Every MCP client handles remote servers slightly differently. The server accepts your access key two ways — pick whichever your client supports:
 
