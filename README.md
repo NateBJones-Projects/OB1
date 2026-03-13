@@ -26,6 +26,8 @@ Never built an Open Brain? Start here:
 
 ## Extensions — The Learning Path
 
+https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60
+
 Build these in order. Each one teaches new concepts through something you'll actually use. By the end, your agent manages your household, your schedule, your meals, your professional network, and your career — all interconnected.
 
 | # | Extension | What You Build | Difficulty |
