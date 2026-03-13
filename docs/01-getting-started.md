@@ -20,7 +20,9 @@ About 45 minutes and zero coding experience. You'll copy and paste everything.
 
 ### If You Get Stuck
 
-Follow this guide step by step — it's designed to get you through without outside help. But if something goes sideways, Supabase has a free built-in AI assistant in every project dashboard. Look for the chat icon in the bottom-right corner. It has access to all of Supabase's documentation and can help with every Supabase-specific step in this guide.
+Follow this guide step by step — it's designed to get you through without outside help. If you'd rather have an AI coding tool walk you through it, check out the [AI-Assisted Setup guide](04-ai-assisted-setup.md) — it covers how to use Cursor, Claude Code, or similar tools to build alongside this guide.
+
+If something goes sideways, Supabase has a free built-in AI assistant in every project dashboard. Look for the chat icon in the bottom-right corner. It has access to all of Supabase's documentation and can help with every Supabase-specific step in this guide.
 
 Things it's good at:
 
