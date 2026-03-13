@@ -240,8 +240,8 @@ def walk_messages(mapping):
     if not roots:
         return []
 
-    # Walk from root, following first child at each level (linear conversation)
-    # For branched conversations, we follow the last child (most recent branch)
+    # Walk from root depth-first, visiting all branches.
+    # Most conversations are linear; branched ones yield all paths.
     messages = []
     visited = set()
 
