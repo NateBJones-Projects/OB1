@@ -1,0 +1,20 @@
+{
+  "name": "Panning for Gold",
+  "description": "Mine raw brain dumps, voice transcripts, and stream-of-consciousness notes for actionable ideas. Three-phase process: extract every thread, evaluate the best ones, synthesize into Open Brain thoughts.",
+  "category": "recipes",
+  "author": {
+    "name": "Jared Irish",
+    "github": "jaredirish"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Claude Code or similar AI coding tool"]
+  },
+  "tags": ["brain-dump", "transcript", "extraction", "evaluation", "voice", "processing", "skill"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-03-13",
+  "updated": "2026-03-13"
+}
