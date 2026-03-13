@@ -11,11 +11,11 @@ This isn't a notes app. It's a database with vector search and an open protocol 
 > Open Brain was created by [Nate B. Jones](https://natesnewsletter.substack.com/). Follow the [Substack](https://natesnewsletter.substack.com/) for updates, discussion, and the companion prompt pack.
 
 <p align="center">
-  <a href="https://vimeo.com/1173109837">
-    <img src="https://i.vimeocdn.com/filter/overlay?src0=https%3A%2F%2Fi.vimeocdn.com%2Fvideo%2F2133193553-5fb0099fc35bc91f2682ed0393ffad302562327c2da8b430fc398fd2e458ad0d-d_960x540%3F%26region%3Dus&src1=http%3A%2F%2Ff.vimeocdn.com%2Fp%2Fimages%2Fcrawler_play.png" alt="Watch: The Open Brain Philosophy" width="640">
-  </a>
+  <video src=".github/videos/ob1-philosophy.mp4" width="640" controls>
+    Your browser does not support the video tag. <a href="https://vimeo.com/1173109837">Watch on Vimeo</a>.
+  </video>
   <br>
-  <em>Watch: The Open Brain Philosophy (25 sec)</em>
+  <em>The Open Brain Philosophy (25 sec)</em>
 </p>
 
 ## Getting Started
