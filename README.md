@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/ob1-logo.png" alt="Open Brain" width="300">
+  <img src=".github/ob1-logo-wide.png" alt="Open Brain" width="600">
 </p>
 
 <h1 align="center">Open Brain</h1>
@@ -54,6 +54,8 @@ Some concepts show up in multiple extensions. Learn them once, apply them everyw
 | [Shared MCP Server](primitives/shared-mcp/) | Giving others scoped access to parts of your brain | Extension 4 |
 
 ## Community Contributions
+
+https://github.com/user-attachments/assets/9454662f-2648-4928-8723-f7d52e94e9b8
 
 Beyond the curated learning path, the community builds and shares:
 
