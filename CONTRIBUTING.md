@@ -12,7 +12,7 @@ You don't need to write code to contribute to Open Brain. If you have a workflow
 2. **A community mentor picks it up.** They'll work with you to shape your idea into a contribution — writing the code, structuring the README, filling in the metadata.
 3. **You get full credit.** Your name goes in the `author` field of `metadata.json` and in CONTRIBUTORS.md. The mentor is credited as a co-author in the PR.
 
-This is a first-class path, not a workaround. Some of the best contributions come from people who use Open Brain daily but don't code.
+This is a first-class path, not a workaround. Some of the best contributions come from people who use Open Brain daily but don't code. You can also post ideas in the `#non-dev-contributions` channel on [Discord](https://discord.gg/Cgh9WJEkeG).
 
 **Other ways to contribute without code:**
 - Report bugs or unclear documentation

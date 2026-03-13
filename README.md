@@ -104,7 +104,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
 
 ## Community
 
-Questions, ideas, help with contributions — the [Substack community chat](https://natesnewsletter.substack.com/) is where it happens.
+- **[Discord](https://discord.gg/Cgh9WJEkeG)** — Real-time help, show-and-tell, contributor discussion
+- **[Substack](https://natesnewsletter.substack.com/)** — Updates, deep dives, and the story behind Open Brain
 
 ## Who Maintains This
 

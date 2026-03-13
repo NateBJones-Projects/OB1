@@ -784,6 +784,8 @@ Want to add a new capture source beyond Slack? Ask it how to create another Edge
 
 You just built AI infrastructure using AI. That pattern doesn't stop here.
 
+Got stuck or want to share what you've built? Join the [Open Brain Discord](https://discord.gg/Cgh9WJEkeG) — there's a `#help` channel for troubleshooting and a `#show-and-tell` channel for showing off.
+
 ---
 
 ## Your Next Step
