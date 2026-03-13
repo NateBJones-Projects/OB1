@@ -427,6 +427,110 @@ jobs:
           # are clear and complete. For now, always passes.
           pass_check "LLM clarity review" "*(Planned for v2)* Auto-pass"
 
+          # ─── Additional automated checks ────────────────────────────────
+
+          # ─── Scope check ───
+          # Contribution PRs should only modify files in their own folder
+          rule12_pass=true
+          rule12_detail=""
+          out_of_scope=""
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            in_scope=false
+            while IFS= read -r dir; do
+              [ -z "$dir" ] && continue
+              if echo "$f" | grep -qE "^${dir}/"; then
+                in_scope=true
+                break
+              fi
+            done <<< "$CONTRIB_DIRS"
+            if [ "$in_scope" = false ]; then
+              out_of_scope="${out_of_scope}  - \`$f\`\n"
+              rule12_pass=false
+            fi
+          done <<< "$CHANGED_FILES"
+
+          if [ "$rule12_pass" = true ]; then
+            pass_check "Scope check" "All changes are within the contribution folder(s)"
+          else
+            fail_check "Scope check" "Files changed outside contribution folder(s):\n${out_of_scope}Contribution PRs should only modify files in their own folder."
+          fi
+
+          # ─── Internal link validation ───
+          # Check that relative links in READMEs point to files that exist
+          rule13_pass=true
+          rule13_detail=""
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            [ ! -f "$dir/README.md" ] && continue
+
+            # Extract relative markdown links (not http, not anchors)
+            links=$(grep -oE '\]\([^)]+\)' "$dir/README.md" | sed 's/^\](//' | sed 's/)$//' | grep -v '^http' | grep -v '^#' || true)
+
+            while IFS= read -r link; do
+              [ -z "$link" ] && continue
+              # Strip anchor fragment
+              filepath=$(echo "$link" | sed 's/#.*//')
+              [ -z "$filepath" ] && continue
+              # Resolve relative to the contribution directory
+              resolved="$dir/$filepath"
+              if [ ! -e "$resolved" ]; then
+                rule13_detail="${rule13_detail}  - \`$dir/README.md\`: broken link \`$link\` → target does not exist\n"
+                rule13_pass=false
+              fi
+            done <<< "$links"
+          done <<< "$CONTRIB_DIRS"
+
+          if [ "$rule13_pass" = true ]; then
+            pass_check "Internal links" "All relative links in READMEs resolve to existing files"
+          else
+            fail_check "Internal links" "Broken links found:\n${rule13_detail}"
+          fi
+
+          # ─── Post-merge reminders (non-blocking) ───────────────────────
+          # These don't block merge — they flag tasks for admins after merge
+          reminders=""
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            category=$(echo "$dir" | cut -d'/' -f1)
+            folder_name=$(echo "$dir" | cut -d'/' -f2)
+            contrib_name=$(jq -r '.name // empty' "$dir/metadata.json" 2>/dev/null || echo "$folder_name")
+            author_name=$(jq -r '.author.name // empty' "$dir/metadata.json" 2>/dev/null || echo "unknown")
+            author_github=$(jq -r '.author.github // empty' "$dir/metadata.json" 2>/dev/null || echo "")
+
+            # Check category index file
+            index_file="$category/README.md"
+            if [ -f "$index_file" ]; then
+              if ! grep -q "$folder_name" "$index_file"; then
+                reminders="${reminders}- [ ] Add **${contrib_name}** to [\`${index_file}\`](${index_file})\n"
+              fi
+            fi
+
+            # Check root README community section
+            if [ -f "README.md" ]; then
+              if ! grep -qi "$folder_name" "README.md"; then
+                reminders="${reminders}- [ ] Add **${contrib_name}** to root README.md community contributions section\n"
+              fi
+            fi
+
+            # Check CONTRIBUTORS.md
+            if [ -f "CONTRIBUTORS.md" ]; then
+              found_contributor=false
+              if [ -n "$author_name" ] && grep -qi "$author_name" "CONTRIBUTORS.md"; then
+                found_contributor=true
+              fi
+              if [ -n "$author_github" ] && grep -qi "$author_github" "CONTRIBUTORS.md"; then
+                found_contributor=true
+              fi
+              if [ "$found_contributor" = false ]; then
+                reminders="${reminders}- [ ] Add **${author_name}**$([ -n "$author_github" ] && echo " (@${author_github})") to [CONTRIBUTORS.md](CONTRIBUTORS.md)\n"
+              fi
+            fi
+          done <<< "$CONTRIB_DIRS"
+
+          # Always remind about Discord
+          reminders="${reminders}- [ ] Post in OB1 Discord [#show-and-tell](https://discord.gg/Cgh9WJEkeG)\n"
+
           # ─── Build summary ───
           total=$((pass_count + fail_count))
           if [ "$fail_count" -gt 0 ]; then
@@ -438,6 +542,12 @@ jobs:
           fi
 
           comment="## OB1 Automated Review\n\n${results}\n${summary}"
+
+          # Append post-merge reminders (non-blocking, for admins)
+          if [ -n "$reminders" ]; then
+            comment="${comment}\n\n---\n\n### Post-Merge Tasks\n\n*These don't block merge — they're reminders for admins after this PR lands.*\n\n${reminders}"
+          fi
+
           echo "comment<<EOF" >> $GITHUB_OUTPUT
           echo -e "$comment" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
