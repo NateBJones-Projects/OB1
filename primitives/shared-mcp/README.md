@@ -2,8 +2,6 @@
 
 A guide to building scoped MCP servers that give other people limited access to specific parts of your Open Brain.
 
-https://github.com/user-attachments/assets/f488e495-fe2a-4ccc-a834-fc6ab5a0ed41
-
 ## When You Need This
 
 You've built your Open Brain—a personal knowledge system with thoughts, contacts, goals, and work data. But now you want to share *part* of it with someone else:

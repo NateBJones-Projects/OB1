@@ -15,8 +15,6 @@ Your agent can reason across five datasets — what you've cooked before, what's
 | 5 | Professional CRM | Not started |
 | 6 | Job Hunt Pipeline | Not started |
 
-https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60
-
 ## What You'll Learn
 
 - Row Level Security (first introduction to multi-user access)

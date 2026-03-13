@@ -15,8 +15,6 @@ Job hunting is an emotional grinder. You think you're failing because you got 3 
 | 5 | Professional CRM | Completed |
 | **6** | **Job Hunt Pipeline** | **<-- You are here** |
 
-https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60
-
 ## What It Does
 
 A complete job search management system — companies, postings, applications, interviews, and contacts. The most complex extension in the learning path, with 5 RLS-protected tables and sophisticated cross-extension integration to your Professional CRM (Extension 5). This extension demonstrates advanced multi-table relationships, pipeline tracking, and data analysis patterns.

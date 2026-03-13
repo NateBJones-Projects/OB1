@@ -15,8 +15,6 @@ You ran into someone at a conference six months ago. They mentioned they were lo
 | **5** | **Professional CRM** | **<-- You are here** |
 | 6 | Job Hunt Pipeline | Not started |
 
-https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60
-
 ## What It Does
 
 A professional contact management system with interaction logging, opportunity tracking, and follow-up reminders. RLS-protected so your professional network stays private. This extension introduces multi-level relationships (contacts → interactions → opportunities) and cross-extension integration with your core Open Brain thoughts table.

@@ -15,8 +15,6 @@ You're at the paint store and can't remember what shade of blue is in the living
 | 5 | Professional CRM | Not started |
 | 6 | Job Hunt Pipeline | Not started |
 
-https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60
-
 ## What It Does
 
 A database and MCP server for storing and retrieving household facts — paint colors, appliance details, vendor contacts, measurements, warranty info, and anything else about your home and family that you'd otherwise forget.

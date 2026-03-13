@@ -1,7 +1,5 @@
 # Contributing to OB1
 
-https://github.com/user-attachments/assets/9454662f-2648-4928-8723-f7d52e94e9b8
-
 ## Before You Contribute
 
 You need a working Open Brain setup. If you haven't built one yet, start with the [Open Brain guide](docs/01-getting-started.md). Every contribution you submit should be tested against your own instance first — don't submit something you haven't run yourself.
