@@ -45,6 +45,11 @@ jobs:
                   labels.add(label);
                 }
               }
+
+              // Label docs and repo-level markdown changes
+              if (file.filename.startsWith('docs/') || (file.filename.endsWith('.md') && !file.filename.includes('/'))) {
+                labels.add('documentation');
+              }
             }
 
             if (labels.size > 0) {
