@@ -2,6 +2,8 @@
 
 ## Before You Contribute
 
+Read **[SOUL.md](SOUL.md)** first — it defines what Open Brain is, what belongs here, and what doesn't. Every PR and issue gets an automated alignment check against this document.
+
 You need a working Open Brain setup. If you haven't built one yet, start with the [Open Brain guide](docs/01-getting-started.md). Every contribution you submit should be tested against your own instance first — don't submit something you haven't run yourself.
 
 ## Not a Developer? You Can Still Contribute.
@@ -173,7 +175,7 @@ As you contribute, you'll progress through these levels. Every level is achievab
 
 Non-code contributions count at every level. Testing recipes, mentoring non-technical contributors, improving documentation, and triaging issues all count toward progression.
 
-## The 11 Automated Review Rules
+## The Automated Review
 
 Every PR is checked against these rules. All must pass before human review.
 
@@ -187,4 +189,6 @@ Every PR is checked against these rules. All must pass before human review.
 8. **No binary blobs** — No files over 1MB, no `.exe`, `.dmg`, `.zip`, `.tar.gz`
 9. **README completeness** — Contribution README includes Prerequisites, step-by-step instructions, and expected outcome sections
 10. **Primitive dependencies** — If a contribution declares `requires_primitives`, the primitives must exist in the repo and be linked in the README
-11. **LLM clarity review** — *(Planned for v2)* Automated check that instructions are clear and complete
+11. **Soul check** — An LLM evaluates whether the contribution aligns with [SOUL.md](SOUL.md) and posts an advisory comment. This check is non-blocking — it flags alignment questions for human reviewers but never prevents a merge.
+12. **Scope check** — All changed files must be within the contribution folder
+13. **Internal links** — Relative links in READMEs must point to files that exist
