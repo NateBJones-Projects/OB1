@@ -1,0 +1,114 @@
+name: Soul Check (Issues)
+
+# Evaluates new issues against SOUL.md to help contributors
+# understand if their idea fits OB1 before they start building.
+# Advisory only — never closes or rejects issues.
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  soul-check:
+    name: Soul Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Evaluate issue alignment
+        id: soul
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          # Skip if no API key configured
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            exit 0
+          fi
+
+          # Skip if SOUL.md doesn't exist
+          if [ ! -f "SOUL.md" ]; then
+            exit 0
+          fi
+
+          SOUL=$(cat SOUL.md)
+          ISSUE_TITLE=$(jq -r '.issue.title // ""' "$GITHUB_EVENT_PATH")
+          ISSUE_BODY=$(jq -r '.issue.body // ""' "$GITHUB_EVENT_PATH" | head -c 3000)
+          ISSUE_LABELS=$(jq -r '[.issue.labels[].name] | join(", ")' "$GITHUB_EVENT_PATH" 2>/dev/null || echo "")
+
+          # Skip for bug reports and questions — soul check is for contribution ideas
+          if echo "$ISSUE_LABELS" | grep -qiE '(bug|question|help)'; then
+            exit 0
+          fi
+
+          SYSTEM_PROMPT="You are the voice of Open Brain (OB1), an open-source project. Someone has opened an issue — it might be a contribution idea, a feature request, or a proposal. You evaluate whether it aligns with the project's soul. You speak as OB1 — welcoming, direct, specific, and constructive. You never discourage people. When something doesn't fit, you suggest how it could be adapted or where it might belong instead. Personal, creative, wellness, and non-technical use cases are explicitly valued."
+
+          USER_CONTENT=$(jq -n \
+            --arg soul "$SOUL" \
+            --arg title "$ISSUE_TITLE" \
+            --arg body "$ISSUE_BODY" \
+            --arg labels "$ISSUE_LABELS" \
+            '$"Evaluate this issue against the OB1 soul document.\n\n<soul_document>\n\($soul)\n</soul_document>\n\n<issue>\nTitle: \($title)\nLabels: \($labels)\n\nBody:\n\($body)\n</issue>\n\nRespond in this exact JSON format:\n{\n  \"alignment\": \"strong_fit\" or \"likely_fit\" or \"needs_discussion\" or \"potential_misfit\",\n  \"response\": \"2-4 sentences. Speak as OB1 directly to the issue author. Be welcoming. If it fits, say why and suggest which category (recipes/schemas/dashboards/integrations) it might land in. If alignment is unclear, ask clarifying questions. If it doesnt fit, be kind and suggest alternatives or adaptations.\"\n}\n\nBe generous. Encourage people. When in doubt, ask questions rather than flagging misalignment."')
+
+          PAYLOAD=$(jq -n \
+            --arg system "$SYSTEM_PROMPT" \
+            --arg user "$USER_CONTENT" \
+            '{
+              "model": "openai/gpt-4o-mini",
+              "response_format": {"type": "json_object"},
+              "messages": [
+                {"role": "system", "content": $system},
+                {"role": "user", "content": $user}
+              ],
+              "temperature": 0.3
+            }')
+
+          RESPONSE=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
+            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            --max-time 30)
+
+          LLM_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+          if [ -z "$LLM_CONTENT" ]; then
+            exit 0
+          fi
+
+          ALIGNMENT=$(echo "$LLM_CONTENT" | jq -r '.alignment // "unknown"')
+          RESPONSE_TEXT=$(echo "$LLM_CONTENT" | jq -r '.response // ""')
+
+          case "$ALIGNMENT" in
+            strong_fit)       EMOJI="✨" ;;
+            likely_fit)       EMOJI="👍" ;;
+            needs_discussion) EMOJI="🤔" ;;
+            potential_misfit)  EMOJI="💡" ;;
+            *)                EMOJI="🧠" ;;
+          esac
+
+          COMMENT="${EMOJI} ${RESPONSE_TEXT}\n\n---\n*I'm an automated check that evaluates ideas against [what Open Brain is about](../blob/main/SOUL.md). A human will follow up.*"
+
+          echo "comment<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$COMMENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post comment
+        if: steps.soul.outputs.comment != ''
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          SOUL_COMMENT: ${{ steps.soul.outputs.comment }}
+        with:
+          script: |
+            const body = process.env.SOUL_COMMENT;
+            if (!body) return;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: body,
+            });

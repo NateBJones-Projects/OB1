@@ -591,3 +591,152 @@ jobs:
         run: |
           echo "One or more review checks failed. See the PR comment for details."
           exit 1
+
+      # ─── Soul Check (non-blocking, advisory) ──────────────────────────
+      # Evaluates PR alignment with OB1's mission using an LLM.
+      # Posts a separate comment. Never blocks merge.
+
+      - name: Soul check
+        if: always() && steps.changed.outputs.contrib_dirs != ''
+        continue-on-error: true
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          CONTRIB_DIRS: ${{ steps.changed.outputs.contrib_dirs }}
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+        run: |
+          # Skip if no API key configured
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "soul_comment=*Soul check skipped — OPENROUTER_API_KEY not configured.*" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Skip if SOUL.md doesn't exist
+          if [ ! -f "SOUL.md" ]; then
+            echo "soul_comment=*Soul check skipped — SOUL.md not found.*" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          SOUL=$(cat SOUL.md)
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY=$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH" | head -c 2000)
+
+          # Read contribution README (first contribution folder)
+          CONTRIB_DIR=$(echo "$CONTRIB_DIRS" | head -1)
+          README_EXCERPT=""
+          if [ -f "$CONTRIB_DIR/README.md" ]; then
+            README_EXCERPT=$(head -c 3000 "$CONTRIB_DIR/README.md")
+          fi
+
+          # Read metadata
+          METADATA=""
+          if [ -f "$CONTRIB_DIR/metadata.json" ]; then
+            METADATA=$(cat "$CONTRIB_DIR/metadata.json")
+          fi
+
+          # Build the prompt
+          SYSTEM_PROMPT="You are the voice of Open Brain (OB1), an open-source project. You evaluate whether contributions align with the project's soul and values. You speak as OB1 itself — welcoming, direct, specific, and constructive. You never reject ideas outright. When something doesn't fit, you suggest how it could be adapted. Personal, creative, wellness, and non-technical use cases are explicitly valued."
+
+          # Use jq to safely build the JSON payload with proper escaping
+          USER_CONTENT=$(jq -n \
+            --arg soul "$SOUL" \
+            --arg title "$PR_TITLE" \
+            --arg body "$PR_BODY" \
+            --arg files "$CHANGED_FILES" \
+            --arg readme "$README_EXCERPT" \
+            --arg metadata "$METADATA" \
+            '$"Evaluate this contribution against the OB1 soul document.\n\n<soul_document>\n\($soul)\n</soul_document>\n\n<contribution>\nTitle: \($title)\n\nDescription:\n\($body)\n\nFiles changed:\n\($files)\n\nmetadata.json:\n\($metadata)\n\nREADME excerpt:\n\($readme)\n</contribution>\n\nRespond in this exact JSON format:\n{\n  \"alignment\": \"strong_fit\" or \"likely_fit\" or \"needs_discussion\" or \"potential_misfit\",\n  \"summary\": \"2-3 sentences. Speak as OB1. Be specific about what this adds and how it connects to the mission. If alignment is unclear or a misfit, be constructive — suggest how it could be adapted.\",\n  \"highlights\": \"One sentence about what is good or interesting about this contribution.\",\n  \"concerns\": \"Specific concerns, or none if no concerns. If there are concerns, suggest a path forward.\"\n}\n\nAlignment definitions:\n- strong_fit: Clearly serves the core thesis. No concerns.\n- likely_fit: Serves the mission with minor questions or suggestions.\n- needs_discussion: Not clearly aligned or misaligned. An admin should weigh in.\n- potential_misfit: Appears to violate a This Doesnt Belong criterion. Suggest adaptation.\n\nBe generous. When in doubt, choose the more welcoming alignment level."')
+
+          PAYLOAD=$(jq -n \
+            --arg system "$SYSTEM_PROMPT" \
+            --arg user "$USER_CONTENT" \
+            '{
+              "model": "openai/gpt-4o-mini",
+              "response_format": {"type": "json_object"},
+              "messages": [
+                {"role": "system", "content": $system},
+                {"role": "user", "content": $user}
+              ],
+              "temperature": 0.3
+            }')
+
+          # Call OpenRouter
+          RESPONSE=$(curl -s -X POST "https://openrouter.ai/api/v1/chat/completions" \
+            -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            --max-time 30)
+
+          # Parse response
+          LLM_CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content // empty')
+          if [ -z "$LLM_CONTENT" ]; then
+            echo "soul_comment=*Soul check failed — could not get LLM response.*" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          ALIGNMENT=$(echo "$LLM_CONTENT" | jq -r '.alignment // "unknown"')
+          SUMMARY=$(echo "$LLM_CONTENT" | jq -r '.summary // "No summary available."')
+          HIGHLIGHTS=$(echo "$LLM_CONTENT" | jq -r '.highlights // ""')
+          CONCERNS=$(echo "$LLM_CONTENT" | jq -r '.concerns // "none"')
+
+          # Map alignment to emoji and label
+          case "$ALIGNMENT" in
+            strong_fit)     LABEL="Strong Fit"; EMOJI="✨" ;;
+            likely_fit)     LABEL="Likely Fit"; EMOJI="👍" ;;
+            needs_discussion) LABEL="Needs Discussion"; EMOJI="🤔" ;;
+            potential_misfit)  LABEL="Potential Misfit"; EMOJI="⚠️" ;;
+            *)              LABEL="Unknown"; EMOJI="❓" ;;
+          esac
+
+          # Build the comment
+          SOUL_COMMENT="### ${EMOJI} Soul Check: ${LABEL}\n\n${SUMMARY}"
+
+          if [ -n "$HIGHLIGHTS" ] && [ "$HIGHLIGHTS" != "none" ]; then
+            SOUL_COMMENT="${SOUL_COMMENT}\n\n**Highlights:** ${HIGHLIGHTS}"
+          fi
+
+          if [ -n "$CONCERNS" ] && [ "$CONCERNS" != "none" ] && [ "$CONCERNS" != "None" ] && [ "$CONCERNS" != "None." ]; then
+            SOUL_COMMENT="${SOUL_COMMENT}\n\n**To consider:** ${CONCERNS}"
+          fi
+
+          SOUL_COMMENT="${SOUL_COMMENT}\n\n---\n*Advisory check based on [SOUL.md](../blob/main/SOUL.md). Human reviewers make the final call.*"
+
+          # Output for next step
+          echo "soul_comment<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$SOUL_COMMENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post soul check comment
+        if: always() && steps.changed.outputs.contrib_dirs != ''
+        continue-on-error: true
+        uses: actions/github-script@v7
+        env:
+          SOUL_COMMENT: ${{ steps.soul.outputs.soul_comment || '*Soul check did not produce a result.*' }}
+        with:
+          script: |
+            const body = process.env.SOUL_COMMENT;
+            if (!body || body === '*Soul check did not produce a result.*') return;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const soulComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('Soul Check')
+            );
+
+            if (soulComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: soulComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
