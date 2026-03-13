@@ -14,9 +14,11 @@ This isn't a notes app. It's a database with vector search and an open protocol 
   <em>The Open Brain Philosophy (25 sec)</em>
 </p>
 
-https://github.com/NateBJones-Projects/OB1/raw/main/.github/videos/ob1-philosophy.mp4
+https://github.com/user-attachments/assets/0b961acb-89da-4bb8-8587-c59c6efed0a1
 
 ## Getting Started
+
+https://github.com/user-attachments/assets/85208d73-112b-4204-82fd-d03b6c397a8b
 
 Never built an Open Brain? Start here:
 
