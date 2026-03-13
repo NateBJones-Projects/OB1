@@ -10,7 +10,7 @@ This isn't a notes app. It's a database with vector search and an open protocol 
 
 > Open Brain was created by [Nate B. Jones](https://natesnewsletter.substack.com/). Follow the [Substack](https://natesnewsletter.substack.com/) for updates, discussion, and the companion prompt pack. Join the [Discord](https://discord.gg/Cgh9WJEkeG) for real-time help and community.
 
-https://github.com/user-attachments/assets/0b961acb-89da-4bb8-8587-c59c6efed0a1
+https://github.com/user-attachments/assets/80a79b09-f323-42c6-b11b-de10bb6fa36f
 
 ## Getting Started
 
@@ -43,6 +43,8 @@ Build these in order. Each one teaches new concepts through something you'll act
 Extensions compound. Your CRM knows about thoughts you've captured. Your meal planner checks who's home this week. Your job hunt contacts automatically become professional network contacts. This is what happens when your agent can see across your whole system.
 
 ## Primitives: Concepts That Compound
+
+https://github.com/user-attachments/assets/f488e495-fe2a-4ccc-a834-fc6ab5a0ed41
 
 Some concepts show up in multiple extensions. Learn them once, apply them everywhere.
 
