@@ -1,7 +1,4 @@
 node_modules/
 .DS_Store
 .planning/
-supabase/.temp/
-supabase/.branches/
-supabase/config.toml
-!supabase/functions/
+supabase/
