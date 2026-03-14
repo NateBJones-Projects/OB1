@@ -1,0 +1,48 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude-review:
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are reviewing a contribution to Open Brain (OB1), an open-source
+            persistent AI memory system. Read CLAUDE.md, CONTRIBUTING.md, and
+            SOUL.md (if it exists) for full project context.
+
+            Review this PR for:
+            1. **Alignment** — Does this contribution fit OB1's mission? Is it a
+               capture pathway, retrieval pathway, schema extension, dashboard, or
+               teaching-through-building contribution?
+            2. **Clarity** — Will a user with the stated prerequisites actually be
+               able to follow the instructions and get a working result?
+            3. **Completeness** — README has prerequisites, numbered steps, and
+               expected outcome? metadata.json looks right?
+            4. **Safety** — No credentials, no destructive SQL, no core schema
+               modifications, no local MCP servers (must use remote Edge Functions)?
+            5. **Value** — Does this add something meaningfully different from
+               existing contributions?
+
+            Be constructive and welcoming. If a contribution needs work, explain
+            what specifically needs to change. If it looks good, approve the PR.
+
+            Important: The mechanical checks (file structure, metadata validation,
+            SQL safety) are handled by a separate CI job. Focus your review on the
+            things that require judgment — clarity, alignment, value, and quality.
