@@ -1,20 +1,20 @@
 {
   "name": "Email History Import",
-  "description": "Import your Gmail email history into Open Brain as searchable thoughts with sender, subject, and date metadata.",
+  "description": "Pull Gmail email history via OAuth, strip quotes and signatures, chunk long emails for RAG, and ingest into Open Brain with embeddings and metadata.",
   "category": "recipes",
   "author": {
     "name": "Matt Hallett",
-    "github": "matthallett"
+    "github": "matthallett1"
   },
   "version": "1.0.0",
   "requires": {
     "open_brain": true,
-    "services": ["Gmail API"],
-    "tools": ["Node.js 18+"]
+    "services": ["Gmail API", "OpenRouter"],
+    "tools": ["Deno 1.40+"]
   },
-  "tags": ["email", "gmail", "import", "history"],
+  "tags": ["email", "gmail", "import", "history", "chunking", "RAG"],
   "difficulty": "intermediate",
-  "estimated_time": "30 minutes",
+  "estimated_time": "45 minutes",
   "created": "2026-03-10",
-  "updated": "2026-03-10"
+  "updated": "2026-03-13"
 }
