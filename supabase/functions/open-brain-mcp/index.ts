@@ -372,10 +372,9 @@ server.registerTool(
 const app = new Hono();
 
 app.all("*", async (c) => {
-  // Accept access key via header OR URL query parameter
-  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
+  const provided = c.req.query("key") || c.req.header("x-access-key") || c.req.header("x-brain-key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401);
+    return c.json({ error: "Unauthorized" }, 401);
   }
 
   const transport = new StreamableHTTPTransport();
