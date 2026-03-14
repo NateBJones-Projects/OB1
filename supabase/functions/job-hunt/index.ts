@@ -450,60 +450,70 @@ app.post("*", async (c) => {
   const server = new McpServer({ name: "job-hunt", version: "1.0.0" });
 
   // Register tools
+  const wrap = async (fn: () => Promise<string>) => {
+    try {
+      const text = await fn();
+      return { content: [{ type: "text" as const, text }] };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: msg }) }], isError: true };
+    }
+  };
+
   server.tool(
     "add_company",
     "Add a company to track in your job search",
     addCompanySchema.shape,
-    async (args) => await handleAddCompany(supabase, args)
+    async (args) => wrap(() => handleAddCompany(supabase, args))
   );
 
   server.tool(
     "add_job_posting",
     "Add a job posting at a company",
     addJobPostingSchema.shape,
-    async (args) => await handleAddJobPosting(supabase, args)
+    async (args) => wrap(() => handleAddJobPosting(supabase, args))
   );
 
   server.tool(
     "submit_application",
     "Record a submitted application",
     submitApplicationSchema.shape,
-    async (args) => await handleSubmitApplication(supabase, args)
+    async (args) => wrap(() => handleSubmitApplication(supabase, args))
   );
 
   server.tool(
     "schedule_interview",
     "Schedule an interview for an application",
     scheduleInterviewSchema.shape,
-    async (args) => await handleScheduleInterview(supabase, args)
+    async (args) => wrap(() => handleScheduleInterview(supabase, args))
   );
 
   server.tool(
     "log_interview_notes",
     "Add feedback/notes after an interview and mark it as completed",
     logInterviewNotesSchema.shape,
-    async (args) => await handleLogInterviewNotes(supabase, args)
+    async (args) => wrap(() => handleLogInterviewNotes(supabase, args))
   );
 
   server.tool(
     "get_pipeline_overview",
     "Get a dashboard summary: application counts by status, upcoming interviews, recent activity",
     getPipelineOverviewSchema.shape,
-    async (args) => await handleGetPipelineOverview(supabase, args)
+    async (args) => wrap(() => handleGetPipelineOverview(supabase, args))
   );
 
   server.tool(
     "get_upcoming_interviews",
     "List interviews in the next N days with full company/role context",
     getUpcomingInterviewsSchema.shape,
-    async (args) => await handleGetUpcomingInterviews(supabase, args)
+    async (args) => wrap(() => handleGetUpcomingInterviews(supabase, args))
   );
 
   server.tool(
     "link_contact_to_professional_crm",
     "CROSS-EXTENSION: Link a job contact to Extension 5 Professional CRM, creating a professional_contacts record",
     linkContactToProfessionalCRMSchema.shape,
-    async (args) => await handleLinkContactToProfessionalCRM(supabase, args)
+    async (args) => wrap(() => handleLinkContactToProfessionalCRM(supabase, args))
   );
 
   // Connect transport and handle request
