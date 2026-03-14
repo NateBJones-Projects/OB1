@@ -30,6 +30,7 @@ Lead with the human pain point. What real-life scenario makes this extension wor
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
+- Supabase CLI installed and linked to your project
 - List any earlier extensions that must be completed first
 - List any required primitives with links
 
@@ -37,7 +38,7 @@ Lead with the human pain point. What real-life scenario makes this extension wor
 
 Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL, Secret key, and Project ref.
 
 ```text
 EXTENSION NAME -- CREDENTIAL TRACKER
@@ -46,9 +47,12 @@ EXTENSION NAME -- CREDENTIAL TRACKER
 SUPABASE (from your Open Brain setup)
   Project URL:           ____________
   Secret key:            ____________
+  Project ref:           ____________
 
 GENERATED DURING SETUP
-  (list any extension-specific values)
+  MCP Access Key:        ____________
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -57,25 +61,29 @@ GENERATED DURING SETUP
 
 ### 1. Create the Database Tables
 
-Run this SQL in your Supabase SQL Editor:
+Run the SQL in `schema.sql` in your Supabase SQL Editor (`https://supabase.com/dashboard/project/YOUR_PROJECT_ID/sql/new`). Copy, paste, click Run.
 
-```sql
--- SQL here
-```
+### 2. Deploy the MCP Server
 
-### 2. Set Up the MCP Server
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-Instructions for MCP server setup.
+| Setting | Value |
+|---------|-------|
+| Function name | `extension-name-mcp` |
+| Server code | This extension's `index.ts` |
 
-### 3. Configure Environment Variables
+### 3. Connect to Your AI
 
-```bash
-# .env setup
-```
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
+
+| Setting | Value |
+|---------|-------|
+| Connector name | `Extension Name` |
+| URL | Your **MCP Connection URL** from the credential tracker |
 
 ### 4. Test It
 
-Verification steps.
+Verification steps and example prompts go here.
 
 ## Cross-Extension Integration
 
@@ -87,11 +95,12 @@ What should be working when you're done? Be specific.
 
 ## Troubleshooting
 
-**Issue: [Common problem]**
-Solution: [How to fix it]
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-**Issue: [Another common problem]**
-Solution: [How to fix it]
+**Extension-specific issues:**
+
+**"relation 'table_name' does not exist"**
+- The `schema.sql` wasn't run successfully — re-run it in the Supabase SQL Editor
 
 ## Next Steps
 

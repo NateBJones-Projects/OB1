@@ -64,6 +64,7 @@ Your contribution's README must include these sections:
 - **"What You'll Learn"** listing new concepts introduced
 - **"Cross-Extension Integration"** prominently documenting connections to other extensions
 - **"Next Steps"** linking to the next extension
+- **Remote MCP setup** — MCP servers must be deployed as Supabase Edge Functions and connected via custom connectors (URL-based). Do NOT use local Node.js servers or `claude_desktop_config.json`. See the [extension template](extensions/_template/) for the correct pattern.
 
 **Primitives** additionally require:
 - **"Extensions That Use This"** section listing which extensions reference this primitive
@@ -148,7 +149,7 @@ Example for an extension:
 ## The Review Process
 
 1. You submit a PR
-2. An automated GitHub Action checks 11 machine-readable rules (see below)
+2. An automated GitHub Action checks machine-readable rules (see below)
 3. If the automated check passes, a human admin reviews for quality, clarity, and safety
 4. Expect 2-5 business days for human review
 
@@ -188,3 +189,6 @@ Every PR is checked against these rules. All must pass before human review.
 9. **README completeness** — Contribution README includes Prerequisites, step-by-step instructions, and expected outcome sections
 10. **Primitive dependencies** — If a contribution declares `requires_primitives`, the primitives must exist in the repo and be linked in the README
 11. **LLM clarity review** — *(Planned for v2)* Automated check that instructions are clear and complete
+12. **Scope check** — All changes are within the contribution folder(s)
+13. **Internal links** — All relative links in READMEs resolve to existing files
+14. **Remote MCP pattern** — Extensions and integrations must use remote MCP via Supabase Edge Functions. No `claude_desktop_config.json`, no local Node.js stdio servers. See the [Getting Started guide](docs/01-getting-started.md) for the correct pattern

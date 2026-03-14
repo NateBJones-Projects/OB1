@@ -32,8 +32,7 @@ A maintenance scheduling and history system. Track recurring tasks, log complete
 
 - Working Open Brain setup
 - Supabase project configured
-- Node.js 18+ installed
-- Basic understanding of SQL and TypeScript
+- Supabase CLI installed and linked to your project
 - Extension 1 recommended but not required
 
 ## Credential Tracker
@@ -49,6 +48,12 @@ HOME MAINTENANCE -- CREDENTIAL TRACKER
 SUPABASE (from your Open Brain setup)
   Project URL:           ____________
   Secret key:            ____________
+  Project ref:           ____________
+
+GENERATED DURING SETUP
+  MCP Access Key:        ____________
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -66,52 +71,25 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run.
 
-### 2. Install Dependencies
+### 2. Deploy the MCP Server
 
-```bash
-cd extensions/home-maintenance
-npm install
-```
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-### 3. Configure Environment Variables
+| Setting | Value |
+|---------|-------|
+| Function name | `home-maintenance-mcp` |
+| Server code | This extension's `index.ts` |
 
-Create a `.env` file in this directory:
+### 3. Connect to Your AI
 
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
-### 4. Build the MCP Server
+| Setting | Value |
+|---------|-------|
+| Connector name | `Home Maintenance` |
+| URL | Your **MCP Connection URL** from the credential tracker |
 
-```bash
-npm run build
-```
-
-### 5. Add to Your MCP Configuration
-
-Add this extension to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "home-maintenance": {
-      "command": "node",
-      "args": ["/path/to/extensions/home-maintenance/build/index.js"],
-      "env": {
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your_service_role_key"
-      }
-    }
-  }
-}
-```
-
-### 6. Restart Claude Desktop
-
-Restart Claude Desktop to load the new MCP server.
-
-### 7. Test the Extension
+### 4. Test the Extension
 
 Try these commands with Claude:
 
@@ -167,37 +145,17 @@ Your agent will be able to answer questions like:
 
 ## Troubleshooting
 
-### "Cannot connect to Supabase"
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-- Verify your `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
-- Check that your Supabase project is active
-- Ensure Row Level Security (RLS) policies allow service role access
+**Extension-specific issues:**
 
-### "Tool not found" in Claude
-
-- Verify the MCP server is configured in `claude_desktop_config.json`
-- Check that the path to `index.js` is absolute and correct
-- Restart Claude Desktop after configuration changes
-- Check Claude's MCP logs for connection errors
-
-### "next_due not updating after logging maintenance"
-
+**"next_due not updating after logging maintenance"**
 - Verify that the task has a `frequency_days` value set
 - Check that the `log_maintenance` tool completed successfully
-- The trigger should auto-update `next_due` = `completed_at` + `frequency_days`
 - For one-time tasks (frequency_days = null), next_due remains null
 
-### "Date parsing errors"
-
+**"Date parsing errors"**
 - Ensure dates are in ISO 8601 format: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ`
-- The MCP server expects date strings, which PostgreSQL will parse
-- For "N days from now" calculations, let the tool compute the date
-
-### TypeScript build errors
-
-- Ensure you've run `npm install` first
-- Check that Node.js version is 18 or higher: `node --version`
-- Delete `node_modules` and `package-lock.json`, then reinstall
 
 ## Next Steps
 

@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Shared Meal Planning MCP Server
  *
@@ -14,265 +12,199 @@
  * - Cannot create/delete recipes or meal plans
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { Hono } from "hono";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPTransport } from "@hono/mcp";
+import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_HOUSEHOLD_KEY = process.env.SUPABASE_HOUSEHOLD_KEY;
+const app = new Hono();
 
-if (!SUPABASE_URL || !SUPABASE_HOUSEHOLD_KEY) {
-  throw new Error(
-    "Missing required environment variables: SUPABASE_URL and SUPABASE_HOUSEHOLD_KEY"
+app.post("/mcp", async (c) => {
+  const key = c.req.query("key") || c.req.header("x-access-key");
+  const expected = Deno.env.get("MCP_HOUSEHOLD_ACCESS_KEY");
+  if (!key || key !== expected) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_HOUSEHOLD_KEY")!,
   );
-}
 
-// Create client with household member credentials
-const supabase = createClient(SUPABASE_URL, SUPABASE_HOUSEHOLD_KEY);
+  const server = new McpServer({ name: "meal-planning-shared", version: "1.0.0" });
 
-const server = new Server(
-  {
-    name: "meal-planning-shared",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
+  // view_meal_plan tool
+  server.tool(
+    "view_meal_plan",
+    "View the meal plan for a given week (read-only)",
+    {
+      user_id: z.string().describe("User ID (UUID)"),
+      week_start: z.string().describe("Monday of the week (YYYY-MM-DD)"),
     },
-  }
-);
-
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: "view_meal_plan",
-        description: "View the meal plan for a given week (read-only)",
-        inputSchema: {
-          type: "object",
-          properties: {
-            user_id: { type: "string", description: "User ID (UUID)" },
-            week_start: {
-              type: "string",
-              description: "Monday of the week (YYYY-MM-DD)",
-            },
-          },
-          required: ["user_id", "week_start"],
-        },
-      },
-      {
-        name: "view_recipes",
-        description: "Browse or search recipes (read-only)",
-        inputSchema: {
-          type: "object",
-          properties: {
-            user_id: { type: "string", description: "User ID (UUID)" },
-            query: { type: "string", description: "Search query for name" },
-            cuisine: { type: "string", description: "Filter by cuisine" },
-            tag: { type: "string", description: "Filter by tag" },
-          },
-          required: ["user_id"],
-        },
-      },
-      {
-        name: "view_shopping_list",
-        description: "View the shopping list for a given week",
-        inputSchema: {
-          type: "object",
-          properties: {
-            user_id: { type: "string", description: "User ID (UUID)" },
-            week_start: {
-              type: "string",
-              description: "Monday of the week (YYYY-MM-DD)",
-            },
-          },
-          required: ["user_id", "week_start"],
-        },
-      },
-      {
-        name: "mark_item_purchased",
-        description: "Toggle an item's purchased status on the shopping list",
-        inputSchema: {
-          type: "object",
-          properties: {
-            shopping_list_id: {
-              type: "string",
-              description: "Shopping list ID (UUID)",
-            },
-            item_name: {
-              type: "string",
-              description: "Name of the item to mark",
-            },
-            purchased: {
-              type: "boolean",
-              description: "New purchased status",
-            },
-          },
-          required: ["shopping_list_id", "item_name", "purchased"],
-        },
-      },
-    ],
-  };
-});
-
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case "view_meal_plan": {
-        const { data, error } = await supabase
-          .from("meal_plans")
-          .select(
-            `
-            *,
-            recipes:recipe_id (name, cuisine, prep_time_minutes, cook_time_minutes, servings)
+    async (args) => {
+      const { data, error } = await supabase
+        .from("meal_plans")
+        .select(
           `
-          )
-          .eq("user_id", args.user_id)
-          .eq("week_start", args.week_start)
-          .order("day_of_week")
-          .order("meal_type");
+          *,
+          recipes:recipe_id (name, cuisine, prep_time_minutes, cook_time_minutes, servings)
+        `
+        )
+        .eq("user_id", args.user_id)
+        .eq("week_start", args.week_start)
+        .order("day_of_week")
+        .order("meal_type");
 
-        if (error) throw error;
+      if (error) throw error;
 
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(data, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "view_recipes": {
-        let query = supabase
-          .from("recipes")
-          .select("id, name, cuisine, prep_time_minutes, cook_time_minutes, servings, tags, rating")
-          .eq("user_id", args.user_id);
-
-        if (args.query) {
-          query = query.ilike("name", `%${args.query}%`);
-        }
-
-        if (args.cuisine) {
-          query = query.eq("cuisine", args.cuisine);
-        }
-
-        if (args.tag) {
-          query = query.contains("tags", [args.tag]);
-        }
-
-        const { data, error } = await query.order("name");
-
-        if (error) throw error;
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(data, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "view_shopping_list": {
-        const { data, error } = await supabase
-          .from("shopping_lists")
-          .select("*")
-          .eq("user_id", args.user_id)
-          .eq("week_start", args.week_start)
-          .single();
-
-        if (error) throw error;
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(data, null, 2),
-            },
-          ],
-        };
-      }
-
-      case "mark_item_purchased": {
-        // Fetch the current shopping list
-        const { data: list, error: fetchError } = await supabase
-          .from("shopping_lists")
-          .select("items")
-          .eq("id", args.shopping_list_id)
-          .single();
-
-        if (fetchError) throw fetchError;
-
-        // Update the specific item's purchased status
-        const items = list.items as Array<{
-          name: string;
-          quantity: string;
-          unit: string;
-          purchased: boolean;
-          recipe_id?: string;
-        }>;
-
-        const updatedItems = items.map((item) => {
-          if (item.name === args.item_name) {
-            return { ...item, purchased: args.purchased };
-          }
-          return item;
-        });
-
-        // Save back to database
-        const { data, error } = await supabase
-          .from("shopping_lists")
-          .update({
-            items: updatedItems,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", args.shopping_list_id)
-          .select()
-          .single();
-
-        if (error) throw error;
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(data, null, 2),
-            },
-          ],
-        };
-      }
-
-      default:
-        throw new Error(`Unknown tool: ${name}`);
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+      };
     }
-  } catch (error) {
-    return {
-      content: [
-        {
-          type: "text",
-          text: `Error: ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
-      isError: true,
-    };
-  }
-});
+  );
 
-async function main() {
-  const transport = new StdioServerTransport();
+  // view_recipes tool
+  server.tool(
+    "view_recipes",
+    "Browse or search recipes (read-only)",
+    {
+      user_id: z.string().describe("User ID (UUID)"),
+      query: z.string().optional().describe("Search query for name"),
+      cuisine: z.string().optional().describe("Filter by cuisine"),
+      tag: z.string().optional().describe("Filter by tag"),
+    },
+    async (args) => {
+      let query = supabase
+        .from("recipes")
+        .select("id, name, cuisine, prep_time_minutes, cook_time_minutes, servings, tags, rating")
+        .eq("user_id", args.user_id);
+
+      if (args.query) {
+        query = query.ilike("name", `%${args.query}%`);
+      }
+
+      if (args.cuisine) {
+        query = query.eq("cuisine", args.cuisine);
+      }
+
+      if (args.tag) {
+        query = query.contains("tags", [args.tag]);
+      }
+
+      const { data, error } = await query.order("name");
+
+      if (error) throw error;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  // view_shopping_list tool
+  server.tool(
+    "view_shopping_list",
+    "View the shopping list for a given week",
+    {
+      user_id: z.string().describe("User ID (UUID)"),
+      week_start: z.string().describe("Monday of the week (YYYY-MM-DD)"),
+    },
+    async (args) => {
+      const { data, error } = await supabase
+        .from("shopping_lists")
+        .select("*")
+        .eq("user_id", args.user_id)
+        .eq("week_start", args.week_start)
+        .single();
+
+      if (error) throw error;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  // mark_item_purchased tool
+  server.tool(
+    "mark_item_purchased",
+    "Toggle an item's purchased status on the shopping list",
+    {
+      shopping_list_id: z.string().describe("Shopping list ID (UUID)"),
+      item_name: z.string().describe("Name of the item to mark"),
+      purchased: z.boolean().describe("New purchased status"),
+    },
+    async (args) => {
+      // Fetch the current shopping list
+      const { data: list, error: fetchError } = await supabase
+        .from("shopping_lists")
+        .select("items")
+        .eq("id", args.shopping_list_id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Update the specific item's purchased status
+      const items = list.items as Array<{
+        name: string;
+        quantity: string;
+        unit: string;
+        purchased: boolean;
+        recipe_id?: string;
+      }>;
+
+      const updatedItems = items.map((item) => {
+        if (item.name === args.item_name) {
+          return { ...item, purchased: args.purchased };
+        }
+        return item;
+      });
+
+      // Save back to database
+      const { data, error } = await supabase
+        .from("shopping_lists")
+        .update({
+          items: updatedItems,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", args.shopping_list_id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(data, null, 2),
+          },
+        ],
+      };
+    }
+  );
+
+  const transport = new StreamableHTTPTransport();
   await server.connect(transport);
-}
-
-main().catch((error) => {
-  console.error("Shared server error:", error);
-  process.exit(1);
+  return transport.handleRequest(c);
 });
+
+app.get("/", (c) => c.json({ status: "ok", service: "Meal Planning (Shared)", version: "1.0.0" }));
+
+Deno.serve(app.fetch);

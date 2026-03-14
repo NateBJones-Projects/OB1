@@ -114,99 +114,59 @@ CREATE POLICY "Household members update shared lists"
 
 ### Step 3: Build a Separate MCP Server
 
-Create a new MCP server project (TypeScript example):
+Create a new Edge Function for the shared server. This is a Supabase Edge Function using Hono and the MCP SDK — the same pattern as the core Open Brain and all extensions.
 
 ```typescript
-// shared-server.ts
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+// shared-server index.ts (Supabase Edge Function)
+import { Hono } from "hono";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPTransport } from "@hono/mcp";
+import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 
-// Use separate environment variables for scoped access
-const supabaseUrl = process.env.SHARED_SUPABASE_URL!;
-const supabaseKey = process.env.SHARED_SUPABASE_KEY!; // Limited key
+const app = new Hono();
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-const server = new Server(
-  {
-    name: "household-shared-server",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
+app.post("/mcp", async (c) => {
+  // Authenticate with a SEPARATE access key for the shared server
+  const key = c.req.query("key") || c.req.header("x-access-key");
+  const expected = Deno.env.get("MCP_HOUSEHOLD_ACCESS_KEY");
+  if (!key || key !== expected) {
+    return c.json({ error: "Unauthorized" }, 401);
   }
-);
 
-// Only expose tools for shared tables
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: "view_meal_plans",
-        description: "View upcoming meal plans",
-        inputSchema: {
-          type: "object",
-          properties: {
-            days: { type: "number", description: "Number of days to view" },
-          },
-        },
-      },
-      {
-        name: "view_shopping_list",
-        description: "View current shopping list",
-        inputSchema: { type: "object", properties: {} },
-      },
-      {
-        name: "add_shopping_item",
-        description: "Add item to shopping list",
-        inputSchema: {
-          type: "object",
-          properties: {
-            item: { type: "string" },
-            quantity: { type: "string" },
-          },
-          required: ["item"],
-        },
-      },
-      {
-        name: "update_shopping_item",
-        description: "Mark shopping item as purchased",
-        inputSchema: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            purchased: { type: "boolean" },
-          },
-          required: ["id", "purchased"],
-        },
-      },
-    ],
-  };
-});
+  // Use SCOPED credentials — not the service role key
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_HOUSEHOLD_KEY")!, // Limited key
+  );
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  switch (request.params.name) {
-    case "view_meal_plans": {
-      const days = request.params.arguments?.days || 7;
+  const server = new McpServer(
+    { name: "household-shared-server", version: "1.0.0" },
+  );
+
+  // Only expose tools for shared tables
+  server.tool(
+    "view_meal_plans",
+    "View upcoming meal plans",
+    { days: z.number().optional().describe("Number of days to view") },
+    async ({ days }) => {
       const { data, error } = await supabase
         .from("meal_plans")
         .select("*")
         .gte("date", new Date().toISOString().split("T")[0])
         .order("date", { ascending: true })
-        .limit(days);
+        .limit(days || 7);
 
       if (error) throw error;
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
+  );
 
-    case "view_shopping_list": {
+  server.tool(
+    "view_shopping_list",
+    "View current shopping list",
+    {},
+    async () => {
       const { data, error } = await supabase
         .from("shopping_list_items")
         .select("*")
@@ -216,30 +176,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (error) throw error;
       return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }] };
     }
+  );
 
-    case "add_shopping_item": {
-      const { item, quantity } = request.params.arguments as {
-        item: string;
-        quantity?: string;
-      };
+  server.tool(
+    "add_shopping_item",
+    "Add item to shopping list",
+    {
+      item: z.string().describe("Item name"),
+      quantity: z.string().optional().describe("Quantity"),
+    },
+    async ({ item, quantity }) => {
       const { data, error } = await supabase
         .from("shopping_list_items")
         .insert({ item, quantity: quantity || "1", purchased: false })
         .select();
 
       if (error) throw error;
-      return {
-        content: [
-          { type: "text", text: `Added: ${JSON.stringify(data, null, 2)}` },
-        ],
-      };
+      return { content: [{ type: "text", text: `Added: ${JSON.stringify(data, null, 2)}` }] };
     }
+  );
 
-    case "update_shopping_item": {
-      const { id, purchased } = request.params.arguments as {
-        id: string;
-        purchased: boolean;
-      };
+  server.tool(
+    "update_shopping_item",
+    "Mark shopping item as purchased",
+    {
+      id: z.string().describe("Item ID"),
+      purchased: z.boolean().describe("Purchased status"),
+    },
+    async ({ id, purchased }) => {
       const { data, error } = await supabase
         .from("shopping_list_items")
         .update({ purchased })
@@ -247,35 +211,31 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         .select();
 
       if (error) throw error;
-      return {
-        content: [
-          { type: "text", text: `Updated: ${JSON.stringify(data, null, 2)}` },
-        ],
-      };
+      return { content: [{ type: "text", text: `Updated: ${JSON.stringify(data, null, 2)}` }] };
     }
+  );
 
-    default:
-      throw new Error(`Unknown tool: ${request.params.name}`);
-  }
+  const transport = new StreamableHTTPTransport();
+  await server.connect(transport);
+  return transport.handleRequest(c);
 });
 
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Shared MCP server running on stdio");
-}
+app.get("/", (c) => c.json({ status: "ok", service: "Household Shared", version: "1.0.0" }));
 
-main().catch(console.error);
+Deno.serve(app.fetch);
 ```
 
-### Step 4: Configure Separate Environment Variables
+### Step 4: Configure Separate Secrets
 
-Create a `.env.shared` file:
+Set the shared server's secrets in Supabase (separate from your main server's secrets):
 
 ```bash
-# Shared MCP Server Environment Variables
-SHARED_SUPABASE_URL=https://your-project.supabase.co
-SHARED_SUPABASE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # LIMITED KEY
+# Generate a separate access key for the shared server
+openssl rand -hex 32
+
+# Set secrets
+supabase secrets set MCP_HOUSEHOLD_ACCESS_KEY=your-generated-shared-key
+supabase secrets set SUPABASE_HOUSEHOLD_KEY=your-limited-supabase-key  # LIMITED KEY
 
 # Optional: Household ID for RLS
 SHARED_HOUSEHOLD_ID=uuid-here
@@ -303,29 +263,40 @@ Add to `package.json`:
 }
 ```
 
-### Step 5: Deploy Independently
+### Step 5: Deploy as a Separate Edge Function
 
-Add to the other person's Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+Deploy the shared server as its own Supabase Edge Function:
 
-```json
-{
-  "mcpServers": {
-    "household-shared": {
-      "command": "node",
-      "args": [
-        "--env-file=/absolute/path/to/.env.shared",
-        "/absolute/path/to/shared-server/dist/shared-server.js"
-      ]
-    }
-  }
-}
+```bash
+supabase functions new household-shared-mcp
 ```
 
+Copy the shared server code into `supabase/functions/household-shared-mcp/index.ts`, generate a separate access key, and deploy:
+
+```bash
+# Generate a separate access key for the shared server
+openssl rand -hex 32
+
+# Set the shared server's secrets
+supabase secrets set MCP_HOUSEHOLD_ACCESS_KEY=generated-key-here
+supabase secrets set SUPABASE_HOUSEHOLD_KEY=household-scoped-api-key
+
+# Deploy
+supabase functions deploy household-shared-mcp --no-verify-jwt
+```
+
+The other person connects via Claude Desktop:
+
+1. Open Claude Desktop → **Settings** → **Connectors**
+2. Click **Add custom connector**
+3. Name: `Household Shared`
+4. Remote MCP server URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/household-shared-mcp?key=shared-access-key`
+5. Click **Add**
+
 **Key points:**
-- This config goes on *their* machine, not yours
-- They need Node.js installed
-- They need the compiled server code and `.env.shared` file
+- They connect via URL — no Node.js, no config files, no terminal needed on their end
 - They do NOT need access to your main MCP server or credentials
+- You can revoke access by changing the shared access key in Supabase secrets
 
 ### Step 6: Test the Access Boundaries
 
@@ -545,21 +516,11 @@ For Supabase: Create a custom JWT with limited claims, or use connection pooling
    tail -f ~/Library/Logs/Claude/mcp*.log
    ```
 
-4. Verify absolute paths in config:
+4. Verify the connector URL is correct:
 
-   ```json
-   {
-     "mcpServers": {
-       "household-shared": {
-         "command": "node",
-         "args": [
-           "--env-file=/Users/spouse/shared-mcp/.env.shared",
-           "/Users/spouse/shared-mcp/dist/shared-server.js"
-         ]
-       }
-     }
-   }
-   ```
+   - Check that the `?key=` value matches the `MCP_HOUSEHOLD_ACCESS_KEY` secret exactly
+   - Try removing and re-adding the connector in Settings → Connectors
+   - Verify the Edge Function is deployed: `supabase functions list`
 
 ## Extensions That Use This
 

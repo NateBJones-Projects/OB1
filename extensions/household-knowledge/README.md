@@ -32,8 +32,7 @@ A database and MCP server for storing and retrieving household facts — paint c
 
 - Working Open Brain setup
 - Supabase project configured
-- Node.js 18+ installed
-- Basic understanding of SQL and TypeScript
+- Supabase CLI installed and linked to your project
 
 ## Credential Tracker
 
@@ -48,6 +47,12 @@ HOUSEHOLD KNOWLEDGE -- CREDENTIAL TRACKER
 SUPABASE (from your Open Brain setup)
   Project URL:           ____________
   Secret key:            ____________
+  Project ref:           ____________
+
+GENERATED DURING SETUP
+  MCP Access Key:        ____________
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -65,52 +70,25 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run.
 
-### 2. Install Dependencies
+### 2. Deploy the MCP Server
 
-```bash
-cd extensions/household-knowledge
-npm install
-```
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-### 3. Configure Environment Variables
+| Setting | Value |
+|---------|-------|
+| Function name | `household-knowledge-mcp` |
+| Server code | This extension's `index.ts` |
 
-Create a `.env` file in this directory:
+### 3. Connect to Your AI
 
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
-### 4. Build the MCP Server
+| Setting | Value |
+|---------|-------|
+| Connector name | `Household Knowledge` |
+| URL | Your **MCP Connection URL** from the credential tracker |
 
-```bash
-npm run build
-```
-
-### 5. Add to Your MCP Configuration
-
-Add this extension to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "household-knowledge": {
-      "command": "node",
-      "args": ["/path/to/extensions/household-knowledge/build/index.js"],
-      "env": {
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your_service_role_key"
-      }
-    }
-  }
-}
-```
-
-### 6. Restart Claude Desktop
-
-Restart Claude Desktop to load the new MCP server.
-
-### 7. Test the Extension
+### 4. Test the Extension
 
 Try these commands with Claude:
 
@@ -157,30 +135,14 @@ Your agent will be able to answer questions like:
 
 ## Troubleshooting
 
-### "Cannot connect to Supabase"
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-- Verify your `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
-- Check that your Supabase project is active
-- Ensure Row Level Security (RLS) policies allow service role access
+**Extension-specific issues:**
 
-### "Tool not found" in Claude
-
-- Verify the MCP server is configured in `claude_desktop_config.json`
-- Check that the path to `index.js` is absolute and correct
-- Restart Claude Desktop after configuration changes
-- Check Claude's MCP logs for connection errors
-
-### "Permission denied" errors
-
+**"Permission denied" errors**
 - The service role key bypasses RLS, so this suggests a configuration issue
 - Verify the user_id being passed exists in `auth.users`
 - Check that foreign key constraints are not blocking inserts
-
-### TypeScript build errors
-
-- Ensure you've run `npm install` first
-- Check that Node.js version is 18 or higher: `node --version`
-- Delete `node_modules` and `package-lock.json`, then reinstall
 
 ## Next Steps
 

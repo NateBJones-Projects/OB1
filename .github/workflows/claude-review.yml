@@ -3,6 +3,8 @@ name: Claude PR Review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  pull_request_review_comment:
+    types: [created]
   issue_comment:
     types: [created]
 
@@ -10,17 +12,21 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  id-token: write
 
 jobs:
   claude-review:
     if: >
       github.event_name == 'pull_request' ||
       (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' &&
        contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     steps:
       - uses: anthropics/claude-code-action@v1
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
             You are reviewing a contribution to Open Brain (OB1), an open-source
