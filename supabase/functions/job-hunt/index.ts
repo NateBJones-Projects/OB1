@@ -453,56 +453,56 @@ app.post("*", async (c) => {
   server.tool(
     "add_company",
     "Add a company to track in your job search",
-    addCompanySchema,
+    addCompanySchema.shape,
     async (args) => await handleAddCompany(supabase, args)
   );
 
   server.tool(
     "add_job_posting",
     "Add a job posting at a company",
-    addJobPostingSchema,
+    addJobPostingSchema.shape,
     async (args) => await handleAddJobPosting(supabase, args)
   );
 
   server.tool(
     "submit_application",
     "Record a submitted application",
-    submitApplicationSchema,
+    submitApplicationSchema.shape,
     async (args) => await handleSubmitApplication(supabase, args)
   );
 
   server.tool(
     "schedule_interview",
     "Schedule an interview for an application",
-    scheduleInterviewSchema,
+    scheduleInterviewSchema.shape,
     async (args) => await handleScheduleInterview(supabase, args)
   );
 
   server.tool(
     "log_interview_notes",
     "Add feedback/notes after an interview and mark it as completed",
-    logInterviewNotesSchema,
+    logInterviewNotesSchema.shape,
     async (args) => await handleLogInterviewNotes(supabase, args)
   );
 
   server.tool(
     "get_pipeline_overview",
     "Get a dashboard summary: application counts by status, upcoming interviews, recent activity",
-    getPipelineOverviewSchema,
+    getPipelineOverviewSchema.shape,
     async (args) => await handleGetPipelineOverview(supabase, args)
   );
 
   server.tool(
     "get_upcoming_interviews",
     "List interviews in the next N days with full company/role context",
-    getUpcomingInterviewsSchema,
+    getUpcomingInterviewsSchema.shape,
     async (args) => await handleGetUpcomingInterviews(supabase, args)
   );
 
   server.tool(
     "link_contact_to_professional_crm",
     "CROSS-EXTENSION: Link a job contact to Extension 5 Professional CRM, creating a professional_contacts record",
-    linkContactToProfessionalCRMSchema,
+    linkContactToProfessionalCRMSchema.shape,
     async (args) => await handleLinkContactToProfessionalCRM(supabase, args)
   );
 
