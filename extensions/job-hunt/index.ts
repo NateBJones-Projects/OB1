@@ -424,7 +424,7 @@ async function handleLinkContactToProfessionalCRM(supabase: any, args: z.infer<t
 }
 
 // MCP server endpoint
-app.post("/mcp", async (c) => {
+app.post("*", async (c) => {
   // Validate access key
   const key = c.req.query("key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_ACCESS_KEY");
@@ -511,7 +511,7 @@ app.post("/mcp", async (c) => {
 });
 
 // Health check endpoint
-app.get("/", (c) => c.json({
+app.get("*", (c) => c.json({
   status: "ok",
   service: "Job Hunt Pipeline",
   version: "1.0.0"

@@ -18,7 +18,7 @@ import { createClient } from "@supabase/supabase-js";
 const app = new Hono();
 
 // POST /mcp - Main MCP endpoint
-app.post("/mcp", async (c) => {
+app.post("*", async (c) => {
   // Auth check
   const key = c.req.query("key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_ACCESS_KEY");
@@ -424,6 +424,6 @@ app.post("/mcp", async (c) => {
 });
 
 // GET / - Health check
-app.get("/", (c) => c.json({ status: "ok", service: "Professional CRM", version: "1.0.0" }));
+app.get("*", (c) => c.json({ status: "ok", service: "Professional CRM", version: "1.0.0" }));
 
 Deno.serve(app.fetch);
