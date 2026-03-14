@@ -18,10 +18,12 @@ jobs:
   claude-review:
     if: >
       github.event_name == 'pull_request' ||
-      (github.event_name == 'issue_comment' &&
-       contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' &&
-       contains(github.event.comment.body, '@claude'))
+      ((github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude')) &&
+       contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login)) ||
+      ((github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude')) &&
+       contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login))
     runs-on: ubuntu-latest
     steps:
       - uses: anthropics/claude-code-action@v1
