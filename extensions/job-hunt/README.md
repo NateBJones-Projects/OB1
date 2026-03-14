@@ -32,22 +32,27 @@ A complete job search management system — companies, postings, applications, i
 
 - Working Open Brain setup
 - Extension 5 (Professional CRM) strongly recommended — cross-extension linking depends on it
-- Node.js 18+ installed
+- Supabase CLI installed and linked to your project
 - **Required reading:** [Row Level Security](../../primitives/rls/) primitive
 
 ## Credential Tracker
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project ref and Secret key, plus a new MCP Access Key.
 
 ```text
 JOB HUNT PIPELINE -- CREDENTIAL TRACKER
 --------------------------------------
 
 SUPABASE (from your Open Brain setup)
-  Project URL:           ____________
+  Project ref:           ____________
   Secret key:            ____________
+
+MCP SERVER (new for this extension)
+  MCP Access Key:        ____________
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -65,52 +70,25 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run. This creates five RLS-enabled tables with proper foreign key relationships and cascading deletes.
 
-### 2. Install Dependencies
+### 2. Deploy the MCP Server
 
-```bash
-cd extensions/job-hunt
-npm install
-```
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-### 3. Configure Environment Variables
+| Setting | Value |
+|---------|-------|
+| Function name | `job-hunt-mcp` |
+| Server code | This extension's `index.ts` |
 
-Create a `.env` file in this directory:
+### 3. Connect to Your AI
 
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
-### 4. Build the MCP Server
+| Setting | Value |
+|---------|-------|
+| Connector name | `Job Hunt Pipeline` |
+| URL | Your **MCP Connection URL** from the credential tracker |
 
-```bash
-npm run build
-```
-
-### 5. Add to Your MCP Configuration
-
-Add this extension to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "job-hunt": {
-      "command": "node",
-      "args": ["/path/to/extensions/job-hunt/build/index.js"],
-      "env": {
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your_service_role_key"
-      }
-    }
-  }
-}
-```
-
-### 6. Restart Claude Desktop
-
-Restart Claude Desktop to load the new MCP server.
-
-### 7. Test the Extension
+### 4. Test the Extension
 
 Try these commands with Claude:
 
@@ -205,41 +183,19 @@ Your agent will be able to answer questions like:
 
 ## Troubleshooting
 
-### "Cannot connect to Supabase"
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-- Verify your `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
-- Check that your Supabase project is active
-- Ensure RLS policies are created correctly (service role bypasses RLS, but policies must exist)
+**Extension-specific issues:**
 
-### "Foreign key violation" errors
-
+**"Foreign key violation" errors**
 - Ensure parent records exist before creating child records (company → job_posting → application → interview)
 - Verify UUIDs are correct and belong to the same user_id
-- Check cascading delete behavior — deleting a company will delete all related postings, applications, and interviews
+- Deleting a company will cascade-delete all related postings, applications, and interviews
 
-### "Extension 5 not found" when linking contacts
-
+**"Extension 5 not found" when linking contacts**
 - Verify Extension 5 (Professional CRM) is installed and its tables exist
 - Check that the `professional_contacts` table is accessible
 - Ensure both extensions are using the same Supabase project
-
-### RLS "permission denied" errors
-
-- The service role key should bypass RLS, so this suggests a configuration issue
-- Verify all five tables have RLS enabled and policies created
-- Check that user_id values are valid UUIDs from `auth.users`
-
-### "Interview not found" when logging notes
-
-- Ensure the interview_id exists and belongs to the correct user
-- Check that the interview hasn't been deleted
-- Verify the application_id chain is intact
-
-### TypeScript build errors
-
-- Ensure you've run `npm install` first
-- Check that Node.js version is 18 or higher: `node --version`
-- Delete `node_modules` and `package-lock.json`, then reinstall
 
 ## Next Steps
 

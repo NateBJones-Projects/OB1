@@ -427,6 +427,35 @@ jobs:
           # are clear and complete. For now, always passes.
           pass_check "LLM clarity review" "*(Planned for v2)* Auto-pass"
 
+          # ─── Rule 14: No local MCP pattern ───
+          # Extensions and integrations must use remote MCP (Edge Functions + custom connectors).
+          # The old pattern of editing claude_desktop_config.json with local Node.js servers
+          # is not allowed — it's inconsistent with the core Open Brain setup.
+          rule14_pass=true
+          rule14_detail=""
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            [ ! -f "$f" ] && continue
+            case "$f" in *.md|*.ts|*.js) ;; *) continue ;; esac
+
+            # Check for old local MCP config pattern
+            local_mcp=$(grep -niE '(claude_desktop_config|"command":\s*"node"|StdioServerTransport|mcpServers.*command)' "$f" 2>/dev/null || true)
+            if [ -n "$local_mcp" ]; then
+              # Skip _template files (they might reference the pattern to warn against it)
+              if echo "$f" | grep -q '_template'; then
+                continue
+              fi
+              rule14_detail="${rule14_detail}  - \`$f\`: references local MCP pattern (claude_desktop_config.json or stdio transport). Extensions must use remote MCP via Supabase Edge Functions.\n"
+              rule14_pass=false
+            fi
+          done <<< "$CHANGED_FILES"
+
+          if [ "$rule14_pass" = true ]; then
+            pass_check "Remote MCP pattern" "No local MCP server patterns detected — uses remote MCP correctly"
+          else
+            fail_check "Remote MCP pattern" "Local MCP patterns found (must use remote MCP via Edge Functions):\n${rule14_detail}See the [Getting Started guide](docs/01-getting-started.md) for the correct remote MCP pattern."
+          fi
+
           # ─── Additional automated checks ────────────────────────────────
 
           # ─── Scope check ───

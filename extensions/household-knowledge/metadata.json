@@ -10,9 +10,9 @@
   "requires": {
     "open_brain": true,
     "services": [],
-    "tools": ["Node.js 18+"]
+    "tools": ["Supabase CLI"]
   },
-  "requires_primitives": [],
+  "requires_primitives": ["deploy-edge-function", "remote-mcp"],
   "learning_order": 1,
   "tags": ["household", "home", "knowledge-base", "beginner"],
   "difficulty": "beginner",

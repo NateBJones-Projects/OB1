@@ -32,22 +32,28 @@ A professional contact management system with interaction logging, opportunity t
 
 - Working Open Brain setup
 - Extensions 1-4 recommended (RLS concepts from Extension 4 are required knowledge)
-- Node.js 18+ installed
+- Supabase CLI installed and linked to your project
 - **Required reading:** [Row Level Security](../../primitives/rls/) primitive
 
 ## Credential Tracker
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key, plus you'll generate a new MCP Access Key.
 
 ```text
 PROFESSIONAL CRM -- CREDENTIAL TRACKER
 --------------------------------------
 
 SUPABASE (from your Open Brain setup)
+  Project ref:           ____________
   Project URL:           ____________
   Secret key:            ____________
+
+MCP SERVER (you'll create these)
+  MCP Access Key:        ____________
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -65,52 +71,25 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run. This creates three RLS-enabled tables with proper foreign key relationships.
 
-### 2. Install Dependencies
+### 2. Deploy the MCP Server
 
-```bash
-cd extensions/professional-crm
-npm install
-```
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-### 3. Configure Environment Variables
+| Setting | Value |
+|---------|-------|
+| Function name | `professional-crm-mcp` |
+| Server code | This extension's `index.ts` |
 
-Create a `.env` file in this directory:
+### 3. Connect to Your AI
 
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
-### 4. Build the MCP Server
+| Setting | Value |
+|---------|-------|
+| Connector name | `Professional CRM` |
+| URL | Your **MCP Connection URL** from the credential tracker |
 
-```bash
-npm run build
-```
-
-### 5. Add to Your MCP Configuration
-
-Add this extension to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "professional-crm": {
-      "command": "node",
-      "args": ["/path/to/extensions/professional-crm/build/index.js"],
-      "env": {
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your_service_role_key"
-      }
-    }
-  }
-}
-```
-
-### 6. Restart Claude Desktop
-
-Restart Claude Desktop to load the new MCP server.
-
-### 7. Test the Extension
+### 4. Test the Extension
 
 Try these commands with Claude:
 
@@ -182,35 +161,18 @@ Your agent will be able to answer questions like:
 
 ## Troubleshooting
 
-### "Cannot connect to Supabase"
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-- Verify your `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
-- Check that your Supabase project is active
-- Ensure RLS policies are created correctly (service role bypasses RLS, but policies must exist)
+**Extension-specific issues:**
 
-### "Foreign key violation" when logging interactions
-
+**"Foreign key violation" when logging interactions**
 - Ensure the contact exists before logging an interaction
 - Verify the `contact_id` UUID is correct
 - Check that the contact belongs to the same user_id
 
-### "Thought not found" when linking
-
+**"Thought not found" when linking**
 - Verify the thought_id exists in your core Open Brain `thoughts` table
 - Check that the user has permission to access that thought
-- Ensure the core Open Brain MCP server is running
-
-### RLS "permission denied" errors
-
-- The service role key should bypass RLS, so this suggests a configuration issue
-- Verify all three tables have RLS enabled and policies created
-- Check that user_id values are valid UUIDs from `auth.users`
-
-### TypeScript build errors
-
-- Ensure you've run `npm install` first
-- Check that Node.js version is 18 or higher: `node --version`
-- Delete `node_modules` and `package-lock.json`, then reinstall
 
 ## Next Steps
 

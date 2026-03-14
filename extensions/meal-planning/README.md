@@ -50,7 +50,7 @@ A complete meal planning system with recipes, weekly meal plans, and auto-genera
 
 - Working Open Brain setup
 - Extensions 1-3 recommended (Extension 3's family_members table is referenced for cross-extension integration)
-- Node.js 18+ and npm installed
+- Supabase CLI installed and linked to your project
 - **Required reading:** [Row Level Security](../../primitives/rls/) primitive
 - **Required reading:** [Shared MCP Server](../../primitives/shared-mcp/) primitive
 
@@ -67,95 +67,64 @@ MEAL PLANNING -- CREDENTIAL TRACKER
 SUPABASE (from your Open Brain setup)
   Project URL:           ____________
   Secret key:            ____________
+  Project ref:           ____________
 
-GENERATED DURING SETUP (for shared server)
-  Household key:         ____________
+GENERATED DURING SETUP
+  MCP Access Key:              ____________
+  MCP Server URL:              ____________
+  MCP Connection URL:          ____________
 
-NOTE: This extension uses TWO MCP servers:
-  1. Primary server (meal-planning) — uses Project URL + Secret key
-  2. Shared server (meal-planning-shared) — uses Project URL + Household key
+FOR SHARED SERVER
+  Household Access Key:        ____________
+  Household Key (Supabase):    ____________
+  Shared Server URL:           ____________
+  Shared Connection URL:       ____________
+
+NOTE: This extension uses TWO Edge Functions:
+  1. Primary (meal-planning-mcp) — your full access
+  2. Shared (meal-planning-shared-mcp) — household read + shopping list
 
 --------------------------------------
 ```
 
 ## Steps
 
+> **No JSON config files. No local Node.js server. Same pattern as your core Open Brain setup.**
+
 ### 1. Create the Database Schema
 
 Run the SQL in `schema.sql` against your Supabase database. This creates three RLS-enabled tables:
 
 ```bash
-# Option A: Using Supabase SQL Editor (recommended)
+# Using Supabase SQL Editor (recommended)
 # 1. Open https://supabase.com/dashboard/project/YOUR_PROJECT_ID/sql/new
 # 2. Paste the contents of schema.sql
 # 3. Click "Run"
-
-# Option B: Using psql (if available)
-psql $DATABASE_URL -f extensions/meal-planning/schema.sql
 ```
 
 **Important:** The schema includes Row Level Security policies. Make sure you understand what RLS does before proceeding (see the [RLS primitive](../../primitives/rls/)).
 
-### 2. Install Dependencies
+### 2. Deploy the Primary MCP Server
 
-```bash
-cd extensions/meal-planning
-npm init -y
-npm install @modelcontextprotocol/sdk @supabase/supabase-js
-npm install -D @types/node typescript
-```
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-### 3. Build Both TypeScript Servers
+| Setting | Value |
+|---------|-------|
+| Function name | `meal-planning-mcp` |
+| Server code | This extension's `index.ts` |
 
-```bash
-npx tsc --init
-npx tsc index.ts shared-server.ts --outDir dist --esModuleInterop --moduleResolution node
-```
+### 3. Connect to Your AI
 
-Or add to `package.json`:
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
-```json
-{
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
-  }
-}
-```
+| Setting | Value |
+|---------|-------|
+| Connector name | `Meal Planning` |
+| URL | Your **MCP Connection URL** from the credential tracker |
 
-### 4. Configure Environment Variables
+### 4. Test the Primary Server
 
-The primary MCP server needs your standard Supabase credentials:
-
-```bash
-echo $SUPABASE_URL
-echo $SUPABASE_SERVICE_ROLE_KEY
-```
-
-The shared server needs a separate household key (see "Setting Up the Shared Server" below).
-
-### 5. Register the Primary MCP Server
-
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
-
-```json
-{
-  "mcpServers": {
-    "meal-planning": {
-      "command": "node",
-      "args": ["/absolute/path/to/OB1/extensions/meal-planning/dist/index.js"],
-      "env": {
-        "SUPABASE_URL": "your-supabase-url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key"
-      }
-    }
-  }
-}
-```
-
-### 6. Test the Primary Server
-
-Restart Claude Desktop and try these prompts:
+Try these prompts in Claude Desktop:
 
 ```
 Add a recipe: Chicken Stir-Fry. Ingredients: 1 lb chicken breast, 2 cups broccoli, 1 cup bell peppers, 3 tbsp soy sauce, 2 tbsp oil. Instructions: 1) Cut chicken into cubes. 2) Heat oil in wok. 3) Cook chicken 5 min. 4) Add vegetables, cook 3 min. 5) Add soy sauce, toss well. Tags: quick, healthy, asian. Prep 10 min, cook 15 min, serves 4.
@@ -167,7 +136,7 @@ Generate a shopping list for the week of March 17.
 
 ## Setting Up the Shared Server
 
-The shared server is a separate MCP server with limited access for household members. Your spouse installs this on their device to view meal plans and manage the shopping list without accessing your full Open Brain.
+The shared server gives household members limited access — they can view meal plans, browse recipes, and manage the shopping list without accessing your full Open Brain.
 
 ### 1. Create a Household Member Role in Supabase
 
@@ -195,28 +164,34 @@ WHERE email = 'spouse@example.com';
 
 For this guide, we'll use Option B (shared service account).
 
-### 2. Configure the Shared Server Environment
+### 2. Deploy the Shared Edge Function
 
-Your spouse's Claude Desktop config:
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide with these differences:
 
-```json
-{
-  "mcpServers": {
-    "meal-planning-shared": {
-      "command": "node",
-      "args": ["/absolute/path/to/OB1/extensions/meal-planning/dist/shared-server.js"],
-      "env": {
-        "SUPABASE_URL": "your-supabase-url",
-        "SUPABASE_HOUSEHOLD_KEY": "household-member-api-key"
-      }
-    }
-  }
-}
+| Setting | Value |
+|---------|-------|
+| Function name | `meal-planning-shared-mcp` |
+| Server code | This extension's `shared-server.ts` |
+| Access key secret name | `MCP_HOUSEHOLD_ACCESS_KEY` (not `MCP_ACCESS_KEY`) |
+
+You'll also need to set the household Supabase key:
+
+```bash
+supabase secrets set SUPABASE_HOUSEHOLD_KEY=household-scoped-api-key
 ```
 
-**Security note:** The `SUPABASE_HOUSEHOLD_KEY` should be a separate API key with limited permissions. It can only SELECT from recipes/meal_plans and UPDATE shopping_lists due to the RLS policies.
+### 3. Connect Your Household Member
 
-### 3. Test the Shared Server
+Your spouse/partner follows the [Remote MCP Connection](../../primitives/remote-mcp/) guide on their device:
+
+| Setting | Value |
+|---------|-------|
+| Connector name | `Meal Planning (Shared)` |
+| URL | The shared server's MCP Connection URL |
+
+They can view meal plans and check off grocery items. They cannot create recipes, modify meal plans, or access other parts of your Open Brain.
+
+### 4. Test the Shared Server
 
 Your spouse can now use prompts like:
 
@@ -226,8 +201,6 @@ Show me the shopping list for this week.
 Mark "chicken breast" as purchased.
 Search recipes tagged "quick".
 ```
-
-They cannot create recipes, modify meal plans, or access other parts of your Open Brain.
 
 ## Cross-Extension Integration
 
@@ -257,27 +230,25 @@ The shared server demonstrates a key Open Brain principle: your data, your rules
 
 ## Troubleshooting
 
-**"Missing required environment variables: SUPABASE_HOUSEHOLD_KEY"**
-- The shared server needs a separate API key. Create one in Supabase Dashboard → Settings → API, or use the steps in "Setting Up the Shared Server" above.
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-**RLS policies blocking queries:**
+**Extension-specific issues:**
+
+**RLS policies blocking queries on the shared server**
 - Verify your user has the `household_member` role set in `raw_app_meta_data`
-- Check the RLS policies in the Supabase SQL Editor (they should match the schema.sql)
+- Check the RLS policies match the schema.sql
 - Test with service role key first to confirm it's not an RLS issue
 
-**"Cannot find module '@modelcontextprotocol/sdk'"**
-- Run `npm install` in the `extensions/meal-planning/` directory
+**JSONB ingredient search not working**
+- The `search_recipes` tool uses `.cs.` (contains) operator for JSONB — ingredient names must match exactly (case-insensitive)
+- For more flexible search, consider adding a GIN index on the ingredients JSONB column
 
-**JSONB ingredient search not working:**
-- The `search_recipes` tool uses `.cs.` (contains) operator for JSONB. Make sure the ingredient name matches exactly (case-insensitive).
-- For more flexible search, consider adding a GIN index on the ingredients JSONB column.
+**Shopping list aggregation is wrong**
+- The current implementation does simple string concatenation for quantities (e.g., "1 cup + 2 cups")
+- For production use, you'd want smarter quantity aggregation
 
-**Shopping list aggregation is wrong:**
-- The current implementation does simple string concatenation for quantities (e.g., "1 cup + 2 cups").
-- For production use, you'd want smarter quantity aggregation (parsing units and adding numbers).
-
-**Shared server can see all my data:**
-- Double-check the RLS policies are enabled (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)
+**Shared server can see all data**
+- Double-check that RLS policies are enabled (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`)
 - Verify the `household_member` role is set correctly in the JWT claims
 - Test by trying to insert/delete from the shared server (should fail)
 
