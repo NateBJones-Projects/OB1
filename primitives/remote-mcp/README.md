@@ -2,6 +2,9 @@
 
 A guide to connecting your Open Brain extensions to any AI client. Deploy once as a Supabase Edge Function, connect from anywhere.
 
+**Jump to your client:**
+[Claude Desktop](#claude-desktop) | [ChatGPT](#chatgpt) | [Claude Code](#claude-code) | [Cursor / Windsurf / VS Code / Zed](#other-clients-cursor-windsurf-vs-code-zed) | [Troubleshooting](#troubleshooting)
+
 ## What You Need
 
 - Your **MCP Connection URL** (from the extension's credential tracker — looks like `https://YOUR_REF.supabase.co/functions/v1/extension-mcp?key=your-access-key`)
