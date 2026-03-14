@@ -16,7 +16,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const app = new Hono();
 
-app.post("/mcp", async (c) => {
+app.post("*", async (c) => {
   const key = c.req.query("key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_ACCESS_KEY");
   if (!key || key !== expected) {
@@ -315,6 +315,6 @@ app.post("/mcp", async (c) => {
   return transport.handleRequest(c);
 });
 
-app.get("/", (c) => c.json({ status: "ok", service: "Home Maintenance Tracker", version: "1.0.0" }));
+app.get("*", (c) => c.json({ status: "ok", service: "Home Maintenance Tracker", version: "1.0.0" }));
 
 Deno.serve(app.fetch);
