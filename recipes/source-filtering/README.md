@@ -33,6 +33,13 @@ FOR BACKFILL ONLY
 
 ## Steps
 
+1. Check your sources
+2. Use source filtering
+3. Check if you need backfill
+4. Set up environment variables for backfill
+5. Run the backfill
+6. Verify
+
 ### Step 1: Check your sources
 
 Run this query in the Supabase SQL Editor to see what sources exist in your brain:

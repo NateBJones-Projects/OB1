@@ -215,7 +215,7 @@ All wired together through your Open Brain, with cross-extension tools that let 
 ### What's Next?
 
 1. **Build your own extensions** — Use these 6 as templates for domains specific to your life
-2. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Recurring Tasks](../../primitives/recurring-tasks/), and other patterns
+2. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Remote MCP](../../primitives/remote-mcp/), and other patterns
 3. **Create compound queries** — Build tools that reason across multiple extensions simultaneously
 4. **Share your extensions** — Contribute back to the OB1 community
 
