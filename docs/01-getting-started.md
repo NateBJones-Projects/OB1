@@ -57,40 +57,14 @@ For 20 thoughts/day: roughly $0.10–0.30/month in API costs.
 
 You're going to generate API keys, passwords, and IDs across three different services. You'll need them at specific steps later — sometimes minutes after you create them, sometimes much later. Don't trust your memory.
 
-> [!IMPORTANT]
-> Copy the block below into a text editor (Notes, TextEdit, Notepad) and fill it in as you go. Each item tells you which step generates it.
->
-> **Prefer a pre-formatted file?** [Download the credential tracker as a .docx](open-brain-credential-tracker.docx) and fill it in as you go.
-
-```text
-OPEN BRAIN -- CREDENTIAL TRACKER
-Keep this file. Fill in as you go.
---------------------------------------
-
-SUPABASE
-  Account email:      ____________
-  Account password:   ____________
-  Database password:  ____________ <- Step 1
-  Project name:       ____________
-  Project ref:        ____________ <- Step 1
-  Project URL:        ____________ <- Step 3
-  Secret key:         ____________ <- Step 3 (formerly "Service role key")
-
-OPENROUTER
-  Account email:      ____________
-  Account password:   ____________
-  API key:            ____________ <- Step 4
-
-GENERATED DURING SETUP
-  MCP Access Key:     ____________ <- Step 5
-  MCP Server URL:     ____________ <- Step 6
-  MCP Connection URL: ____________ <- Step 6 (server URL + ?key=your-access-key)
-
---------------------------------------
-```
-
 > [!CAUTION]
-> Seriously — copy that now. You'll need these credentials later and some can't be retrieved once you leave the page.
+> **STOP. Download this before you do anything else.**
+>
+> ### 📥 [Download the Credential Tracker (.xlsx)](open-brain-credential-tracker.xlsx)
+>
+> This spreadsheet is your lifeline for the entire setup. Every API key, password, and URL you generate goes here. Some of these credentials **cannot be retrieved once you leave the page** — if you don't save them immediately, you'll have to start over.
+>
+> Open it now. Keep it open. Fill it in as you go.
 
 ---
 
