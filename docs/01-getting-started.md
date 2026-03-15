@@ -94,7 +94,7 @@ GENERATED DURING SETUP
 
 ---
 
-![Step 1](https://img.shields.io/badge/Step_1-Create_Your_Supabase_Project-0078D4?style=for-the-badge)
+![Step 1](https://img.shields.io/badge/Step_1-Create_Your_Supabase_Project-E53935?style=for-the-badge)
 
 Supabase is your database. It stores your thoughts as raw text, vector embeddings, and structured metadata. It also gives you a REST API automatically.
 
@@ -113,7 +113,7 @@ Supabase is your database. It stores your thoughts as raw text, vector embedding
 
 ---
 
-![Step 2](https://img.shields.io/badge/Step_2-Set_Up_the_Database-0078D4?style=for-the-badge)
+![Step 2](https://img.shields.io/badge/Step_2-Set_Up_the_Database-F4511E?style=for-the-badge)
 
 Three SQL commands, pasted one at a time. This creates your storage table, your search function, and your security policy.
 
@@ -232,7 +232,7 @@ create policy "Service role full access"
 
 ---
 
-![Step 3](https://img.shields.io/badge/Step_3-Save_Your_Connection_Details-0078D4?style=for-the-badge)
+![Step 3](https://img.shields.io/badge/Step_3-Save_Your_Connection_Details-FB8C00?style=for-the-badge)
 
 In the left sidebar: **Settings** (gear icon) → **API**. Copy these into your credential tracker:
 
@@ -246,7 +246,7 @@ In the left sidebar: **Settings** (gear icon) → **API**. Copy these into your 
 
 ---
 
-![Step 4](https://img.shields.io/badge/Step_4-Get_an_OpenRouter_API_Key-0078D4?style=for-the-badge)
+![Step 4](https://img.shields.io/badge/Step_4-Get_an_OpenRouter_API_Key-43A047?style=for-the-badge)
 
 OpenRouter is a universal AI API gateway — one account gives you access to every major model. We're using it for embeddings and lightweight LLM metadata extraction.
 
@@ -262,7 +262,7 @@ Why OpenRouter instead of OpenAI directly? One account, one key, one billing rel
 
 ---
 
-![Step 5](https://img.shields.io/badge/Step_5-Create_an_Access_Key-0078D4?style=for-the-badge)
+![Step 5](https://img.shields.io/badge/Step_5-Create_an_Access_Key-00897B?style=for-the-badge)
 
 Your MCP server will be a public URL. The Supabase project ref in that URL is random enough that nobody will stumble onto it, but let's close the gap entirely. You'll generate a simple access key that the server checks on every request. Takes 30 seconds.
 
@@ -292,7 +292,7 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 
 ---
 
-![Step 6](https://img.shields.io/badge/Step_6-Deploy_the_MCP_Server-0078D4?style=for-the-badge)
+![Step 6](https://img.shields.io/badge/Step_6-Deploy_the_MCP_Server-1E88E5?style=for-the-badge)
 
 One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stats, and capture. This gives any MCP-connected AI the ability to read and write to your brain.
 
@@ -563,7 +563,7 @@ Paste this into your credential tracker as the MCP Connection URL. This is what 
 
 ---
 
-![Step 7](https://img.shields.io/badge/Step_7-Connect_to_Your_AI-0078D4?style=for-the-badge)
+![Step 7](https://img.shields.io/badge/Step_7-Connect_to_Your_AI-5C6BC0?style=for-the-badge)
 
 You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end. Pick your AI client below:
 
@@ -662,7 +662,7 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 ---
 
-![Step 8](https://img.shields.io/badge/Step_8-Use_It-0078D4?style=for-the-badge)
+![Step 8](https://img.shields.io/badge/Step_8-Use_It-8E24AA?style=for-the-badge)
 
 Ask your AI naturally. It picks the right tool automatically:
 
