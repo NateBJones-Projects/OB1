@@ -122,6 +122,9 @@ In the left sidebar: **Database → Extensions** → search for "vector" → fli
 
 In the left sidebar: **SQL Editor → New query** → paste and Run:
 
+<details>
+<summary><strong>SQL: Thoughts table + indexes</strong></summary>
+
 ```sql
 -- Create the thoughts table
 create table thoughts (
@@ -158,12 +161,16 @@ create trigger thoughts_updated_at
   execute function update_updated_at();
 ```
 
+</details>
+
 ### Create the Search Function
 
 New query → paste and Run:
 
+<details>
+<summary><strong>SQL: Semantic search function</strong></summary>
+
 ```sql
--- Semantic search function
 create or replace function match_thoughts(
   query_embedding vector(1536),
   match_threshold float default 0.7,
@@ -196,20 +203,25 @@ end;
 $$;
 ```
 
+</details>
+
 ### Lock Down Security
 
 One more new query:
 
+<details>
+<summary><strong>SQL: Row Level Security</strong></summary>
+
 ```sql
--- Enable Row Level Security
 alter table thoughts enable row level security;
 
--- Service role full access only
 create policy "Service role full access"
   on thoughts
   for all
   using (auth.role() = 'service_role');
 ```
+
+</details>
 
 ### Quick Verification
 
@@ -250,13 +262,13 @@ Your MCP server will be a public URL. The Supabase project ref in that URL is ra
 
 In your terminal, generate a random key:
 
-**Mac/Linux:**
+🟩 **Mac/Linux:**
 
 ```bash
 openssl rand -hex 32
 ```
 
-**Windows (PowerShell):**
+🟦 **Windows (PowerShell):**
 
 ```powershell
 -join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
@@ -274,13 +286,13 @@ One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stat
 
 Pick the install method for your OS:
 
-**Mac (with Homebrew):**
+🟩 **Mac (with Homebrew):**
 
 ```bash
 brew install supabase/tap/supabase
 ```
 
-**Windows (with Scoop — [recommended by Supabase](https://supabase.com/docs/guides/local-development/cli/getting-started)):**
+🟦 **Windows (with Scoop — [recommended by Supabase](https://supabase.com/docs/guides/local-development/cli/getting-started)):**
 
 If you don't have Scoop yet, install it first:
 
@@ -301,7 +313,7 @@ Then install Supabase:
 scoop install supabase
 ```
 
-**Linux (or Mac without Homebrew):**
+🟩 **Linux (or Mac without Homebrew):**
 
 ```bash
 npm install -g supabase
@@ -353,7 +365,8 @@ supabase functions new open-brain-mcp
 
 The previous command created a folder at `supabase/functions/open-brain-mcp/`. Now you need to add a dependencies file to it. Paste the command for your OS into your terminal — it creates the file automatically.
 
-**Mac/Linux:**
+<details>
+<summary>🟩 <strong>Mac/Linux</strong></summary>
 
 ```bash
 cat > supabase/functions/open-brain-mcp/deno.json << 'EOF'
@@ -369,7 +382,10 @@ cat > supabase/functions/open-brain-mcp/deno.json << 'EOF'
 EOF
 ```
 
-**Windows (PowerShell):**
+</details>
+
+<details>
+<summary>🟦 <strong>Windows (PowerShell)</strong></summary>
 
 ```powershell
 @'
@@ -385,11 +401,14 @@ EOF
 '@ | Set-Content supabase\functions\open-brain-mcp\deno.json
 ```
 
+</details>
+
 ### Write the Server
 
 Now replace the starter code in `index.ts` with the Open Brain MCP server. Same approach — paste the command for your OS and it replaces the file.
 
-**Mac/Linux:**
+<details>
+<summary>🟩 <strong>Mac/Linux</strong></summary>
 
 ```bash
 cat > supabase/functions/open-brain-mcp/index.ts << 'SERVERCODE'
@@ -765,7 +784,10 @@ Deno.serve(app.fetch);
 SERVERCODE
 ```
 
-**Windows (PowerShell):**
+</details>
+
+<details>
+<summary>🟦 <strong>Windows (PowerShell)</strong></summary>
 
 ```powershell
 @'
@@ -1140,6 +1162,8 @@ app.all("*", async (c) => {
 Deno.serve(app.fetch);
 '@ | Set-Content supabase\functions\open-brain-mcp\index.ts -Encoding utf8
 ```
+
+</details>
 
 ### Deploy
 
