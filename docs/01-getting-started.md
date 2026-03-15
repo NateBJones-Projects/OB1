@@ -700,7 +700,8 @@ Your AI should retrieve the thought you just saved.
 
 ---
 
-## ❓ Troubleshooting
+<details>
+<summary>❓ <strong>Troubleshooting</strong></summary>
 
 > [!TIP]
 > If the specific suggestions below don't solve your issue, the Supabase AI assistant (chat icon, bottom-right of your dashboard) can help diagnose problems with anything Supabase-related. Paste the error message and tell it what step you're on.
@@ -729,9 +730,10 @@ First search on a cold function takes a few seconds — the Edge Function is wak
 
 The metadata extraction is best-effort — the LLM is making its best guess with limited context. The embedding is what powers semantic search, and that works regardless of how the metadata gets classified. If you consistently want a specific classification, use the capture templates from the prompt kit to give the LLM clearer signals.
 
----
+</details>
 
-## 🔍 How It Works Under the Hood
+<details>
+<summary>🔍 <strong>How It Works Under the Hood</strong></summary>
 
 **When you capture from any AI via MCP:** your AI client sends the text to the `capture_thought` tool → the MCP server generates an embedding (1536-dimensional vector of meaning) AND extracts metadata via LLM in parallel → both get stored as a single row in Supabase → confirmation returned to your AI.
 
@@ -743,18 +745,20 @@ The embedding is what makes retrieval powerful. "Sarah's thinking about leaving"
 
 Because you're using OpenRouter, you can swap models by editing the model strings in the Edge Function code and redeploying. Browse available models at [openrouter.ai/models](https://openrouter.ai/models). Just make sure embedding dimensions match (1536 for the current setup).
 
----
+</details>
 
-## ➕ Optional: Add Capture Sources
+<details>
+<summary>➕ <strong>Optional: Add Capture Sources</strong></summary>
 
 Your MCP server handles both reading and writing. But if you want a quick-capture channel outside your AI tools:
 
 - **[Slack Capture](../integrations/slack-capture/)** — Type thoughts in a Slack channel, automatically embedded and stored
 - More integrations in [`/integrations`](../integrations/)
 
----
+</details>
 
-## 🎉 What You Just Built — And What You Can Build Next
+<details>
+<summary>🎉 <strong>What You Just Built — And What You Can Build Next</strong></summary>
 
 You just used two free services, some copy-pasted code, and a built-in AI assistant to build a personal knowledge system with semantic search, an open write protocol, and an open read protocol. No CS degree. No local servers. No monthly SaaS fee.
 
@@ -765,6 +769,8 @@ Want to add a new capture source? Ask it how to create another Edge Function. Wa
 You just built AI infrastructure using AI. That pattern doesn't stop here.
 
 Got stuck or want to share what you've built? Join the [Open Brain Discord](https://discord.gg/Cgh9WJEkeG) — there's a `#help` channel for troubleshooting and a `#show-and-tell` channel for showing off.
+
+</details>
 
 ---
 
