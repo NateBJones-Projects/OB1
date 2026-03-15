@@ -565,9 +565,13 @@ Paste this into your credential tracker as the MCP Connection URL. This is what 
 
 ![Step 7](https://img.shields.io/badge/Step_7-Connect_to_Your_AI-0078D4?style=for-the-badge)
 
-You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end.
+You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end. Pick your AI client below:
 
-### 7.1 — Claude Desktop
+<details>
+<summary>🤖 <strong>7.1 — Claude Desktop</strong></summary>
+
+> [!NOTE]
+> No JSON config files. No Node.js. No terminal. This is the simplest connection method.
 
 1. Open Claude Desktop → **Settings** → **Connectors**
 2. Click **Add custom connector**
@@ -577,12 +581,13 @@ You need your MCP Connection URL from the credential tracker — the one with `?
 
 That's it. Start a new conversation, and Claude will have access to your Open Brain tools. You can enable or disable it per conversation via the "+" button → Connectors.
 
-> [!NOTE]
-> No JSON config files. No Node.js. No terminal. If you had trouble with earlier versions of this guide, this is the fix.
+</details>
 
-### 7.2 — ChatGPT
+<details>
+<summary>🤖 <strong>7.2 — ChatGPT</strong></summary>
 
-Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works on the web at [chatgpt.com](https://chatgpt.com). Not available on mobile.
+> [!WARNING]
+> Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu). Works on the web at [chatgpt.com](https://chatgpt.com) only — not available on mobile.
 
 **Enable Developer Mode (one-time setup):**
 
@@ -590,7 +595,7 @@ Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works
 2. Navigate to **Apps & Connectors** → **Advanced settings**
 3. Toggle **Developer mode** ON
 
-> [!WARNING]
+> [!CAUTION]
 > Enabling Developer Mode disables ChatGPT's built-in Memory feature. Yes, that's ironic for a brain tool. Your Open Brain replaces that functionality anyway — and it works across every AI, not just ChatGPT.
 
 **Add the connector:**
@@ -605,7 +610,12 @@ Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works
 > [!TIP]
 > ChatGPT is less intuitive than Claude at picking the right MCP tool automatically. If it doesn't use your brain on its own, be explicit: "Use the Open Brain search_thoughts tool to find my notes about project planning." After it gets the pattern once or twice in a conversation, it usually picks up the habit.
 
-### 7.3 — Claude Code
+</details>
+
+<details>
+<summary>🤖 <strong>7.3 — Claude Code</strong></summary>
+
+One command:
 
 ```bash
 claude mcp add --transport http open-brain \
@@ -613,7 +623,10 @@ claude mcp add --transport http open-brain \
   --header "x-brain-key: your-access-key-from-step-5"
 ```
 
-### 7.4 — Other Clients (Cursor, VS Code Copilot, Windsurf)
+</details>
+
+<details>
+<summary>🤖 <strong>7.4 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
 
 Every MCP client handles remote servers slightly differently. The server accepts your access key two ways — pick whichever your client supports:
 
@@ -642,6 +655,8 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 > [!NOTE]
 > No space after the colon in `x-brain-key:${BRAIN_KEY}`. Some clients have a bug where spaces inside args get mangled.
+
+</details>
 
 ✅ **Done when:** You can start a conversation in your AI client and it has access to Open Brain tools (search_thoughts, list_thoughts, thought_stats, capture_thought).
 
