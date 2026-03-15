@@ -229,6 +229,9 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 
 One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stats, and capture. This gives any MCP-connected AI the ability to read and write to your brain.
 
+> [!WARNING]
+> **Tried this before and starting over?** If you have a `supabase/` folder in your home directory from a previous attempt, delete it first — it will silently hijack your setup. Run `rm -rf ~/supabase` (Mac/Linux) or `Remove-Item -Recurse ~\supabase` (Windows) to clean it out.
+
 **Pick your operating system and follow the steps inside:**
 
 <details>
@@ -247,6 +250,14 @@ You need a folder on your computer for this project. The Supabase CLI will put y
 ```bash
 cd /paste/your/path/here
 ```
+
+Confirm you're in the right place:
+
+```bash
+pwd
+```
+
+This should print the path to your `open-brain` folder. If it shows your home directory (`/Users/yourname`) or anything else — you're in the wrong place. Re-do the `cd` command.
 
 > [!IMPORTANT]
 > From this point on, every terminal command should be run from this folder. If you close your terminal and come back later, `cd` into this folder again.
@@ -284,6 +295,15 @@ Set up the Supabase project structure in your folder:
 ```bash
 supabase init
 ```
+
+You should now see a `supabase/` folder inside your project folder. Verify:
+
+```bash
+ls supabase/
+```
+
+> [!CAUTION]
+> ❌ If `ls supabase/` shows "No such file or directory," you're not in your project folder. Run `pwd` to check, then `cd` to the right place and try `supabase init` again.
 
 Link it to your Supabase project — replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1):
 
@@ -331,13 +351,34 @@ curl -o supabase/functions/open-brain-mcp/deno.json https://raw.githubuserconten
 > These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
 
 > [!WARNING]
-> ❌ If you see `No such file or directory` — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
+> ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
+>
+> ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
+> ```bash
+> rm -rf supabase/functions/open-brain-mcp
+> supabase functions new open-brain-mcp
+> ```
+> Then retry the curl commands.
+
+Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
+
+```bash
+head -1 supabase/functions/open-brain-mcp/index.ts
+```
+
+> [!CAUTION]
+> ❌ If you see `console.log("Hello from Functions!")` — the download didn't overwrite the starter file. Delete the folder, re-create it, and retry the curl commands.
+>
+> ✅ If you see `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — you're good.
 
 ### 6.7 — Deploy
 
 ```bash
 supabase functions deploy open-brain-mcp --no-verify-jwt
 ```
+
+> [!IMPORTANT]
+> Check the first line of the deploy output — it should say `Using workdir` followed by **your project folder path**. If it shows your home directory instead, your supabase project structure is in the wrong place. Go back to Step 6.1 and start over from a clean folder.
 
 Your MCP server is now live at:
 
@@ -375,6 +416,14 @@ You need a folder on your computer for this project. The Supabase CLI will put y
 ```powershell
 cd "C:\paste\your\path\here"
 ```
+
+Confirm you're in the right place:
+
+```powershell
+Get-Location
+```
+
+This should print the path to your `open-brain` folder. If it shows your home directory (`C:\Users\yourname`) or anything else — you're in the wrong place. Re-do the `cd` command.
 
 > [!IMPORTANT]
 > From this point on, every terminal command should be run from this folder. If you close PowerShell and come back later, `cd` into this folder again.
@@ -419,6 +468,15 @@ Set up the Supabase project structure in your folder:
 ```powershell
 supabase init
 ```
+
+You should now see a `supabase\` folder inside your project folder. Verify:
+
+```powershell
+dir supabase\
+```
+
+> [!CAUTION]
+> ❌ If `dir supabase\` shows an error, you're not in your project folder. Run `Get-Location` to check, then `cd` to the right place and try `supabase init` again.
 
 Link it to your Supabase project — replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1):
 
@@ -466,13 +524,34 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1
 > These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
 
 > [!WARNING]
-> ❌ If you see `No such file or directory` — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
+> ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
+>
+> ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
+> ```powershell
+> Remove-Item -Recurse supabase\functions\open-brain-mcp
+> supabase functions new open-brain-mcp
+> ```
+> Then retry the download commands.
+
+Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
+
+```powershell
+Get-Content supabase\functions\open-brain-mcp\index.ts -Head 1
+```
+
+> [!CAUTION]
+> ❌ If you see `console.log("Hello from Functions!")` — the download didn't overwrite the starter file. Delete the folder, re-create it, and retry the download commands.
+>
+> ✅ If you see `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — you're good.
 
 ### 6.7 — Deploy
 
 ```powershell
 supabase functions deploy open-brain-mcp --no-verify-jwt
 ```
+
+> [!IMPORTANT]
+> Check the first line of the deploy output — it should say `Using workdir` followed by **your project folder path**. If it shows your home directory instead, your supabase project structure is in the wrong place. Go back to Step 6.1 and start over from a clean folder.
 
 Your MCP server is now live at:
 
