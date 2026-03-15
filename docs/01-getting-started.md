@@ -58,13 +58,15 @@ For 20 thoughts/day: roughly $0.10–0.30/month in API costs.
 You're going to generate API keys, passwords, and IDs across three different services. You'll need them at specific steps later — sometimes minutes after you create them, sometimes much later. Don't trust your memory.
 
 > [!CAUTION]
-> **STOP. Download this before you do anything else.**
+> 🛑🛑🛑 **STOP. Download this before you do anything else.** 🛑🛑🛑
 >
 > ### 📥 [Download the Credential Tracker (.xlsx)](open-brain-credential-tracker.xlsx)
 >
 > This spreadsheet is your lifeline for the entire setup. Every API key, password, and URL you generate goes here. Some of these credentials **cannot be retrieved once you leave the page** — if you don't save them immediately, you'll have to start over.
 >
 > Open it now. Keep it open. Fill it in as you go.
+>
+> 🛑🛑🛑 **Do not skip this.** 🛑🛑🛑
 
 ---
 
