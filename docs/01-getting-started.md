@@ -396,6 +396,9 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access
 
 Paste this into your credential tracker as the MCP Connection URL. This is what you'll give to AI clients that support remote MCP — one URL, no extra config.
 
+> [!TIP]
+> If you've been filling in your credential tracker as you go, the **MCP Server URL** and **MCP Connection URL** are already auto-generated for you in the Step 6 section of the spreadsheet. Just verify they match.
+
 ✅ **Done when:** You have both the **MCP Server URL** and **MCP Connection URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
 
 </details>
@@ -569,6 +572,9 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access
 
 Paste this into your credential tracker as the MCP Connection URL. This is what you'll give to AI clients that support remote MCP — one URL, no extra config.
 
+> [!TIP]
+> If you've been filling in your credential tracker as you go, the **MCP Server URL** and **MCP Connection URL** are already auto-generated for you in the Step 6 section of the spreadsheet. Just verify they match.
+
 ✅ **Done when:** You have both the **MCP Server URL** and **MCP Connection URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
 
 </details>
@@ -577,7 +583,12 @@ Paste this into your credential tracker as the MCP Connection URL. This is what 
 
 ![Step 7](https://img.shields.io/badge/Step_7-Connect_to_Your_AI-5C6BC0?style=for-the-badge)
 
-You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end. Pick your AI client below:
+You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end.
+
+> [!TIP]
+> Your credential tracker spreadsheet has a **Step 7** section with ready-to-copy values for each AI client — including the full terminal command for Claude Code. If you've been filling it in, just copy from there.
+
+Pick your AI client below:
 
 <details>
 <summary>🤖 <strong>7.1 — Claude Desktop</strong></summary>
