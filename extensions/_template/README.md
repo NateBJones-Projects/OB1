@@ -70,7 +70,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Setting | Value |
 |---------|-------|
 | Function name | `extension-name-mcp` |
-| Server code | This extension's `index.ts` |
+| Download path | `extensions/extension-name` |
 
 ### 3. Connect to Your AI
 
