@@ -271,19 +271,22 @@ Your MCP server will be a public URL. The Supabase project ref in that URL is ra
 
 In your terminal, generate a random key:
 
-🟩 **Mac/Linux:**
+🟩 **Mac/Linux** — open Terminal and run:
 
 ```bash
 openssl rand -hex 32
 ```
 
-🟦 **Windows (PowerShell):**
+🟦 **Windows** — open PowerShell and run:
 
 ```powershell
 -join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
 ```
 
 Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters). Paste it into your credential tracker under MCP Access Key. You'll set this as a Supabase secret in the next step (after installing the CLI).
+
+> [!WARNING]
+> Copy and paste the command for **your operating system only**. The Mac command won't work on Windows and vice versa.
 
 ✅ **Done when:** Your credential tracker has the **MCP Access Key** filled in.
 
@@ -293,67 +296,37 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 
 One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stats, and capture. This gives any MCP-connected AI the ability to read and write to your brain.
 
+**Pick your operating system and follow the steps inside:**
+
+<details>
+<summary>🟩 <strong>Step 6 — Mac / Linux</strong> (click to expand)</summary>
+
 ### 6.1 — Create a Project Folder
 
 You need a folder on your computer for this project. The Supabase CLI will put your server files here, and you'll deploy from this folder.
 
 1. **Create a new folder** wherever you keep projects — your Documents folder, a Projects folder, wherever makes sense to you. Name it something like `open-brain`.
 
-2. **Copy the folder's path** — this is the address your terminal needs to find it:
+2. **Copy the folder's path** — right-click the folder in Finder, hold the **Option** key, and click **Copy "open-brain" as Pathname**.
 
-   🟩 **Mac:** Right-click the folder in Finder, hold the **Option** key, and click **Copy "open-brain" as Pathname**.
-
-   🟦 **Windows:** Open the folder in File Explorer, click the address bar at the top, and copy the path that appears.
-
-3. **Navigate to it in your terminal** — paste the path you just copied after `cd`:
-
-🟩 **Mac/Linux:**
+3. **Navigate to it in your terminal** — open **Terminal** (search Spotlight) and paste the path after `cd`:
 
 ```bash
 cd /paste/your/path/here
 ```
 
-🟦 **Windows (PowerShell):**
-
-```powershell
-cd "C:\paste\your\path\here"
-```
-
 > [!IMPORTANT]
-> From this point on, every terminal command in this guide should be run from this folder. If you close your terminal and come back later, you'll need to `cd` into this folder again before running commands.
+> From this point on, every terminal command should be run from this folder. If you close your terminal and come back later, `cd` into this folder again.
 
 ### 6.2 — Install the Supabase CLI
 
-Pick the install method for your OS:
-
-🟩 **Mac (with Homebrew):**
+**With Homebrew:**
 
 ```bash
 brew install supabase/tap/supabase
 ```
 
-🟦 **Windows (with Scoop — [recommended by Supabase](https://supabase.com/docs/guides/local-development/cli/getting-started)):**
-
-If you don't have Scoop yet, install it first:
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
-```
-
-Then add the Supabase bucket:
-
-```powershell
-scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-```
-
-Then install Supabase:
-
-```powershell
-scoop install supabase
-```
-
-🟩 **Linux (or Mac without Homebrew):**
+**Without Homebrew:**
 
 ```bash
 npm install -g supabase
@@ -413,24 +386,12 @@ Create the function folder, then download the two server files directly from Git
 supabase functions new open-brain-mcp
 ```
 
-🟩 **Mac/Linux:**
-
 ```bash
 curl -o supabase/functions/open-brain-mcp/index.ts https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts
 ```
 
 ```bash
 curl -o supabase/functions/open-brain-mcp/deno.json https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json
-```
-
-🟦 **Windows (PowerShell):**
-
-```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts -OutFile supabase\functions\open-brain-mcp\index.ts
-```
-
-```powershell
-Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json -OutFile supabase\functions\open-brain-mcp\deno.json
 ```
 
 > [!TIP]
@@ -462,6 +423,143 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access
 Paste this into your credential tracker as the MCP Connection URL. This is what you'll give to AI clients that support remote MCP — one URL, no extra config.
 
 ✅ **Done when:** You have both the **MCP Server URL** and **MCP Connection URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
+
+</details>
+
+<details>
+<summary>🟦 <strong>Step 6 — Windows</strong> (click to expand)</summary>
+
+### 6.1 — Create a Project Folder
+
+You need a folder on your computer for this project. The Supabase CLI will put your server files here, and you'll deploy from this folder.
+
+1. **Create a new folder** wherever you keep projects — your Documents folder, a Projects folder, wherever makes sense to you. Name it something like `open-brain`.
+
+2. **Copy the folder's path** — open the folder in File Explorer, click the address bar at the top, and copy the path that appears.
+
+3. **Navigate to it in your terminal** — open **PowerShell** and paste the path after `cd`:
+
+```powershell
+cd "C:\paste\your\path\here"
+```
+
+> [!IMPORTANT]
+> From this point on, every terminal command should be run from this folder. If you close PowerShell and come back later, `cd` into this folder again.
+
+### 6.2 — Install the Supabase CLI
+
+If you don't have Scoop yet, install it first ([recommended by Supabase](https://supabase.com/docs/guides/local-development/cli/getting-started)):
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+```
+
+Then add the Supabase bucket:
+
+```powershell
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+```
+
+Then install Supabase:
+
+```powershell
+scoop install supabase
+```
+
+Verify it worked:
+
+```powershell
+supabase --version
+```
+
+### 6.3 — Log In
+
+```powershell
+supabase login
+```
+
+### 6.4 — Initialize and Link
+
+Set up the Supabase project structure in your folder:
+
+```powershell
+supabase init
+```
+
+Link it to your Supabase project — replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1):
+
+```powershell
+supabase link --project-ref YOUR_PROJECT_REF
+```
+
+### 6.5 — Set Your Secrets
+
+Set your access key from Step 5:
+
+```powershell
+supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
+```
+
+Set your OpenRouter key from Step 4:
+
+```powershell
+supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
+```
+
+> [!NOTE]
+> `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+
+> [!CAUTION]
+> Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
+
+### 6.6 — Download the Server Files
+
+Create the function folder, then download the two server files directly from GitHub:
+
+```powershell
+supabase functions new open-brain-mcp
+```
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts -OutFile supabase\functions\open-brain-mcp\index.ts
+```
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json -OutFile supabase\functions\open-brain-mcp\deno.json
+```
+
+> [!TIP]
+> These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
+
+> [!WARNING]
+> ❌ If you see `No such file or directory` — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
+
+### 6.7 — Deploy
+
+```powershell
+supabase functions deploy open-brain-mcp --no-verify-jwt
+```
+
+Your MCP server is now live at:
+
+```text
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
+```
+
+Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1). Paste the full URL into your credential tracker as the MCP Server URL.
+
+Now build your **MCP Connection URL** by adding your access key to the end:
+
+```text
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5
+```
+
+Paste this into your credential tracker as the MCP Connection URL. This is what you'll give to AI clients that support remote MCP — one URL, no extra config.
+
+✅ **Done when:** You have both the **MCP Server URL** and **MCP Connection URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
+
+</details>
 
 ---
 
