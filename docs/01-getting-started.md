@@ -1,7 +1,5 @@
 # Build Your Open Brain
 
-https://github.com/user-attachments/assets/85208d73-112b-4204-82fd-d03b6c397a8b
-
 This is the core of Open Brain — the foundation everything else builds on. Once this is running, you'll have a personal knowledge system that any AI can read from and write to. Every extension, recipe, and integration in this repo starts here.
 
 About 30 minutes. Zero coding experience. Two free services:
