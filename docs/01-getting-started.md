@@ -16,7 +16,7 @@ You're going to generate API keys, passwords, and IDs across three different ser
 > [!CAUTION]
 > 🛑🛑🛑 **STOP. Download this before you do anything else.** 🛑🛑🛑
 >
-> ### 📥 [Download the Credential Tracker (.xlsx)](open-brain-credential-tracker.xlsx)
+> ### 📥 [Download the Credential Tracker (.xlsx)](https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/docs/open-brain-credential-tracker.xlsx)
 >
 > This spreadsheet is your lifeline for the entire setup. Every API key, password, and URL you generate goes here. Some of these credentials **cannot be retrieved once you leave the page** — if you don't save them immediately, you'll have to start over.
 >
@@ -24,7 +24,6 @@ You're going to generate API keys, passwords, and IDs across three different ser
 >
 > 🛑🛑🛑 **Do not skip this.** 🛑🛑🛑
 
-![How to download the credential tracker — click the download button in the top right](credential-tracker-download-help.png)
 
 ---
 
