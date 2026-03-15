@@ -2,54 +2,12 @@
 
 https://github.com/user-attachments/assets/85208d73-112b-4204-82fd-d03b6c397a8b
 
-## Complete Setup Guide
+This is the core of Open Brain — the foundation everything else builds on. Once this is running, you'll have a personal knowledge system that any AI can read from and write to. Every extension, recipe, and integration in this repo starts here.
 
----
+About 30 minutes. Zero coding experience. Two free services:
 
-## What You're Building
-
-A database that stores your thoughts with vector embeddings, plus an MCP server that lets any AI assistant search and write to your brain. No Slack required — capture happens from whatever AI tool you're already using (Claude Desktop, ChatGPT, Claude Code, Cursor).
-
-## What You Need
-
-About 30 minutes and zero coding experience. You'll copy and paste everything.
-
-### Services (All Free Tier)
-
-- **[Supabase](https://supabase.com)** — Your database — stores everything
-- **[OpenRouter](https://openrouter.ai)** — Your AI gateway — understands everything
-
-### If You Get Stuck
-
-Follow this guide step by step — it's designed to get you through without outside help. If you'd rather have an AI coding tool walk you through it, check out the [AI-Assisted Setup guide](04-ai-assisted-setup.md) — it covers how to use Cursor, Claude Code, or similar tools to build alongside this guide.
-
-> [!TIP]
-> Supabase has a free built-in AI assistant in every project dashboard. Look for the chat icon in the bottom-right corner. It can help with:
-> - 🔗 Finding where to click when you can't find something in the dashboard
-> - 🔗 Fixing SQL errors if you paste in the error message
-> - 🔗 Explaining terminal commands and what their output means
-> - 🔗 Interpreting Edge Function logs when something isn't working
-> - 🔗 Explaining Supabase concepts in plain English
->
-> It can't see your screen or run commands for you, but if you paste what you're seeing, it can tell you what to do next.
-
-## How This Works
-
-You'll set up your database, connect it to an AI gateway for embeddings, then deploy an MCP server that gives any AI assistant the ability to search and write to your brain. One progressive setup: database → AI gateway → MCP server → connect your AI.
-
-### After You're Done
-
-This guide builds the system. The companion prompt pack — **[Open Brain: Companion Prompts](https://promptkit.natebjones.com/20260224_uq1_promptkit_1)** — makes it useful. It includes prompts for migrating your existing AI memories into the brain, migrating an existing second brain system, discovering use cases specific to your workflow, capture templates that optimize metadata extraction, and a weekly review ritual. Finish the setup first, then grab the prompts.
-
-## Cost Breakdown
-
-| Service | Cost |
-| ------- | ---- |
-| Supabase (free tier) | $0 |
-| Embeddings (text-embedding-3-small) | ~$0.02 / million tokens |
-| Metadata extraction (gpt-4o-mini) | ~$0.15 / million input tokens |
-
-For 20 thoughts/day: roughly $0.10–0.30/month in API costs.
+- **[Supabase](https://supabase.com)** — Your database
+- **[OpenRouter](https://openrouter.ai)** — Your AI gateway
 
 ---
 
