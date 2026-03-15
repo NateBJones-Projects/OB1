@@ -78,7 +78,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Setting | Value |
 |---------|-------|
 | Function name | `professional-crm-mcp` |
-| Server code | This extension's `index.ts` |
+| Download path | `extensions/professional-crm` |
 
 ### 3. Connect to Your AI
 

@@ -77,7 +77,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Setting | Value |
 |---------|-------|
 | Function name | `household-knowledge-mcp` |
-| Server code | This extension's `index.ts` |
+| Download path | `extensions/household-knowledge` |
 
 ### 3. Connect to Your AI
 

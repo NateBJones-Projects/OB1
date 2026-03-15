@@ -94,7 +94,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Setting | Value |
 |---------|-------|
 | Function name | `family-calendar-mcp` |
-| Server code | This extension's `index.ts` |
+| Download path | `extensions/family-calendar` |
 
 ### 3. Connect to Your AI
 
