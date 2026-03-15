@@ -24,6 +24,8 @@ You're going to generate API keys, passwords, and IDs across three different ser
 >
 > 🛑🛑🛑 **Do not skip this.** 🛑🛑🛑
 
+![How to download the credential tracker — click the download button in the top right](credential-tracker-download-help.png)
+
 ---
 
 ![Step 1](https://img.shields.io/badge/Step_1-Create_Your_Supabase_Project-E53935?style=for-the-badge)
