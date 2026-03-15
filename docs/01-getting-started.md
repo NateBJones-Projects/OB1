@@ -16,8 +16,8 @@ About 30 minutes and zero coding experience. You'll copy and paste everything.
 
 ### Services (All Free Tier)
 
-- **Supabase** — Your database — stores everything
-- **OpenRouter** — Your AI gateway — understands everything
+- **[Supabase](https://supabase.com)** — Your database — stores everything
+- **[OpenRouter](https://openrouter.ai)** — Your AI gateway — understands everything
 
 ### If You Get Stuck
 
@@ -98,7 +98,7 @@ GENERATED DURING SETUP
 
 Supabase is your database. It stores your thoughts as raw text, vector embeddings, and structured metadata. It also gives you a REST API automatically.
 
-1. Go to supabase.com and sign up (GitHub login is fastest)
+1. Go to [supabase.com](https://supabase.com) and sign up (GitHub login is fastest)
 2. Click **New Project** in the dashboard
 3. Pick your organization (default is fine)
 4. Set Project name: `open-brain` (or whatever you want)
@@ -234,8 +234,8 @@ OpenRouter is a universal AI API gateway — one account gives you access to eve
 
 Why OpenRouter instead of OpenAI directly? One account, one key, one billing relationship — and it future-proofs you for Claude, Gemini, or any other model later.
 
-1. Go to openrouter.ai and sign up
-2. Go to openrouter.ai/keys
+1. Go to [openrouter.ai](https://openrouter.ai) and sign up
+2. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
 3. Click **Create Key**, name it `open-brain`
 4. Copy the key into your credential tracker immediately
 5. Add $5 in credits under Credits (lasts months)
@@ -250,21 +250,19 @@ Your MCP server will be a public URL. The Supabase project ref in that URL is ra
 
 In your terminal, generate a random key:
 
-```bash
-# Mac/Linux
-openssl rand -hex 32
+**Mac/Linux:**
 
-# Windows (PowerShell)
+```bash
+openssl rand -hex 32
+```
+
+**Windows (PowerShell):**
+
+```powershell
 -join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
 ```
 
-Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters). Paste it into your credential tracker under MCP Access Key.
-
-Set it as a Supabase secret:
-
-```bash
-supabase secrets set MCP_ACCESS_KEY=your-generated-key-here
-```
+Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters). Paste it into your credential tracker under MCP Access Key. You'll set this as a Supabase secret in the next step (after installing the CLI).
 
 ---
 
@@ -274,22 +272,38 @@ One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stat
 
 ### Install the Supabase CLI
 
-> **Mac users:** If you already have Homebrew installed (you'll know — it's the thing you install with `brew`), use the first option. **Windows users:** use Scoop — Supabase recommends it over npm for Windows because it handles PATH and permissions cleanly. **Linux or Mac without Homebrew:** use npm.
+Pick the install method for your OS:
+
+**Mac (with Homebrew):**
 
 ```bash
-# Mac with Homebrew
 brew install supabase/tap/supabase
+```
 
-# Windows with Scoop (recommended)
-# Install Scoop first if you don't have it:
+**Windows (with Scoop — [recommended by Supabase](https://supabase.com/docs/guides/local-development/cli/getting-started)):**
+
+If you don't have Scoop yet, install it first:
+
+```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+```
 
-# Then install Supabase:
+Then add the Supabase bucket:
+
+```powershell
 scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
-scoop install supabase
+```
 
-# Linux or Mac without Homebrew
+Then install Supabase:
+
+```powershell
+scoop install supabase
+```
+
+**Linux (or Mac without Homebrew):**
+
+```bash
 npm install -g supabase
 ```
 
@@ -299,16 +313,29 @@ Verify it worked:
 supabase --version
 ```
 
-### Log In and Link
+### Log In
 
 ```bash
 supabase login
+```
+
+### Link to Your Project
+
+Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1):
+
+```bash
 supabase link --project-ref YOUR_PROJECT_REF
 ```
 
-Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1).
+### Set Your Secrets
 
-### Set Your OpenRouter Secret
+Set your access key from Step 5:
+
+```bash
+supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
+```
+
+Set your OpenRouter key from Step 4:
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
@@ -359,7 +386,7 @@ Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (St
 Now build your **MCP Connection URL** by adding your access key to the end:
 
 ```text
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-10
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5
 ```
 
 Paste this into your credential tracker as the MCP Connection URL. This is what you'll give to AI clients that support remote MCP — one URL, no extra config.
@@ -386,11 +413,11 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 
 ### ChatGPT
 
-Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works on the web at chatgpt.com. Not available on mobile.
+Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works on the web at [chatgpt.com](https://chatgpt.com). Not available on mobile.
 
 **Enable Developer Mode (one-time setup):**
 
-1. Go to chatgpt.com → click your profile icon → **Settings**
+1. Go to [chatgpt.com](https://chatgpt.com) → click your profile icon → **Settings**
 2. Navigate to **Apps & Connectors** → **Advanced settings**
 3. Toggle **Developer mode** ON
 
@@ -412,7 +439,7 @@ Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu) and works
 ```bash
 claude mcp add --transport http open-brain \
   https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp \
-  --header "x-brain-key: your-access-key-from-step-10"
+  --header "x-brain-key: your-access-key-from-step-5"
 ```
 
 ### Other Clients (Cursor, VS Code Copilot, Windsurf)
@@ -435,7 +462,7 @@ Every MCP client handles remote servers slightly differently. The server accepts
         "x-brain-key:${BRAIN_KEY}"
       ],
       "env": {
-        "BRAIN_KEY": "your-access-key-from-step-10"
+        "BRAIN_KEY": "your-access-key-from-step-5"
       }
     }
   }
@@ -521,7 +548,7 @@ The embedding is what makes retrieval powerful. "Sarah's thinking about leaving"
 
 ### Swapping Models Later
 
-Because you're using OpenRouter, you can swap models by editing the model strings in the Edge Function code and redeploying. Browse available models at openrouter.ai/models. Just make sure embedding dimensions match (1536 for the current setup).
+Because you're using OpenRouter, you can swap models by editing the model strings in the Edge Function code and redeploying. Browse available models at [openrouter.ai/models](https://openrouter.ai/models). Just make sure embedding dimensions match (1536 for the current setup).
 
 ---
 
