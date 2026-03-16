@@ -3,19 +3,25 @@
 /**
  * Open Brain — Gmail Pull Script
  *
- * Fetches emails from Gmail via REST API, cleans them, and POSTs each
- * as a single thought to the ingest-thought endpoint. Long emails are
- * stored in full (truncation for embedding happens server-side).
+ * Fetches emails from Gmail via REST API, cleans them, generates embeddings
+ * and metadata, and inserts each as a thought into Supabase with SHA-256
+ * content fingerprint dedup.
+ *
+ * Ingestion modes:
+ *   Default:              Supabase direct insert (requires SUPABASE_URL,
+ *                         SUPABASE_SERVICE_ROLE_KEY, OPENROUTER_API_KEY)
+ *   --ingest-endpoint:    Custom endpoint (requires INGEST_URL, INGEST_KEY)
  *
  * Usage:
  *   deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts [options]
  *
  * Options:
- *   --window=24h|7d|30d|1y|all    Time window to fetch (default: 24h)
- *   --labels=SENT,STARRED          Comma-separated Gmail labels (default: SENT)
- *   --dry-run                      Parse and show emails without ingesting
- *   --limit=N                      Max emails to process (default: 50)
- *   --list-labels                  List all Gmail labels and exit
+ *   --window=24h|7d|30d|90d|1y|all  Time window to fetch (default: 24h)
+ *   --labels=SENT,STARRED           Comma-separated Gmail labels (default: SENT)
+ *   --dry-run                       Parse and show emails without ingesting
+ *   --limit=N                       Max emails to process (default: 50)
+ *   --list-labels                   List all Gmail labels and exit
+ *   --ingest-endpoint               Use INGEST_URL/INGEST_KEY instead of Supabase direct
  */
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -28,8 +34,16 @@ const SYNC_LOG_PATH = `${SCRIPT_DIR}sync-log.json`;
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
 
+// Supabase direct insert (default mode)
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
+
+// Edge Function endpoint (--ingest-endpoint mode)
 const INGEST_URL = Deno.env.get("INGEST_URL") || "";
 const INGEST_KEY = Deno.env.get("INGEST_KEY") || "";
+
+const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 
 // ─── Sync Log (deduplication) ────────────────────────────────────────────────
 
@@ -69,6 +83,7 @@ interface CliArgs {
   dryRun: boolean;
   limit: number;
   listLabels: boolean;
+  ingestEndpoint: boolean;
 }
 
 function parseArgs(): CliArgs {
@@ -78,6 +93,7 @@ function parseArgs(): CliArgs {
     dryRun: false,
     limit: 50,
     listLabels: false,
+    ingestEndpoint: false,
   };
 
   for (const arg of Deno.args) {
@@ -91,6 +107,8 @@ function parseArgs(): CliArgs {
       args.limit = parseInt(arg.split("=")[1], 10);
     } else if (arg === "--list-labels") {
       args.listLabels = true;
+    } else if (arg === "--ingest-endpoint") {
+      args.ingestEndpoint = true;
     }
   }
 
@@ -280,13 +298,16 @@ function windowToQuery(window: string): string {
     case "30d":
       after = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
       break;
+    case "90d":
+      after = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      break;
     case "1y":
       after = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
       break;
     case "all":
       return "";
     default:
-      console.error(`Unknown window: ${window}. Use 24h, 7d, 30d, 1y, or all.`);
+      console.error(`Unknown window: ${window}. Use 24h, 7d, 30d, 90d, 1y, or all.`);
       Deno.exit(1);
   }
 
@@ -559,6 +580,69 @@ function processEmail(msg: GmailMessage): ProcessedEmail | null {
   };
 }
 
+// ─── Embedding & Metadata (Supabase direct mode) ───────────────────────────
+
+async function getEmbedding(text: string): Promise<number[]> {
+  const truncated = text.slice(0, 8000);
+  const res = await fetch(`${OPENROUTER_BASE}/embeddings`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "openai/text-embedding-3-small",
+      input: truncated,
+    }),
+  });
+  if (!res.ok) {
+    const msg = await res.text().catch(() => "");
+    throw new Error(`Embedding failed: ${res.status} ${msg}`);
+  }
+  const d = await res.json();
+  return d.data[0].embedding;
+}
+
+async function extractMetadata(text: string): Promise<Record<string, unknown>> {
+  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: `Extract metadata from the user's captured thought. Return JSON with:
+- "people": array of people mentioned (empty if none)
+- "action_items": array of implied to-dos (empty if none)
+- "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
+- "topics": array of 1-3 short topic tags (always at least one)
+- "type": one of "observation", "task", "idea", "reference", "person_note"
+Only extract what's explicitly there.`,
+        },
+        { role: "user", content: text },
+      ],
+    }),
+  });
+  const d = await res.json();
+  try {
+    return JSON.parse(d.choices[0].message.content);
+  } catch {
+    return { topics: ["uncategorized"], type: "observation" };
+  }
+}
+
+// ─── Content Fingerprint (normalized, matches upsert_thought RPC) ───────────
+
+async function contentFingerprint(text: string): Promise<string> {
+  const normalized = text.toLowerCase().trim().replace(/\s+/g, " ");
+  return await sha256(normalized);
+}
+
 // ─── Ingestion ───────────────────────────────────────────────────────────────
 
 interface IngestResult {
@@ -567,17 +651,111 @@ interface IngestResult {
   type?: string;
   topics?: string[];
   error?: string;
+  duplicate?: boolean;
 }
 
-async function ingestThought(
+let fingerprintSupported: boolean | null = null;
+
+async function ingestThoughtDirect(
   content: string,
   source: string,
   extraMetadata?: Record<string, unknown>,
 ): Promise<IngestResult> {
-  if (!INGEST_URL) {
-    return { ok: false, error: "INGEST_URL not set" };
+  const fingerprint = await contentFingerprint(content);
+
+  const [embedding, metadata] = await Promise.all([
+    getEmbedding(content),
+    extractMetadata(content),
+  ]);
+
+  const row: Record<string, unknown> = {
+    content,
+    embedding,
+    metadata: { ...metadata, source, ...extraMetadata },
+  };
+
+  if (fingerprintSupported !== false) {
+    row.content_fingerprint = fingerprint;
   }
 
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/thoughts`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: SUPABASE_SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      Prefer: "return=representation",
+    },
+    body: JSON.stringify(row),
+  });
+
+  // 409 = duplicate fingerprint — content already exists, treat as success
+  if (res.status === 409) {
+    const meta = metadata as Record<string, unknown>;
+    return {
+      ok: true,
+      type: meta.type as string,
+      topics: meta.topics as string[],
+      duplicate: true,
+    };
+  }
+
+  // If fingerprint column doesn't exist, retry without it
+  if (!res.ok && fingerprintSupported === null) {
+    const body = await res.text();
+    if (body.includes("content_fingerprint")) {
+      fingerprintSupported = false;
+      console.log("   (content_fingerprint column not found — inserting without dedup)");
+      console.log("   Run the SQL from primitives/content-fingerprint-dedup to enable dedup.\n");
+      delete row.content_fingerprint;
+      const retry = await fetch(`${SUPABASE_URL}/rest/v1/thoughts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(row),
+      });
+      if (!retry.ok) {
+        const retryBody = await retry.text();
+        return { ok: false, error: `HTTP ${retry.status}: ${retryBody}` };
+      }
+      const data = await retry.json();
+      const meta = metadata as Record<string, unknown>;
+      return {
+        ok: true,
+        id: Array.isArray(data) ? data[0]?.id : data?.id,
+        type: meta.type as string,
+        topics: meta.topics as string[],
+      };
+    }
+    return { ok: false, error: `HTTP ${res.status}: ${body}` };
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    return { ok: false, error: `HTTP ${res.status}: ${body}` };
+  }
+
+  if (fingerprintSupported === null) fingerprintSupported = true;
+
+  const data = await res.json();
+  const meta = metadata as Record<string, unknown>;
+  return {
+    ok: true,
+    id: Array.isArray(data) ? data[0]?.id : data?.id,
+    type: meta.type as string,
+    topics: meta.topics as string[],
+  };
+}
+
+async function ingestThoughtEndpoint(
+  content: string,
+  source: string,
+  extraMetadata?: Record<string, unknown>,
+): Promise<IngestResult> {
   const fingerprint = await sha256(content);
 
   const body: Record<string, unknown> = {
@@ -634,19 +812,36 @@ async function main() {
     labelMap.set(l.id, l.name);
   }
 
+  // Determine ingestion mode
+  const useEndpoint = args.ingestEndpoint;
+  const ingestMode = args.dryRun ? "DRY RUN" : useEndpoint ? "Edge Function endpoint" : "Supabase direct insert";
+
   // Normal pull mode
   const query = windowToQuery(args.window);
   console.log(`\nFetching emails...`);
   console.log(`  Labels: ${args.labels.join(", ")}`);
   console.log(`  Window: ${args.window}${query ? ` (${query})` : ""}`);
   console.log(`  Limit:  ${args.limit}`);
-  console.log(`  Mode:   ${args.dryRun ? "DRY RUN (no ingestion)" : "LIVE"}`);
+  console.log(`  Mode:   ${ingestMode}`);
 
-  if (!args.dryRun && !INGEST_URL) {
-    console.error("\nINGEST_URL environment variable is required for live mode.");
-    console.error("Set it to your ingest-thought endpoint URL.");
-    console.error("Example: export INGEST_URL=https://YOUR_REF.supabase.co/functions/v1/ingest-thought");
-    Deno.exit(1);
+  if (!args.dryRun) {
+    if (useEndpoint) {
+      if (!INGEST_URL || !INGEST_KEY) {
+        console.error("\nINGEST_URL and INGEST_KEY are required with --ingest-endpoint.");
+        console.error("Example: export INGEST_URL=https://YOUR_REF.supabase.co/functions/v1/ingest-thought");
+        Deno.exit(1);
+      }
+    } else {
+      if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+        console.error("\nSUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for live mode.");
+        console.error("Example: export SUPABASE_URL=https://YOUR_REF.supabase.co");
+        Deno.exit(1);
+      }
+      if (!OPENROUTER_API_KEY) {
+        console.error("\nOPENROUTER_API_KEY is required for embedding + metadata extraction.");
+        Deno.exit(1);
+      }
+    }
   }
 
   const syncLog = await loadSyncLog();
@@ -706,12 +901,15 @@ async function main() {
     };
 
     const content = buildEmailContent(email.body, email.from, email.subject, email.date);
-    const result = await ingestThought(content, "gmail", emailMeta);
+    const result = useEndpoint
+      ? await ingestThoughtEndpoint(content, "gmail", emailMeta)
+      : await ingestThoughtDirect(content, "gmail", emailMeta);
 
     if (result.ok) {
       ingested++;
       syncLog.ingested_ids[ref.id] = new Date().toISOString();
-      console.log(`   -> Ingested: ${result.type} — ${(result.topics || []).join(", ")}`);
+      const dupTag = result.duplicate ? " (duplicate — skipped)" : "";
+      console.log(`   -> Ingested: ${result.type} — ${(result.topics || []).join(", ")}${dupTag}`);
     } else {
       errors++;
       console.error(`   -> ERROR: ${result.error}`);
