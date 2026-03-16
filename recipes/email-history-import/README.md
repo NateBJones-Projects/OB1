@@ -4,15 +4,17 @@
 
 ## What It Does
 
-Pulls your Gmail history via the Gmail API and loads each email into Open Brain as a thought. Emails are embedded and stored with sender, subject, date, and label metadata — making your entire email archive searchable through your brain's semantic search.
+Pulls your Gmail history via the Gmail API and loads each email into Open Brain as a single thought. Long emails are stored in full — truncation for embedding happens server-side. Each thought includes a SHA-256 content fingerprint for dedup.
+
+**One email = one thought.** No chunking, no parent/child relationships. This aligns with how the OB1 community handles long content (truncate for embedding, store full content).
 
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
+- Deno runtime installed
 - Google Cloud project with Gmail API enabled
 - Gmail API OAuth credentials (Client ID + Client Secret)
-- Node.js 18+
-- Your Supabase project URL and service role key
+- Your `ingest-thought` endpoint URL and key
 
 ## Credential Tracker
 
@@ -25,6 +27,8 @@ EMAIL HISTORY IMPORT -- CREDENTIAL TRACKER
 FROM YOUR OPEN BRAIN SETUP
   Supabase Project URL:  ____________
   Supabase Secret key:   ____________
+  Ingest URL:            ____________/functions/v1/ingest-thought
+  Ingest Key:            ____________
 
 GENERATED DURING SETUP
   Google Cloud Project ID:     ____________
@@ -34,36 +38,74 @@ GENERATED DURING SETUP
 --------------------------------------
 ```
 
-## Steps
+## Setup
 
-<!-- TODO: Matt Hallett to fill in step-by-step instructions -->
+1. **Enable Gmail API** in your Google Cloud project
+2. **Create OAuth 2.0 credentials** (Desktop app type) and download as `credentials.json` into this folder
+3. **Set environment variables:**
+   ```bash
+   export INGEST_URL=https://YOUR_REF.supabase.co/functions/v1/ingest-thought
+   export INGEST_KEY=your-service-role-key
+   ```
+4. **First run — authenticate:**
+   ```bash
+   deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --dry-run --limit=5
+   ```
+   This opens a browser window for OAuth consent. After authorizing, your token is cached in `token.json`.
 
-1. Set up Google Cloud project and enable the Gmail API
-2. Create OAuth 2.0 credentials
-3. Clone this folder and install dependencies
-4. Configure your environment variables
-5. Run the authentication flow
-6. Run the import script
-7. Verify thoughts were created in your Supabase database
+## Usage
+
+```bash
+# Dry run — see what would be imported
+deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --dry-run
+
+# Import sent emails from the last 7 days
+deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --window=7d
+
+# Import starred emails
+deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --labels=STARRED
+
+# List all Gmail labels
+deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --list-labels
+```
+
+### Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--window=` | `24h` | Time window: `24h`, `7d`, `30d`, `1y`, `all` |
+| `--labels=` | `SENT` | Comma-separated Gmail labels |
+| `--limit=` | `50` | Max emails to process |
+| `--dry-run` | off | Preview without ingesting |
+| `--list-labels` | off | List all Gmail labels and exit |
+
+## How It Works
+
+1. **Fetch** emails from Gmail API by label and time window
+2. **Extract** body (base64 decode, HTML-to-text, strip quoted replies and signatures)
+3. **Filter** out noise (no-reply senders, receipts, auto-generated, <10 words)
+4. **Deduplicate** via sync-log (tracks Gmail message IDs already imported)
+5. **Ingest** each email as one thought with SHA-256 content fingerprint and metadata
+
+### What gets filtered out
+
+- Auto-generated emails (receipts, confirmations, password resets)
+- No-reply / notification senders
+- Emails with <10 words after cleanup
+- Quoted replies and email signatures are stripped before ingestion
 
 ## Expected Outcome
 
-After running the import, you should see your emails as rows in the `thoughts` table. Each thought's `content` field contains the email body, and the `metadata` jsonb field includes:
-- `source`: `"gmail"`
-- `sender`: sender email address
-- `subject`: email subject line
-- `date`: original send date
-- `labels`: Gmail labels
-
-You can search for any email content using your Open Brain MCP server's `search_thoughts` tool.
+Each imported email becomes one row in the `thoughts` table:
+- `content`: Email body with context prefix (`[Email from X | Subject: Y | Date: Z]`)
+- `metadata`: LLM-extracted topics, type, people, etc. plus `source: "gmail"`, `gmail_id`, `gmail_labels`, `gmail_thread_id`
+- `content_fingerprint`: SHA-256 hash for dedup (aligns with PR #54)
+- `embedding`: Generated server-side from content (truncated to model limit)
 
 ## Troubleshooting
 
-**Issue: OAuth flow fails or redirects to an error page**
-Solution: Make sure your redirect URI in Google Cloud Console matches exactly what's in your config. For local development, use `http://localhost:3000/callback`.
+**OAuth flow fails:** Make sure your redirect URI in Google Cloud Console is `http://localhost:3847/callback`.
 
-**Issue: Import runs but no thoughts appear in Supabase**
-Solution: Check that your `SUPABASE_SERVICE_ROLE_KEY` is set (not the anon key). RLS blocks anon inserts.
+**No thoughts appear:** Check that `INGEST_KEY` is your service role key (not the anon key). RLS blocks anon inserts.
 
-**Issue: Rate limiting from Gmail API**
-Solution: The script includes built-in rate limiting, but if you have a very large mailbox, you may need to import in batches. Use the `--after` flag to set a start date.
+**Re-running imports the same emails:** The `sync-log.json` file tracks imported Gmail IDs. Delete it to re-import everything.

@@ -10,7 +10,7 @@
   "requires": {
     "open_brain": true,
     "services": ["Gmail API"],
-    "tools": ["Node.js 18+"]
+    "tools": ["Deno"]
   },
   "tags": ["email", "gmail", "import", "history"],
   "difficulty": "intermediate",

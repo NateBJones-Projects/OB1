@@ -2,3 +2,9 @@ node_modules/
 .DS_Store
 .planning/
 supabase/
+
+# Recipe credentials & runtime state
+credentials.json
+token.json
+gmail-sync-log.json
+sync-log.json
