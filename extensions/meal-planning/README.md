@@ -111,7 +111,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Setting | Value |
 |---------|-------|
 | Function name | `meal-planning-mcp` |
-| Server code | This extension's `index.ts` |
+| Download path | `extensions/meal-planning` |
 
 ### 3. Connect to Your AI
 
@@ -171,7 +171,8 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Setting | Value |
 |---------|-------|
 | Function name | `meal-planning-shared-mcp` |
-| Server code | This extension's `shared-server.ts` |
+| Download path | `extensions/meal-planning` |
+| Server file | `shared-server.ts` (not `index.ts`) |
 | Access key secret name | `MCP_HOUSEHOLD_ACCESS_KEY` (not `MCP_ACCESS_KEY`) |
 
 You'll also need to set the household Supabase key:

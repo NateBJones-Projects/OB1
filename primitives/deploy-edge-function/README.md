@@ -4,54 +4,91 @@ A guide to deploying any Open Brain extension as a Supabase Edge Function. This 
 
 ## Prerequisites
 
-- Supabase CLI installed and linked to your project (covered in the [Getting Started Guide](../../docs/01-getting-started.md))
-- Your extension's `index.ts` server code ready
+- Completed the [Getting Started Guide](../../docs/01-getting-started.md) — you should already have:
+  - Supabase CLI installed
+  - A project folder with `supabase init` and `supabase link` already done
+  - Your credential tracker with Supabase project ref and secrets
 
-## Step 1: Create the Function
+## Before You Start
 
-```bash
-supabase functions new your-extension-mcp
-```
+Navigate to your Open Brain project folder — the one you created during the Getting Started guide.
 
-Replace `your-extension-mcp` with the name from your extension's README (e.g., `household-knowledge-mcp`, `family-calendar-mcp`).
-
-## Step 2: Add Dependencies
-
-Create `supabase/functions/your-extension-mcp/deno.json`:
-
-```json
-{
-  "imports": {
-    "@hono/mcp": "npm:@hono/mcp@0.1.1",
-    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@1.24.3",
-    "hono": "npm:hono@4.9.2",
-    "zod": "npm:zod@4.1.13",
-    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.47.10"
-  }
-}
-```
-
-These are the standard dependencies for all Open Brain MCP servers. Use these exact versions unless the extension specifies otherwise.
-
-## Step 3: Write the Server
-
-Open `supabase/functions/your-extension-mcp/index.ts` and paste the MCP server code from the extension's `index.ts` file.
-
-> `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them manually.
-
-## Step 4: Generate an Access Key
-
-Your MCP server will be a public URL. The access key ensures only you can use it.
+🟩 **Mac/Linux:**
 
 ```bash
-# Mac/Linux
+cd /paste/your/path/here
+```
+
+🟦 **Windows (PowerShell):**
+
+```powershell
+cd "C:\paste\your\path\here"
+```
+
+> Not sure where it is? It's the folder you created in Step 6 of the Getting Started guide — the one with the `supabase/` directory inside it.
+
+## What You Need From the Extension
+
+Every extension README includes a deployment table like this:
+
+| Setting | Value |
+|---------|-------|
+| Function name | `extension-name-mcp` |
+| Download path | `extensions/extension-name` |
+
+You'll use these values in the steps below. Replace `FUNCTION_NAME` and `DOWNLOAD_PATH` with the values from the extension you're deploying.
+
+---
+
+## Step 1: Create the Function Folder
+
+```bash
+supabase functions new FUNCTION_NAME
+```
+
+Example: `supabase functions new household-knowledge-mcp`
+
+## Step 2: Download the Server Files
+
+🟩 **Mac/Linux:**
+
+```bash
+curl -o supabase/functions/FUNCTION_NAME/index.ts https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/DOWNLOAD_PATH/index.ts
+```
+
+```bash
+curl -o supabase/functions/FUNCTION_NAME/deno.json https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/DOWNLOAD_PATH/deno.json
+```
+
+🟦 **Windows (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/DOWNLOAD_PATH/index.ts -OutFile supabase\functions\FUNCTION_NAME\index.ts
+```
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/DOWNLOAD_PATH/deno.json -OutFile supabase\functions\FUNCTION_NAME\deno.json
+```
+
+> Replace `FUNCTION_NAME` and `DOWNLOAD_PATH` with the values from the extension's deployment table.
+
+## Step 3: Generate an Access Key
+
+> **Already have an access key from a previous extension?** You can reuse it — skip to Step 4 and use the same key. Or generate a new one if you prefer each extension to have its own key.
+
+🟩 **Mac/Linux:**
+
+```bash
 openssl rand -hex 32
+```
 
-# Windows (PowerShell)
+🟦 **Windows (PowerShell):**
+
+```powershell
 -join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
 ```
 
-Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters). Save it in your credential tracker under **MCP Access Key**.
+Copy the output (64 characters). Save it in your credential tracker.
 
 Set it as a Supabase secret:
 
@@ -59,49 +96,65 @@ Set it as a Supabase secret:
 supabase secrets set MCP_ACCESS_KEY=your-generated-key-here
 ```
 
-## Step 5: Deploy
+> If you already set `MCP_ACCESS_KEY` for a previous extension or during the Getting Started guide, setting it again will overwrite it. All functions share the same secrets, so every deployed function will use the new key. If you want separate keys per extension, use a different secret name (e.g., `HOUSEHOLD_MCP_KEY`) and update the extension's `index.ts` to read from that name instead.
+
+## Step 4: Deploy
 
 ```bash
-supabase functions deploy your-extension-mcp --no-verify-jwt
+supabase functions deploy FUNCTION_NAME --no-verify-jwt
 ```
 
 Your MCP server is now live at:
 
 ```text
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/your-extension-mcp
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/FUNCTION_NAME
 ```
 
-Replace `YOUR_PROJECT_REF` with your project ref from the credential tracker. Save this as your **MCP Server URL**.
-
-Now build your **MCP Connection URL** by adding your access key:
+Build your **MCP Connection URL** by adding your access key:
 
 ```text
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/your-extension-mcp?key=your-access-key
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/FUNCTION_NAME?key=your-access-key
 ```
 
-Save this in your credential tracker. This is what you'll give to AI clients.
+Save this in your credential tracker, then follow the [Remote MCP Connection](../remote-mcp/) guide to connect it to your AI client.
 
-> That's it. No npm install, no TypeScript build, no local server to keep running. It's deployed on Supabase's infrastructure.
+---
 
 ## Updating a Deployed Function
 
-When you modify the server code, redeploy with the same command:
+When the extension code is updated in the repo, pull the latest version and redeploy:
+
+🟩 **Mac/Linux:**
 
 ```bash
-supabase functions deploy your-extension-mcp --no-verify-jwt
+curl -o supabase/functions/FUNCTION_NAME/index.ts https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/DOWNLOAD_PATH/index.ts
+```
+
+🟦 **Windows (PowerShell):**
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/DOWNLOAD_PATH/index.ts -OutFile supabase\functions\FUNCTION_NAME\index.ts
+```
+
+Then deploy:
+
+```bash
+supabase functions deploy FUNCTION_NAME --no-verify-jwt
 ```
 
 The URL and access key stay the same — no need to reconfigure your AI clients.
 
+---
+
 ## Troubleshooting
 
 **"Function not found" during deploy**
-- Verify you ran `supabase functions new your-extension-mcp` first
-- Check that the function directory exists: `ls supabase/functions/your-extension-mcp/`
+- Verify you ran `supabase functions new FUNCTION_NAME` first
+- Make sure you're in your Open Brain project folder (the one with the `supabase/` directory)
 
-**"Missing deno.json" or import errors**
-- Verify `deno.json` is in the function directory (not the project root)
-- Check that the import paths in `deno.json` match the versions listed above
+**Import errors or "not in import map"**
+- Verify `deno.json` was downloaded into the function directory, not the project root
+- Run `ls supabase/functions/FUNCTION_NAME/` — you should see both `index.ts` and `deno.json`
 
 **Deploy succeeds but function returns errors**
 - Check Edge Function logs: Supabase Dashboard → Edge Functions → your function → Logs
@@ -110,12 +163,6 @@ The URL and access key stay the same — no need to reconfigure your AI clients.
 
 **"Invalid JWT" or authentication errors**
 - Make sure you deployed with `--no-verify-jwt` flag
-- The MCP server handles its own authentication via the access key
-
-**"Permission denied" errors**
-- The service role key bypasses RLS, so this suggests a configuration issue
-- Verify the user_id being passed exists in `auth.users`
-- Check that foreign key constraints are not blocking inserts
 
 ## Extensions That Use This
 
@@ -125,5 +172,3 @@ The URL and access key stay the same — no need to reconfigure your AI clients.
 - [Meal Planning](../../extensions/meal-planning/) (Extension 4)
 - [Professional CRM](../../extensions/professional-crm/) (Extension 5)
 - [Job Hunt Pipeline](../../extensions/job-hunt/) (Extension 6)
-
-Every extension follows this exact deployment pattern.

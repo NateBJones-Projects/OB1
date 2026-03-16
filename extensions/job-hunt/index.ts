@@ -440,6 +440,7 @@ app.post("*", async (c) => {
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
+
   // Validate access key
   const key = c.req.query("key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_ACCESS_KEY");
