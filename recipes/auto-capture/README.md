@@ -52,47 +52,48 @@ No additional credentials needed for this recipe.
 
 ## Steps
 
-### 1. Create the skill directory
+1. **Create the skill directory**
 
-```bash
-mkdir -p ~/.claude/skills/auto-capture
-```
+   ```bash
+   mkdir -p ~/.claude/skills/auto-capture
+   ```
 
-### 2. Copy the skill file
+2. **Copy the skill file**
 
-```bash
-cp auto-capture.skill.md ~/.claude/skills/auto-capture/SKILL.md
-```
+   ```bash
+   cp auto-capture.skill.md ~/.claude/skills/auto-capture/SKILL.md
+   ```
 
-Or download directly from GitHub:
-```bash
-curl -o ~/.claude/skills/auto-capture/SKILL.md \
-  https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/recipes/auto-capture/auto-capture.skill.md
-```
+   Or download directly from GitHub:
 
-### 3. Verify your AI tool picks up the skill
+   ```bash
+   curl -o ~/.claude/skills/auto-capture/SKILL.md \
+     https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/recipes/auto-capture/auto-capture.skill.md
+   ```
 
-Restart Claude Code (or your AI tool). Ask: "What skills do you have loaded?" and confirm Auto-Capture is listed.
+3. **Verify your AI tool picks up the skill**
 
-### 4. Run a session and verify capture
+   Restart Claude Code (or your AI tool). Ask: "What skills do you have loaded?" and confirm Auto-Capture is listed.
 
-Start a brainstorming or work session. When you end it, the auto-capture protocol should fire. You will see `capture_thought` calls in the tool output. Verify with:
+4. **Run a session and verify capture**
 
-```
-thought_stats()
-```
+   Start a brainstorming or work session. When you end it, the auto-capture protocol should fire. You will see `capture_thought` calls in the tool output. Verify with:
 
-Your thought count should have increased by the number of ACT NOW items plus one (the session summary).
+   ```
+   thought_stats()
+   ```
 
-### 5. Search for your captures
+   Your thought count should have increased by the number of ACT NOW items plus one (the session summary).
 
-In a new session, test retrieval:
+5. **Search for your captures**
 
-```
-search_thoughts({ "query": "[topic from your session]" })
-```
+   In a new session, test retrieval:
 
-You should see your ACT NOW items and session summary in the results.
+   ```
+   search_thoughts({ "query": "[topic from your session]" })
+   ```
+
+   You should see your ACT NOW items and session summary in the results.
 
 ## Expected Outcome
 
