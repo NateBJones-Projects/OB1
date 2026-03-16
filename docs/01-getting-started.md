@@ -809,6 +809,17 @@ Your Open Brain is live. Now make it work for you. The **[Companion Prompts](02-
 
 Start with the Memory Migration. If you have an existing second brain, run the Second Brain Migration next. Then use the Spark to figure out what to capture going forward. The templates build the daily habit. The weekly review closes the loop.
 
+### Then start importing your data
+
+The companion prompts pull out what your AI already knows. **Recipes** go further — they connect directly to your existing services and bulk-import real data.
+
+| Recipe | What It Does | Time |
+| ------ | ------------ | ---- |
+| [Email History Import](../recipes/email-history-import/) | Pull your Gmail archive into searchable thoughts | 30 min |
+| [ChatGPT Conversation Import](../recipes/chatgpt-conversation-import/) | Ingest your full ChatGPT data export | 30 min |
+
+Browse all recipes in [`/recipes`](../recipes/).
+
 ---
 
 *Built by Nate B. Jones — companion to "Your Second Brain Is Closed. Your AI Can't Use It. Here's the Fix."*

@@ -2,6 +2,8 @@
 
 > Import your Gmail email history into Open Brain as searchable, embedded thoughts.
 
+Your email is full of decisions, commitments, and context that your AI has never seen. This recipe connects to Gmail, pulls the emails that matter (filtering out receipts, auto-replies, and noise), and loads them into your Open Brain. Once imported, your AI can recall what you said to someone three months ago, find that pricing discussion from last quarter, or surface commitments you forgot about.
+
 ## What It Does
 
 Pulls your Gmail history via the Gmail API and loads each email into Open Brain as a single thought. Long emails are stored in full — truncation for embedding happens server-side. Each thought includes a SHA-256 content fingerprint for dedup.

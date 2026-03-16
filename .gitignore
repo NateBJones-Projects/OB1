@@ -4,6 +4,7 @@ node_modules/
 supabase/
 
 # Recipe credentials & runtime state
+.env
 credentials.json
 token.json
 gmail-sync-log.json
