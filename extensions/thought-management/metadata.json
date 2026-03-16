@@ -1,0 +1,20 @@
+{
+  "name": "Thought Management Tools",
+  "description": "Update and delete MCP tools for managing existing thoughts — edit content, reclassify, or remove outdated thoughts.",
+  "category": "extensions",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["openrouter"],
+    "tools": ["capture_thought", "search_thoughts"]
+  },
+  "tags": ["mcp", "update", "delete", "management", "crud"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-03-16",
+  "updated": "2026-03-16"
+}
