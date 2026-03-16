@@ -48,6 +48,22 @@ And don't forget the Supabase AI assistant covered in the [setup guide](01-getti
 
 ---
 
+## Importing Data
+
+### "Can I import my Gmail into the Open Brain?"
+
+Yes. The [Email History Import](../recipes/email-history-import/) recipe connects to Gmail via OAuth, pulls emails by label and time window, strips noise (signatures, quoted replies, auto-generated messages), and loads each email as a thought with sender, subject, and date metadata. Takes about 30 minutes to set up. You need a Google Cloud project with Gmail API enabled.
+
+### "How do I import my ChatGPT conversations?"
+
+Export your data from ChatGPT (Settings → Data controls → Export data), then use the [ChatGPT Conversation Import](../recipes/chatgpt-conversation-import/) recipe. It processes the JSON export, extracts the meaningful exchanges, and loads them as thoughts. Unlike the manual approach described in the FAQ above, this handles the full export automatically.
+
+### "What other data sources can I import?"
+
+Check [`/recipes`](../recipes/) for the current list. The community is actively building importers for Google Activity (Takeout), Twitter/X archives, Claude conversations, Gemini, and more. Each recipe is a standalone build — pick the ones that match your data.
+
+---
+
 ## "How does this work with Obsidian?"
 
 Short answer: it doesn't, and it's not supposed to.
