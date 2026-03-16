@@ -105,7 +105,7 @@ deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --list
 Each imported email becomes one row in the `thoughts` table:
 - `content`: Email body with context prefix (`[Email from X | Subject: Y | Date: Z]`)
 - `metadata`: LLM-extracted topics, type, people, etc. plus `source: "gmail"`, `gmail_id`, `gmail_labels`, `gmail_thread_id`
-- `content_fingerprint`: SHA-256 hash for dedup (aligns with PR #54)
+- `content_fingerprint`: SHA-256 hash for dedup (see [content fingerprint primitive](../../primitives/content-fingerprint-dedup/README.md))
 - `embedding`: Generated server-side from content (truncated to model limit)
 
 ## Troubleshooting
