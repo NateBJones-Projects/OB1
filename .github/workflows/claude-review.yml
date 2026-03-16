@@ -47,10 +47,22 @@ jobs:
                modifications, no local MCP servers (must use remote Edge Functions)?
             5. **Value** — Does this add something meaningfully different from
                existing contributions?
+            6. **Design patterns** — Does this follow OB1's established patterns?
+               Check for: direct Supabase insert or MCP ingest endpoint (not
+               custom servers), remote Edge Functions (not local Node.js),
+               Row Level Security on new tables, JSONB metadata fields,
+               environment variables for credentials (not hardcoded).
+            7. **Scope fit** — Is this appropriately sized for OB1, or is it
+               growing into its own project? Red flags: own package.json with
+               many dependencies, doesn't interact with the thoughts table,
+               needs independent deployment, or introduces its own auth system.
+               If it seems too big, suggest it could be a standalone project
+               that integrates with OB1 instead.
 
             Be constructive and welcoming. If a contribution needs work, explain
             what specifically needs to change. If it looks good, approve the PR.
 
             Important: The mechanical checks (file structure, metadata validation,
             SQL safety) are handled by a separate CI job. Focus your review on the
-            things that require judgment — clarity, alignment, value, and quality.
+            things that require judgment — clarity, alignment, value, design
+            patterns, scope fit, and quality.

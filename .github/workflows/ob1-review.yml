@@ -421,11 +421,11 @@ jobs:
             fail_check "Primitive dependencies" "Primitive dependency issues:\n${rule10_detail}"
           fi
 
-          # ─── Rule 11: LLM clarity review (stub) ───
-          # TODO: LLM clarity review — planned for v2. Requires API key secret.
-          # Will send contribution READMEs to an LLM API to check if instructions
-          # are clear and complete. For now, always passes.
-          pass_check "LLM clarity review" "*(Planned for v2)* Auto-pass"
+          # ─── Rule 11: LLM clarity review ───
+          # Clarity, alignment, and design pattern reviews are handled by the
+          # Claude PR Review workflow (claude-review.yml) using claude-code-action.
+          # This keeps ob1-review.yml fast and deterministic.
+          pass_check "LLM clarity review" "Covered by Claude PR Review workflow"
 
           # ─── Rule 14: No local MCP pattern ───
           # Extensions and integrations must use remote MCP (Edge Functions + custom connectors).
