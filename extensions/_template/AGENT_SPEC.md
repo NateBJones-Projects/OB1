@@ -85,6 +85,7 @@ PostgreSQL DDL that runs in the Supabase SQL Editor. Must follow these rules:
 3. **Include indexes** for columns that will be queried frequently (user_id + any filter columns).
 
 4. **Include Row Level Security:**
+
    ```sql
    ALTER TABLE table_name ENABLE ROW LEVEL SECURITY;
 
@@ -101,6 +102,7 @@ PostgreSQL DDL that runs in the Supabase SQL Editor. Must follow these rules:
 7. **Use JSONB for flexible metadata fields** where the structure might vary (e.g., `details JSONB DEFAULT '{}'`).
 
 8. **Add update triggers** if the table has `updated_at`:
+
    ```sql
    CREATE OR REPLACE FUNCTION update_updated_at_column()
    RETURNS TRIGGER AS $$

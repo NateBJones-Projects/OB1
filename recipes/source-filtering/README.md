@@ -65,18 +65,21 @@ You'll see something like:
 Source filtering works with three MCP tools. Pass the `source` parameter to scope results:
 
 **search_thoughts** — semantic search within a single source:
+
 ```
 "Search my gmail thoughts for conversations about the product roadmap"
 → search_thoughts({ query: "product roadmap", source: "gmail" })
 ```
 
 **list_thoughts** — recent thoughts from a specific source:
+
 ```
 "Show me my last 10 ChatGPT thoughts"
 → list_thoughts({ limit: 10, source: "chatgpt" })
 ```
 
 **thought_stats** — stats scoped to a source:
+
 ```
 "How many gmail thoughts do I have?"
 → thought_stats({ source: "gmail" })
@@ -155,6 +158,7 @@ ORDER BY count DESC;
 
 **Thoughts have `null` source**
 Some early thoughts were captured before source tracking was added. You can backfill the source field manually:
+
 ```sql
 UPDATE thoughts SET metadata = metadata || '{"source": "mcp"}'::jsonb
 WHERE metadata->>'source' IS NULL;
@@ -165,12 +169,14 @@ All your thoughts already have LLM-extracted metadata. This happens if everythin
 
 **Rate limiting from OpenRouter**
 The script batches requests (default 10 concurrent) with a 500ms pause between batches. If you hit rate limits, reduce the batch size:
+
 ```bash
 deno run --allow-net --allow-env backfill-metadata.ts --batch-size=3
 ```
 
 **Source strings are case-sensitive**
 `source: "Gmail"` won't match `source: "gmail"`. Sources are stored lowercase. If you have mixed-case sources from a custom import, normalize them:
+
 ```sql
 UPDATE thoughts SET metadata = jsonb_set(metadata, '{source}', to_jsonb(LOWER(metadata->>'source')))
 WHERE metadata->>'source' IS DISTINCT FROM LOWER(metadata->>'source');

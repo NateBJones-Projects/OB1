@@ -45,14 +45,18 @@ GENERATED DURING SETUP
 1. **Enable Gmail API** in your Google Cloud project
 2. **Create OAuth 2.0 credentials** (Desktop app type) and download as `credentials.json` into this folder
 3. **Set environment variables:**
+
    ```bash
    export INGEST_URL=https://YOUR_REF.supabase.co/functions/v1/ingest-thought
    export INGEST_KEY=your-service-role-key
    ```
+
 4. **First run — authenticate:**
+
    ```bash
    deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --dry-run --limit=5
    ```
+
    This opens a browser window for OAuth consent. After authorizing, your token is cached in `token.json`.
 
 ## Usage

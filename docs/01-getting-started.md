@@ -24,7 +24,6 @@ You're going to generate API keys, passwords, and IDs across three different ser
 >
 > 🛑🛑🛑 **Do not skip this.** 🛑🛑🛑
 
-
 ---
 
 ![Step 1](https://img.shields.io/badge/Step_1-Create_Your_Supabase_Project-E53935?style=for-the-badge)
@@ -328,6 +327,8 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
 
+<!-- -->
+
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
@@ -350,14 +351,18 @@ curl -o supabase/functions/open-brain-mcp/deno.json https://raw.githubuserconten
 > [!TIP]
 > These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
 
+<!-- -->
+
 > [!WARNING]
 > ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
 >
 > ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
+>
 > ```bash
 > rm -rf supabase/functions/open-brain-mcp
 > supabase functions new open-brain-mcp
 > ```
+>
 > Then retry the curl commands.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
@@ -504,6 +509,8 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
 
+<!-- -->
+
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
@@ -526,14 +533,18 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1
 > [!TIP]
 > These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
 
+<!-- -->
+
 > [!WARNING]
 > ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
 >
 > ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
+>
 > ```powershell
 > Remove-Item -Recurse supabase\functions\open-brain-mcp
 > supabase functions new open-brain-mcp
 > ```
+>
 > Then retry the download commands.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
