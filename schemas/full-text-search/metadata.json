@@ -1,0 +1,20 @@
+{
+  "name": "Full-Text Search",
+  "description": "PostgreSQL full-text search RPC for keyword-based thought retrieval — complements the existing semantic vector search.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["search", "full-text", "postgresql", "tsvector", "keyword"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-03-16",
+  "updated": "2026-03-16"
+}
