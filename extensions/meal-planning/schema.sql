@@ -4,7 +4,7 @@
 -- Recipe collection
 CREATE TABLE recipes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users NOT NULL,
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     cuisine TEXT,
     prep_time_minutes INTEGER,
@@ -22,7 +22,7 @@ CREATE TABLE recipes (
 -- Weekly meal planning
 CREATE TABLE meal_plans (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users NOT NULL,
+    user_id UUID NOT NULL,
     week_start DATE NOT NULL, -- should be a Monday
     day_of_week TEXT NOT NULL, -- 'monday', 'tuesday', etc.
     meal_type TEXT NOT NULL CHECK (meal_type IN ('breakfast', 'lunch', 'dinner', 'snack')),
@@ -36,7 +36,7 @@ CREATE TABLE meal_plans (
 -- Auto-generated or manual grocery lists
 CREATE TABLE shopping_lists (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users NOT NULL,
+    user_id UUID NOT NULL,
     week_start DATE NOT NULL,
     items JSONB NOT NULL DEFAULT '[]', -- array of {name, quantity, unit, purchased: bool, recipe_id}
     notes TEXT,

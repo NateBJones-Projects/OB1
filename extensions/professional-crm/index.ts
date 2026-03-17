@@ -54,6 +54,11 @@ app.post("*", async (c) => {
     },
   );
 
+  const userId = Deno.env.get("DEFAULT_USER_ID");
+  if (!userId) {
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+  }
+
   const server = new McpServer({ name: "professional-crm", version: "1.0.0" });
 
   // Tool 1: add_professional_contact
@@ -61,7 +66,6 @@ app.post("*", async (c) => {
     "add_professional_contact",
     "Add a new professional contact to your network",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       name: z.string().describe("Contact's full name"),
       company: z.string().optional().describe("Company name"),
       title: z.string().optional().describe("Job title"),
@@ -72,11 +76,11 @@ app.post("*", async (c) => {
       tags: z.array(z.string()).optional().describe("Tags for categorization (e.g., ['ai', 'consulting', 'conference'])"),
       notes: z.string().optional().describe("Additional notes about this contact"),
     },
-    async ({ user_id, name, company, title, email, phone, linkedin_url, how_we_met, tags, notes }) => {
+    async ({ name, company, title, email, phone, linkedin_url, how_we_met, tags, notes }) => {
       const { data, error } = await supabase
         .from("professional_contacts")
         .insert({
-          user_id,
+          user_id: userId,
           name,
           company: company || null,
           title: title || null,
@@ -114,15 +118,14 @@ app.post("*", async (c) => {
     "search_contacts",
     "Search professional contacts by name, company, or tags",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       query: z.string().optional().describe("Search term (searches name, company, title, notes)"),
       tags: z.array(z.string()).optional().describe("Filter by specific tags"),
     },
-    async ({ user_id, query, tags }) => {
+    async ({ query, tags }) => {
       let queryBuilder = supabase
         .from("professional_contacts")
         .select("*")
-        .eq("user_id", user_id);
+        .eq("user_id", userId);
 
       if (query) {
         queryBuilder = queryBuilder.or(
@@ -160,7 +163,6 @@ app.post("*", async (c) => {
     "log_interaction",
     "Log an interaction with a contact (automatically updates last_contacted)",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       contact_id: z.string().describe("Contact ID (UUID)"),
       interaction_type: z.enum(["meeting", "email", "call", "coffee", "event", "linkedin", "other"]).describe("Type of interaction"),
       occurred_at: z.string().optional().describe("When the interaction occurred (ISO 8601 timestamp, defaults to now)"),
@@ -168,11 +170,11 @@ app.post("*", async (c) => {
       follow_up_needed: z.boolean().optional().describe("Whether a follow-up is needed"),
       follow_up_notes: z.string().optional().describe("Notes about the follow-up"),
     },
-    async ({ user_id, contact_id, interaction_type, occurred_at, summary, follow_up_needed, follow_up_notes }) => {
+    async ({ contact_id, interaction_type, occurred_at, summary, follow_up_needed, follow_up_notes }) => {
       const { data, error } = await supabase
         .from("contact_interactions")
         .insert({
-          user_id,
+          user_id: userId,
           contact_id,
           interaction_type,
           occurred_at: occurred_at || new Date().toISOString(),
@@ -209,16 +211,15 @@ app.post("*", async (c) => {
     "get_contact_history",
     "Get a contact's full profile and all interactions, ordered by date",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       contact_id: z.string().describe("Contact ID (UUID)"),
     },
-    async ({ user_id, contact_id }) => {
+    async ({ contact_id }) => {
       // Get contact details
       const { data: contact, error: contactError } = await supabase
         .from("professional_contacts")
         .select("*")
         .eq("id", contact_id)
-        .eq("user_id", user_id)
+        .eq("user_id", userId)
         .single();
 
       if (contactError) {
@@ -230,7 +231,7 @@ app.post("*", async (c) => {
         .from("contact_interactions")
         .select("*")
         .eq("contact_id", contact_id)
-        .eq("user_id", user_id)
+        .eq("user_id", userId)
         .order("occurred_at", { ascending: false });
 
       if (interactionsError) {
@@ -242,7 +243,7 @@ app.post("*", async (c) => {
         .from("opportunities")
         .select("*")
         .eq("contact_id", contact_id)
-        .eq("user_id", user_id)
+        .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if (opportunitiesError) {
@@ -271,7 +272,6 @@ app.post("*", async (c) => {
     "create_opportunity",
     "Create a new opportunity/deal, optionally linked to a contact",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       contact_id: z.string().optional().describe("Contact ID (UUID) - optional"),
       title: z.string().describe("Opportunity title"),
       description: z.string().optional().describe("Detailed description"),
@@ -280,11 +280,11 @@ app.post("*", async (c) => {
       expected_close_date: z.string().optional().describe("Expected close date (YYYY-MM-DD)"),
       notes: z.string().optional().describe("Additional notes"),
     },
-    async ({ user_id, contact_id, title, description, stage, value, expected_close_date, notes }) => {
+    async ({ contact_id, title, description, stage, value, expected_close_date, notes }) => {
       const { data, error } = await supabase
         .from("opportunities")
         .insert({
-          user_id,
+          user_id: userId,
           contact_id: contact_id || null,
           title,
           description: description || null,
@@ -320,10 +320,9 @@ app.post("*", async (c) => {
     "get_follow_ups_due",
     "List contacts with follow-ups due in the past or next N days",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       days_ahead: z.number().optional().describe("Number of days to look ahead (default: 7)"),
     },
-    async ({ user_id, days_ahead }) => {
+    async ({ days_ahead }) => {
       const daysToCheck = days_ahead || 7;
 
       const today = new Date().toISOString().split('T')[0];
@@ -334,7 +333,7 @@ app.post("*", async (c) => {
       const { data, error } = await supabase
         .from("professional_contacts")
         .select("*")
-        .eq("user_id", user_id)
+        .eq("user_id", userId)
         .not("follow_up_date", "is", null)
         .lte("follow_up_date", futureDateStr)
         .order("follow_up_date", { ascending: true });
@@ -369,17 +368,16 @@ app.post("*", async (c) => {
     "link_thought_to_contact",
     "CROSS-EXTENSION: Link a thought from your core Open Brain to a professional contact",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       thought_id: z.string().describe("Thought ID (UUID) from core Open Brain thoughts table"),
       contact_id: z.string().describe("Contact ID (UUID)"),
     },
-    async ({ user_id, thought_id, contact_id }) => {
+    async ({ thought_id, contact_id }) => {
       // Retrieve the thought from core Open Brain
       const { data: thought, error: thoughtError } = await supabase
         .from("thoughts")
         .select("*")
         .eq("id", thought_id)
-        .eq("user_id", user_id)
+        .eq("user_id", userId)
         .single();
 
       if (thoughtError) {
@@ -395,7 +393,7 @@ app.post("*", async (c) => {
         .from("professional_contacts")
         .select("*")
         .eq("id", contact_id)
-        .eq("user_id", user_id)
+        .eq("user_id", userId)
         .single();
 
       if (contactError) {
@@ -410,7 +408,7 @@ app.post("*", async (c) => {
         .from("professional_contacts")
         .update({ notes: updatedNotes })
         .eq("id", contact_id)
-        .eq("user_id", user_id)
+        .eq("user_id", userId)
         .select()
         .single();
 

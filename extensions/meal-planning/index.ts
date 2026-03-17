@@ -34,6 +34,11 @@ app.post("*", async (c) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const userId = Deno.env.get("DEFAULT_USER_ID");
+  if (!userId) {
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+  }
+
   const server = new McpServer({ name: "meal-planning", version: "1.0.0" });
 
   // add_recipe tool
@@ -41,7 +46,6 @@ app.post("*", async (c) => {
     "add_recipe",
     "Add a recipe with ingredients and instructions",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       name: z.string().describe("Recipe name"),
       cuisine: z.string().optional().describe("Cuisine type"),
       prep_time_minutes: z.number().optional().describe("Prep time in minutes"),
@@ -61,7 +65,7 @@ app.post("*", async (c) => {
       const { data, error } = await supabase
         .from("recipes")
         .insert({
-          user_id: args.user_id,
+          user_id: userId,
           name: args.name,
           cuisine: args.cuisine,
           prep_time_minutes: args.prep_time_minutes,
@@ -95,7 +99,6 @@ app.post("*", async (c) => {
     "search_recipes",
     "Search recipes by name, cuisine, tags, or ingredient",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       query: z.string().optional().describe("Search query for name"),
       cuisine: z.string().optional().describe("Filter by cuisine"),
       tag: z.string().optional().describe("Filter by tag"),
@@ -105,7 +108,7 @@ app.post("*", async (c) => {
       let query = supabase
         .from("recipes")
         .select("*")
-        .eq("user_id", args.user_id);
+        .eq("user_id", userId);
 
       if (args.query) {
         query = query.ilike("name", `%${args.query}%`);
@@ -209,7 +212,6 @@ app.post("*", async (c) => {
     "create_meal_plan",
     "Plan meals for a week",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       week_start: z.string().describe("Monday of the week (YYYY-MM-DD)"),
       meals: z.array(z.object({
         day_of_week: z.string(),
@@ -223,7 +225,7 @@ app.post("*", async (c) => {
     async (args) => {
       // Insert multiple meal plan entries
       const mealEntries = args.meals.map((meal: any) => ({
-        user_id: args.user_id,
+        user_id: userId,
         week_start: args.week_start,
         day_of_week: meal.day_of_week,
         meal_type: meal.meal_type,
@@ -256,7 +258,6 @@ app.post("*", async (c) => {
     "get_meal_plan",
     "View the meal plan for a given week",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       week_start: z.string().describe("Monday of the week (YYYY-MM-DD)"),
     },
     async (args) => {
@@ -268,7 +269,7 @@ app.post("*", async (c) => {
           recipes:recipe_id (name, cuisine, prep_time_minutes, cook_time_minutes)
         `
         )
-        .eq("user_id", args.user_id)
+        .eq("user_id", userId)
         .eq("week_start", args.week_start)
         .order("day_of_week")
         .order("meal_type");
@@ -291,7 +292,6 @@ app.post("*", async (c) => {
     "generate_shopping_list",
     "Auto-generate a shopping list from a week's meal plan by aggregating recipe ingredients",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       week_start: z.string().describe("Monday of the week (YYYY-MM-DD)"),
     },
     async (args) => {
@@ -304,7 +304,7 @@ app.post("*", async (c) => {
           recipes:recipe_id (id, ingredients, name)
         `
         )
-        .eq("user_id", args.user_id)
+        .eq("user_id", userId)
         .eq("week_start", args.week_start);
 
       if (mealError) throw mealError;
@@ -345,7 +345,7 @@ app.post("*", async (c) => {
       const { data: existing } = await supabase
         .from("shopping_lists")
         .select("id")
-        .eq("user_id", args.user_id)
+        .eq("user_id", userId)
         .eq("week_start", args.week_start)
         .single();
 
@@ -369,7 +369,7 @@ app.post("*", async (c) => {
         const { data, error } = await supabase
           .from("shopping_lists")
           .insert({
-            user_id: args.user_id,
+            user_id: userId,
             week_start: args.week_start,
             items,
           })

@@ -42,6 +42,11 @@ app.post("*", async (c) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const userId = Deno.env.get("DEFAULT_USER_ID");
+  if (!userId) {
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+  }
+
   const server = new McpServer(
     { name: "household-knowledge", version: "1.0.0" },
   );
@@ -51,19 +56,18 @@ app.post("*", async (c) => {
     "add_household_item",
     "Add a new household item (paint color, appliance, measurement, document, etc.)",
     {
-      user_id: z.string().describe("User ID (UUID) - typically auth.uid()"),
       name: z.string().describe("Name or description of the item"),
       category: z.string().optional().describe("Category (e.g. 'paint', 'appliance', 'measurement', 'document')"),
       location: z.string().optional().describe("Location in the home (e.g. 'Living Room', 'Kitchen')"),
       details: z.string().optional().describe("Flexible metadata as JSON string (e.g. '{\"brand\": \"Sherwin Williams\", \"color\": \"Sea Salt\"}')"),
       notes: z.string().optional().describe("Additional notes or context"),
     },
-    async ({ user_id, name, category, location, details, notes }) => {
+    async ({ name, category, location, details, notes }) => {
       try {
         const { data, error } = await supabase
           .from("household_items")
           .insert({
-            user_id,
+            user_id: userId,
             name,
             category: category || null,
             location: location || null,
@@ -102,17 +106,16 @@ app.post("*", async (c) => {
     "search_household_items",
     "Search household items by name, category, or location",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       query: z.string().optional().describe("Search term (searches name, category, location, and notes)"),
       category: z.string().optional().describe("Filter by specific category"),
       location: z.string().optional().describe("Filter by specific location"),
     },
-    async ({ user_id, query, category, location }) => {
+    async ({ query, category, location }) => {
       try {
         let queryBuilder = supabase
           .from("household_items")
           .select("*")
-          .eq("user_id", user_id);
+          .eq("user_id", userId);
 
         if (category) {
           queryBuilder = queryBuilder.ilike("category", `%${category}%`);
@@ -160,15 +163,14 @@ app.post("*", async (c) => {
     "Get full details of a specific household item by ID",
     {
       item_id: z.string().describe("Item ID (UUID)"),
-      user_id: z.string().describe("User ID (UUID) for authorization"),
     },
-    async ({ item_id, user_id }) => {
+    async ({ item_id }) => {
       try {
         const { data, error } = await supabase
           .from("household_items")
           .select("*")
           .eq("id", item_id)
-          .eq("user_id", user_id)
+          .eq("user_id", userId)
           .single();
 
         if (error) {
@@ -203,7 +205,6 @@ app.post("*", async (c) => {
     "add_vendor",
     "Add a service provider (plumber, electrician, landscaper, etc.)",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       name: z.string().describe("Vendor name"),
       service_type: z.string().optional().describe("Type of service (e.g. 'plumber', 'electrician', 'landscaper')"),
       phone: z.string().optional().describe("Phone number"),
@@ -213,12 +214,12 @@ app.post("*", async (c) => {
       rating: z.number().min(1).max(5).optional().describe("Rating from 1-5"),
       last_used: z.string().optional().describe("Date last used (YYYY-MM-DD format)"),
     },
-    async ({ user_id, name, service_type, phone, email, website, notes, rating, last_used }) => {
+    async ({ name, service_type, phone, email, website, notes, rating, last_used }) => {
       try {
         const { data, error } = await supabase
           .from("household_vendors")
           .insert({
-            user_id,
+            user_id: userId,
             name,
             service_type: service_type || null,
             phone: phone || null,
@@ -260,15 +261,14 @@ app.post("*", async (c) => {
     "list_vendors",
     "List service providers, optionally filtered by service type",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       service_type: z.string().optional().describe("Filter by service type (e.g. 'plumber', 'electrician')"),
     },
-    async ({ user_id, service_type }) => {
+    async ({ service_type }) => {
       try {
         let queryBuilder = supabase
           .from("household_vendors")
           .select("*")
-          .eq("user_id", user_id);
+          .eq("user_id", userId);
 
         if (service_type) {
           queryBuilder = queryBuilder.ilike("service_type", `%${service_type}%`);

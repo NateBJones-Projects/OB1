@@ -34,6 +34,11 @@ app.post("*", async (c) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const userId = Deno.env.get("DEFAULT_USER_ID");
+  if (!userId) {
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+  }
+
   const server = new McpServer({ name: "family-calendar", version: "1.0.0" });
 
   // Tool: add_family_member
@@ -41,7 +46,6 @@ app.post("*", async (c) => {
     "add_family_member",
     "Add a person to your household roster",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       name: z.string().describe("Person's name"),
       relationship: z.string().optional().describe("Relationship to you (e.g. 'self', 'spouse', 'child', 'parent')"),
       birth_date: z.string().optional().describe("Birth date (YYYY-MM-DD format)"),
@@ -51,7 +55,7 @@ app.post("*", async (c) => {
       const { data, error } = await supabase
         .from("family_members")
         .insert({
-          user_id: args.user_id,
+          user_id: userId,
           name: args.name,
           relationship: args.relationship,
           birth_date: args.birth_date,
@@ -78,7 +82,6 @@ app.post("*", async (c) => {
     "add_activity",
     "Schedule an activity or recurring event",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       family_member_id: z.string().optional().describe("Family member ID (null for whole family)"),
       title: z.string().describe("Activity title"),
       activity_type: z.string().optional().describe("Type: 'sports', 'medical', 'school', 'social', etc."),
@@ -94,7 +97,7 @@ app.post("*", async (c) => {
       const { data, error } = await supabase
         .from("activities")
         .insert({
-          user_id: args.user_id,
+          user_id: userId,
           family_member_id: args.family_member_id || null,
           title: args.title,
           activity_type: args.activity_type,
@@ -127,7 +130,6 @@ app.post("*", async (c) => {
     "get_week_schedule",
     "Get all activities for a given week, grouped by day",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       week_start: z.string().describe("Monday of the week (YYYY-MM-DD format)"),
       family_member_id: z.string().optional().describe("Optional: filter by family member"),
     },
@@ -145,7 +147,7 @@ app.post("*", async (c) => {
           family_members:family_member_id (name, relationship)
         `
         )
-        .eq("user_id", args.user_id)
+        .eq("user_id", userId)
         .or(
           `and(start_date.lte.${weekEnd.toISOString().split("T")[0]},or(end_date.gte.${args.week_start},end_date.is.null)),day_of_week.not.is.null`
         );
@@ -174,7 +176,6 @@ app.post("*", async (c) => {
     "search_activities",
     "Search activities by title, type, or family member name",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       query: z.string().optional().describe("Search query"),
       activity_type: z.string().optional().describe("Optional: filter by activity type"),
       family_member_id: z.string().optional().describe("Optional: filter by family member"),
@@ -188,7 +189,7 @@ app.post("*", async (c) => {
           family_members:family_member_id (name, relationship)
         `
         )
-        .eq("user_id", args.user_id);
+        .eq("user_id", userId);
 
       if (args.query) {
         query = query.ilike("title", `%${args.query}%`);
@@ -224,7 +225,6 @@ app.post("*", async (c) => {
     "add_important_date",
     "Add a date to remember (birthday, anniversary, deadline)",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       family_member_id: z.string().optional().describe("Family member ID (null for family-wide)"),
       title: z.string().describe("Event title"),
       date_value: z.string().describe("Date (YYYY-MM-DD format)"),
@@ -236,7 +236,7 @@ app.post("*", async (c) => {
       const { data, error } = await supabase
         .from("important_dates")
         .insert({
-          user_id: args.user_id,
+          user_id: userId,
           family_member_id: args.family_member_id || null,
           title: args.title,
           date_value: args.date_value,
@@ -265,7 +265,6 @@ app.post("*", async (c) => {
     "get_upcoming_dates",
     "Get important dates in the next N days",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       days_ahead: z.number().optional().describe("How many days to look ahead (default 30)"),
     },
     async (args) => {
@@ -282,7 +281,7 @@ app.post("*", async (c) => {
           family_members:family_member_id (name, relationship)
         `
         )
-        .eq("user_id", args.user_id)
+        .eq("user_id", userId)
         .gte("date_value", today.toISOString().split("T")[0])
         .lte("date_value", futureDate.toISOString().split("T")[0])
         .order("date_value");

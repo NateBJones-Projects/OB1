@@ -5,7 +5,7 @@
 -- People in your professional network
 CREATE TABLE IF NOT EXISTS professional_contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     company TEXT,
     title TEXT,
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS professional_contacts (
 CREATE TABLE IF NOT EXISTS contact_interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     contact_id UUID REFERENCES professional_contacts(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     interaction_type TEXT NOT NULL CHECK (interaction_type IN ('meeting', 'email', 'call', 'coffee', 'event', 'linkedin', 'other')),
     occurred_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     summary TEXT NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS contact_interactions (
 -- Deals, projects, or potential collaborations
 CREATE TABLE IF NOT EXISTS opportunities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     contact_id UUID REFERENCES professional_contacts(id) ON DELETE SET NULL,
     title TEXT NOT NULL,
     description TEXT,
