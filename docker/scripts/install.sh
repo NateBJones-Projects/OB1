@@ -184,22 +184,31 @@ fi
 # --- Start the Docker stack ---
 info "Starting the OB1 Docker stack (this may take a few minutes on first run)..."
 
-# If no NVIDIA GPU, remove the deploy section so docker compose doesn't error
-if ! command -v nvidia-smi &>/dev/null; then
-  info "No NVIDIA GPU — starting without GPU reservation..."
-  # Use a profile override to drop the deploy key
-  docker compose up -d --build 2>&1 || {
-    warn "docker compose up failed — retrying without GPU deploy section..."
-    # Create a temporary override that nullifies the GPU reservation
-    cat > docker-compose.override.yml <<'OVERRIDE'
-services:
-  ob1-ollama:
-    deploy: {}
-OVERRIDE
-    docker compose up -d --build
-    rm -f docker-compose.override.yml
+# If no NVIDIA GPU / toolkit, use an override that removes the GPU requirement
+HAS_GPU=false
+if command -v nvidia-smi &>/dev/null && docker info 2>/dev/null | grep -qi "nvidia"; then
+  HAS_GPU=true
+fi
+
+if [ "$HAS_GPU" = false ]; then
+  info "No NVIDIA GPU or toolkit — starting in CPU-only mode..."
+  # Python one-liner to strip the deploy key from ob1-ollama
+  python3 -c "
+import yaml, sys
+with open('docker-compose.yml') as f:
+    cfg = yaml.safe_load(f)
+cfg['services']['ob1-ollama'].pop('deploy', None)
+with open('docker-compose.cpu.yml', 'w') as f:
+    yaml.dump(cfg, f, default_flow_style=False, sort_keys=False)
+" 2>/dev/null || {
+    # Fallback if PyYAML not available: use grep -v to strip deploy block
+    grep -v -E "^    deploy:|^      resources:|^        reservations:|^          devices:|^            - driver:|^              count:|^              capabilities:" \
+      docker-compose.yml > docker-compose.cpu.yml
   }
+  docker compose -f docker-compose.cpu.yml up -d --build
+  rm -f docker-compose.cpu.yml
 else
+  ok "NVIDIA GPU detected — using GPU acceleration"
   docker compose up -d --build
 fi
 
