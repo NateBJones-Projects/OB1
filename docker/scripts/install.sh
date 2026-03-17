@@ -132,12 +132,23 @@ echo ""
 if command -v nvidia-smi &>/dev/null; then
   ok "NVIDIA GPU detected — Ollama will use GPU acceleration"
   if ! dpkg -l nvidia-container-toolkit &>/dev/null 2>&1; then
-    warn "nvidia-container-toolkit not found. GPU pass-through may not work."
-    warn "Install it with: sudo apt-get install -y nvidia-container-toolkit"
+    info "Installing NVIDIA Container Toolkit (required for Docker GPU access)..."
+    # Add the NVIDIA container toolkit repo
+    curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+      sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+      sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+      sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+    sudo apt-get update -qq
+    sudo apt-get install -y nvidia-container-toolkit
+    sudo nvidia-ctk runtime configure --runtime=docker
+    sudo systemctl restart docker
+    ok "NVIDIA Container Toolkit installed and configured"
+  else
+    ok "NVIDIA Container Toolkit is already installed"
   fi
 else
   info "No NVIDIA GPU detected — Ollama will run on CPU (slower but works fine)"
-  info "If the GPU deploy section causes errors, the script will handle it."
 fi
 
 # ── Print version summary ─────────────────────────────────────────────────
