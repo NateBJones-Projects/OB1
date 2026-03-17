@@ -19,6 +19,9 @@ Thumbs.db
 !.env.example
 !.env.test
 
+# Lock file (regenerated on npm install)
+package-lock.json
+
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*

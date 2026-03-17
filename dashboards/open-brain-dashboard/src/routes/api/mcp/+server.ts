@@ -51,17 +51,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const mcpKey = privateEnv.MCP_KEY || publicEnv.PUBLIC_MCP_KEY;
 
 		if (!mcpUrl || !mcpKey) {
-		return json(
+			return json(
 				{ error: 'Missing MCP_URL/MCP_KEY (or PUBLIC_MCP_URL/PUBLIC_MCP_KEY) in your environment config' },
 				{ status: 500 },
 			);
 		}
 
-		const upstream = await fetch(`${mcpUrl}?key=${mcpKey}`, {
+		const upstream = await fetch(mcpUrl, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Accept': 'application/json, text/event-stream'
+				'Accept': 'application/json, text/event-stream',
+				'Authorization': `Bearer ${mcpKey}`
 			},
 			body: JSON.stringify({
 				jsonrpc: '2.0',
