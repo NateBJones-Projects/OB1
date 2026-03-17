@@ -355,8 +355,12 @@ server.registerTool(
 const app = new Hono();
 
 app.all("*", async (c) => {
-  // Accept access key via header OR URL query parameter
-  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
+  // Accept access key via header OR URL query parameter.
+  // Note: URLSearchParams treats '+' as a space, so we parse the raw query string
+  // and use decodeURIComponent (which preserves literal '+') instead.
+  const rawKeySegment = new URL(c.req.url).search.slice(1).split("&").find((p) => p.startsWith("key="));
+  const keyFromQuery = rawKeySegment ? decodeURIComponent(rawKeySegment.slice(4)) : null;
+  const provided = c.req.header("x-brain-key") || keyFromQuery;
   if (!provided || provided !== MCP_ACCESS_KEY) {
     return c.json({ error: "Invalid or missing access key" }, 401);
   }
@@ -367,3 +371,4 @@ app.all("*", async (c) => {
 });
 
 Deno.serve(app.fetch);
+
