@@ -57,12 +57,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			);
 		}
 
-		const upstream = await fetch(mcpUrl, {
+		const upstream = await fetch(`${mcpUrl}?key=${mcpKey}`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Accept': 'application/json, text/event-stream',
-				'Authorization': `Bearer ${mcpKey}`
+				'Accept': 'application/json, text/event-stream'
 			},
 			body: JSON.stringify({
 				jsonrpc: '2.0',

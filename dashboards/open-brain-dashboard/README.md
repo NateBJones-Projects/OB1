@@ -38,39 +38,46 @@ HOSTING
 ------------------------------------------
 ```
 
-## Steps
+## Quick Start
 
-1. Clone or copy this folder into its own repo or monorepo workspace.
-2. Install dependencies:
+1. Install dependencies:
 
    ```bash
+   cd dashboards/open-brain-dashboard
    npm install
    ```
 
-3. Create local environment variables from `.env.example`:
+2. Create `.env.local` in the dashboard folder (or symlink from the repo root):
 
    ```bash
    cp .env.example .env.local
    ```
 
-4. Edit `.env.local` with your values:
+3. Fill in your 4 values. You can find them at:
 
-   - `PUBLIC_SUPABASE_URL`
-   - `PUBLIC_SUPABASE_ANON_KEY`
-   - `MCP_URL`
-   - `MCP_KEY`
+   | Variable | Where to get it |
+   |----------|----------------|
+   | `PUBLIC_SUPABASE_URL` | Supabase Dashboard → Settings → API → Project URL |
+   | `PUBLIC_SUPABASE_ANON_KEY` | Supabase Dashboard → Settings → API → `anon` `public` key |
+   | `MCP_URL` | Your deployed Edge Function URL (e.g. `https://<ref>.supabase.co/functions/v1/open-brain-mcp`) |
+   | `MCP_KEY` | The `MCP_ACCESS_KEY` you set during Open Brain setup. Also visible in Claude Desktop → Settings → Connectors → your connector URL after `?key=` |
 
-5. Ensure your MCP URL points to your deployed `open-brain-mcp` function and the value in `MCP_KEY` matches your MCP access key.
-6. Start the app:
+4. Create a sign-in user (if you don't have one). In Supabase Dashboard → Authentication → Add user → create with email + password + Auto Confirm.
+
+   > **Note:** If your existing user was created via OAuth, you won't have a password. Click "Send password recovery" from the user detail panel, or create a second user with email/password (e.g. `you+dashboard@gmail.com`).
+
+5. Start the app:
 
    ```bash
    npm run dev
    ```
 
-7. Open `http://localhost:5173` and sign in with an existing Open Brain user email/password.
-8. Deploy to Vercel or Netlify:
-   - Vercel: import this folder and set the same environment variables.
-   - Netlify: deploy as a SvelteKit site and set the same environment variables.
+6. Open `http://localhost:5173` and sign in.
+
+## Deploy to Production
+
+- **Vercel:** Import this folder, set the same 4 environment variables.
+- **Netlify:** Deploy as a SvelteKit site, set the same 4 environment variables.
 
 ## Expected outcome
 
@@ -95,5 +102,12 @@ Solution: Confirm you have a valid Supabase user in the project and correct cred
 **Issue: MCP calls fail with `Unauthorized` or 401**
 Solution: Verify `MCP_URL` points to the Supabase Edge Function for this project, and `MCP_KEY` matches the function key expected by `open-brain-mcp`.
 
-**Issue: Search results look empty even when thoughts exist**
-Solution: Confirm your MCP function can run `search_thoughts` and `thought_stats` for your authenticated user or service scope.
+**Issue: Search returns "No thoughts found" but stats show thoughts exist**
+Solution: Search uses semantic (vector) similarity, not keyword matching. Three things to check:
+
+1. **OpenRouter API key** — `search_thoughts` calls OpenRouter to generate a query embedding. If `OPENROUTER_API_KEY` is missing or invalid in your Supabase secrets, search silently returns nothing. Verify with: `supabase secrets list | grep OPENROUTER`
+2. **Embeddings exist** — Thoughts captured before embeddings were configured won't be searchable. Check in SQL Editor: `SELECT count(*) FROM thoughts WHERE embedding IS NULL`
+3. **Similarity threshold** — Short queries against long content may score below the default 0.5 threshold. Try a more specific search phrase, or pass a lower `threshold` value.
+
+**Issue: "Database error querying schema" on sign-in**
+Solution: Your user was likely created via OAuth and has no password set. Either send a password recovery email from the Supabase Dashboard user detail panel, or create a new email/password user.
