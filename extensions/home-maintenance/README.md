@@ -51,6 +51,7 @@ SUPABASE (from your Open Brain setup)
   Project ref:           ____________
 
 GENERATED DURING SETUP
+  Default User ID:       ____________
   MCP Access Key:        ____________
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
@@ -71,7 +72,26 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run.
 
-### 2. Deploy the MCP Server
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
+
+```bash
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
+```
+
+Set it as an environment variable for your Edge Function:
+
+```bash
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
+```
+
+> If you already set `DEFAULT_USER_ID` for a previous extension, you can skip this step — all extensions share the same user ID.
+
+### 3. Deploy the MCP Server
 
 Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
@@ -80,7 +100,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Function name | `home-maintenance-mcp` |
 | Download path | `extensions/home-maintenance` |
 
-### 3. Connect to Your AI
+### 4. Connect to Your AI
 
 Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
@@ -89,7 +109,7 @@ Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connec
 | Connector name | `Home Maintenance` |
 | URL | Your **MCP Connection URL** from the credential tracker |
 
-### 4. Test the Extension
+### 5. Test the Extension
 
 Try these commands with Claude:
 
