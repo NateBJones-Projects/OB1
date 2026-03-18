@@ -47,7 +47,7 @@ Supabase is your database. It stores your thoughts as raw text, vector embedding
 
 ![Step 2](https://img.shields.io/badge/Step_2-Set_Up_the_Database-F4511E?style=for-the-badge)
 
-Three SQL commands, pasted one at a time. This creates your storage table, your search function, and your security policy.
+Four SQL commands, pasted one at a time. This creates your storage table, your search function, your security policy, and the permissions your server needs to read and write data.
 
 ### 2.1 — Enable the Vector Extension
 
@@ -158,7 +158,24 @@ create policy "Service role full access"
 
 </details>
 
-### 2.5 — Verify
+### 2.5 — Grant Table Permissions
+
+New query → paste and Run:
+
+<details>
+<summary>📋 <strong>SQL: Grant service_role access</strong> (click to expand)</summary>
+
+```sql
+-- Allow the service_role to read and write thoughts
+grant select, insert, update, delete on table public.thoughts to service_role;
+```
+
+</details>
+
+> [!IMPORTANT]
+> This step is required. Supabase no longer grants full table permissions to `service_role` by default on new projects. Without this, your MCP server will return "permission denied for table thoughts" when trying to capture or search.
+
+### 2.6 — Verify
 
 ✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, created_at, updated_at. Database → Functions shows `match_thoughts`.
 
@@ -166,13 +183,17 @@ create policy "Service role full access"
 
 ![Step 3](https://img.shields.io/badge/Step_3-Save_Your_Connection_Details-FB8C00?style=for-the-badge)
 
-In the left sidebar: **Settings** (gear icon) → **API**. Copy these into your credential tracker:
+In the left sidebar: **Settings** (gear icon) → **API Keys**.
 
-- 🔖 **Project URL** — Listed in the API settings section under "Project URL"
-- 🔖 **Secret key** — Under "API keys," this is the key formerly labeled "Service role key." Same key, new name — click reveal and copy it.
+You'll land on the **"Publishable and secret API keys"** tab. Copy these into your credential tracker:
+
+- 🔖 **Project URL** — Shown at the top of the page under "Project URL"
+- 🔖 **Secret key** — Scroll down to the **"Secret keys"** section on the same page. You'll see a `default` key. Click the copy button to copy it. (You can also click **"+ New secret key"** to create a dedicated one named `open-brain` — this makes it easier to revoke later without affecting other services, but using the default is fine too.)
 
 > [!WARNING]
-> Treat the Secret key like a password. Anyone with it has full access to your data. You may also see a "Publishable key" listed — that's the anon key surfaced more prominently in the updated Supabase UI. You don't need it for this setup.
+> Treat the Secret key like a password. Anyone with it has full access to your data. The "Publishable key" at the top of the page is safe to expose publicly — you don't need it for this setup.
+>
+> You may also see a **"Legacy anon, service_role API keys"** tab — those are the old-style JWT keys. You don't need them. Everything in this guide uses the new key format.
 
 ✅ **Done when:** Your credential tracker has both **Project URL** and **Secret key** filled in.
 
@@ -747,6 +768,10 @@ Make sure you added the connector in Settings → Connectors (not by editing the
 **❌ ChatGPT doesn't use the Open Brain tools**
 
 First, confirm Developer Mode is enabled (Settings → Apps & Connectors → Advanced settings). Without it, ChatGPT only exposes limited MCP functionality that won't cover Open Brain's full toolset. Next, check that the connector is active for your current conversation — look for it in the tools/apps panel. If it's connected but ChatGPT ignores it, be direct: "Use the Open Brain search_thoughts tool to search for [topic]." ChatGPT often needs explicit tool references the first few times before it starts picking them up automatically.
+
+**❌ "Permission denied for table thoughts"**
+
+Your `service_role` doesn't have table-level permissions. This happens on newer Supabase projects where CRUD grants are no longer automatic. Go back to Step 2.5 and run the `GRANT` SQL, then retry.
 
 **❌ Getting 401 errors**
 
