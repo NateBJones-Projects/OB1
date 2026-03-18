@@ -192,6 +192,10 @@ else
   ok ".env already exists — keeping current values"
 fi
 
+# --- Generate TLS certificates for HTTPS proxy ---
+info "Generating self-signed TLS certificate..."
+bash scripts/gen-certs.sh
+
 # --- Start the Docker stack ---
 info "Starting the OB1 Docker stack (this may take a few minutes on first run)..."
 

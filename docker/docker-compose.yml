@@ -80,6 +80,16 @@ services:
       ob1-ollama:
         condition: service_healthy
 
+  ob1-https:
+    image: nginx:alpine
+    ports:
+      - "3443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - ob1-mcp
+
 volumes:
   ob1-pgdata:
   ob1-ollama:
