@@ -234,9 +234,10 @@ All wired together through your Open Brain, with cross-extension tools that let 
 
 ### What's Next?
 
-1. **Build your own extensions** — Use these 6 as templates for domains specific to your life
-2. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Remote MCP](../../primitives/remote-mcp/), and other patterns
-3. **Create compound queries** — Build tools that reason across multiple extensions simultaneously
-4. **Share your extensions** — Contribute back to the OB1 community
+1. **Audit and optimize your tools** — You now have ~40 MCP tool definitions across 6 extensions. That's a lot of context weight. Run the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) to identify redundancies, merge CRUD tools, and scope your servers by workflow. This is the single highest-impact thing you can do to keep your AI performing well.
+2. **Build your own extensions** — Use these 6 as templates for domains specific to your life
+3. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Remote MCP](../../primitives/remote-mcp/), and other patterns
+4. **Create compound queries** — Build tools that reason across multiple extensions simultaneously
+5. **Share your extensions** — Contribute back to the OB1 community
 
 [Explore Primitives →](../../primitives/)

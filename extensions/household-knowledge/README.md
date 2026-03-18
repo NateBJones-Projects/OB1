@@ -167,3 +167,5 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 **Extension 2: Home Maintenance Tracker** — Learn how to handle recurring tasks, date-based scheduling, and historical logging. The maintenance tracker introduces one-to-many relationships (task → multiple log entries) and time-based queries that surface upcoming work.
 
 [Continue to Extension 2 →](../home-maintenance/README.md)
+
+> **As you add extensions**, each one adds MCP tool definitions to your AI's context window. By Extension 3–4, it's worth thinking about which servers you keep connected. See the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies.
