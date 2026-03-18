@@ -39,7 +39,7 @@ A professional contact management system with interaction logging, opportunity t
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key, plus you'll generate a new MCP Access Key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL, Secret key, and MCP Access Key — reuse the key from your core setup.
 
 ```text
 PROFESSIONAL CRM -- CREDENTIAL TRACKER
@@ -52,7 +52,7 @@ SUPABASE (from your Open Brain setup)
 
 MCP SERVER (you'll create these)
   Default User ID:       ____________
-  MCP Access Key:        ____________
+  MCP Access Key:        ____________  (same key for all extensions)
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
 

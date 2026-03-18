@@ -39,7 +39,7 @@ A complete job search management system — companies, postings, applications, i
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project ref and Secret key, plus a new MCP Access Key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project ref, Secret key, and MCP Access Key — reuse the key from your core setup.
 
 ```text
 JOB HUNT PIPELINE -- CREDENTIAL TRACKER
@@ -51,7 +51,7 @@ SUPABASE (from your Open Brain setup)
 
 MCP SERVER (new for this extension)
   Default User ID:       ____________
-  MCP Access Key:        ____________
+  MCP Access Key:        ____________  (same key for all extensions)
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
 

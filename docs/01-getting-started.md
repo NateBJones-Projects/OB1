@@ -241,6 +241,9 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 > [!WARNING]
 > Copy and paste the command for **your operating system only**. The Mac command won't work on Windows and vice versa.
 
+> [!IMPORTANT]
+> This is your **one access key for all of Open Brain** — core setup and every extension you add later. Save it somewhere permanent. Never generate a new one unless you want to replace it for ALL deployed functions.
+
 ✅ **Done when:** Your credential tracker has the **MCP Access Key** filled in.
 
 ---

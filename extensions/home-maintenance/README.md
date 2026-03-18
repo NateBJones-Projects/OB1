@@ -52,7 +52,7 @@ SUPABASE (from your Open Brain setup)
 
 GENERATED DURING SETUP
   Default User ID:       ____________
-  MCP Access Key:        ____________
+  MCP Access Key:        ____________  (same key for all extensions)
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
 

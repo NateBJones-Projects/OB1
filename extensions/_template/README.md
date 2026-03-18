@@ -90,7 +90,7 @@ SUPABASE (from your Open Brain setup)
   Project ref:           ____________
 
 GENERATED DURING SETUP
-  MCP Access Key:        ____________
+  MCP Access Key:        ____________  (same key for all extensions)
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
 
