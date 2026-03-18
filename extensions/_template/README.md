@@ -228,3 +228,12 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 ## Next Steps
 
 Link to the next extension in the learning path and briefly describe what it adds.
+
+> **Tool hygiene:** This extension adds MCP tools to your AI's context window. As you build more extensions, the total tool count grows — and with it, the context cost and risk of your AI picking the wrong tool. See the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on auditing, merging, and scoping your tools.
+
+<!--
+REQUIRED: Every extension that exposes MCP tools must include a link to
+docs/05-tool-audit.md somewhere in its README. The automated review checks
+for this. The blockquote above is the recommended format — adjust the wording
+to fit your extension's context, but keep the link.
+-->

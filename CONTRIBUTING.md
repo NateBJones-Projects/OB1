@@ -124,6 +124,7 @@ grant select, insert, update, delete on table public.your_table to service_role;
 - **"What You'll Learn"** listing new concepts introduced
 - **"Cross-Extension Integration"** prominently documenting connections to other extensions
 - **"Next Steps"** linking to the next extension
+- **Tool audit link** — Any extension or integration that exposes MCP tools must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in its "Next Steps" or closing section. This helps users manage their tool surface area as they add extensions. The link is checked by the automated review.
 - **Remote MCP setup** — MCP servers must be deployed as Supabase Edge Functions and connected via custom connectors (URL-based). Do NOT use local Node.js servers or `claude_desktop_config.json`. See the [extension template](extensions/_template/) for the correct pattern.
 
 **Primitives** additionally require:
@@ -234,7 +235,7 @@ As you contribute, you'll progress through these levels. Every level is achievab
 
 Non-code contributions count at every level. Testing recipes, mentoring non-technical contributors, improving documentation, and triaging issues all count toward progression.
 
-## The 11 Automated Review Rules
+## The Automated Review Rules
 
 Every PR is checked against these rules. All must pass before human review.
 
@@ -252,3 +253,4 @@ Every PR is checked against these rules. All must pass before human review.
 12. **Scope check** — All changes are within the contribution folder(s)
 13. **Internal links** — All relative links in READMEs resolve to existing files
 14. **Remote MCP pattern** — Extensions and integrations must use remote MCP via Supabase Edge Functions. No `claude_desktop_config.json`, no local Node.js stdio servers. See the [Getting Started guide](docs/01-getting-started.md) for the correct pattern
+15. **Tool audit link** — Extensions and integrations must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in their README. This ensures users are aware of tool surface area management as they add capabilities

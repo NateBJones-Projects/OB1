@@ -456,6 +456,33 @@ jobs:
             fail_check "Remote MCP pattern" "Local MCP patterns found (must use remote MCP via Edge Functions):\n${rule14_detail}See the [Getting Started guide](docs/01-getting-started.md) for the correct remote MCP pattern."
           fi
 
+          # ─── Rule 15: Tool audit link ───
+          # Extensions and integrations that expose MCP tools must link to the
+          # tool audit guide so users know how to manage their tool surface area.
+          rule15_pass=true
+          rule15_detail=""
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            category=$(echo "$dir" | cut -d'/' -f1)
+            case "$category" in
+              extensions|integrations) ;;
+              *) continue ;;
+            esac
+            [ ! -f "$dir/README.md" ] && continue
+
+            # Check for any link to the tool audit guide
+            if ! grep -q '05-tool-audit' "$dir/README.md"; then
+              rule15_detail="${rule15_detail}  - \`$dir/README.md\`: missing link to [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md). Required for extensions and integrations that expose MCP tools.\n"
+              rule15_pass=false
+            fi
+          done <<< "$CONTRIB_DIRS"
+
+          if [ "$rule15_pass" = true ]; then
+            pass_check "Tool audit link" "Extensions/integrations link to the MCP Tool Audit guide"
+          else
+            fail_check "Tool audit link" "Missing tool audit guide link:\n${rule15_detail}See the extension template for the recommended format."
+          fi
+
           # ─── Additional automated checks ────────────────────────────────
 
           # ─── Scope check ───
