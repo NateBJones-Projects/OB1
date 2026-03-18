@@ -317,6 +317,8 @@ supabase --version
 
 ![6.3](https://img.shields.io/badge/6.3-Log_In-555?style=for-the-badge&labelColor=1E88E5)
 
+This connects your local terminal to your Supabase account so the CLI can deploy to your project. It'll open your browser to authenticate — just follow the prompts and come back here when it says "You are now logged in."
+
 ```bash
 supabase login
 ```
@@ -368,36 +370,28 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 ![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
-Create the function folder, then download the two server files directly from GitHub:
+Three commands, run them one at a time in order:
+
+**1. Create the function folder:**
 
 ```bash
 supabase functions new open-brain-mcp
 ```
 
+**2. Download the server code:**
+
 ```bash
 curl -o supabase/functions/open-brain-mcp/index.ts https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts
 ```
+
+**3. Download the dependencies file:**
 
 ```bash
 curl -o supabase/functions/open-brain-mcp/deno.json https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json
 ```
 
-> [!TIP]
-> These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
-
-<!-- -->
-
 > [!WARNING]
-> ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
->
-> ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
->
-> ```bash
-> rm -rf supabase/functions/open-brain-mcp
-> supabase functions new open-brain-mcp
-> ```
->
-> Then retry the curl commands.
+> ❌ **`No such file or directory`** on command 2 or 3 — you skipped command 1. Run it first, then retry.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
 
@@ -499,6 +493,8 @@ supabase --version
 
 ![6.3](https://img.shields.io/badge/6.3-Log_In-555?style=for-the-badge&labelColor=1E88E5)
 
+This connects your local terminal to your Supabase account so the CLI can deploy to your project. It'll open your browser to authenticate — just follow the prompts and come back here when it says "You are now logged in."
+
 ```powershell
 supabase login
 ```
@@ -550,36 +546,28 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 ![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
-Create the function folder, then download the two server files directly from GitHub:
+Three commands, run them one at a time in order:
+
+**1. Create the function folder:**
 
 ```powershell
 supabase functions new open-brain-mcp
 ```
 
+**2. Download the server code:**
+
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts -OutFile supabase\functions\open-brain-mcp\index.ts
 ```
+
+**3. Download the dependencies file:**
 
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json -OutFile supabase\functions\open-brain-mcp\deno.json
 ```
 
-> [!TIP]
-> These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
-
-<!-- -->
-
 > [!WARNING]
-> ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
->
-> ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
->
-> ```powershell
-> Remove-Item -Recurse supabase\functions\open-brain-mcp
-> supabase functions new open-brain-mcp
-> ```
->
-> Then retry the download commands.
+> ❌ **`No such file or directory`** on command 2 or 3 — you skipped command 1. Run it first, then retry.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
 
