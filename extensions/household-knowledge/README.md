@@ -22,7 +22,7 @@ A database and MCP server for storing and retrieving household facts — paint c
 ## What You'll Learn
 
 - Basic table design with PostgreSQL
-- Foreign key relationships to user accounts
+- User-scoped data isolation with environment variables
 - Simple MCP tool creation
 - JSONB patterns for flexible metadata storage
 - Text search with ILIKE patterns
@@ -50,6 +50,7 @@ SUPABASE (from your Open Brain setup)
   Project ref:           ____________
 
 GENERATED DURING SETUP
+  Default User ID:       ____________
   MCP Access Key:        ____________
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
@@ -70,7 +71,24 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run.
 
-### 2. Deploy the MCP Server
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
+
+```bash
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
+```
+
+Set it as an environment variable for your Edge Function:
+
+```bash
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
+```
+
+### 3. Deploy the MCP Server
 
 Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
@@ -79,7 +97,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Function name | `household-knowledge-mcp` |
 | Download path | `extensions/household-knowledge` |
 
-### 3. Connect to Your AI
+### 4. Connect to Your AI
 
 Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
@@ -88,7 +106,7 @@ Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connec
 | Connector name | `Household Knowledge` |
 | URL | Your **MCP Connection URL** from the credential tracker |
 
-### 4. Test the Extension
+### 5. Test the Extension
 
 Try these commands with Claude:
 
@@ -139,10 +157,10 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 
 **Extension-specific issues:**
 
-**"Permission denied" errors**
-- The service role key bypasses RLS, so this suggests a configuration issue
-- Verify the user_id being passed exists in `auth.users`
-- Check that foreign key constraints are not blocking inserts
+**"Permission denied" or foreign key errors on insert**
+- Verify `DEFAULT_USER_ID` is set: `supabase secrets list` should show it
+- The service role key bypasses RLS, so permission errors usually mean a missing env var
+- If you ran an older version of `schema.sql` that had `REFERENCES auth.users(id)`, drop and recreate the tables with the updated schema
 
 ## Next Steps
 

@@ -44,6 +44,11 @@ app.post("*", async (c) => {
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
+  const userId = Deno.env.get("DEFAULT_USER_ID");
+  if (!userId) {
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+  }
+
   const server = new McpServer(
     { name: "home-maintenance", version: "1.0.0" },
   );
@@ -53,7 +58,6 @@ app.post("*", async (c) => {
     "add_maintenance_task",
     "Create a new maintenance task (recurring or one-time)",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       name: z.string().describe("Name of the maintenance task"),
       category: z.string().optional().describe("Category (e.g. 'hvac', 'plumbing', 'exterior', 'appliance', 'landscaping')"),
       frequency_days: z.number().optional().describe("How often this task repeats (in days). Null for one-time tasks. E.g. 90 for quarterly, 365 for annual"),
@@ -63,12 +67,12 @@ app.post("*", async (c) => {
     },
     async (args) => {
       try {
-        const { user_id, name, category, frequency_days, next_due, priority, notes } = args;
+        const { name, category, frequency_days, next_due, priority, notes } = args;
 
         const { data, error } = await supabase
           .from("maintenance_tasks")
           .insert({
-            user_id,
+            user_id: userId,
             name,
             category: category || null,
             frequency_days: frequency_days || null,
@@ -109,7 +113,6 @@ app.post("*", async (c) => {
     "Log that a maintenance task was completed. Automatically updates task's last_completed and calculates next_due.",
     {
       task_id: z.string().describe("ID of the maintenance task (UUID)"),
-      user_id: z.string().describe("User ID (UUID)"),
       completed_at: z.string().optional().describe("When the work was completed (ISO 8601 timestamp). Defaults to now if not provided."),
       performed_by: z.string().optional().describe("Who performed the work (e.g. 'self', vendor name)"),
       cost: z.number().optional().describe("Cost in dollars (or your currency)"),
@@ -118,7 +121,7 @@ app.post("*", async (c) => {
     },
     async (args) => {
       try {
-        const { task_id, user_id, completed_at, performed_by, cost, notes, next_action } = args;
+        const { task_id, completed_at, performed_by, cost, notes, next_action } = args;
 
         // Insert the maintenance log
         // The database trigger will automatically update the parent task's last_completed and next_due
@@ -126,7 +129,7 @@ app.post("*", async (c) => {
           .from("maintenance_logs")
           .insert({
             task_id,
-            user_id,
+            user_id: userId,
             completed_at: completed_at || new Date().toISOString(),
             performed_by: performed_by || null,
             cost: cost || null,
@@ -177,12 +180,11 @@ app.post("*", async (c) => {
     "get_upcoming_maintenance",
     "List maintenance tasks due in the next N days",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       days_ahead: z.number().optional().describe("Number of days to look ahead (default 30)"),
     },
     async (args) => {
       try {
-        const { user_id, days_ahead = 30 } = args;
+        const { days_ahead = 30 } = args;
 
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() + days_ahead);
@@ -190,7 +192,7 @@ app.post("*", async (c) => {
         const { data, error } = await supabase
           .from("maintenance_tasks")
           .select("*")
-          .eq("user_id", user_id)
+          .eq("user_id", userId)
           .not("next_due", "is", null)
           .lte("next_due", cutoffDate.toISOString())
           .order("next_due", { ascending: true });
@@ -225,7 +227,6 @@ app.post("*", async (c) => {
     "search_maintenance_history",
     "Search maintenance logs by task name, category, or date range",
     {
-      user_id: z.string().describe("User ID (UUID)"),
       task_name: z.string().optional().describe("Filter by task name (partial match)"),
       category: z.string().optional().describe("Filter by category"),
       date_from: z.string().optional().describe("Start date for filtering (ISO 8601 date string)"),
@@ -233,7 +234,7 @@ app.post("*", async (c) => {
     },
     async (args) => {
       try {
-        const { user_id, task_name, category, date_from, date_to } = args;
+        const { task_name, category, date_from, date_to } = args;
 
         // First, build a query to get relevant task IDs if filtering by name or category
         let taskIds: string[] | null = null;
@@ -242,7 +243,7 @@ app.post("*", async (c) => {
           let taskQuery = supabase
             .from("maintenance_tasks")
             .select("id")
-            .eq("user_id", user_id);
+            .eq("user_id", userId);
 
           if (task_name) {
             taskQuery = taskQuery.ilike("name", `%${task_name}%`);
@@ -286,7 +287,7 @@ app.post("*", async (c) => {
               category
             )
           `)
-          .eq("user_id", user_id);
+          .eq("user_id", userId);
 
         if (taskIds) {
           logQuery = logQuery.in("task_id", taskIds);
