@@ -2,10 +2,10 @@
 
 This is the core of Open Brain — the foundation everything else builds on. Once this is running, you'll have a personal knowledge system that any AI can read from and write to. Every extension, recipe, and integration in this repo starts here.
 
-About 30 minutes. Zero coding experience. Two free services:
+About 30 minutes. Zero coding experience. Two services:
 
-- **[Supabase](https://supabase.com)** — Your database
-- **[OpenRouter](https://openrouter.ai)** — Your AI gateway
+- **[Supabase](https://supabase.com)** — Your database (free tier)
+- **[OpenRouter](https://openrouter.ai)** — Your AI gateway (~$5 in credits, lasts months)
 
 ---
 
@@ -49,11 +49,11 @@ Supabase is your database. It stores your thoughts as raw text, vector embedding
 
 Four SQL commands, pasted one at a time. This creates your storage table, your search function, your security policy, and the permissions your server needs to read and write data.
 
-### 2.1 — Enable the Vector Extension
+![2.1](https://img.shields.io/badge/2.1-Enable_the_Vector_Extension-555?style=for-the-badge&labelColor=F4511E)
 
 In the left sidebar: **Database → Extensions** → search for "vector" → flip **pgvector ON**.
 
-### 2.2 — Create the Thoughts Table
+![2.2](https://img.shields.io/badge/2.2-Create_the_Thoughts_Table-555?style=for-the-badge&labelColor=F4511E)
 
 In the left sidebar: **SQL Editor → New query** → paste and Run:
 
@@ -98,7 +98,7 @@ create trigger thoughts_updated_at
 
 </details>
 
-### 2.3 — Create the Search Function
+![2.3](https://img.shields.io/badge/2.3-Create_the_Search_Function-555?style=for-the-badge&labelColor=F4511E)
 
 New query → paste and Run:
 
@@ -140,7 +140,7 @@ $$;
 
 </details>
 
-### 2.4 — Lock Down Security
+![2.4](https://img.shields.io/badge/2.4-Lock_Down_Security-555?style=for-the-badge&labelColor=F4511E)
 
 One more new query:
 
@@ -158,7 +158,7 @@ create policy "Service role full access"
 
 </details>
 
-### 2.5 — Grant Table Permissions
+![2.5](https://img.shields.io/badge/2.5-Grant_Table_Permissions-555?style=for-the-badge&labelColor=F4511E)
 
 New query → paste and Run:
 
@@ -175,7 +175,7 @@ grant select, insert, update, delete on table public.thoughts to service_role;
 > [!IMPORTANT]
 > This step is required. Supabase no longer grants full table permissions to `service_role` by default on new projects. Without this, your MCP server will return "permission denied for table thoughts" when trying to capture or search.
 
-### 2.6 — Verify
+![2.6](https://img.shields.io/badge/2.6-Verify-555?style=for-the-badge&labelColor=F4511E)
 
 ✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, created_at, updated_at. Database → Functions shows `match_thoughts`.
 
@@ -257,7 +257,7 @@ One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stat
 <details>
 <summary>🟩 <strong>Step 6 — Mac / Linux</strong> (click to expand)</summary>
 
-### 6.1 — Create a Project Folder
+![6.1](https://img.shields.io/badge/6.1-Create_a_Project_Folder-555?style=for-the-badge&labelColor=1E88E5)
 
 You need a folder on your computer for this project. The Supabase CLI will put your server files here, and you'll deploy from this folder.
 
@@ -282,13 +282,26 @@ This should print the path to your `open-brain` folder. If it shows your home di
 > [!IMPORTANT]
 > From this point on, every terminal command should be run from this folder. If you close your terminal and come back later, `cd` into this folder again.
 
-### 6.2 — Install the Supabase CLI
+![6.2](https://img.shields.io/badge/6.2-Install_the_Supabase_CLI-555?style=for-the-badge&labelColor=1E88E5)
 
 **With Homebrew:**
 
 ```bash
 brew install supabase/tap/supabase
 ```
+
+<details>
+<summary>🍺 <strong>Don't have Homebrew?</strong> (click to expand)</summary>
+
+Homebrew is the standard package manager for Mac. If you've never installed it, paste this into your terminal:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Follow the prompts — it may ask for your Mac password. Once it finishes, close and reopen your terminal, then come back to the `brew install` command above.
+
+</details>
 
 **Without Homebrew:**
 
@@ -302,13 +315,13 @@ Verify it worked:
 supabase --version
 ```
 
-### 6.3 — Log In
+![6.3](https://img.shields.io/badge/6.3-Log_In-555?style=for-the-badge&labelColor=1E88E5)
 
 ```bash
 supabase login
 ```
 
-### 6.4 — Initialize and Link
+![6.4](https://img.shields.io/badge/6.4-Initialize_and_Link-555?style=for-the-badge&labelColor=1E88E5)
 
 Set up the Supabase project structure in your folder:
 
@@ -331,7 +344,7 @@ Link it to your Supabase project — replace `YOUR_PROJECT_REF` with the project
 supabase link --project-ref YOUR_PROJECT_REF
 ```
 
-### 6.5 — Set Your Secrets
+![6.5](https://img.shields.io/badge/6.5-Set_Your_Secrets-555?style=for-the-badge&labelColor=1E88E5)
 
 Set your access key from Step 5:
 
@@ -353,7 +366,7 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
-### 6.6 — Download the Server Files
+![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
 Create the function folder, then download the two server files directly from GitHub:
 
@@ -397,7 +410,7 @@ head -1 supabase/functions/open-brain-mcp/index.ts
 >
 > ✅ If you see `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — you're good.
 
-### 6.7 — Deploy
+![6.7](https://img.shields.io/badge/6.7-Deploy-555?style=for-the-badge&labelColor=1E88E5)
 
 ```bash
 supabase functions deploy open-brain-mcp --no-verify-jwt
@@ -432,7 +445,7 @@ Paste this into your credential tracker as the MCP Connection URL. This is what 
 <details>
 <summary>🟦 <strong>Step 6 — Windows</strong> (click to expand)</summary>
 
-### 6.1 — Create a Project Folder
+![6.1](https://img.shields.io/badge/6.1-Create_a_Project_Folder-555?style=for-the-badge&labelColor=1E88E5)
 
 You need a folder on your computer for this project. The Supabase CLI will put your server files here, and you'll deploy from this folder.
 
@@ -457,7 +470,7 @@ This should print the path to your `open-brain` folder. If it shows your home di
 > [!IMPORTANT]
 > From this point on, every terminal command should be run from this folder. If you close PowerShell and come back later, `cd` into this folder again.
 
-### 6.2 — Install the Supabase CLI
+![6.2](https://img.shields.io/badge/6.2-Install_the_Supabase_CLI-555?style=for-the-badge&labelColor=1E88E5)
 
 If you don't have Scoop yet, install it first ([recommended by Supabase](https://supabase.com/docs/guides/local-development/cli/getting-started)):
 
@@ -484,13 +497,13 @@ Verify it worked:
 supabase --version
 ```
 
-### 6.3 — Log In
+![6.3](https://img.shields.io/badge/6.3-Log_In-555?style=for-the-badge&labelColor=1E88E5)
 
 ```powershell
 supabase login
 ```
 
-### 6.4 — Initialize and Link
+![6.4](https://img.shields.io/badge/6.4-Initialize_and_Link-555?style=for-the-badge&labelColor=1E88E5)
 
 Set up the Supabase project structure in your folder:
 
@@ -513,7 +526,7 @@ Link it to your Supabase project — replace `YOUR_PROJECT_REF` with the project
 supabase link --project-ref YOUR_PROJECT_REF
 ```
 
-### 6.5 — Set Your Secrets
+![6.5](https://img.shields.io/badge/6.5-Set_Your_Secrets-555?style=for-the-badge&labelColor=1E88E5)
 
 Set your access key from Step 5:
 
@@ -535,7 +548,7 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
-### 6.6 — Download the Server Files
+![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
 Create the function folder, then download the two server files directly from GitHub:
 
@@ -579,7 +592,7 @@ Get-Content supabase\functions\open-brain-mcp\index.ts -Head 1
 >
 > ✅ If you see `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — you're good.
 
-### 6.7 — Deploy
+![6.7](https://img.shields.io/badge/6.7-Deploy-555?style=for-the-badge&labelColor=1E88E5)
 
 ```powershell
 supabase functions deploy open-brain-mcp --no-verify-jwt
