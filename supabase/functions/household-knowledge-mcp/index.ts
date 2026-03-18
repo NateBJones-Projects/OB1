@@ -1,3 +1,5 @@
+// DEPLOYMENT COPY — source of truth: extensions/household-knowledge/index.ts
+
 /**
  * Extension 1: Household Knowledge Base MCP Server
  *

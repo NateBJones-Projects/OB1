@@ -72,6 +72,8 @@ Copy and paste the contents of `schema.sql` and click Run.
 
 ### 2. Deploy the MCP Server
 
+> **Note:** The source code lives here in `extensions/household-knowledge/`. During deployment, the Supabase CLI reads from `supabase/functions/household-knowledge-mcp/`. If you modify the code, edit `extensions/household-knowledge/index.ts` first, then copy it to `supabase/functions/household-knowledge-mcp/index.ts` before redeploying.
+
 Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
 | Setting | Value |
