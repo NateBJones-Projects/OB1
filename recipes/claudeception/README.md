@@ -91,6 +91,7 @@ Claudeception connects to Open Brain at two points:
 **After creating (capture):** Saves the new skill to Open Brain via `capture_thought` with tags like `skill-created`, the skill name, and relevant domain tags. This means future sessions across any project can find the skill via semantic search.
 
 **Example flow:**
+
 ```
 Discovery: n8n Code node blocks process.env
   -> search_thoughts("n8n code node sandbox process.env")
