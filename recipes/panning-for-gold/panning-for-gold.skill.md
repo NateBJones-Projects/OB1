@@ -80,53 +80,58 @@ File naming: `docs/meetings/YYYY-MM-DD-{source}-transcript.md` or `docs/brainsto
 **BEFORE EXTRACTING THREADS:** Clean the speaker data. Voice transcripts with auto-generated speaker labels are actively misleading, not just unreliable. This is a data quality problem that must be solved before any analysis.
 
 ### Why This Exists
-Added 2026-03-18 after a Tyler Bartlett lunch transcript: 10 speaker labels were generated for a 2-person conversation. The same person got different labels across scenes (office, car, restaurant), and different people shared labels. 40+ threads were attributed to the wrong person, turning pain points into pitches and vice versa. The entire inventory had to be re-done.
+
+Added 2026-03-18 after a lunch meeting transcript: 10 speaker labels were generated for a 2-person conversation. The same person got different labels across scenes (office, car, restaurant), and different people shared labels. 40+ threads were attributed to the wrong person, turning pain points into pitches and vice versa. The entire inventory had to be re-done.
 
 ### The Problem (Quantified)
+
 Typical voice transcription software (Otter, Plaud, phone recording apps) re-assigns speaker labels when:
 - **Environment changes** (office to hallway to car to restaurant)
 - **Background noise shifts** (quiet room vs. loud restaurant)
 - **Volume/distance changes** (close mic vs. across table)
 - **Brief pauses or interruptions** (any silence can trigger a new "speaker")
 
-Result: A 2-person lunch meeting generated 10 speaker labels. Speaker 5 was attributed to BOTH "Sam says hi, hugs" (Jared) AND "That's a AI fall system" (Tyler). The labels are worse than useless, they're actively wrong.
+Result: A 2-person lunch meeting generated 10 speaker labels. Speaker 5 was attributed to BOTH participants at different points. The labels are worse than useless, they're actively wrong.
 
 ### Process
 
 #### Step 1: Ask the user FIRST (10 seconds, saves 30 minutes)
+
 Before reading a single line of transcript:
 - "Who was present?"
 - "Any other people who spoke briefly?" (receptionist, waiter, etc.)
 - "What was the setting?" (helps predict environment-change label swaps)
 
 #### Step 2: Speaker Label Audit (automated)
+
 Run a quick frequency analysis on the raw transcript:
+
 ```
 Count lines per speaker label
 Sample 2-3 lines from each label
 Compare: expected speakers vs. actual labels
 ```
+
 If `number_of_labels > (expected_speakers * 2)`, the labels are fragmented and CANNOT be trusted for attribution. Flag this immediately.
 
 #### Step 3: Build Anchor Lines
+
 From memory, CRM, and context, identify "unmistakable" lines per person. These are lines that could ONLY have been said by one specific person:
 
-**Jared anchors (stable across all transcripts):**
-- References to Sam (wife), Charlie/Joey (daughters), Greg/Karen (in-laws)
-- "Claude" / "Open Brain" / "Harbor Accelerator" / "Kingmaker"
-- Military/government career ("23 years", "stifled")
-- Germany/overseas living references
-- AI tooling evangelism, multi-AI strategy
-- Self-deprecation about sales skills
-- "I'm not pitching anything, I'm just learning"
-- EstateGenie / patent / holding company references
+**Your anchors (stable across all transcripts):**
+- References to family members by name
+- Your specific projects, tools, or frameworks
+- Career history details only you would mention
+- Hobby or interest references unique to you
 
 **Other speaker anchors (build per-meeting):**
-- Workplace-specific vocabulary ("our patients", "our census", "we admitted")
-- System knowledge ("Power BI", "MatrixCare", specific internal tools)
+- Workplace-specific vocabulary ("our patients", "our census")
+- System knowledge (specific internal tools only they would reference)
 - Budget/operational details only an insider would know
+- Personal anecdotes or stories unique to them
 
 #### Step 4: Scene-Based Re-Attribution
+
 Instead of trusting speaker labels, segment the transcript by SCENE (environment change). Within each scene:
 1. Identify the anchor lines (unmistakable attribution)
 2. Use conversational flow (questions vs. answers, topic expertise) to attribute the rest
@@ -135,12 +140,15 @@ Instead of trusting speaker labels, segment the transcript by SCENE (environment
 Scenes typically break at: location changes, long pauses, topic resets, new people entering.
 
 #### Step 5: Batch Clarification
+
 Collect all MEDIUM and LOW attributions into ONE numbered list. Present to user. Get all corrections in a single pass.
 
 #### Step 6: Produce Clean Transcript (Optional but recommended for high-value meetings)
+
 If the meeting is high-value (potential deal, important relationship), produce a cleaned version with consolidated speaker names replacing label numbers. Save as `YYYY-MM-DD-{source}-clean-transcript.md`. This becomes the canonical reference.
 
 ### Decision: Is Re-Extraction Needed?
+
 After attribution corrections, assess:
 - If >20% of threads change meaning with correct attribution: **re-extract from scratch**
 - If <20% but key pain-point threads are affected: **targeted fixes to inventory**
@@ -311,7 +319,7 @@ If any lesson is learned, update this skill file directly. The skill improves wi
 | 2026-03-13 | Re-reading 926-line transcript burned ~30K tokens when Fathom summary covered 90% | Added "Summaries First" strategy. Use Grep for quotes instead of full re-reads. |
 | 2026-03-13 | Phase 1 inventory not saved to file, lost on compaction | Added Phase 1 "Save the Inventory" step with permanent file. |
 | 2026-03-18 | 10 speaker labels generated for 2-person conversation. Labels are WORSE than useless, they actively mislead. Same person gets different labels across environments, different people share labels. | Added Phase 0.5: Speaker Consolidation & Identification. Must clean speaker data before ANY thread extraction. Ask user who was present FIRST. |
-| 2026-03-18 | Voices swapped between Jared and Tyler caused 40+ threads to be misattributed. Pain points became pitches and vice versa. | Phase 0.5 now includes anchor-line identification, scene-based re-attribution, and a decision framework for whether re-extraction is needed. |
+| 2026-03-18 | Voice labels swapped between two speakers caused 40+ threads to be misattributed. Pain points became pitches and vice versa. | Phase 0.5 now includes anchor-line identification, scene-based re-attribution, and a decision framework for whether re-extraction is needed. |
 | 2026-03-18 | "Don't be stingy with the extract" - first pass had 42 threads, expanded to 82 after user pushed back. Collapsing related threads and skipping "non-business" categories loses signal. | Added to Common Mistakes. Default to over-extraction, let Phase 2 triage handle prioritization. |
 
 ## Red Flags: You're Rushing
