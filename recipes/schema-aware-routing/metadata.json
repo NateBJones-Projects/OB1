@@ -1,0 +1,30 @@
+{
+  "name": "schema-aware-routing",
+  "description": "A pattern for using LLM-extracted metadata to route unstructured text into the correct database tables. Demonstrates multi-table writes to thoughts, people, interactions, and action_items based on structured fields extracted by an LLM from raw input.",
+  "category": "recipes",
+  "author": {
+    "name": "Clay Dunker",
+    "github": "claydunker"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenAI-compatible API (LLM + embeddings)"],
+    "tools": ["Node.js 18+ or Deno"]
+  },
+  "tags": [
+    "ingestion",
+    "routing",
+    "schema",
+    "slack",
+    "supabase",
+    "llm",
+    "metadata-extraction",
+    "people-graph",
+    "action-items"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-03-19",
+  "updated": "2026-03-19"
+}
