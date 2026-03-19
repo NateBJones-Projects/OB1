@@ -5,7 +5,12 @@ supabase/
 
 # Recipe credentials & runtime state
 .env
+.env.local
+.env.*.local
 credentials.json
 token.json
 gmail-sync-log.json
 sync-log.json
+
+# Deno lock files
+deno.lock
