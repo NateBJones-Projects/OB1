@@ -33,7 +33,7 @@ You receive a **30-second animated video** on Telegram with:
 - 🎵 Optional ambient background music
 - 📱 Vertical format (9:16) optimized for phone viewing
 
-The video is rendered on your machine by Remotion, then sent directly to your Telegram via the Bot API.
+The video is rendered on your machine by Remotion, then sent to your Telegram via the channel's `reply` tool.
 
 ---
 
@@ -53,9 +53,8 @@ The video is rendered on your machine by Remotion, then sent directly to your Te
 # ElevenLabs
 ELEVENLABS_API_KEY=
 
-# Telegram (reuse from Life Engine)
-TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
+# Telegram
+# (Reuse from Life Engine setup — the channel plugin's `reply` tool handles video delivery)
 
 # Voice Selection
 ELEVENLABS_VOICE_ID=         # See Voice Options below
@@ -109,8 +108,8 @@ Life Engine Loop fires
              │
              ▼
   ┌─────────────────────┐
-  │  Telegram Bot API   │◄── Send video file to phone
-  │  sendVideo          │
+  │  Telegram Channel   │◄── Send video via `reply` tool
+  │  reply(files: [...])│     (max 50MB per file)
   └─────────────────────┘
 ```
 
@@ -635,28 +634,21 @@ This script orchestrates the entire flow — Claude calls this to generate and s
 PROJECT_DIR="$HOME/life-engine-video"
 cd "$PROJECT_DIR"
 
-echo "1/4 — Rendering video..."
+echo "1/3 — Rendering video..."
 PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin" \
   pnpm exec remotion render src/index.ts Briefing \
   out/briefing.mp4 --codec h264 --crf 23 --scale 1
 
-echo "2/4 — Normalizing audio..."
+echo "2/3 — Normalizing audio..."
 bash scripts/normalize-audio.sh out/briefing.mp4
 
-echo "3/4 — Sending to Telegram..."
-curl -s -X POST \
-  "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendVideo" \
-  -F "chat_id=${TELEGRAM_CHAT_ID}" \
-  -F "video=@out/briefing-normalized.mp4" \
-  -F "caption=📹 Your briefing is ready"
-
-echo "4/4 — Cleanup..."
-rm -f out/briefing.mp4 out/briefing-normalized.mp4
-
-echo "Done!"
+echo "3/3 — Done! Video ready for delivery."
+# Delivery handled by Claude via the Telegram channel's `reply` tool:
+#   reply(chat_id=..., text="📹 Your briefing is ready", files=["/path/to/out/briefing-normalized.mp4"])
+# The `reply` tool supports file attachments (images, videos, documents) up to 50MB each.
 ```
 
-✅ **Checkpoint:** Running the pipeline script manually produces a video and sends it to Telegram.
+✅ **Checkpoint:** Running the pipeline script manually produces a normalized video file. Claude then delivers it via `reply(files=[...])` in the next step.
 
 ---
 
@@ -686,7 +678,7 @@ a video briefing instead of (or in addition to) a text message.
 5. Convert character timestamps to 5-7 word subtitle cues
 6. Write briefing.json to ~/life-engine-video/src/data/
 7. Run: bash ~/life-engine-video/scripts/generate-briefing.sh
-8. Video is automatically sent to Telegram
+8. Send via Telegram channel: `reply(chat_id=..., text="📹 Your briefing is ready", files=["~/life-engine-video/out/briefing-normalized.mp4"])`
 9. Log to life_engine_briefings with delivered_via = 'telegram_video'
 
 ### Voiceover script guidelines:
@@ -759,7 +751,7 @@ Place in `public/music.mp3`. The composition plays it at 12-15% volume under the
 | **Render crashes with SIGSEGV** | Use `--codec h264`, NOT h265/libx265 (crashes on Apple Silicon) |
 | **Render takes too long** | Keep videos under 45 seconds. Use `--scale 0.5` for testing |
 | **Subtitles out of sync** | Use `normalized_alignment` from ElevenLabs, not `alignment` |
-| **Telegram rejects video** | Max file size is 50MB. 30s H.264 at CRF 23 is typically 3-5MB |
+| **Telegram rejects video** | Max file size is 50MB per the `reply` tool. 30s H.264 at CRF 23 is typically 3-5MB |
 | **TTS sounds robotic** | Adjust stability (0.4-0.6) and style (0.1-0.3). Lower stability = more expressive |
 | **Missing fonts** | Install Inter font, or Remotion will fall back to system-ui |
 | **FFmpeg not found** | Set PATH explicitly: `PATH="/opt/homebrew/bin:$PATH"` |
@@ -808,7 +800,7 @@ For meeting prep, capture a screenshot of the client's website or relevant dashb
 │       │                                                      │
 │  8. Run: normalize-audio.sh → out/briefing-normalized.mp4   │
 │       │                                                      │
-│  9. POST to Telegram sendVideo API                          │
+│  9. Send via Telegram channel `reply` tool (files param)     │
 │       │                                                      │
 │  10. Log to life_engine_briefings (type: telegram_video)    │
 │       │                                                      │

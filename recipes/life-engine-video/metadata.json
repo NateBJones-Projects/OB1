@@ -18,7 +18,9 @@
       "claude-code",
       "remotion",
       "node",
-      "ffmpeg"
+      "ffmpeg",
+      "bun",
+      "telegram-channel"
     ]
   },
   "tags": [
@@ -34,5 +36,5 @@
   "difficulty": "advanced",
   "estimated_time": "60-90 minutes",
   "created": "2026-03-18",
-  "updated": "2026-03-18"
+  "updated": "2026-03-19"
 }

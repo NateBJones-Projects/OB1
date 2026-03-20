@@ -9,8 +9,50 @@ A self-improving, time-aware personal assistant that runs in the background via 
 > [!IMPORTANT]
 > **This recipe requires [Claude Code](https://claude.ai/download).** It uses Claude Code-specific features — skills, the `/loop` command, and MCP server connections — that aren't available in other AI coding tools. If you're using a different agent, this one isn't for you (yet).
 
+> [!TIP]
+> **You don't have to set this up manually.** This guide is detailed enough that Claude Code can do most of the setup for you. If you'd rather not walk through every step yourself, skip to [Quick Setup with Claude Code](#quick-setup-with-claude-code) — paste one prompt and Claude handles the plugin install, skill file creation, schema setup, and permissions configuration. Come back to the step-by-step sections if you want to understand what it built or customize further.
+
 > [!NOTE]
 > **This will not be perfect on day one.** That's by design. Life Engine is built to iterate — your first morning briefing will be rough, your tenth will be dialed in, and by week four the system is suggesting its own improvements based on what you actually use. The value comes from the feedback loop between you and the agent, powered by the structured context your Open Brain provides. Treat the first run as a starting point, not a finished product.
+
+---
+
+## Quick Setup with Claude Code
+
+This guide contains everything Claude Code needs to set up your entire Life Engine — the Telegram channel, skill files, database schema, and permissions config. Instead of walking through 8 steps manually, point Claude Code at this README and let it do the work.
+
+**Before you start**, you'll need:
+- Claude Code installed ([claude.ai/download](https://claude.ai/download))
+- A working Open Brain setup ([Getting Started Guide](../../docs/01-getting-started.md))
+- Google Calendar MCP connected to Claude Code
+- [Bun](https://bun.sh/) installed (`brew install oven-sh/bun/bun`)
+- A Telegram or Discord account (whichever you want briefings delivered to)
+
+**Tell Claude Code:**
+
+> Read the Life Engine recipe at `~/path-to-ob1/recipes/life-engine/README.md` and set up my Life Engine end to end. I want to use **Telegram** *(or Discord)* as my messaging channel. Walk me through creating a bot if I don't have one yet. Install the channel plugin, configure it with my bot token, create the Life Engine skill file at `~/.claude/skills/life-engine/SKILL.md` using the full skill from `recipes/life-engine/life-engine-skill.md`, run the schema.sql in my Supabase SQL Editor, and configure permissions for unattended operation. Pause and walk me through any steps that need my phone or browser (bot creation, channel pairing). When everything is ready, test it with `/life-engine`.
+
+**What Claude Code will do:**
+1. Install and configure the Telegram channel plugin
+2. Create the skill file with the full Life Engine prompt
+3. Run the database schema in your Supabase project
+4. Set up permissions for unattended operation
+5. Pause for you to complete Telegram pairing (requires your phone)
+6. Run a test cycle to confirm everything works
+
+After setup, exit and relaunch with your channel:
+
+```bash
+# Telegram
+claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+
+# Discord
+claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
+```
+
+Then start your loop: `/loop 30m /life-engine`
+
+If you want to understand each piece or customize the setup, continue with the step-by-step guide below.
 
 ---
 
@@ -47,6 +89,7 @@ The skill evolves. Claude proposes changes, you approve them, and over time your
 ## What You'll Learn
 
 - Using Claude Code's `/loop` command for recurring background tasks
+- Using Claude Code's **Channels** for real-time two-way Telegram messaging
 - Building time-aware Claude Code skills that adapt behavior based on context
 - Connecting multiple MCP integrations into a single cohesive workflow
 - Querying your Open Brain for contextual knowledge surfacing
@@ -65,6 +108,7 @@ Before starting, you'll need:
 | Claude Code installed and working ([claude.ai/download](https://claude.ai/download)) | ☐ |
 | Google Calendar MCP connected to Claude Code | ☐ |
 | Telegram account + Bot created via [@BotFather](https://t.me/BotFather) | ☐ |
+| [Bun](https://bun.sh/) installed (`bun --version` to check) | ☐ |
 | Supabase project with Open Brain MCP deployed | ☐ |
 
 ### Credential Tracker
@@ -79,7 +123,7 @@ OB1_MCP_URL=
 
 # Telegram
 TELEGRAM_BOT_TOKEN=
-TELEGRAM_CHAT_ID=
+# (Chat ID is handled automatically via channel pairing — no need to look it up)
 
 # Google Calendar
 (Connected via Claude Code MCP settings)
@@ -93,6 +137,7 @@ TELEGRAM_CHAT_ID=
 ┌─────────────────────────────────────────────────┐
 │                  Claude Code                     │
 │                                                  │
+│  claude --channels plugin:<platform>@...           │
 │  /loop 30m /life-engine                          │
 │       │                                          │
 │       ▼                                          │
@@ -107,9 +152,9 @@ TELEGRAM_CHAT_ID=
 │    ┌────┼────────────┬──────────────┐            │
 │    ▼    ▼            ▼              ▼            │
 │  📅    🧠          💬           📊             │
-│  Google  Open Brain   Telegram     Life Engine   │
-│  Calendar (Supabase   (Bot API)    Tables        │
-│  MCP      MCP)                     (Supabase)    │
+│  Google  Open Brain   Messaging    Life Engine   │
+│  Calendar (Supabase   Channel      Tables        │
+│  MCP      MCP)       (plugin)      (Supabase)    │
 │                                                  │
 └─────────────────────────────────────────────────┘
 ```
@@ -117,36 +162,156 @@ TELEGRAM_CHAT_ID=
 **Data flows:**
 1. **Calendar → Claude**: What's coming up?
 2. **Open Brain → Claude**: What do I know about it?
-3. **Claude → Telegram**: Here's what you need.
-4. **User → Telegram → Claude**: Feedback, check-ins, approvals
+3. **Claude → You**: Here's what you need (sent via Telegram or Discord channel).
+4. **You → Claude**: Replies pushed into the session in real time via channel.
 5. **Claude → Life Engine Tables**: Log habits, moods, improvements
 
 ---
 
-## Step 1: Set Up the Telegram Bridge
+## Step 1: Connect a Messaging Channel
 
-> **Why Telegram?** It's the delivery channel — how Life Engine talks to you when you're away from your desk. Free, fast, works on every phone, and has a simple bot API.
+Life Engine needs a way to talk to you when you're away from the terminal. Claude Code's **Channels** feature provides built-in, two-way messaging — messages push into your session in real time with no custom server required. Pick whichever platform you already use.
 
-### 1.1 Create a Telegram Bot
+> [!NOTE]
+> Channels are a **research preview** feature. The `--channels` flag is not yet shown in `--help`, and the plugin syntax may evolve. See the [Channels documentation](https://code.claude.com/docs/en/channels) for the latest details.
+
+**First, install Bun** — all channel plugins require it:
+
+```bash
+brew install oven-sh/bun/bun
+```
+
+Verify with `bun --version`.
+
+Now pick your platform:
+
+### Option A: Telegram (Recommended)
+
+Telegram is free, fast, works on every phone, and has the simplest bot setup.
+
+**1. Create a Telegram Bot**
 
 1. Open Telegram and message [@BotFather](https://t.me/BotFather)
 2. Send `/newbot`
 3. Give it a name (e.g., "My Life Engine")
 4. Give it a username (e.g., `my_life_engine_bot`)
-5. Copy the **bot token** — save it to your credential tracker
+5. Copy the **bot token**
 
-### 1.2 Get Your Chat ID
+**2. Install and Configure the Plugin**
+
+Start a Claude Code session and install the official Telegram plugin:
+
+```
+/plugin install telegram@claude-plugins-official
+/reload-plugins
+```
+
+Then configure it with your bot token:
+
+```
+/telegram:configure <YOUR_BOT_TOKEN>
+```
+
+This writes your token to `~/.claude/channels/telegram/.env`.
+
+**3. Launch with Channels Enabled**
+
+Exit your session and relaunch with the channel flag:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official
+```
+
+**4. Pair Your Telegram Account**
+
+1. DM your bot on Telegram — send it any message (e.g., "hello")
+2. The bot replies with a **6-character pairing code**
+3. Back in Claude Code, approve the pairing:
+   ```
+   /telegram:access pair <code>
+   ```
+4. Lock down access so only your account can reach the session:
+   ```
+   /telegram:access policy allowlist
+   ```
+
+✅ **Checkpoint:** Send a test message to your bot on Telegram. Claude Code should receive it in the terminal and can reply back through the channel.
+
+### Option B: Discord
+
+If you prefer Discord or already have a server, the setup is similar but requires a few extra steps in the Discord Developer Portal.
+
+**1. Create a Discord Bot**
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and click **New Application**
+2. In the **Bot** section, create a username, then click **Reset Token** and copy the token
+3. Under **Privileged Gateway Intents**, enable **Message Content Intent**
+
+**2. Invite the Bot to Your Server**
+
+1. Go to **OAuth2 > URL Generator**
+2. Select the `bot` scope and enable these permissions:
+   - View Channels
+   - Send Messages
+   - Send Messages in Threads
+   - Read Message History
+   - Attach Files
+   - Add Reactions
+3. Open the generated URL to add the bot to your server
+
+**3. Install and Configure the Plugin**
+
+```
+/plugin install discord@claude-plugins-official
+/reload-plugins
+/discord:configure <YOUR_BOT_TOKEN>
+```
+
+**4. Launch with Channels Enabled**
+
+Exit your session and relaunch:
+
+```bash
+claude --channels plugin:discord@claude-plugins-official
+```
+
+**5. Pair Your Discord Account**
+
+1. DM your bot on Discord — if it doesn't respond, make sure Claude Code is running with `--channels` from the previous step
+2. The bot replies with a **pairing code**
+3. Back in Claude Code:
+   ```
+   /discord:access pair <code>
+   /discord:access policy allowlist
+   ```
+
+✅ **Checkpoint:** Send a test message to your bot on Discord. Claude Code should receive it in the terminal and can reply back through the channel.
+
+### Channel Tools (Same for Both Platforms)
+
+After setup, the same three tools are available regardless of platform:
+
+| Tool | Purpose |
+|------|---------|
+| `reply` | Send text or files to a chat. Supports `text`, `chat_id`, optional `files` (array of absolute paths, max 50MB each), and `reply_to` (message ID). Auto-chunks long text. Images send as photos with preview. |
+| `react` | Add emoji reaction to a message. |
+| `edit_message` | Edit a previously sent bot message. Good for "working…" → result updates. |
+
+<details>
+<summary>Option C: Custom Telegram Bridge (for older Claude Code versions)</summary>
+
+If your Claude Code version doesn't support `--channels`, you can use a lightweight bridge server instead.
+
+**1. Create a Telegram Bot** — same as Option A above.
+
+**2. Get Your Chat ID**
 
 1. Message your new bot (send anything — "hello")
 2. Visit: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
 3. Find `"chat":{"id":XXXXXXX}` in the response
-4. Copy the **chat ID** — save it to your credential tracker
+4. Copy the **chat ID**
 
-### 1.3 Set Up a Telegram Bridge for Claude Code
-
-You need a small bridge server that lets Claude Code's MCP tools communicate with your Telegram bot.
-
-Create a project directory:
+**3. Set Up the Bridge Server**
 
 ```bash
 mkdir ~/life-engine-telegram && cd ~/life-engine-telegram
@@ -156,8 +321,6 @@ Create `bridge.js`:
 
 ```javascript
 // Minimal Telegram bridge for Claude Code MCP
-// Receives messages from your Telegram bot and exposes them to Claude
-
 import { Telegraf } from 'telegraf';
 import express from 'express';
 
@@ -167,7 +330,6 @@ app.use(express.json());
 
 let unreadMessages = [];
 
-// Capture incoming messages
 bot.on('text', (ctx) => {
   unreadMessages.push({
     text: ctx.message.text,
@@ -176,26 +338,20 @@ bot.on('text', (ctx) => {
   });
 });
 
-// Claude Code polls this endpoint
 app.get('/messages', (req, res) => {
-  if (unreadMessages.length === 0) {
-    res.json({ status: 'no_messages', messages: [] });
-  } else {
-    res.json({ status: 'unread', messages: unreadMessages });
-  }
+  res.json(unreadMessages.length === 0
+    ? { status: 'no_messages', messages: [] }
+    : { status: 'unread', messages: unreadMessages });
 });
 
-// Mark messages as read
 app.post('/messages/read', (req, res) => {
   const count = unreadMessages.length;
   unreadMessages = [];
   res.json({ markedAsRead: count });
 });
 
-// Send a reply back to the user
 app.post('/reply', (req, res) => {
-  const { message } = req.body;
-  bot.telegram.sendMessage(process.env.TELEGRAM_CHAT_ID, message, {
+  bot.telegram.sendMessage(process.env.TELEGRAM_CHAT_ID, req.body.message, {
     parse_mode: 'Markdown'
   });
   res.json({ sent: true });
@@ -225,30 +381,36 @@ npm install
 TELEGRAM_BOT_TOKEN="your_token" TELEGRAM_CHAT_ID="your_chat_id" node bridge.js
 ```
 
-> **💡 Tip:** For persistent operation, use a process manager like `pm2` or create a `launchd` service (macOS) so the bridge starts automatically.
+For persistent operation, use `pm2` or create a `launchd` service (macOS).
 
-### 1.4 Register as an MCP Server in Claude Code
-
-Add the Telegram bridge as an MCP server so Claude Code can use it:
+**4. Register as an MCP Server**
 
 ```bash
 claude mcp add telegram-bridge --transport http --url http://localhost:3456
 ```
 
-Or manually add to `.claude/settings.local.json`:
+**5. Add Telegram Polling**
 
-```json
-{
-  "mcpServers": {
-    "telegram-bridge": {
-      "type": "http",
-      "url": "http://localhost:3456"
-    }
-  }
-}
+With the custom bridge, you also need a companion skill to poll for incoming messages. Create `.claude/skills/check-telegram/SKILL.md`:
+
+```markdown
+# /check-telegram — Poll for Telegram Messages
+
+Check for new Telegram messages from the user.
+
+1. Use the Telegram MCP tools to check for unread messages.
+2. If there are NO unread messages, say "No new messages." and stop.
+3. If there ARE unread messages:
+   a. Read and understand what the user is asking for
+   b. Mark the messages as read
+   c. Take action on the request
+   d. Send your response back via Telegram
+   e. Keep responses concise and mobile-friendly
 ```
 
-✅ **Checkpoint:** Send a test message to your bot on Telegram. Then ask Claude Code: *"Check for Telegram messages."* It should see your message.
+Then run it on a separate loop: `/loop 1m /check-telegram`
+
+</details>
 
 ---
 
@@ -333,11 +495,14 @@ based on the current time, their calendar, and their Open Brain.
 
 ## Core Behavior
 
-1. **Check the current time** — your behavior changes throughout the day
-2. **Decide what action to take** based on the time windows below
-3. **Execute the action** using available MCP tools
-4. **Deliver via Telegram** — keep messages concise and mobile-friendly
-5. **Log what you did** so you don't repeat yourself
+1. **Time check** — What time is it? What time window am I in?
+2. **Duplicate check** — Did I already send something this cycle/today?
+3. **Decide** — Based on the time window, what should I be doing?
+4. **External pull** — Grab live data from integrations (calendar, etc.)
+5. **Internal enrich** — Search Open Brain for context on what you found.
+   You can't enrich what you haven't seen yet — always external before internal.
+6. **Deliver via Telegram** — only if worth it. Silence > noise.
+7. **Log what you did** so the next cycle knows what's been covered
 
 ## Time Windows
 
@@ -401,8 +566,9 @@ Use these MCP tools:
 - `gcal_list_events` — Get calendar events for a date range
 - `gcal_get_event` — Get details on a specific event
 - Open Brain semantic search — Find relevant knowledge
-- Telegram reply — Send messages to the user
-- Telegram get messages — Check for user responses
+- `reply` — Send text or files via Telegram channel
+- `react` — Acknowledge messages with emoji reactions
+- `edit_message` — Update a previously sent message
 - Supabase execute_sql — Query/insert Life Engine tables
 
 ## Self-Improvement Protocol
@@ -454,36 +620,120 @@ Evening summary:
 📅 Tomorrow: [first event]
 ```
 
-### 5.2 Create the Companion Skill for Telegram Polling
+✅ **Checkpoint:** The skill file exists in `.claude/skills/`.
 
-Create `.claude/skills/check-telegram/SKILL.md`:
-
-```markdown
-# /check-telegram — Poll for Telegram Messages
-
-Check for new Telegram messages from the user.
-
-1. Use the Telegram MCP tools to check for unread messages.
-2. If there are NO unread messages, say "No new messages." and stop.
-3. If there ARE unread messages:
-   a. Read and understand what the user is asking for
-   b. Mark the messages as read
-   c. Take action on the request
-   d. Send your response back via Telegram
-   e. Keep responses concise and mobile-friendly
-```
-
-✅ **Checkpoint:** Both skill files exist in `.claude/skills/`.
+> **Note:** In the previous version of this recipe, a separate `/check-telegram` polling skill was required to read incoming messages. With Channels, that's no longer needed — Telegram messages are pushed directly into your Claude Code session in real time. Claude reads and responds to them inline.
 
 ---
 
-## Step 6: Start Simple — Your First Loop
+## Step 6: Configure Permissions for Unattended Operation
+
+Life Engine runs autonomously via `/loop`. If Claude encounters a tool it doesn't have permission to use, **the session pauses silently** until you approve it at the terminal. Nothing happens — no briefings, no check-ins, no Telegram responses — until you're back at the keyboard.
+
+> [!WARNING]
+> **This is the most common reason a Life Engine "stops working."** You walk away, Claude hits one permission prompt, and everything freezes. Configure permissions before starting your first loop.
+
+### 6.1 Choose Your Approach
+
+| Approach | Best For | Risk Level |
+|----------|----------|------------|
+| **`--dangerously-skip-permissions`** | Always-on setups on a dedicated, trusted machine | High — bypasses ALL checks |
+| **`--permission-mode auto`** | A middle ground — automatic but with some guardrails | Medium |
+| **`--allowedTools` (CLI flag)** | Fine-grained — approve only the tools Life Engine needs | Low — scoped |
+| **`settings.json` allowlist** | Same as above, but persisted in config instead of CLI | Low — scoped + persistent |
+
+### 6.2 Option A: Skip Permissions (Simplest for Dedicated Machines)
+
+For a machine you fully trust (e.g., a Mac Mini running Life Engine in a persistent terminal):
+
+```bash
+# Use whichever channel you set up in Step 1
+claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
+```
+
+> [!CAUTION]
+> This means Claude can run any tool, any bash command, write any file — without asking. Only use this on a machine and in an environment you fully trust.
+
+### 6.3 Option B: Auto Permission Mode
+
+A less extreme alternative. Claude can take actions automatically but still respects certain guardrails:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official --permission-mode auto
+```
+
+(Swap `telegram` for `discord` if using Discord.)
+
+### 6.4 Option C: Allowlisted Tools (Most Precise)
+
+Pre-approve only the specific tools Life Engine uses. You can pass them on the CLI:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official \
+  --allowedTools "Bash Read Write Edit \
+    mcp__plugin_telegram_telegram__reply \
+    mcp__plugin_telegram_telegram__react \
+    mcp__plugin_telegram_telegram__edit_message \
+    mcp__google-calendar__gcal_list_events \
+    mcp__google-calendar__gcal_get_event \
+    mcp__open-brain__* \
+    mcp__supabase__*"
+```
+
+Or persist them in `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_telegram_telegram__reply",
+      "mcp__plugin_telegram_telegram__react",
+      "mcp__plugin_telegram_telegram__edit_message",
+      "mcp__google-calendar__gcal_list_events",
+      "mcp__google-calendar__gcal_get_event",
+      "mcp__open-brain__*",
+      "mcp__supabase__*"
+    ]
+  }
+}
+```
+
+> **Note:** The exact tool names depend on how you named your MCP servers. Run `/mcp` in Claude Code to see your server names, then match them here. The `__*` wildcard approves all tools from that server.
+
+If you're using the [Dynamic Loop Timing](#dynamic-loop-timing) feature from the skill, also add `CronCreate` and `CronDelete`.
+
+### 6.5 Test Before You Walk Away
+
+1. Start Claude Code with your chosen permission strategy
+2. Run `/life-engine` manually
+3. Watch for any permission prompts — if you see one, add that tool to your allowlist
+4. Repeat until the skill runs clean with no prompts
+5. Only then start the loop and step away
+
+✅ **Checkpoint:** `/life-engine` completes a full cycle (calendar check → briefing → log) with zero permission prompts.
+
+---
+
+## Step 7: Start Simple — Your First Loop
 
 **Don't activate everything at once.** Start with just calendar + Telegram.
 
-### 6.1 Test the Skill Manually
+### 7.1 Start Claude Code with Channels and Permissions
 
-Open Claude Code and run:
+```bash
+# Telegram
+claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+
+# Discord
+claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
+```
+
+Or swap `--dangerously-skip-permissions` for your preferred permission strategy from Step 6.
+
+### 7.2 Test the Skill Manually
+
+In your session, run:
 
 ```
 /life-engine
@@ -491,7 +741,7 @@ Open Claude Code and run:
 
 Claude should check the time, look at your calendar, and send you a Telegram message. If it's morning, you'll get a daily briefing. If there's a meeting coming up, you'll get a prep brief.
 
-### 6.2 Start the Loop
+### 7.3 Start the Loop
 
 Once you've confirmed it works:
 
@@ -499,23 +749,15 @@ Once you've confirmed it works:
 /loop 30m /life-engine
 ```
 
-That's it. Claude will now check in every 30 minutes and decide if you need anything.
+That's it. Claude will now check in every 30 minutes and decide if you need anything. When you reply on Telegram, the channel pushes your message directly into the session — Claude reads and responds inline, no separate polling loop needed.
 
-### 6.3 Add Telegram Polling
+> **Note:** Loop jobs and channels are session-only — they stop when Claude Code exits. For persistent operation, keep a Claude Code session running on a dedicated machine or persistent terminal, or restart when you begin your day.
 
-To also receive responses from Telegram:
-
-```
-/loop 1m /check-telegram
-```
-
-> **Note:** Loop jobs are session-only — they stop when Claude Code exits. For persistent operation, keep a Claude Code session running on a dedicated machine, or restart the loops when you begin your day.
-
-✅ **Checkpoint:** You're receiving proactive Telegram messages from Claude based on your calendar.
+✅ **Checkpoint:** You're receiving proactive Telegram messages from Claude based on your calendar, and your Telegram replies reach Claude in real time.
 
 ---
 
-## Step 7: Grow It Over Time
+## Step 8: Grow It Over Time
 
 This is where Life Engine becomes unique to you. Here's the progression:
 
@@ -565,8 +807,13 @@ No two Life Engines look the same. Yours adapts to your schedule, your habits, y
 
 | Issue | Solution |
 |-------|----------|
-| **Loop stops firing** | Loops are session-only. If Claude Code exits, restart with `/loop 30m /life-engine` |
-| **No Telegram messages received** | Verify bridge is running: `curl http://localhost:3456/messages` |
+| **Life Engine stopped responding** | Most likely blocked on a permission prompt. Check the terminal — if you see a prompt waiting, approve it and configure permissions per Step 6 |
+| **Loop stops firing** | Loops are session-only. If Claude Code exits, restart with the full launch command and `/loop 30m /life-engine` |
+| **No Telegram messages received** | Verify you started with `--channels plugin:telegram@claude-plugins-official` and completed pairing. Run `/plugin list` to confirm the plugin is installed |
+| **Telegram replies not reaching Claude** | Channels only push while the session is open. Verify pairing completed (`/telegram:access pair`) and policy is set (`/telegram:access policy allowlist`) |
+| **`--channels` flag not recognized** | Update Claude Code to the latest version. The flag is in research preview and not shown in `--help` — but it works |
+| **Bun not found** | Install via `brew install oven-sh/bun/bun` or `curl -fsSL https://bun.sh/install \| bash` |
+| **Plugin not loading** | Check `~/.claude/channels/telegram/.env` exists with your bot token. Try `/reload-plugins` in the session |
 | **Calendar not showing events** | Run `/mcp` and verify Google Calendar is connected |
 | **Open Brain returns nothing** | Test with: *"Search my Open Brain for [topic]"* — you may need more captured thoughts |
 | **Duplicate briefings** | The skill checks `life_engine_briefings` before sending. If duplicates occur, verify Supabase connection |
@@ -577,7 +824,7 @@ No two Life Engines look the same. Yours adapts to your schedule, your habits, y
 ## Going Further
 
 ### Video Briefings with Remotion
-Instead of text, render a short video summary using [Remotion](https://www.remotion.dev/). Claude can generate a Remotion composition from the briefing data and send the rendered video via Telegram's file API.
+Instead of text, render a short video summary using [Remotion](https://www.remotion.dev/). Claude can generate a Remotion composition from the briefing data and send the rendered video via the Telegram channel's `reply` tool (which supports file attachments up to 50MB).
 
 ### Multi-Person Households
 Combine with the [Family Calendar Extension](../../extensions/family-calendar/) to track multiple family members' schedules and send briefings relevant to the whole household.
@@ -600,7 +847,19 @@ Claude Code's `/loop` command creates a cron job that fires a skill at a set int
 /loop 30m /life-engine
 ```
 
-This creates a `*/30 * * * *` cron entry that triggers the `/life-engine` skill every 30 minutes.
+This creates a `*/30 * * * *` cron entry that triggers the `/life-engine` skill every 30 minutes. The loop handles the **proactive** side — Claude wakes up on a schedule and decides what you need.
+
+### The Channel
+
+The messaging channel handles the **reactive** side — two-way communication. When Claude sends a briefing, it goes out through the channel using the `reply` tool. When you reply on Telegram or Discord, the message is pushed directly into the Claude Code session in real time as a `<channel>` event. No polling, no bridge server.
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official
+# or
+claude --channels plugin:discord@claude-plugins-official
+```
+
+The `--channels` flag enables the chosen plugin for the session. Events only arrive while the session is open. Both plugins expose the same three tools: `reply` (send text or files), `react` (add emoji reactions), and `edit_message` (update a previously sent message).
 
 ### The Skill
 
@@ -615,7 +874,7 @@ The skill file (`.claude/skills/life-engine/SKILL.md`) is a prompt that Claude f
 Claude Code communicates with external services through MCP (Model Context Protocol) servers:
 - **Google Calendar MCP** — reads calendar events
 - **Open Brain MCP** — searches your knowledge base
-- **Telegram Bridge** — sends and receives messages
+- **Messaging Channel** — sends and receives messages via Telegram or Discord plugin (`reply`, `react`, `edit_message`)
 - **Supabase MCP** — reads/writes Life Engine tables
 
 All of these are configured in Claude Code's MCP settings and available to the skill automatically.
@@ -678,8 +937,7 @@ After setup, you'll have:
 | Supabase Project URL | `https://xxx.supabase.co` | Open Brain MCP, Life Engine tables |
 | Supabase Service Key | `eyJ...` | Database access |
 | OB1 MCP URL | `https://xxx.supabase.co/functions/v1/open-brain-mcp?key=xxx` | Knowledge search |
-| Telegram Bot Token | `123456:ABC...` | Telegram bridge |
-| Telegram Chat ID | `XXXXXXXXX` | Message delivery |
+| Telegram Bot Token | `123456:ABC...` | Telegram channel plugin |
 | Google Calendar | (OAuth via Claude Code) | Calendar events |
 
 </details>
