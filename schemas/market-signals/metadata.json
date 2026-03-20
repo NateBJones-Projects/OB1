@@ -1,0 +1,20 @@
+{
+  "name": "Market Signals",
+  "description": "Track customer pain points, feature requests, competitor gaps, and willingness-to-pay signals from Reddit, forums, and conversations. Accumulates evidence over time so your agent can surface patterns and inform product build priorities.",
+  "category": "schemas",
+  "author": {
+    "name": "JQ",
+    "github": "zubi-wiz"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["product", "market-research", "customer-signals", "feature-requests", "competitive-intelligence"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-03-20",
+  "updated": "2026-03-20"
+}
