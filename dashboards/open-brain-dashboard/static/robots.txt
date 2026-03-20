@@ -1,0 +1,3 @@
+# Personal dashboard — no crawling
+User-agent: *
+Disallow: /

@@ -1,0 +1,30 @@
+{
+  "name": "Open Brain Dashboard",
+  "description": "A production-ready SvelteKit dashboard for searching, filtering, and capturing Open Brain thoughts.",
+  "category": "dashboards",
+  "author": {
+    "name": "Mads Bergdal (aka Headcrest)",
+    "github": "headcrest"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": [
+      "Node.js 18+"
+    ]
+  },
+  "tags": [
+    "dashboard",
+    "open-brain",
+    "OB1",
+    "sveltekit",
+    "search",
+    "thought-capture",
+    "mcp"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "1 hour",
+  "created": "2026-03-16",
+  "updated": "2026-03-16"
+}
