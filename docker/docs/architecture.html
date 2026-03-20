@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OB1 — Architecture</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; padding: 40px 20px; }
+        h1 { text-align: center; font-size: 28px; font-weight: 600; margin-bottom: 8px; color: #fff; }
+        .subtitle { text-align: center; font-size: 14px; color: #888; margin-bottom: 40px; }
+        .diagram { max-width: 960px; margin: 0 auto; position: relative; }
+
+        /* Sections */
+        .section { margin-bottom: 32px; }
+        .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: #666; margin-bottom: 12px; padding-left: 4px; }
+
+        /* Card grid */
+        .cards { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+        .card {
+            border-radius: 12px; padding: 20px 24px; min-width: 180px; flex: 1;
+            position: relative; transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+        .card-name { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+        .card-desc { font-size: 12px; opacity: 0.8; margin-bottom: 8px; }
+        .card-port { font-size: 11px; font-family: 'SF Mono', 'Consolas', monospace; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px; display: inline-block; }
+        .card-url { font-size: 11px; font-family: 'SF Mono', 'Consolas', monospace; color: rgba(255,255,255,0.6); margin-top: 6px; }
+
+        /* Colors */
+        .blue { background: linear-gradient(135deg, #1e88e5, #1565c0); color: #fff; }
+        .green { background: linear-gradient(135deg, #43a047, #2e7d32); color: #fff; }
+        .red { background: linear-gradient(135deg, #e53935, #c62828); color: #fff; }
+        .orange { background: linear-gradient(135deg, #fb8c00, #ef6c00); color: #fff; }
+        .purple { background: linear-gradient(135deg, #8e24aa, #6a1b9a); color: #fff; }
+        .teal { background: linear-gradient(135deg, #00897b, #00695c); color: #fff; }
+        .slate { background: linear-gradient(135deg, #455a64, #37474f); color: #fff; }
+
+        /* Connection lines */
+        .connections { display: flex; justify-content: center; padding: 16px 0; }
+        .arrow { display: flex; flex-direction: column; align-items: center; color: #555; }
+        .arrow-line { width: 2px; height: 24px; background: #333; }
+        .arrow-label { font-size: 10px; color: #666; padding: 4px 0; }
+        .arrow-head { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #333; }
+        .arrows-row { display: flex; gap: 120px; justify-content: center; padding: 8px 0; }
+
+        /* Flow arrow */
+        .flow { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 0; }
+        .flow-line { height: 2px; width: 40px; background: #333; }
+        .flow-label { font-size: 10px; color: #666; white-space: nowrap; }
+
+        /* Volume badges */
+        .volumes { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 16px; }
+        .volume {
+            background: #1a1d27; border: 1px solid #333; border-radius: 8px;
+            padding: 10px 16px; font-size: 12px; text-align: center;
+        }
+        .volume-name { font-family: 'SF Mono', 'Consolas', monospace; font-weight: 600; color: #bb86fc; }
+        .volume-desc { font-size: 10px; color: #888; margin-top: 2px; }
+
+        /* Model badges */
+        .models { display: flex; gap: 12px; justify-content: center; margin-top: 8px; }
+        .model {
+            background: #1a1d27; border: 1px solid #444; border-radius: 6px;
+            padding: 6px 14px; font-size: 11px;
+        }
+        .model-name { font-family: 'SF Mono', 'Consolas', monospace; font-weight: 600; color: #ef9a9a; }
+        .model-info { color: #888; }
+
+        /* Credential table */
+        .creds { margin: 0 auto; max-width: 700px; margin-top: 40px; }
+        .creds h2 { font-size: 18px; margin-bottom: 16px; color: #fff; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #888; padding: 8px 12px; border-bottom: 1px solid #333; }
+        td { padding: 10px 12px; border-bottom: 1px solid #1e2030; font-size: 13px; }
+        td:nth-child(2) { font-family: 'SF Mono', 'Consolas', monospace; font-size: 12px; color: #81c784; }
+
+        /* Tools table */
+        .tools { margin: 0 auto; max-width: 700px; margin-top: 32px; }
+        .tools h2 { font-size: 18px; margin-bottom: 16px; color: #fff; }
+        .tool-name { font-family: 'SF Mono', 'Consolas', monospace; color: #64b5f6; }
+    </style>
+</head>
+<body>
+    <h1>OB1 — Fully Local Open Brain</h1>
+    <p class="subtitle">Docker &bull; PostgreSQL + pgvector &bull; Ollama &bull; Deno MCP Server &bull; Zero Cloud Dependencies</p>
+
+    <div class="diagram">
+
+        <!-- AI Clients -->
+        <div class="section">
+            <div class="section-label">AI Clients</div>
+            <div class="cards">
+                <div class="card slate">
+                    <div class="card-name">Claude Desktop</div>
+                    <div class="card-desc">via mcp-remote bridge</div>
+                </div>
+                <div class="card slate">
+                    <div class="card-name">Claude Code</div>
+                    <div class="card-desc">HTTP transport</div>
+                </div>
+                <div class="card slate">
+                    <div class="card-name">Cursor / VS Code</div>
+                    <div class="card-desc">mcp-remote or direct URL</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Arrow down -->
+        <div class="connections">
+            <div class="arrow">
+                <div class="arrow-line"></div>
+                <div class="arrow-label">MCP Protocol (JSON-RPC over HTTP)</div>
+                <div class="arrow-head"></div>
+            </div>
+        </div>
+
+        <!-- MCP Server -->
+        <div class="section">
+            <div class="section-label">MCP Server</div>
+            <div class="cards">
+                <div class="card blue" style="max-width: 400px;">
+                    <div class="card-name">ob1-mcp</div>
+                    <div class="card-desc">Deno + Hono &bull; Auth check &bull; 4 MCP tools &bull; Streams responses</div>
+                    <div class="card-port">:3000</div>
+                    <div class="card-url">http://localhost:3000</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Arrows down to core -->
+        <div class="arrows-row">
+            <div class="arrow">
+                <div class="arrow-line"></div>
+                <div class="arrow-label">SQL</div>
+                <div class="arrow-head"></div>
+            </div>
+            <div class="arrow">
+                <div class="arrow-line"></div>
+                <div class="arrow-label">Embed + LLM</div>
+                <div class="arrow-head"></div>
+            </div>
+        </div>
+
+        <!-- Core Services -->
+        <div class="section">
+            <div class="section-label">Core Services</div>
+            <div class="cards">
+                <div class="card green">
+                    <div class="card-name">ob1-postgres</div>
+                    <div class="card-desc">PostgreSQL 17 + pgvector<br/>thoughts table, HNSW index, match_thoughts()</div>
+                    <div class="card-port">:5432</div>
+                </div>
+                <div class="card red">
+                    <div class="card-name">ob1-ollama</div>
+                    <div class="card-desc">Ollama with NVIDIA GPU<br/>Embeddings + metadata extraction</div>
+                    <div class="card-port">:11434</div>
+                    <div class="models">
+                        <div class="model"><span class="model-name">nomic-embed-text</span> <span class="model-info">768d embeddings</span></div>
+                        <div class="model"><span class="model-name">llama3</span> <span class="model-info">8B metadata</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin UIs -->
+        <div class="section" style="margin-top: 32px;">
+            <div class="section-label">Admin Interfaces</div>
+            <div class="cards">
+                <div class="card orange">
+                    <div class="card-name">ob1-pgadmin</div>
+                    <div class="card-desc">Database management</div>
+                    <div class="card-port">:5050</div>
+                    <div class="card-url">http://localhost:5050</div>
+                </div>
+                <div class="card purple">
+                    <div class="card-name">ob1-webui</div>
+                    <div class="card-desc">Ollama management &amp; chat</div>
+                    <div class="card-port">:8080</div>
+                    <div class="card-url">http://localhost:8080</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volumes -->
+        <div class="section" style="margin-top: 32px;">
+            <div class="section-label">Persistent Volumes</div>
+            <div class="volumes">
+                <div class="volume">
+                    <div class="volume-name">ob1-pgdata</div>
+                    <div class="volume-desc">Thoughts + embeddings</div>
+                </div>
+                <div class="volume">
+                    <div class="volume-name">ob1-ollama</div>
+                    <div class="volume-desc">Model weights (~5 GB)</div>
+                </div>
+                <div class="volume">
+                    <div class="volume-name">ob1-webui</div>
+                    <div class="volume-desc">WebUI config</div>
+                </div>
+                <div class="volume">
+                    <div class="volume-name">ob1-pgadmin</div>
+                    <div class="volume-desc">pgAdmin config</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Credentials -->
+        <div class="creds">
+            <h2>Default Credentials</h2>
+            <table>
+                <tr><th>Service</th><th>Value</th><th>Notes</th></tr>
+                <tr><td>PostgreSQL user</td><td>openbrain</td><td></td></tr>
+                <tr><td>PostgreSQL password</td><td>openbrain</td><td>Change in .env</td></tr>
+                <tr><td>PostgreSQL database</td><td>openbrain</td><td></td></tr>
+                <tr><td>pgAdmin email</td><td>admin@openbrain.dev</td><td></td></tr>
+                <tr><td>pgAdmin password</td><td>openbrain</td><td>Matches POSTGRES_PASSWORD</td></tr>
+                <tr><td>Open WebUI</td><td><i>set on first visit</i></td><td>Local account only</td></tr>
+                <tr><td>MCP Access Key</td><td><i>set in .env</i></td><td>Generate: openssl rand -hex 32</td></tr>
+            </table>
+        </div>
+
+        <!-- MCP Tools -->
+        <div class="tools">
+            <h2>MCP Tools</h2>
+            <table>
+                <tr><th>Tool</th><th>Description</th></tr>
+                <tr><td class="tool-name">capture_thought</td><td>Save a thought with auto-embedding + metadata extraction</td></tr>
+                <tr><td class="tool-name">search_thoughts</td><td>Semantic search — finds by meaning, not keywords</td></tr>
+                <tr><td class="tool-name">list_thoughts</td><td>Browse recent thoughts with type/topic/person/date filters</td></tr>
+                <tr><td class="tool-name">thought_stats</td><td>Summary totals, top topics, and people mentioned</td></tr>
+            </table>
+        </div>
+
+    </div>
+</body>
+</html>
