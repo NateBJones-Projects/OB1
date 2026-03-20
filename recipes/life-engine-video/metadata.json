@@ -1,0 +1,40 @@
+{
+  "name": "Life Engine Video Briefings",
+  "description": "Add-on for Life Engine that renders short video briefings using Remotion and ElevenLabs TTS instead of text-only Telegram messages. Turns your daily briefing into a 30-60 second animated video with voiceover, delivered directly to your phone.",
+  "category": "recipes",
+  "author": {
+    "name": "Jonathan Edwards",
+    "github": "jonathanedwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [
+      "supabase",
+      "elevenlabs",
+      "telegram"
+    ],
+    "tools": [
+      "claude-code",
+      "remotion",
+      "node",
+      "ffmpeg",
+      "bun",
+      "telegram-channel"
+    ]
+  },
+  "tags": [
+    "video",
+    "remotion",
+    "elevenlabs",
+    "tts",
+    "briefing",
+    "telegram",
+    "life-engine",
+    "add-on"
+  ],
+  "difficulty": "advanced",
+  "estimated_time": "60-90 minutes",
+  "created": "2026-03-18",
+  "updated": "2026-03-19"
+}
