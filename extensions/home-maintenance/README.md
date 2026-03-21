@@ -32,8 +32,7 @@ A maintenance scheduling and history system. Track recurring tasks, log complete
 
 - Working Open Brain setup
 - Supabase project configured
-- Node.js 18+ installed
-- Basic understanding of SQL and TypeScript
+- Supabase CLI installed and linked to your project
 - Extension 1 recommended but not required
 
 ## Credential Tracker
@@ -49,6 +48,13 @@ HOME MAINTENANCE -- CREDENTIAL TRACKER
 SUPABASE (from your Open Brain setup)
   Project URL:           ____________
   Secret key:            ____________
+  Project ref:           ____________
+
+GENERATED DURING SETUP
+  Default User ID:       ____________
+  MCP Access Key:        ____________  (same key for all extensions)
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -66,52 +72,44 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run.
 
-### 2. Install Dependencies
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
 
 ```bash
-cd extensions/home-maintenance
-npm install
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
 ```
 
-### 3. Configure Environment Variables
-
-Create a `.env` file in this directory:
-
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
-
-### 4. Build the MCP Server
+Set it as an environment variable for your Edge Function:
 
 ```bash
-npm run build
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
 ```
 
-### 5. Add to Your MCP Configuration
+> If you already set `DEFAULT_USER_ID` for a previous extension, you can skip this step — all extensions share the same user ID.
 
-Add this extension to your `claude_desktop_config.json`:
+### 3. Deploy the MCP Server
 
-```json
-{
-  "mcpServers": {
-    "home-maintenance": {
-      "command": "node",
-      "args": ["/path/to/extensions/home-maintenance/build/index.js"],
-      "env": {
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your_service_role_key"
-      }
-    }
-  }
-}
-```
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-### 6. Restart Claude Desktop
+| Setting | Value |
+|---------|-------|
+| Function name | `home-maintenance-mcp` |
+| Download path | `extensions/home-maintenance` |
 
-Restart Claude Desktop to load the new MCP server.
+### 4. Connect to Your AI
 
-### 7. Test the Extension
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
+
+| Setting | Value |
+|---------|-------|
+| Connector name | `Home Maintenance` |
+| URL | Your **MCP Connection URL** from the credential tracker |
+
+### 5. Test the Extension
 
 Try these commands with Claude:
 
@@ -167,37 +165,17 @@ Your agent will be able to answer questions like:
 
 ## Troubleshooting
 
-### "Cannot connect to Supabase"
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-- Verify your `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
-- Check that your Supabase project is active
-- Ensure Row Level Security (RLS) policies allow service role access
+**Extension-specific issues:**
 
-### "Tool not found" in Claude
-
-- Verify the MCP server is configured in `claude_desktop_config.json`
-- Check that the path to `index.js` is absolute and correct
-- Restart Claude Desktop after configuration changes
-- Check Claude's MCP logs for connection errors
-
-### "next_due not updating after logging maintenance"
-
+**"next_due not updating after logging maintenance"**
 - Verify that the task has a `frequency_days` value set
 - Check that the `log_maintenance` tool completed successfully
-- The trigger should auto-update `next_due` = `completed_at` + `frequency_days`
 - For one-time tasks (frequency_days = null), next_due remains null
 
-### "Date parsing errors"
-
+**"Date parsing errors"**
 - Ensure dates are in ISO 8601 format: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM:SSZ`
-- The MCP server expects date strings, which PostgreSQL will parse
-- For "N days from now" calculations, let the tool compute the date
-
-### TypeScript build errors
-
-- Ensure you've run `npm install` first
-- Check that Node.js version is 18 or higher: `node --version`
-- Delete `node_modules` and `package-lock.json`, then reinstall
 
 ## Next Steps
 

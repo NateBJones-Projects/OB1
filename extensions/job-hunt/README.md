@@ -32,22 +32,28 @@ A complete job search management system — companies, postings, applications, i
 
 - Working Open Brain setup
 - Extension 5 (Professional CRM) strongly recommended — cross-extension linking depends on it
-- Node.js 18+ installed
+- Supabase CLI installed and linked to your project
 - **Required reading:** [Row Level Security](../../primitives/rls/) primitive
 
 ## Credential Tracker
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project ref, Secret key, and MCP Access Key — reuse the key from your core setup.
 
 ```text
 JOB HUNT PIPELINE -- CREDENTIAL TRACKER
 --------------------------------------
 
 SUPABASE (from your Open Brain setup)
-  Project URL:           ____________
+  Project ref:           ____________
   Secret key:            ____________
+
+MCP SERVER (new for this extension)
+  Default User ID:       ____________
+  MCP Access Key:        ____________  (same key for all extensions)
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -65,52 +71,44 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run. This creates five RLS-enabled tables with proper foreign key relationships and cascading deletes.
 
-### 2. Install Dependencies
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
 
 ```bash
-cd extensions/job-hunt
-npm install
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
 ```
 
-### 3. Configure Environment Variables
-
-Create a `.env` file in this directory:
-
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
-
-### 4. Build the MCP Server
+Set it as an environment variable for your Edge Function:
 
 ```bash
-npm run build
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
 ```
 
-### 5. Add to Your MCP Configuration
+> If you already set `DEFAULT_USER_ID` for a previous extension, you can skip this step — all extensions share the same user ID.
 
-Add this extension to your `claude_desktop_config.json`:
+### 3. Deploy the MCP Server
 
-```json
-{
-  "mcpServers": {
-    "job-hunt": {
-      "command": "node",
-      "args": ["/path/to/extensions/job-hunt/build/index.js"],
-      "env": {
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your_service_role_key"
-      }
-    }
-  }
-}
-```
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-### 6. Restart Claude Desktop
+| Setting | Value |
+|---------|-------|
+| Function name | `job-hunt-mcp` |
+| Download path | `extensions/job-hunt` |
 
-Restart Claude Desktop to load the new MCP server.
+### 4. Connect to Your AI
 
-### 7. Test the Extension
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
+
+| Setting | Value |
+|---------|-------|
+| Connector name | `Job Hunt Pipeline` |
+| URL | Your **MCP Connection URL** from the credential tracker |
+
+### 5. Test the Extension
 
 Try these commands with Claude:
 
@@ -205,41 +203,19 @@ Your agent will be able to answer questions like:
 
 ## Troubleshooting
 
-### "Cannot connect to Supabase"
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-- Verify your `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
-- Check that your Supabase project is active
-- Ensure RLS policies are created correctly (service role bypasses RLS, but policies must exist)
+**Extension-specific issues:**
 
-### "Foreign key violation" errors
-
+**"Foreign key violation" errors**
 - Ensure parent records exist before creating child records (company → job_posting → application → interview)
 - Verify UUIDs are correct and belong to the same user_id
-- Check cascading delete behavior — deleting a company will delete all related postings, applications, and interviews
+- Deleting a company will cascade-delete all related postings, applications, and interviews
 
-### "Extension 5 not found" when linking contacts
-
+**"Extension 5 not found" when linking contacts**
 - Verify Extension 5 (Professional CRM) is installed and its tables exist
 - Check that the `professional_contacts` table is accessible
 - Ensure both extensions are using the same Supabase project
-
-### RLS "permission denied" errors
-
-- The service role key should bypass RLS, so this suggests a configuration issue
-- Verify all five tables have RLS enabled and policies created
-- Check that user_id values are valid UUIDs from `auth.users`
-
-### "Interview not found" when logging notes
-
-- Ensure the interview_id exists and belongs to the correct user
-- Check that the interview hasn't been deleted
-- Verify the application_id chain is intact
-
-### TypeScript build errors
-
-- Ensure you've run `npm install` first
-- Check that Node.js version is 18 or higher: `node --version`
-- Delete `node_modules` and `package-lock.json`, then reinstall
 
 ## Next Steps
 
@@ -259,7 +235,7 @@ All wired together through your Open Brain, with cross-extension tools that let 
 ### What's Next?
 
 1. **Build your own extensions** — Use these 6 as templates for domains specific to your life
-2. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Recurring Tasks](../../primitives/recurring-tasks/), and other patterns
+2. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Remote MCP](../../primitives/remote-mcp/), and other patterns
 3. **Create compound queries** — Build tools that reason across multiple extensions simultaneously
 4. **Share your extensions** — Contribute back to the OB1 community
 

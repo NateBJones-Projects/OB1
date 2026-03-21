@@ -8,6 +8,14 @@ Turn raw brain dumps, voice transcripts, and stream-of-consciousness notes into 
 
 Takes any unstructured text (voice transcripts, ChatGPT exports, freeform notes, multi-topic brain dumps) and runs a three-phase process: **Extract** every idea thread without filtering, **Evaluate** the highest-signal ones with deep brainstorming, and **Synthesize** into a permanent gold-found file with results captured as Open Brain thoughts. Nothing gets dismissed as noise on the first pass.
 
+## When to Use It
+
+- **After a meeting or brainstorm call.** Export your Fathom/Otter/Fireflies transcript, point Panning for Gold at it, and get a clean inventory of every topic — including the half-sentence at minute 38 that's actually a warm intro worth more than the whole agenda.
+- **Weekly brain dump ritual.** Every Friday, write for 10 minutes with no structure, then run Panning for Gold on it. You'll be surprised what surfaces when every line gets examined without skimming.
+- **Processing AI conversation exports.** Exported a long ChatGPT or Claude session where you explored 8 different ideas? Point this at it instead of re-reading. Pairs well with the [ChatGPT Import recipe](../chatgpt-conversation-import/).
+- **Post-conference notes.** You scribbled 4 pages at a conference. Run Panning for Gold to get a structured inventory and walk away with concrete next actions instead of a notebook you'll never reopen.
+- **End-of-day processing.** Had one of those days where 15 things are bouncing around? Brain dump it all, run the recipe, and let it sort the signal from the noise. The PARK and KILL verdicts are just as valuable as ACT NOW.
+
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
@@ -105,6 +113,14 @@ When working correctly, you should see:
 - Key findings captured in Open Brain, searchable across future sessions with `search_thoughts`
 
 A typical 30-minute voice transcript yields 10-20 threads, with 3-5 getting full evaluations. Processing takes 2-5 minutes depending on length.
+
+## Why a Skill File?
+
+You could ask Claude "process this brain dump and save the good stuff" without the skill file, and sometimes it'd be great. But it'd also skim, miss threads, bias toward technical topics, or dump everything without evaluating what's worth keeping.
+
+Panning for Gold makes the process repeatable. It enforces a "read every line" discipline (skimming is the #1 failure mode), forces a human checkpoint between extraction and evaluation so you confirm nothing was missed, categorizes across six domains (not just tech — personal, wellness, financial, relational, and creative threads get equal weight), and saves files to disk as it goes so you don't lose work if a session crashes. The Red Flags diagnostic tables even help you spot when the process is going sideways.
+
+Think of it less as "new capability" and more as a senior analyst's methodology, encoded as a system prompt. The 5-minute setup buys you consistency every time you use it.
 
 ## Troubleshooting
 

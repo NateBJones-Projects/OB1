@@ -1,0 +1,37 @@
+name: Discord Release Announcement
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+        run: |
+          # Truncate body to 1800 chars for Discord's 2000 char limit
+          BODY=$(echo "$RELEASE_BODY" | head -c 1800)
+
+          # Build the JSON payload
+          PAYLOAD=$(jq -n \
+            --arg title "Open Brain $RELEASE_NAME" \
+            --arg desc "$BODY" \
+            --arg url "$RELEASE_URL" \
+            '{
+              embeds: [{
+                title: $title,
+                description: $desc,
+                url: $url,
+                color: 5814783
+              }]
+            }')
+
+          curl -H "Content-Type: application/json" \
+               -d "$PAYLOAD" \
+               "$WEBHOOK_URL"

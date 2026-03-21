@@ -22,7 +22,7 @@ A database and MCP server for storing and retrieving household facts — paint c
 ## What You'll Learn
 
 - Basic table design with PostgreSQL
-- Foreign key relationships to user accounts
+- User-scoped data isolation with environment variables
 - Simple MCP tool creation
 - JSONB patterns for flexible metadata storage
 - Text search with ILIKE patterns
@@ -32,8 +32,7 @@ A database and MCP server for storing and retrieving household facts — paint c
 
 - Working Open Brain setup
 - Supabase project configured
-- Node.js 18+ installed
-- Basic understanding of SQL and TypeScript
+- Supabase CLI installed and linked to your project
 
 ## Credential Tracker
 
@@ -48,6 +47,13 @@ HOUSEHOLD KNOWLEDGE -- CREDENTIAL TRACKER
 SUPABASE (from your Open Brain setup)
   Project URL:           ____________
   Secret key:            ____________
+  Project ref:           ____________
+
+GENERATED DURING SETUP
+  Default User ID:       ____________
+  MCP Access Key:        ____________  (same key for all extensions)
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -65,52 +71,42 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run.
 
-### 2. Install Dependencies
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
 
 ```bash
-cd extensions/household-knowledge
-npm install
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
 ```
 
-### 3. Configure Environment Variables
-
-Create a `.env` file in this directory:
-
-```env
-SUPABASE_URL=your_supabase_url
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
-
-### 4. Build the MCP Server
+Set it as an environment variable for your Edge Function:
 
 ```bash
-npm run build
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
 ```
 
-### 5. Add to Your MCP Configuration
+### 3. Deploy the MCP Server
 
-Add this extension to your `claude_desktop_config.json`:
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-```json
-{
-  "mcpServers": {
-    "household-knowledge": {
-      "command": "node",
-      "args": ["/path/to/extensions/household-knowledge/build/index.js"],
-      "env": {
-        "SUPABASE_URL": "your_supabase_url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your_service_role_key"
-      }
-    }
-  }
-}
-```
+| Setting | Value |
+|---------|-------|
+| Function name | `household-knowledge-mcp` |
+| Download path | `extensions/household-knowledge` |
 
-### 6. Restart Claude Desktop
+### 4. Connect to Your AI
 
-Restart Claude Desktop to load the new MCP server.
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
-### 7. Test the Extension
+| Setting | Value |
+|---------|-------|
+| Connector name | `Household Knowledge` |
+| URL | Your **MCP Connection URL** from the credential tracker |
+
+### 5. Test the Extension
 
 Try these commands with Claude:
 
@@ -157,30 +153,14 @@ Your agent will be able to answer questions like:
 
 ## Troubleshooting
 
-### "Cannot connect to Supabase"
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-- Verify your `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
-- Check that your Supabase project is active
-- Ensure Row Level Security (RLS) policies allow service role access
+**Extension-specific issues:**
 
-### "Tool not found" in Claude
-
-- Verify the MCP server is configured in `claude_desktop_config.json`
-- Check that the path to `index.js` is absolute and correct
-- Restart Claude Desktop after configuration changes
-- Check Claude's MCP logs for connection errors
-
-### "Permission denied" errors
-
-- The service role key bypasses RLS, so this suggests a configuration issue
-- Verify the user_id being passed exists in `auth.users`
-- Check that foreign key constraints are not blocking inserts
-
-### TypeScript build errors
-
-- Ensure you've run `npm install` first
-- Check that Node.js version is 18 or higher: `node --version`
-- Delete `node_modules` and `package-lock.json`, then reinstall
+**"Permission denied" or foreign key errors on insert**
+- Verify `DEFAULT_USER_ID` is set: `supabase secrets list` should show it
+- The service role key bypasses RLS, so permission errors usually mean a missing env var
+- If you ran an older version of `schema.sql` that had `REFERENCES auth.users(id)`, drop and recreate the tables with the updated schema
 
 ## Next Steps
 

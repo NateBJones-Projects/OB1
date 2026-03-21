@@ -1,0 +1,20 @@
+{
+  "name": "Source Filtering",
+  "description": "Filter thoughts by source (mcp, gmail, chatgpt, obsidian) and backfill missing metadata for early imports.",
+  "category": "recipes",
+  "author": {
+    "name": "Matt Hallett",
+    "github": "matthallett1"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Deno 1.40+"]
+  },
+  "tags": ["source", "filtering", "metadata", "backfill", "search"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-03-13",
+  "updated": "2026-03-13"
+}

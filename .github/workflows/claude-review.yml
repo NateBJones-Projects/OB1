@@ -1,0 +1,68 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  id-token: write
+
+jobs:
+  claude-review:
+    if: >
+      github.event_name == 'pull_request' ||
+      ((github.event_name == 'issue_comment' &&
+        contains(github.event.comment.body, '@claude')) &&
+       contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login)) ||
+      ((github.event_name == 'pull_request_review_comment' &&
+        contains(github.event.comment.body, '@claude')) &&
+       contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are reviewing a contribution to Open Brain (OB1), an open-source
+            persistent AI memory system. Read CLAUDE.md, CONTRIBUTING.md, and
+            SOUL.md (if it exists) for full project context.
+
+            Review this PR for:
+            1. **Alignment** — Does this contribution fit OB1's mission? Is it a
+               capture pathway, retrieval pathway, schema extension, dashboard, or
+               teaching-through-building contribution?
+            2. **Clarity** — Will a user with the stated prerequisites actually be
+               able to follow the instructions and get a working result?
+            3. **Completeness** — README has prerequisites, numbered steps, and
+               expected outcome? metadata.json looks right?
+            4. **Safety** — No credentials, no destructive SQL, no core schema
+               modifications, no local MCP servers (must use remote Edge Functions)?
+            5. **Value** — Does this add something meaningfully different from
+               existing contributions?
+            6. **Design patterns** — Does this follow OB1's established patterns?
+               Check for: direct Supabase insert or MCP ingest endpoint (not
+               custom servers), remote Edge Functions (not local Node.js),
+               Row Level Security on new tables, JSONB metadata fields,
+               environment variables for credentials (not hardcoded).
+            7. **Scope fit** — Is this appropriately sized for OB1, or is it
+               growing into its own project? Red flags: own package.json with
+               many dependencies, doesn't interact with the thoughts table,
+               needs independent deployment, or introduces its own auth system.
+               If it seems too big, suggest it could be a standalone project
+               that integrates with OB1 instead.
+
+            Be constructive and welcoming. If a contribution needs work, explain
+            what specifically needs to change. If it looks good, approve the PR.
+
+            Important: The mechanical checks (file structure, metadata validation,
+            SQL safety) are handled by a separate CI job. Focus your review on the
+            things that require judgment — clarity, alignment, value, design
+            patterns, scope fit, and quality.

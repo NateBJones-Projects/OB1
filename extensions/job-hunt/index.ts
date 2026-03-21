@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 /**
  * Extension 6: Job Hunt Pipeline MCP Server
  *
@@ -12,301 +10,86 @@
  * - Pipeline analytics and upcoming events
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { Hono } from "hono";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPTransport } from "@hono/mcp";
+import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
 
-// Environment validation
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const app = new Hono();
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("Error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set");
-  process.exit(1);
-}
+// Zod schemas for tool inputs
+const addCompanySchema = z.object({
+  name: z.string().describe("Company name"),
+  industry: z.string().optional().describe("Industry"),
+  website: z.string().optional().describe("Company website"),
+  size: z.enum(["startup", "mid-market", "enterprise"]).optional().describe("Company size"),
+  location: z.string().optional().describe("Location"),
+  remote_policy: z.enum(["remote", "hybrid", "onsite"]).optional().describe("Remote work policy"),
+  notes: z.string().optional().describe("Additional notes"),
+  glassdoor_rating: z.number().min(1.0).max(5.0).optional().describe("Glassdoor rating (1.0-5.0)"),
+});
 
-// Initialize Supabase client
-const supabase: SupabaseClient = createClient(
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-);
+const addJobPostingSchema = z.object({
+  company_id: z.string().describe("Company ID (UUID)"),
+  title: z.string().describe("Job title"),
+  url: z.string().optional().describe("Job posting URL"),
+  salary_min: z.number().optional().describe("Minimum salary"),
+  salary_max: z.number().optional().describe("Maximum salary"),
+  salary_currency: z.string().optional().describe("Currency (default: USD)"),
+  requirements: z.array(z.string()).optional().describe("Required qualifications"),
+  nice_to_haves: z.array(z.string()).optional().describe("Nice-to-have qualifications"),
+  notes: z.string().optional().describe("Notes about the role"),
+  source: z.enum(["linkedin", "company-site", "referral", "recruiter", "other"]).optional().describe("Where you found this posting"),
+  posted_date: z.string().optional().describe("Date posted (YYYY-MM-DD)"),
+  closing_date: z.string().optional().describe("Application deadline (YYYY-MM-DD)"),
+});
 
-// Type definitions
-interface Company {
-  id: string;
-  user_id: string;
-  name: string;
-  industry: string | null;
-  website: string | null;
-  size: string | null;
-  location: string | null;
-  remote_policy: string | null;
-  notes: string | null;
-  glassdoor_rating: number | null;
-  created_at: string;
-  updated_at: string;
-}
+const submitApplicationSchema = z.object({
+  job_posting_id: z.string().describe("Job posting ID (UUID)"),
+  status: z.enum(["draft", "applied", "screening", "interviewing", "offer", "accepted", "rejected", "withdrawn"]).optional().describe("Application status (default: applied)"),
+  applied_date: z.string().optional().describe("Date applied (YYYY-MM-DD)"),
+  resume_version: z.string().optional().describe("Resume version used"),
+  cover_letter_notes: z.string().optional().describe("Notes about cover letter"),
+  referral_contact: z.string().optional().describe("Referral contact name"),
+  notes: z.string().optional().describe("Additional notes"),
+});
 
-interface JobPosting {
-  id: string;
-  company_id: string;
-  user_id: string;
-  title: string;
-  url: string | null;
-  salary_min: number | null;
-  salary_max: number | null;
-  salary_currency: string;
-  requirements: string[];
-  nice_to_haves: string[];
-  notes: string | null;
-  source: string | null;
-  posted_date: string | null;
-  closing_date: string | null;
-  created_at: string;
-}
+const scheduleInterviewSchema = z.object({
+  application_id: z.string().describe("Application ID (UUID)"),
+  interview_type: z.enum(["phone_screen", "technical", "behavioral", "system_design", "hiring_manager", "team", "final"]).describe("Type of interview"),
+  scheduled_at: z.string().optional().describe("Interview date/time (ISO 8601)"),
+  duration_minutes: z.number().optional().describe("Expected duration in minutes"),
+  interviewer_name: z.string().optional().describe("Interviewer name"),
+  interviewer_title: z.string().optional().describe("Interviewer title"),
+  notes: z.string().optional().describe("Pre-interview prep notes"),
+});
 
-interface Application {
-  id: string;
-  job_posting_id: string;
-  user_id: string;
-  status: string;
-  applied_date: string | null;
-  response_date: string | null;
-  resume_version: string | null;
-  cover_letter_notes: string | null;
-  referral_contact: string | null;
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-}
+const logInterviewNotesSchema = z.object({
+  interview_id: z.string().describe("Interview ID (UUID)"),
+  feedback: z.string().optional().describe("Post-interview reflection"),
+  rating: z.number().min(1).max(5).optional().describe("Your assessment of how it went (1-5)"),
+});
 
-interface Interview {
-  id: string;
-  application_id: string;
-  user_id: string;
-  interview_type: string;
-  scheduled_at: string | null;
-  duration_minutes: number | null;
-  interviewer_name: string | null;
-  interviewer_title: string | null;
-  status: string;
-  notes: string | null;
-  feedback: string | null;
-  rating: number | null;
-  created_at: string;
-}
+const getPipelineOverviewSchema = z.object({
+  days_ahead: z.number().optional().describe("Number of days to look ahead for interviews (default: 7)"),
+});
 
-interface JobContact {
-  id: string;
-  user_id: string;
-  company_id: string | null;
-  name: string;
-  title: string | null;
-  email: string | null;
-  phone: string | null;
-  linkedin_url: string | null;
-  role_in_process: string | null;
-  professional_crm_contact_id: string | null;
-  notes: string | null;
-  last_contacted: string | null;
-  created_at: string;
-}
+const getUpcomingInterviewsSchema = z.object({
+  days_ahead: z.number().optional().describe("Number of days to look ahead (default: 14)"),
+});
 
-// Tool definitions
-const TOOLS: Tool[] = [
-  {
-    name: "add_company",
-    description: "Add a company to track in your job search",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        name: { type: "string", description: "Company name" },
-        industry: { type: "string", description: "Industry" },
-        website: { type: "string", description: "Company website" },
-        size: {
-          type: "string",
-          enum: ["startup", "mid-market", "enterprise"],
-          description: "Company size",
-        },
-        location: { type: "string", description: "Location" },
-        remote_policy: {
-          type: "string",
-          enum: ["remote", "hybrid", "onsite"],
-          description: "Remote work policy",
-        },
-        notes: { type: "string", description: "Additional notes" },
-        glassdoor_rating: {
-          type: "number",
-          minimum: 1.0,
-          maximum: 5.0,
-          description: "Glassdoor rating (1.0-5.0)",
-        },
-      },
-      required: ["user_id", "name"],
-    },
-  },
-  {
-    name: "add_job_posting",
-    description: "Add a job posting at a company",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        company_id: { type: "string", description: "Company ID (UUID)" },
-        title: { type: "string", description: "Job title" },
-        url: { type: "string", description: "Job posting URL" },
-        salary_min: { type: "number", description: "Minimum salary" },
-        salary_max: { type: "number", description: "Maximum salary" },
-        salary_currency: { type: "string", description: "Currency (default: USD)" },
-        requirements: {
-          type: "array",
-          items: { type: "string" },
-          description: "Required qualifications",
-        },
-        nice_to_haves: {
-          type: "array",
-          items: { type: "string" },
-          description: "Nice-to-have qualifications",
-        },
-        notes: { type: "string", description: "Notes about the role" },
-        source: {
-          type: "string",
-          enum: ["linkedin", "company-site", "referral", "recruiter", "other"],
-          description: "Where you found this posting",
-        },
-        posted_date: { type: "string", description: "Date posted (YYYY-MM-DD)" },
-        closing_date: { type: "string", description: "Application deadline (YYYY-MM-DD)" },
-      },
-      required: ["user_id", "company_id", "title"],
-    },
-  },
-  {
-    name: "submit_application",
-    description: "Record a submitted application",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        job_posting_id: { type: "string", description: "Job posting ID (UUID)" },
-        status: {
-          type: "string",
-          enum: ["draft", "applied", "screening", "interviewing", "offer", "accepted", "rejected", "withdrawn"],
-          description: "Application status (default: applied)",
-        },
-        applied_date: { type: "string", description: "Date applied (YYYY-MM-DD)" },
-        resume_version: { type: "string", description: "Resume version used" },
-        cover_letter_notes: { type: "string", description: "Notes about cover letter" },
-        referral_contact: { type: "string", description: "Referral contact name" },
-        notes: { type: "string", description: "Additional notes" },
-      },
-      required: ["user_id", "job_posting_id"],
-    },
-  },
-  {
-    name: "schedule_interview",
-    description: "Schedule an interview for an application",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        application_id: { type: "string", description: "Application ID (UUID)" },
-        interview_type: {
-          type: "string",
-          enum: ["phone_screen", "technical", "behavioral", "system_design", "hiring_manager", "team", "final"],
-          description: "Type of interview",
-        },
-        scheduled_at: { type: "string", description: "Interview date/time (ISO 8601)" },
-        duration_minutes: { type: "number", description: "Expected duration in minutes" },
-        interviewer_name: { type: "string", description: "Interviewer name" },
-        interviewer_title: { type: "string", description: "Interviewer title" },
-        notes: { type: "string", description: "Pre-interview prep notes" },
-      },
-      required: ["user_id", "application_id", "interview_type"],
-    },
-  },
-  {
-    name: "log_interview_notes",
-    description: "Add feedback/notes after an interview and mark it as completed",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        interview_id: { type: "string", description: "Interview ID (UUID)" },
-        feedback: { type: "string", description: "Post-interview reflection" },
-        rating: {
-          type: "number",
-          minimum: 1,
-          maximum: 5,
-          description: "Your assessment of how it went (1-5)",
-        },
-      },
-      required: ["user_id", "interview_id"],
-    },
-  },
-  {
-    name: "get_pipeline_overview",
-    description: "Get a dashboard summary: application counts by status, upcoming interviews, recent activity",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        days_ahead: {
-          type: "number",
-          description: "Number of days to look ahead for interviews (default: 7)",
-        },
-      },
-      required: ["user_id"],
-    },
-  },
-  {
-    name: "get_upcoming_interviews",
-    description: "List interviews in the next N days with full company/role context",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        days_ahead: {
-          type: "number",
-          description: "Number of days to look ahead (default: 14)",
-        },
-      },
-      required: ["user_id"],
-    },
-  },
-  {
-    name: "link_contact_to_professional_crm",
-    description: "CROSS-EXTENSION: Link a job contact to Extension 5 Professional CRM, creating a professional_contacts record",
-    inputSchema: {
-      type: "object",
-      properties: {
-        user_id: { type: "string", description: "User ID (UUID)" },
-        job_contact_id: { type: "string", description: "Job contact ID (UUID)" },
-      },
-      required: ["user_id", "job_contact_id"],
-    },
-  },
-];
-
+const linkContactToProfessionalCRMSchema = z.object({
+  job_contact_id: z.string().describe("Job contact ID (UUID)"),
+});
 // Tool handlers
-async function handleAddCompany(args: any): Promise<string> {
-  const { user_id, name, industry, website, size, location, remote_policy, notes, glassdoor_rating } = args;
+async function handleAddCompany(supabase: any, args: z.infer<typeof addCompanySchema>, userId: string): Promise<string> {
+  const { name, industry, website, size, location, remote_policy, notes, glassdoor_rating } = args;
 
   const { data, error } = await supabase
     .from("companies")
     .insert({
-      user_id,
+      user_id: userId,
       name,
       industry: industry || null,
       website: website || null,
@@ -330,16 +113,16 @@ async function handleAddCompany(args: any): Promise<string> {
   }, null, 2);
 }
 
-async function handleAddJobPosting(args: any): Promise<string> {
+async function handleAddJobPosting(supabase: any, args: z.infer<typeof addJobPostingSchema>, userId: string): Promise<string> {
   const {
-    user_id, company_id, title, url, salary_min, salary_max, salary_currency,
+    company_id, title, url, salary_min, salary_max, salary_currency,
     requirements, nice_to_haves, notes, source, posted_date, closing_date
   } = args;
 
   const { data, error } = await supabase
     .from("job_postings")
     .insert({
-      user_id,
+      user_id: userId,
       company_id,
       title,
       url: url || null,
@@ -367,16 +150,16 @@ async function handleAddJobPosting(args: any): Promise<string> {
   }, null, 2);
 }
 
-async function handleSubmitApplication(args: any): Promise<string> {
+async function handleSubmitApplication(supabase: any, args: z.infer<typeof submitApplicationSchema>, userId: string): Promise<string> {
   const {
-    user_id, job_posting_id, status, applied_date, resume_version,
+    job_posting_id, status, applied_date, resume_version,
     cover_letter_notes, referral_contact, notes
   } = args;
 
   const { data, error } = await supabase
     .from("applications")
     .insert({
-      user_id,
+      user_id: userId,
       job_posting_id,
       status: status || "applied",
       applied_date: applied_date || null,
@@ -399,16 +182,16 @@ async function handleSubmitApplication(args: any): Promise<string> {
   }, null, 2);
 }
 
-async function handleScheduleInterview(args: any): Promise<string> {
+async function handleScheduleInterview(supabase: any, args: z.infer<typeof scheduleInterviewSchema>, userId: string): Promise<string> {
   const {
-    user_id, application_id, interview_type, scheduled_at, duration_minutes,
+    application_id, interview_type, scheduled_at, duration_minutes,
     interviewer_name, interviewer_title, notes
   } = args;
 
   const { data, error } = await supabase
     .from("interviews")
     .insert({
-      user_id,
+      user_id: userId,
       application_id,
       interview_type,
       scheduled_at: scheduled_at || null,
@@ -432,8 +215,8 @@ async function handleScheduleInterview(args: any): Promise<string> {
   }, null, 2);
 }
 
-async function handleLogInterviewNotes(args: any): Promise<string> {
-  const { user_id, interview_id, feedback, rating } = args;
+async function handleLogInterviewNotes(supabase: any, args: z.infer<typeof logInterviewNotesSchema>, userId: string): Promise<string> {
+  const { interview_id, feedback, rating } = args;
 
   const { data, error } = await supabase
     .from("interviews")
@@ -443,7 +226,7 @@ async function handleLogInterviewNotes(args: any): Promise<string> {
       status: "completed",
     })
     .eq("id", interview_id)
-    .eq("user_id", user_id)
+    .eq("user_id", userId)
     .select()
     .single();
 
@@ -458,15 +241,15 @@ async function handleLogInterviewNotes(args: any): Promise<string> {
   }, null, 2);
 }
 
-async function handleGetPipelineOverview(args: any): Promise<string> {
-  const { user_id, days_ahead } = args;
+async function handleGetPipelineOverview(supabase: any, args: z.infer<typeof getPipelineOverviewSchema>, userId: string): Promise<string> {
+  const { days_ahead } = args;
   const daysToCheck = days_ahead || 7;
 
   // Get application counts by status
   const { data: applications, error: appError } = await supabase
     .from("applications")
     .select("status")
-    .eq("user_id", user_id);
+    .eq("user_id", userId);
 
   if (appError) {
     throw new Error(`Failed to get applications: ${appError.message}`);
@@ -493,7 +276,7 @@ async function handleGetPipelineOverview(args: any): Promise<string> {
         )
       )
     `)
-    .eq("user_id", user_id)
+    .eq("user_id", userId)
     .eq("status", "scheduled")
     .gte("scheduled_at", new Date().toISOString())
     .lte("scheduled_at", futureDate.toISOString())
@@ -512,8 +295,8 @@ async function handleGetPipelineOverview(args: any): Promise<string> {
   }, null, 2);
 }
 
-async function handleGetUpcomingInterviews(args: any): Promise<string> {
-  const { user_id, days_ahead } = args;
+async function handleGetUpcomingInterviews(supabase: any, args: z.infer<typeof getUpcomingInterviewsSchema>, userId: string): Promise<string> {
+  const { days_ahead } = args;
   const daysToCheck = days_ahead || 14;
 
   const futureDate = new Date();
@@ -531,7 +314,7 @@ async function handleGetUpcomingInterviews(args: any): Promise<string> {
         )
       )
     `)
-    .eq("user_id", user_id)
+    .eq("user_id", userId)
     .eq("status", "scheduled")
     .gte("scheduled_at", new Date().toISOString())
     .lte("scheduled_at", futureDate.toISOString())
@@ -548,15 +331,15 @@ async function handleGetUpcomingInterviews(args: any): Promise<string> {
   }, null, 2);
 }
 
-async function handleLinkContactToProfessionalCRM(args: any): Promise<string> {
-  const { user_id, job_contact_id } = args;
+async function handleLinkContactToProfessionalCRM(supabase: any, args: z.infer<typeof linkContactToProfessionalCRMSchema>, userId: string): Promise<string> {
+  const { job_contact_id } = args;
 
   // Get the job contact
   const { data: jobContact, error: contactError } = await supabase
     .from("job_contacts")
     .select("*")
     .eq("id", job_contact_id)
-    .eq("user_id", user_id)
+    .eq("user_id", userId)
     .single();
 
   if (contactError) {
@@ -592,7 +375,7 @@ async function handleLinkContactToProfessionalCRM(args: any): Promise<string> {
   const { data: professionalContact, error: crmError } = await supabase
     .from("professional_contacts")
     .insert({
-      user_id,
+      user_id: userId,
       name: jobContact.name,
       company: companyName,
       title: jobContact.title,
@@ -616,7 +399,7 @@ async function handleLinkContactToProfessionalCRM(args: any): Promise<string> {
     .from("job_contacts")
     .update({ professional_crm_contact_id: professionalContact.id })
     .eq("id", job_contact_id)
-    .eq("user_id", user_id)
+    .eq("user_id", userId)
     .select()
     .single();
 
@@ -632,65 +415,130 @@ async function handleLinkContactToProfessionalCRM(args: any): Promise<string> {
   }, null, 2);
 }
 
-// Server setup
-const server = new Server(
-  {
-    name: "job-hunt",
-    version: "1.0.0",
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
+// MCP server endpoint
+app.post("*", async (c) => {
+  // Fix: Claude Desktop connectors don't send the Accept header that
+  // StreamableHTTPTransport requires. Build a patched request if missing.
+  if (!c.req.header("accept")?.includes("text/event-stream")) {
+    const headers = new Headers(c.req.raw.headers);
+    headers.set("Accept", "application/json, text/event-stream");
+    const patched = new Request(c.req.raw.url, {
+      method: c.req.raw.method,
+      headers,
+      body: c.req.raw.body,
+      // @ts-ignore -- duplex required for streaming body in Deno
+      duplex: "half",
+    });
+    Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
-);
 
-// Register tool handlers
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: TOOLS,
+
+  // Validate access key
+  const key = c.req.query("key") || c.req.header("x-access-key");
+  const expected = Deno.env.get("MCP_ACCESS_KEY");
+  if (!key || key !== expected) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  // Initialize Supabase client
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+
+  const userId = Deno.env.get("DEFAULT_USER_ID");
+  if (!userId) {
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+  }
+
+  // Create MCP server
+  const server = new McpServer({ name: "job-hunt", version: "1.0.0" });
+
+  // Register tools
+  const wrap = async (fn: () => Promise<string>) => {
+    try {
+      const text = await fn();
+      return { content: [{ type: "text" as const, text }] };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { content: [{ type: "text" as const, text: JSON.stringify({ success: false, error: msg }) }], isError: true };
+    }
+  };
+
+  server.tool(
+    "add_company",
+    "Add a company to track in your job search",
+    addCompanySchema.shape,
+    async (args) => wrap(() => handleAddCompany(supabase, args, userId))
+  );
+
+  server.tool(
+    "add_job_posting",
+    "Add a job posting at a company",
+    addJobPostingSchema.shape,
+    async (args) => wrap(() => handleAddJobPosting(supabase, args, userId))
+  );
+
+  server.tool(
+    "submit_application",
+    "Record a submitted application",
+    submitApplicationSchema.shape,
+    async (args) => wrap(() => handleSubmitApplication(supabase, args, userId))
+  );
+
+  server.tool(
+    "schedule_interview",
+    "Schedule an interview for an application",
+    scheduleInterviewSchema.shape,
+    async (args) => wrap(() => handleScheduleInterview(supabase, args, userId))
+  );
+
+  server.tool(
+    "log_interview_notes",
+    "Add feedback/notes after an interview and mark it as completed",
+    logInterviewNotesSchema.shape,
+    async (args) => wrap(() => handleLogInterviewNotes(supabase, args, userId))
+  );
+
+  server.tool(
+    "get_pipeline_overview",
+    "Get a dashboard summary: application counts by status, upcoming interviews, recent activity",
+    getPipelineOverviewSchema.shape,
+    async (args) => wrap(() => handleGetPipelineOverview(supabase, args, userId))
+  );
+
+  server.tool(
+    "get_upcoming_interviews",
+    "List interviews in the next N days with full company/role context",
+    getUpcomingInterviewsSchema.shape,
+    async (args) => wrap(() => handleGetUpcomingInterviews(supabase, args, userId))
+  );
+
+  server.tool(
+    "link_contact_to_professional_crm",
+    "CROSS-EXTENSION: Link a job contact to Extension 5 Professional CRM, creating a professional_contacts record",
+    linkContactToProfessionalCRMSchema.shape,
+    async (args) => wrap(() => handleLinkContactToProfessionalCRM(supabase, args, userId))
+  );
+
+  // Connect transport and handle request
+  const transport = new StreamableHTTPTransport();
+  await server.connect(transport);
+  return transport.handleRequest(c);
+});
+
+// Health check endpoint
+app.get("*", (c) => c.json({
+  status: "ok",
+  service: "Job Hunt Pipeline",
+  version: "1.0.0"
 }));
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case "add_company":
-        return { content: [{ type: "text", text: await handleAddCompany(args) }] };
-      case "add_job_posting":
-        return { content: [{ type: "text", text: await handleAddJobPosting(args) }] };
-      case "submit_application":
-        return { content: [{ type: "text", text: await handleSubmitApplication(args) }] };
-      case "schedule_interview":
-        return { content: [{ type: "text", text: await handleScheduleInterview(args) }] };
-      case "log_interview_notes":
-        return { content: [{ type: "text", text: await handleLogInterviewNotes(args) }] };
-      case "get_pipeline_overview":
-        return { content: [{ type: "text", text: await handleGetPipelineOverview(args) }] };
-      case "get_upcoming_interviews":
-        return { content: [{ type: "text", text: await handleGetUpcomingInterviews(args) }] };
-      case "link_contact_to_professional_crm":
-        return { content: [{ type: "text", text: await handleLinkContactToProfessionalCRM(args) }] };
-      default:
-        throw new Error(`Unknown tool: ${name}`);
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return {
-      content: [{ type: "text", text: JSON.stringify({ success: false, error: errorMessage }) }],
-      isError: true,
-    };
-  }
-});
-
 // Start server
-async function main() {
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("Job Hunt Pipeline MCP Server running on stdio");
-}
-
-main().catch((error) => {
-  console.error("Fatal error in main():", error);
-  process.exit(1);
-});
+Deno.serve(app.fetch);

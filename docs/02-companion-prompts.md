@@ -457,6 +457,12 @@ For each theme (3-5):
 
 Your Open Brain is infrastructure. These prompts are the habits that make it compound. The Memory Migration gets you off the ground with context you've already built. The Second Brain Migration brings over everything you've captured in other systems so you don't start from zero. The Spark shows you where your brain fits into YOUR life, not someone else's. The templates build the daily habit. The weekly review closes the loop. Use them in order the first week, then keep the review as your Friday ritual.
 
+## What's Next — Recipes
+
+The companion prompts work with what your AI already knows. To bring in data from external services — your Gmail history, your ChatGPT conversations, your blog archives — check out the [recipes](../recipes/). Each one connects to a specific service, handles the messy parts (auth, filtering, dedup), and loads clean data into your Open Brain.
+
+Start with whichever source has the most signal for you. For most people, that's [Email History Import](../recipes/email-history-import/) (30 minutes, imports Gmail) or [ChatGPT Conversation Import](../recipes/chatgpt-conversation-import/) (30 minutes, imports your full ChatGPT export).
+
 ---
 
 *Built by [Nate B. Jones](https://natesnewsletter.substack.com/) — companion to [Build Your Open Brain](01-getting-started.md).*

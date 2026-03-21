@@ -1,0 +1,20 @@
+{
+  "name": "Remote MCP Connection",
+  "description": "How to connect any remote MCP server (Supabase Edge Function) to Claude Desktop, ChatGPT, Claude Code, Cursor, and other AI clients.",
+  "category": "primitives",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["mcp", "remote", "connection", "claude", "chatgpt", "cursor"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-03-13",
+  "updated": "2026-03-13"
+}

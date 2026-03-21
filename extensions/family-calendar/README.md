@@ -46,7 +46,7 @@ A multi-person family scheduling system. Track activities, important dates, and 
 
 - Working Open Brain setup
 - Extensions 1-2 recommended but not required
-- Node.js 18+ and npm installed
+- Supabase CLI installed and linked to your project
 
 ## Credential Tracker
 
@@ -61,6 +61,13 @@ FAMILY CALENDAR -- CREDENTIAL TRACKER
 SUPABASE (from your Open Brain setup)
   Project URL:           ____________
   Secret key:            ____________
+  Project ref:           ____________
+
+GENERATED DURING SETUP
+  Default User ID:       ____________
+  MCP Access Key:        ____________  (same key for all extensions)
+  MCP Server URL:        ____________
+  MCP Connection URL:    ____________
 
 --------------------------------------
 ```
@@ -81,66 +88,44 @@ Run the SQL in `schema.sql` against your Supabase database:
 psql $DATABASE_URL -f extensions/family-calendar/schema.sql
 ```
 
-### 2. Install Dependencies
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
 
 ```bash
-cd extensions/family-calendar
-npm init -y
-npm install @modelcontextprotocol/sdk @supabase/supabase-js
-npm install -D @types/node typescript
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
 ```
 
-### 3. Build the TypeScript Server
+Set it as an environment variable for your Edge Function:
 
 ```bash
-npx tsc --init
-npx tsc index.ts --outDir dist --esModuleInterop --moduleResolution node
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
 ```
 
-Or add to `package.json`:
+> If you already set `DEFAULT_USER_ID` for a previous extension, you can skip this step — all extensions share the same user ID.
 
-```json
-{
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch"
-  }
-}
-```
+### 3. Deploy the MCP Server
 
-### 4. Configure Environment Variables
+Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
-The MCP server needs Supabase credentials. These should already be set if you completed the Getting Started guide. Verify:
+| Setting | Value |
+|---------|-------|
+| Function name | `family-calendar-mcp` |
+| Download path | `extensions/family-calendar` |
 
-```bash
-echo $SUPABASE_URL
-echo $SUPABASE_SERVICE_ROLE_KEY
-```
+### 4. Connect to Your AI
 
-### 5. Register the MCP Server
+Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
-Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+| Setting | Value |
+|---------|-------|
+| Connector name | `Family Calendar` |
+| URL | Your **MCP Connection URL** from the credential tracker |
 
-```json
-{
-  "mcpServers": {
-    "family-calendar": {
-      "command": "node",
-      "args": ["/absolute/path/to/OB1/extensions/family-calendar/dist/index.js"],
-      "env": {
-        "SUPABASE_URL": "your-supabase-url",
-        "SUPABASE_SERVICE_ROLE_KEY": "your-service-role-key"
-      }
-    }
-  }
-}
-```
-
-### 6. Restart Claude Desktop
-
-Restart Claude Desktop to load the new MCP server.
-
-### 7. Test It
+### 5. Test It
 
 Try these prompts:
 
@@ -176,22 +161,11 @@ Your agent can now:
 
 ## Troubleshooting
 
-**"Missing required environment variables"**
-- Verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set in the MCP config
-- Check that the values match your Supabase project (find them in Supabase Dashboard → Project Settings → API)
+For common issues (connection errors, 401s, deployment problems), see [Common Troubleshooting](../../primitives/troubleshooting/).
 
-**"relation 'family_members' does not exist"**
-- The schema.sql wasn't run successfully
-- Re-run the SQL in the Supabase SQL Editor
+**Extension-specific issues:**
 
-**"Cannot find module '@modelcontextprotocol/sdk'"**
-- Run `npm install` in the `extensions/family-calendar/` directory
-
-**TypeScript compilation errors:**
-- Make sure you have a valid `tsconfig.json` (run `npx tsc --init` if missing)
-- Verify you're compiling with `--esModuleInterop` and `--moduleResolution node`
-
-**Activities not showing up in get_week_schedule:**
+**Activities not showing up in get_week_schedule**
 - Check that `start_date` and `end_date` are set correctly
 - For recurring activities, make sure `day_of_week` is lowercase ('monday', not 'Monday')
 - The week_start date should be a Monday in YYYY-MM-DD format
