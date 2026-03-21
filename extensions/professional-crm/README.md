@@ -199,3 +199,5 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 **Extension 6: Job Hunt Pipeline** — The most complex build in the learning path. You'll create a complete job search management system with 5 RLS-protected tables (companies, postings, applications, interviews, contacts) and bridge it back to this CRM. You'll learn advanced pipeline tracking, conversion rate analysis, and cross-extension integration at scale.
 
 [Continue to Extension 6 →](../job-hunt/README.md)
+
+> **32 tools and counting.** With 5 extensions connected, your AI is holding ~32 tool definitions in context. If you're noticing the AI picking the wrong tool or ignoring some entirely, the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) has prompt kits that audit your tools, suggest merges, and help you scope servers by workflow (capture vs. query vs. admin).

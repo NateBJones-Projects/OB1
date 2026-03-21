@@ -182,3 +182,5 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 **Extension 3: Family Calendar** — Build on your date-handling skills to create a shared calendar system with event reminders and conflict detection. The calendar extends the time-based query patterns you learned here and introduces more complex date logic (recurring events, all-day vs. timed events, timezone handling).
 
 [Continue to Extension 3 →](../family-calendar/README.md)
+
+> **Tip:** You now have two MCP servers connected. As you add more, consider which ones to keep active per conversation. The [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) covers strategies for managing your tool surface area.

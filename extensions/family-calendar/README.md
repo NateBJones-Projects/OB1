@@ -182,3 +182,5 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 - Cross-extension queries (checking who's home this week from the family calendar)
 
 Continue to [Extension 4: Meal Planning](../meal-planning/)
+
+> **Context check:** With 3 extensions connected, you're now exposing ~15 MCP tools to your AI. This is still manageable, but Extension 4 adds 10 more. Now is a good time to read the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) — it covers when to scope your servers, how to audit your tool surface, and patterns for keeping your AI sharp as you add complexity.

@@ -284,3 +284,5 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 - Integration with calendar (Extension 3) for scheduling follow-ups
 
 Continue to [Extension 5: Professional CRM](../professional-crm/)
+
+> **Tool surface area:** This extension introduced the concept of scoped servers — a primary server with full access and a shared server with limited tools. That same principle applies to how you organize all your MCP tools. With ~25 tools across 4 extensions now, consider running the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) to identify which servers to connect per workflow and whether any tools can be consolidated.
