@@ -232,6 +232,8 @@ Replace the values with:
 
 > SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are automatically available inside Edge Functions — you don't need to set them.
 
+> **If you ever rotate your OpenRouter key:** you must re-run `supabase secrets set OPENROUTER_API_KEY=...` with the new key. This Edge Function reads the key from Supabase secrets at runtime — updating it on openrouter.ai alone won't propagate here. See the [FAQ on key rotation](../../docs/03-faq.md#api-key-rotation) for the full checklist.
+
 ### Deploy
 
 ```bash
