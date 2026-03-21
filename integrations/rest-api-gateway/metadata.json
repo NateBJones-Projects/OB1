@@ -1,0 +1,20 @@
+{
+  "name": "REST API Gateway",
+  "description": "Add a standard REST API to your Open Brain so any app, automation, or device can capture, search, and manage thoughts over HTTP.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": ["rest", "api", "http", "gateway", "chatgpt-actions", "shortcuts", "zapier", "automation"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-03-16",
+  "updated": "2026-03-16"
+}
