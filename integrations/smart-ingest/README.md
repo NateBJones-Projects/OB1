@@ -16,7 +16,7 @@ The reconciliation engine makes four possible decisions per extracted thought:
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
-- [Ingestion Jobs schema](../../schemas/ingestion-jobs/) applied to your database
+- Ingestion Jobs schema (see `schemas/ingestion-jobs` contribution) applied to your database
 - At least one LLM API key: Anthropic, OpenAI, or OpenRouter
 - Supabase CLI installed
 
@@ -45,11 +45,11 @@ LLM PROVIDER (at least one)
 --------------------------------------
 ```
 
-## Steps
+## Step-by-step instructions
 
 **1. Apply the ingestion jobs schema**
 
-If you haven't already, apply the [Ingestion Jobs schema](../../schemas/ingestion-jobs/). This creates the `ingestion_jobs` and `ingestion_items` tables that smart-ingest uses to track extraction jobs.
+If you haven't already, apply the Ingestion Jobs schema (see `schemas/ingestion-jobs` contribution). This creates the `ingestion_jobs` and `ingestion_items` tables that smart-ingest uses to track extraction jobs.
 
 **2. Create the Edge Function**
 
@@ -181,7 +181,7 @@ Solution: Embeddings require `OPENAI_API_KEY` or `OPENROUTER_API_KEY`. Anthropic
 Solution: The same input text was already ingested. Set `"reprocess": true` in your request to force a new extraction. The new job gets a versioned hash (`-v2`, `-v3`, etc.).
 
 **Issue: `relation "ingestion_jobs" does not exist`**
-Solution: Apply the [Ingestion Jobs schema](../../schemas/ingestion-jobs/) first. The schema must be in place before deploying smart-ingest.
+Solution: Apply the Ingestion Jobs schema (see `schemas/ingestion-jobs` contribution) first. The schema must be in place before deploying smart-ingest.
 
 **Issue: All thoughts are being skipped**
 Solution: Check your existing thoughts table. If many similar thoughts already exist, the semantic dedup (>0.85 threshold) will match them. Lower the threshold in the code if you want more permissive ingestion, or use `reprocess: true` for a fresh run.
