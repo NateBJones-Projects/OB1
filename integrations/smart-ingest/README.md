@@ -47,70 +47,64 @@ LLM PROVIDER (at least one)
 
 ## Step-by-step instructions
 
-**1. Apply the ingestion jobs schema**
+1. Apply the Ingestion Jobs schema (see `schemas/ingestion-jobs` contribution) if you haven't already. This creates the `ingestion_jobs` and `ingestion_items` tables that smart-ingest uses to track extraction jobs.
 
-If you haven't already, apply the Ingestion Jobs schema (see `schemas/ingestion-jobs` contribution). This creates the `ingestion_jobs` and `ingestion_items` tables that smart-ingest uses to track extraction jobs.
+2. Create the Edge Function:
 
-**2. Create the Edge Function**
+   ```bash
+   supabase functions new smart-ingest
+   ```
 
-```bash
-supabase functions new smart-ingest
-```
+3. Copy the contents of [`index.ts`](./index.ts) into `supabase/functions/smart-ingest/index.ts`.
 
-**3. Add the function code**
+4. Set environment secrets:
 
-Copy the contents of [`index.ts`](./index.ts) into `supabase/functions/smart-ingest/index.ts`.
+   ```bash
+   supabase secrets set MCP_ACCESS_KEY=<your-key>
+   supabase secrets set ANTHROPIC_API_KEY=<your-key>
+   # Or use OPENAI_API_KEY or OPENROUTER_API_KEY instead
+   ```
 
-**4. Set environment secrets**
+5. Deploy:
 
-```bash
-supabase secrets set MCP_ACCESS_KEY=<your-key>
-supabase secrets set ANTHROPIC_API_KEY=<your-key>
-# Or use OPENAI_API_KEY or OPENROUTER_API_KEY instead
-```
+   ```bash
+   supabase functions deploy smart-ingest --no-verify-jwt
+   ```
 
-**5. Deploy**
+6. Test with a dry run:
 
-```bash
-supabase functions deploy smart-ingest --no-verify-jwt
-```
+   ```bash
+   curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-ingest" \
+     -H "Content-Type: application/json" \
+     -H "x-brain-key: <your-mcp-key>" \
+     -d '{
+       "text": "Met with Sarah about the API redesign. She wants GraphQL instead of REST. We agreed to prototype both by Friday. Also, I learned that our current rate limiter is dropping 3% of requests during peak hours — need to investigate.",
+       "source_label": "meeting-notes-2026-03-22",
+       "dry_run": true
+     }'
+   ```
 
-**6. Test with a dry run**
+7. Review the dry-run results. The response shows each extracted thought with its reconciliation action:
 
-```bash
-curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-ingest" \
-  -H "Content-Type: application/json" \
-  -H "x-brain-key: <your-mcp-key>" \
-  -d '{
-    "text": "Met with Sarah about the API redesign. She wants GraphQL instead of REST. We agreed to prototype both by Friday. Also, I learned that our current rate limiter is dropping 3% of requests during peak hours — need to investigate.",
-    "source_label": "meeting-notes-2026-03-22",
-    "dry_run": true
-  }'
-```
+   ```json
+   {
+     "status": "dry_run_complete",
+     "job_id": "abc123-...",
+     "extracted_count": 3,
+     "added_count": 2,
+     "skipped_count": 1,
+     "message": "Dry run: 3 extracted. Would add 2, skip 1."
+   }
+   ```
 
-**7. Review the dry-run results**
+8. Execute the approved job:
 
-The response shows each extracted thought with its reconciliation action:
-
-```json
-{
-  "status": "dry_run_complete",
-  "job_id": "abc123-...",
-  "extracted_count": 3,
-  "added_count": 2,
-  "skipped_count": 1,
-  "message": "Dry run: 3 extracted. Would add 2, skip 1."
-}
-```
-
-**8. Execute the approved job**
-
-```bash
-curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-ingest/execute" \
-  -H "Content-Type: application/json" \
-  -H "x-brain-key: <your-mcp-key>" \
-  -d '{"job_id": "abc123-..."}'
-```
+   ```bash
+   curl -X POST "https://<your-project>.supabase.co/functions/v1/smart-ingest/execute" \
+     -H "Content-Type: application/json" \
+     -H "x-brain-key: <your-mcp-key>" \
+     -d '{"job_id": "abc123-..."}'
+   ```
 
 ### One-Step Ingest (Skip Dry Run)
 
