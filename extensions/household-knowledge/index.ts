@@ -59,7 +59,7 @@ app.post("*", async (c) => {
       name: z.string().describe("Name or description of the item"),
       category: z.string().optional().describe("Category (e.g. 'paint', 'appliance', 'measurement', 'document')"),
       location: z.string().optional().describe("Location in the home (e.g. 'Living Room', 'Kitchen')"),
-      details: z.string().optional().describe("Flexible metadata as JSON string (e.g. '{\"brand\": \"Sherwin Williams\", \"color\": \"Sea Salt\"}')"),
+      details: z.record(z.unknown()).optional().describe("Flexible metadata as JSON string (e.g. '{\"brand\": \"Sherwin Williams\", \"color\": \"Sea Salt\"}')"),
       notes: z.string().optional().describe("Additional notes or context"),
     },
     async ({ name, category, location, details, notes }) => {
