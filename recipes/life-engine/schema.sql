@@ -16,7 +16,7 @@
 
 CREATE TABLE IF NOT EXISTS life_engine_habits (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
+  user_id TEXT NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
   frequency TEXT DEFAULT 'daily'
@@ -38,7 +38,7 @@ COMMENT ON TABLE life_engine_habits IS 'User-defined habits for Life Engine to t
 
 CREATE TABLE IF NOT EXISTS life_engine_habit_log (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
+  user_id TEXT NOT NULL,
   habit_id UUID REFERENCES life_engine_habits(id) ON DELETE CASCADE,
   completed_at TIMESTAMPTZ DEFAULT now(),
   notes TEXT
@@ -55,7 +55,7 @@ COMMENT ON TABLE life_engine_habit_log IS 'Daily log of habit completions';
 
 CREATE TABLE IF NOT EXISTS life_engine_checkins (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
+  user_id TEXT NOT NULL,
   checkin_type TEXT NOT NULL
     CHECK (checkin_type IN ('mood', 'energy', 'health', 'custom')),
   value TEXT NOT NULL,
@@ -74,9 +74,9 @@ COMMENT ON TABLE life_engine_checkins IS 'User check-in responses (mood, energy,
 
 CREATE TABLE IF NOT EXISTS life_engine_briefings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
+  user_id TEXT NOT NULL,
   briefing_type TEXT NOT NULL
-    CHECK (briefing_type IN ('morning', 'pre_meeting', 'checkin', 'evening', 'habit_reminder', 'custom')),
+    CHECK (briefing_type IN ('morning', 'pre_meeting', 'checkin', 'evening', 'habit_reminder', 'weekly_review', 'cron_state', 'custom')),
   content TEXT NOT NULL,
   delivered_via TEXT DEFAULT 'telegram',
   user_responded BOOLEAN DEFAULT false,
@@ -94,7 +94,7 @@ COMMENT ON TABLE life_engine_briefings IS 'Log of all briefings sent by Life Eng
 
 CREATE TABLE IF NOT EXISTS life_engine_evolution (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID NOT NULL,
+  user_id TEXT NOT NULL,
   change_type TEXT NOT NULL
     CHECK (change_type IN ('added', 'removed', 'modified')),
   description TEXT NOT NULL,
