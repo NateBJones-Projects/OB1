@@ -1,0 +1,20 @@
+{
+  "name": "OpenClaw Native OpenBrain Memory",
+  "description": "OpenClaw memory-kind plugin that connects a live OpenBrain MCP server as the active native memory backend, with MCP-aligned tools for search, capture, list, stats, and delete.",
+  "category": "integrations",
+  "author": {
+    "name": "Leon",
+    "github": "NomLom"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "OpenRouter"],
+    "tools": ["OpenClaw", "Node.js 20+", "npm 10+"]
+  },
+  "tags": ["openclaw", "openbrain", "memory", "mcp", "supabase", "plugin"],
+  "difficulty": "advanced",
+  "estimated_time": "45 minutes",
+  "created": "2026-03-23",
+  "updated": "2026-03-23"
+}
