@@ -62,6 +62,34 @@ LLM_MODEL = "openai/gpt-4o-mini"
 MAX_RETRIES = 3
 RETRY_BACKOFF = 2  # seconds, doubles each retry
 
+# Secret detection patterns — (label, compiled regex)
+SECRET_PATTERNS = [
+    ("OpenAI/OpenRouter API key", re.compile(r'sk-(?:or-v1-|proj-|live-)?[a-zA-Z0-9]{20,}')),
+    ("JWT token", re.compile(r'eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}')),
+    ("GitHub token", re.compile(r'gh[ps]_[a-zA-Z0-9]{36,}')),
+    ("GitHub OAuth token", re.compile(r'gho_[a-zA-Z0-9]{36,}')),
+    ("AWS access key", re.compile(r'AKIA[0-9A-Z]{16}')),
+    ("Supabase key", re.compile(r'sbp_[a-zA-Z0-9]{20,}')),
+    ("Private key block", re.compile(r'-----BEGIN [A-Z ]+ PRIVATE KEY-----')),
+    ("Generic secret assignment", re.compile(
+        r'(?:password|secret|token|api_key|apikey|api_secret|access_token|auth_token)'
+        r'\s*[=:]\s*["\']?[a-zA-Z0-9_\-/.]{16,}',
+        re.IGNORECASE,
+    )),
+    ("Connection string with credentials", re.compile(
+        r'(?:postgres|mysql|mongodb|redis)://[^:]+:[^@]+@',
+        re.IGNORECASE,
+    )),
+]
+
+
+def scan_for_secrets(text: str) -> str | None:
+    """Return the label of the first secret pattern found, or None if clean."""
+    for label, pattern in SECRET_PATTERNS:
+        if pattern.search(text):
+            return label
+    return None
+
 # Summarization prompt for long sections
 SUMMARIZATION_PROMPT = """You are extracting atomic thoughts from an Obsidian note section.
 
@@ -83,7 +111,6 @@ Section content:
 
 WIKILINK_RE = re.compile(r'\[\[([^\]|#]+?)(?:\|[^\]]+)?\]\]')
 INLINE_TAG_RE = re.compile(r'(?<!\w)#([A-Za-z0-9_/-]+)')
-HEADING_RE = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
 
 # Patterns to strip before inline tag extraction (avoid false positives)
 _CODE_FENCE_RE = re.compile(r'```[\s\S]*?```')
@@ -311,11 +338,23 @@ def generate_embedding(text: str, api_key: str) -> list[float] | None:
             data = resp.json()
             return data["data"][0]["embedding"]
         except (requests.RequestException, KeyError, IndexError) as e:
+            status = getattr(getattr(e, 'response', None), 'status_code', None)
             if attempt < MAX_RETRIES - 1:
                 wait = RETRY_BACKOFF * (2 ** attempt)
-                time.sleep(wait)
+                if status == 429:
+                    retry_after = getattr(e, 'response', None)
+                    retry_after = int(retry_after.headers.get('Retry-After', wait)) if retry_after else wait
+                    print(f"  Rate limited by OpenRouter. Retrying in {retry_after}s "
+                          f"(attempt {attempt + 1}/{MAX_RETRIES})")
+                    time.sleep(retry_after)
+                else:
+                    time.sleep(wait)
             else:
-                print(f"  Embedding failed: {e}")
+                if status == 429:
+                    print(f"  Embedding failed: rate limit exceeded after {MAX_RETRIES} retries. "
+                          f"Try again later or use --limit to reduce batch size.")
+                else:
+                    print(f"  Embedding failed: {e}")
                 return None
     return None
 
@@ -324,8 +363,15 @@ def generate_embedding(text: str, api_key: str) -> list[float] | None:
 
 def insert_thought(content: str, embedding: list[float] | None, metadata: dict,
                    supabase_url: str, supabase_key: str,
-                   created_at: str | None = None) -> bool:
-    """Insert a thought into the Supabase thoughts table."""
+                   created_at: str | None = None,
+                   fingerprint: str | None = None) -> str:
+    """Insert a thought into the Supabase thoughts table.
+
+    Returns 'inserted', 'duplicate', or 'failed'.
+
+    If fingerprint is provided and the thoughts table has a unique index on
+    content_fingerprint, duplicates are rejected with 409 Conflict.
+    """
     payload = {
         "content": content,
         "metadata": metadata,
@@ -334,32 +380,48 @@ def insert_thought(content: str, embedding: list[float] | None, metadata: dict,
         payload["embedding"] = embedding
     if created_at:
         payload["created_at"] = created_at
+    if fingerprint:
+        payload["content_fingerprint"] = fingerprint
+
+    headers = {
+        "apikey": supabase_key,
+        "Authorization": f"Bearer {supabase_key}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+    # If fingerprint is set and the table has a unique index on content_fingerprint,
+    # this upsert skips duplicates. Without the index, it behaves as a normal insert.
+    if fingerprint:
+        headers["Prefer"] = "return=minimal,resolution=merge-duplicates"
 
     for attempt in range(MAX_RETRIES):
         try:
             resp = requests.post(
                 f"{supabase_url}/rest/v1/thoughts",
-                headers={
-                    "apikey": supabase_key,
-                    "Authorization": f"Bearer {supabase_key}",
-                    "Content-Type": "application/json",
-                    "Prefer": "return=minimal",
-                },
+                headers=headers,
                 json=payload,
                 timeout=15,
             )
             resp.raise_for_status()
-            return True
+            return "inserted"
         except requests.RequestException as e:
-            if attempt < MAX_RETRIES - 1:
-                status = getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
-                if status in (429, 500, 502, 503, 504):
-                    wait = RETRY_BACKOFF * (2 ** attempt)
-                    time.sleep(wait)
-                    continue
-            print(f"  Insert failed: {e}")
-            return False
-    return False
+            status = getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+            if status == 409:
+                return "duplicate"
+            if attempt < MAX_RETRIES - 1 and status in (429, 500, 502, 503, 504):
+                wait = RETRY_BACKOFF * (2 ** attempt)
+                if status == 429:
+                    print(f"  Supabase rate limit hit. Retrying in {wait}s "
+                          f"(attempt {attempt + 1}/{MAX_RETRIES})", flush=True)
+                time.sleep(wait)
+                continue
+            if status == 429:
+                print(f"  Insert failed: Supabase rate limit exceeded after {MAX_RETRIES} retries. "
+                      f"Use --limit to reduce batch size.", flush=True)
+            else:
+                print(f"  Insert failed: {e}", flush=True)
+            return "failed"
+    return "failed"
 
 
 # ── Sync Log ─────────────────────────────────────────────────────────────────
@@ -386,9 +448,18 @@ def content_hash(body: str) -> str:
     return hashlib.sha256(body.encode()).hexdigest()[:16]
 
 
+def content_fingerprint(text: str) -> str:
+    """SHA-256 fingerprint of normalized content for DB-level dedup."""
+    normalized = re.sub(r'\s+', ' ', text.strip().lower())
+    return hashlib.sha256(normalized.encode()).hexdigest()
+
+
 # ── Main Pipeline ────────────────────────────────────────────────────────────
 
 def main():
+    # Force unbuffered stdout so progress is visible in background/piped runs
+    sys.stdout.reconfigure(line_buffering=True)
+
     parser = argparse.ArgumentParser(
         description="Import an Obsidian vault into Open Brain as searchable thoughts."
     )
@@ -407,6 +478,8 @@ def main():
                         help="Disable LLM chunking (heading splits only, no API cost)")
     parser.add_argument("--no-embed", action="store_true",
                         help="Skip embedding generation (insert thoughts without vectors)")
+    parser.add_argument("--no-secret-scan", action="store_true",
+                        help="Disable secret detection (not recommended)")
     parser.add_argument("--verbose", action="store_true",
                         help="Show detailed progress")
     parser.add_argument("--report", action="store_true",
@@ -428,7 +501,8 @@ def main():
             line = line.strip()
             if line and not line.startswith('#') and '=' in line:
                 key, _, value = line.partition('=')
-                os.environ.setdefault(key.strip(), value.strip())
+                value = value.strip().strip('"').strip("'")
+                os.environ.setdefault(key.strip(), value)
 
     supabase_url = os.environ.get("SUPABASE_URL", "")
     supabase_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
@@ -445,6 +519,44 @@ def main():
             sys.exit(1)
 
     use_llm = not args.no_llm and bool(openrouter_key)
+
+    # ── Preflight: validate connections before any real work ──────────────────
+
+    if not args.dry_run:
+        print("Preflight check...", flush=True)
+
+        # Test Supabase: verify the thoughts table exists and is writable
+        try:
+            resp = requests.get(
+                f"{supabase_url}/rest/v1/thoughts?limit=1",
+                headers={
+                    "apikey": supabase_key,
+                    "Authorization": f"Bearer {supabase_key}",
+                },
+                timeout=10,
+            )
+            if resp.status_code == 404:
+                print("Error: 'thoughts' table not found at this Supabase URL.", file=sys.stderr)
+                print(f"  URL: {supabase_url}/rest/v1/thoughts", file=sys.stderr)
+                print("  Check that the table exists and the URL is correct.", file=sys.stderr)
+                sys.exit(1)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            print(f"Error: could not reach Supabase: {e}", file=sys.stderr)
+            print("  Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env", file=sys.stderr)
+            sys.exit(1)
+
+        # Test OpenRouter: verify the embedding endpoint works with a short string
+        if not args.no_embed:
+            test_embedding = generate_embedding("preflight check", openrouter_key)
+            if not test_embedding:
+                print("Error: embedding preflight failed.", file=sys.stderr)
+                print("  Check OPENROUTER_API_KEY in .env and that your account has credit.",
+                      file=sys.stderr)
+                sys.exit(1)
+
+        print("  Supabase and OpenRouter connections verified.", flush=True)
+        print()
 
     # Parse skip folders
     skip_folders = set()
@@ -578,6 +690,7 @@ def main():
 
             thought = {
                 'content': content,
+                'fingerprint': content_fingerprint(content),
                 'metadata': {
                     'source': 'obsidian',
                     'title': note['title'],
@@ -606,8 +719,23 @@ def main():
     # ── Dry run summary ──────────────────────────────────────────────────────
 
     if args.dry_run:
+        # Scan for secrets even in dry run so users know before committing
+        dry_secrets = 0
+        if not args.no_secret_scan:
+            for t in all_thoughts:
+                secret_match = scan_for_secrets(t['content'])
+                if secret_match:
+                    dry_secrets += 1
+                    title = t['metadata'].get('title', '?')
+                    section = t['metadata'].get('section', '')
+                    location = f"{title} > {section}" if section else title
+                    print(f"  SECRET DETECTED: {location} — {secret_match}")
+
+        print()
         print("=== DRY RUN COMPLETE ===")
         print(f"Would import {len(all_thoughts)} thoughts from {len(filtered)} notes")
+        if dry_secrets:
+            print(f"Would skip {dry_secrets} thoughts containing potential secrets")
         if args.verbose:
             print("\nSample thoughts:")
             for t in all_thoughts[:5]:
@@ -624,36 +752,73 @@ def main():
     else:
         print("Embedding and inserting thoughts...")
     inserted = 0
+    duplicates = 0
     embed_failures = 0
     insert_failures = 0
+    consecutive_failures = 0
+    secrets_skipped = 0
+    successful_paths = {}  # note_path → first insert timestamp
 
     for i, thought in enumerate(all_thoughts):
+        # Scan for secrets before embedding or inserting
+        if not args.no_secret_scan:
+            secret_match = scan_for_secrets(thought['content'])
+            if secret_match:
+                secrets_skipped += 1
+                title = thought['metadata'].get('title', '?')
+                section = thought['metadata'].get('section', '')
+                location = f"{title} > {section}" if section else title
+                print(f"  SKIPPED (secret detected): {location} — {secret_match}", flush=True)
+                continue
+
         # Generate embedding (skip if --no-embed)
         embedding = None
         if not args.no_embed:
             embedding = generate_embedding(thought['content'], openrouter_key)
             if not embedding:
                 embed_failures += 1
+            else:
+                time.sleep(0.15)  # rate-limit between embedding calls
 
-        # Insert into Supabase
-        success = insert_thought(
+        # Insert into Supabase (fingerprint enables DB-level dedup)
+        result = insert_thought(
             content=thought['content'],
             embedding=embedding,
             metadata=thought['metadata'],
             supabase_url=supabase_url,
             supabase_key=supabase_key,
             created_at=thought.get('created_at'),
+            fingerprint=thought.get('fingerprint'),
         )
 
-        if success:
+        if result == "inserted":
             inserted += 1
+            consecutive_failures = 0
+            if thought['note_path'] not in successful_paths:
+                successful_paths[thought['note_path']] = datetime.now(tz=timezone.utc).isoformat()
+        elif result == "duplicate":
+            duplicates += 1
+            consecutive_failures = 0
+            if thought['note_path'] not in successful_paths:
+                successful_paths[thought['note_path']] = datetime.now(tz=timezone.utc).isoformat()
         else:
             insert_failures += 1
+            consecutive_failures += 1
+            if consecutive_failures >= 10:
+                print(f"\n  Aborting: {consecutive_failures} consecutive insert failures.",
+                      file=sys.stderr, flush=True)
+                print("  Check your Supabase connection and try again.", file=sys.stderr)
+                break
 
         # Progress
         if (i + 1) % 10 == 0 or i == len(all_thoughts) - 1:
-            print(f"  Progress: {i + 1}/{len(all_thoughts)} "
-                  f"(inserted: {inserted}, failed: {insert_failures})")
+            parts = [f"inserted: {inserted}"]
+            if duplicates:
+                parts.append(f"skipped: {duplicates}")
+            if insert_failures:
+                parts.append(f"failed: {insert_failures}")
+            print(f"  Progress: {i + 1}/{len(all_thoughts)} ({', '.join(parts)})",
+                  flush=True)
 
         # Rate limit courtesy
         if (i + 1) % 50 == 0:
@@ -661,23 +826,31 @@ def main():
 
     print()
     print(f"=== IMPORT COMPLETE ===")
-    print(f"  Thoughts inserted: {inserted}")
-    print(f"  Embed failures:    {embed_failures}")
-    print(f"  Insert failures:   {insert_failures}")
+    print(f"  Thoughts inserted:  {inserted}")
+    if duplicates:
+        print(f"  Duplicates skipped: {duplicates}")
+    if secrets_skipped:
+        print(f"  Secrets skipped:    {secrets_skipped}")
+    if embed_failures:
+        print(f"  Embed failures:     {embed_failures}")
+    if insert_failures:
+        print(f"  Insert failures:    {insert_failures}")
 
     # ── Update sync log ──────────────────────────────────────────────────────
 
     sync_log["vault_path"] = str(vault_root)
     sync_log["last_run"] = datetime.now(tz=timezone.utc).isoformat()
 
-    # Track which notes were imported
+    # Only log notes that had at least one successful insert
     notes_log = sync_log.setdefault("notes", {})
     for note in filtered:
+        if note['path'] not in successful_paths:
+            continue
         note_thoughts = [t for t in all_thoughts if t['note_path'] == note['path']]
         notes_log[note['path']] = {
             "content_hash": note['_hash'],
             "thoughts_created": len(note_thoughts),
-            "imported_at": datetime.now(tz=timezone.utc).isoformat(),
+            "imported_at": successful_paths[note['path']],
         }
 
     save_sync_log(recipe_dir, sync_log)

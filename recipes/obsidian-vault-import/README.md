@@ -25,8 +25,9 @@ No special configuration is needed for any of these — the script handles them 
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - Python 3.10+
-- Your Supabase project URL and service role key
+- Your Supabase project URL and API key
 - OpenRouter API key (for embeddings and optional LLM chunking)
+- Recommended: add a `content_fingerprint` column and unique index for database-level dedup (see [Re-running and Deduplication](#re-running-and-deduplication))
 
 ## Credential Tracker
 
@@ -38,7 +39,7 @@ OBSIDIAN VAULT IMPORT -- CREDENTIAL TRACKER
 
 FROM YOUR OPEN BRAIN SETUP
   Supabase Project URL:  ____________
-  Supabase service_role key (JWT, starts with eyJ...):  ____________
+  Supabase API key:      ____________
   OpenRouter API key:    ____________
 
 FILE LOCATION
@@ -61,20 +62,19 @@ FILE LOCATION
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` and fill in your Supabase URL, service role key, and OpenRouter API key.
-
-   **Important:** The `SUPABASE_SERVICE_ROLE_KEY` must be the **legacy JWT token** (starts with `eyJ...`). Find it in your Supabase dashboard under Settings → API → scroll down to "Legacy anon, service_role API keys" and click Reveal next to `service_role`. The newer `sb_secret_` format does not work with the REST API.
+   Edit `.env` and fill in your Supabase URL, API key, and OpenRouter API key. Find your Supabase credentials in the dashboard under Settings → API.
 
 4. **Run a dry run first** to see what would be imported:
    ```bash
    python import-obsidian.py /path/to/your/vault --dry-run --verbose
    ```
-   This scans your vault, shows how many notes pass filters, and how many thoughts would be generated — without inserting anything.
+   This scans your vault, shows how many notes pass filters, how many thoughts would be generated, and flags any notes containing potential secrets — without inserting anything.
 
 5. **Start with a small batch** to verify everything works:
    ```bash
    python import-obsidian.py /path/to/your/vault --limit 20 --verbose
    ```
+   The script runs a preflight check before any import — it verifies your Supabase connection and OpenRouter API key before spending time on chunking or embeddings.
 
 6. **Run the full import** once you're satisfied:
    ```bash
@@ -96,6 +96,8 @@ FILE LOCATION
 | `--skip-folders X` | Comma-separated additional folder names to skip |
 | `--after DATE` | Only import notes modified after this date (YYYY-MM-DD) |
 | `--no-llm` | Disable LLM chunking — heading splits only, zero API cost beyond embeddings |
+| `--no-embed` | Skip embedding generation (insert thoughts without vectors) |
+| `--no-secret-scan` | Disable secret detection (not recommended) |
 | `--verbose` | Show detailed progress for each note |
 | `--report` | Generate an `import-report.md` summary file |
 
@@ -125,6 +127,19 @@ The script automatically skips notes that wouldn't make useful thoughts. Run wit
 python import-obsidian.py /path/to/vault --skip-folders "Archive,Files,patterns"
 ```
 
+## Secret Detection
+
+The script scans each thought for potential secrets before embedding or inserting. Thoughts containing API keys, tokens, passwords, or connection strings are skipped and logged — they never reach your database.
+
+Detected patterns include:
+- API keys (OpenAI, OpenRouter, AWS, GitHub, Supabase)
+- JWT tokens
+- Private key blocks
+- Connection strings with embedded credentials
+- Generic secret assignments (`password=`, `token=`, `api_key=`, etc.)
+
+The dry run (`--dry-run`) also runs the scanner, so you can review what would be flagged before a live import. If the scanner flags a false positive, use `--no-secret-scan` to disable it.
+
 ## How Chunking Works
 
 The script uses a hybrid chunking strategy to turn notes into atomic thoughts:
@@ -135,14 +150,47 @@ The script uses a hybrid chunking strategy to turn notes into atomic thoughts:
 
 Use `--no-llm` to skip step 3 if you want to avoid LLM costs. Heading-based splitting still works.
 
-## Re-running and Updates
+## Cost Estimate
 
-The script maintains a sync log (`obsidian-sync-log.json`) that tracks which notes have been imported and their content hashes. If you re-run the import:
-- Notes that haven't changed are skipped automatically
-- Notes with new content are re-imported
-- New notes are imported
+Costs depend on vault size and whether LLM chunking is enabled. Embeddings use `text-embedding-3-small` and LLM chunking uses `gpt-4o-mini`, both via OpenRouter.
 
-To do a clean re-import, delete `obsidian-sync-log.json` and clear your `thoughts` table.
+| Vault size | Embeddings only (`--no-llm`) | With LLM chunking |
+|------------|------------------------------|---------------------|
+| 100 notes  | ~$0.02                       | ~$0.15              |
+| 500 notes  | ~$0.10                       | ~$0.75              |
+| 1000+ notes | ~$0.20                      | ~$1.50              |
+
+Use `--dry-run` to see how many thoughts your vault would generate before committing to a full run. Use `--no-embed` to skip embeddings entirely (zero API cost) if you plan to generate them separately.
+
+**Time estimate:** Roughly 1 second per thought or 16 minutes per 1,000 thoughts. A 700-note vault producing ~2,700 thoughts takes about 45 minutes. The bottleneck is embedding generation — each thought requires a round-trip API call.
+
+## Rate Limiting
+
+The script self-throttles to respect upstream API limits:
+- **150ms delay** between embedding API calls to avoid flooding OpenRouter
+- **1-second pause** every 50 inserts to give Supabase breathing room
+- **Exponential backoff** on 429/5xx errors (2s → 4s → 8s, up to 3 retries)
+
+For large vaults (1000+ notes), use `--limit` to import in batches if you encounter rate limit errors. The sync log ensures you can resume where you left off.
+
+See also: [Graceful Boundaries](https://github.com/snapsynapse/graceful-boundaries) — a spec for how services communicate operational limits to humans and agents.
+
+## Re-running and Deduplication
+
+The script prevents duplicates at two levels:
+
+**Local sync log** (`obsidian-sync-log.json`) — tracks content hashes of imported notes. On re-runs, unchanged notes are skipped entirely (saving embedding API calls). Modified notes are re-imported, and new notes are added.
+
+**Database-level fingerprinting** — each thought includes a `content_fingerprint` (SHA-256 of normalized content). If your `thoughts` table has a unique index on `content_fingerprint`, the insert automatically skips duplicates even if the sync log is deleted or a different machine imports overlapping content. To add the index:
+
+```sql
+CREATE UNIQUE INDEX IF NOT EXISTS thoughts_content_fingerprint_idx
+  ON thoughts (content_fingerprint);
+```
+
+Without the index, the fingerprint is stored but dedup relies on the sync log only.
+
+To do a clean re-import, delete `obsidian-sync-log.json` and remove the imported thoughts from your `thoughts` table (filter by `metadata->>'source' = 'obsidian'`).
 
 ## Expected Outcome
 
@@ -176,4 +224,10 @@ Solution: Run with `--verbose` to see which notes are filtered and why. Common r
 Solution: The parser handles encoding errors gracefully — problematic files are skipped with a warning. If you see many parse errors, your vault may contain non-UTF-8 files. The script will continue processing the rest.
 
 **Issue: Duplicate thoughts after re-running**
-Solution: The sync log prevents duplicates on re-runs. If you see duplicates, the sync log may have been deleted. To clean up, delete duplicates from the `thoughts` table in Supabase and re-run the import.
+Solution: The sync log prevents duplicates on re-runs. For stronger protection, add the `content_fingerprint` unique index (see "Re-running and Deduplication" above) — this catches duplicates even if the sync log is deleted or another machine imports the same content. To clean up existing duplicates, filter by `metadata->>'source' = 'obsidian'` in the Supabase Table Editor.
+
+**Issue: Import aborts after "10 consecutive insert failures"**
+Solution: The script stops early if 10 inserts fail in a row to avoid wasting embedding credits. Check your Supabase connection, verify the `thoughts` table exists, and confirm your API key is correct. The preflight check catches most of these, but a connection drop mid-import can also trigger this.
+
+**Issue: Notes flagged as containing secrets (false positive)**
+Solution: Review the flagged content. If it's a false positive (e.g., a note discussing API key formats without containing real keys), re-run with `--no-secret-scan`. The scanner is intentionally conservative — it's better to flag and skip than to store a real secret in your database.
