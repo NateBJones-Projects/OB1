@@ -37,7 +37,7 @@ Advantages of the native memory approach:
 - npm 10+
 - OpenClaw gateway access
 
-## Included docs
+## Included docs and code
 
 1. `01-install-local.md` — build/install/config flow
 2. `02-architecture.md` — plugin/runtime/tool architecture
@@ -45,9 +45,10 @@ Advantages of the native memory approach:
 4. `04-validation-checklist.md` — end-to-end checks
 5. `05-troubleshooting.md` — common issues and fixes
 6. `06-housekeeping.md` — maintenance policy and delete guidance
-7. `07-deploy.md` — deployment notes
+7. `07-deploy.md` — deployment notes, including MCP server rebuild/redeploy steps
 8. `08-release-process.md` — release/update workflow
 9. `AI-INSTRUCTIONS.md` — AI-oriented implementation and review notes
+10. `plugin-extension/` — the actual OpenClaw plugin source used for this integration
 
 ## Expected outcome
 
@@ -57,6 +58,26 @@ When working correctly:
 - the runtime exposes the five memory tools above
 - the plugin points at a live OpenBrain MCP endpoint
 - delete operations target exact ids, not fuzzy content guesses
+
+## If you had never seen this before, what you need
+
+At minimum, a newcomer needs all three layers:
+
+1. **The OpenBrain MCP server contract**
+   - tool names
+   - auth pattern
+   - redeploy steps after interface changes
+2. **The OpenClaw plugin code**
+   - actual extension source
+   - plugin manifest/schema
+   - package metadata
+3. **The operating docs**
+   - install
+   - validation
+   - troubleshooting
+   - maintenance policy
+
+This contribution now includes all three so someone can rebuild the integration instead of guessing it from prose alone.
 
 ## Security / secrets
 

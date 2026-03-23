@@ -181,3 +181,52 @@ Run `04-validation-checklist.md` in full.
 - Always tag releases
 - Deploy by tag, not floating branch
 - Validate in stage before prod
+
+
+## Rebuilding the MCP server after interface changes
+
+If you change the MCP tool contract, you must update and redeploy the Supabase Edge Function before the OpenClaw plugin can use the new interface.
+
+### Typical server files
+- `supabase/functions/open-brain-mcp/index.ts`
+- `supabase/functions/open-brain-mcp/deno.json`
+
+### Changes this integration expects
+At minimum, the server should expose these tools:
+- `search_thoughts`
+- `capture_thought`
+- `list_thoughts`
+- `thought_stats`
+- `delete_thought`
+
+For maintenance flows, the server should also:
+- return inserted `id` from `capture_thought`
+- include ids in `search_thoughts` output
+- include ids in `list_thoughts` output
+
+### Redeploy command
+From the Supabase project directory:
+
+```bash
+cd supabase
+supabase functions deploy open-brain-mcp --no-verify-jwt
+```
+
+`--no-verify-jwt` matters here because this MCP deployment pattern uses the MCP access key check inside the function itself.
+
+### Validate after deploy
+
+**1. List tools:**
+```bash
+curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY'   -H 'content-type: application/json'   -H 'accept: application/json, text/event-stream'   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+**2. Capture a test row:**
+```bash
+curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY'   -H 'content-type: application/json'   -H 'accept: application/json, text/event-stream'   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"capture_thought","arguments":{"content":"validation row"}}}'
+```
+
+**3. Delete by returned id:**
+```bash
+curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY'   -H 'content-type: application/json'   -H 'accept: application/json, text/event-stream'   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"delete_thought","arguments":{"id":"UUID_HERE"}}}'
+```
