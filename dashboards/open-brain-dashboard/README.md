@@ -117,7 +117,7 @@ The dashboard calls these endpoints on your Open Brain REST API:
 
 ## Optional: Restricted Content
 
-If you've applied the [sensitivity-tiers](../../primitives/sensitivity-tiers/) primitive and want to control access to sensitive thoughts:
+If you've applied the [sensitivity-tiers](https://github.com/NateBJones-Projects/OB1/pull/110) primitive and want to control access to sensitive thoughts:
 
 1. Set `RESTRICTED_PASSPHRASE_HASH` in your environment
 2. A lock/unlock toggle appears in the sidebar
