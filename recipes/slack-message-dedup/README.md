@@ -8,6 +8,17 @@
 
 Prevents duplicate thought ingestion when Slack delivers the same webhook event more than once. Uses the Slack message timestamp (`slack_ts`) stored inside the `thoughts` table's jsonb `metadata` column as a natural idempotency key — if a thought with that timestamp already exists, the function skips processing and returns `200` immediately.
 
+## When to Use This
+
+Use this pattern if:
+- You're ingesting thoughts from Slack via webhooks
+- You're experiencing duplicate rows in your `thoughts` table
+- You want to avoid burning API credits on retry events
+
+This pattern is NOT needed if:
+- You're using Slack's Socket Mode (it has built-in dedup)
+- Your ingestion source already provides idempotency (like email Message-IDs)
+
 ## Why This Matters
 
 Slack's Events API makes no guarantee of exactly-once delivery. Network hiccups, retries, and edge function cold starts can all cause the same message to arrive multiple times. Without dedup, a single Slack message could generate duplicate rows in `thoughts`, duplicate `action_items`, and duplicate `people` entries — polluting your Open Brain data with noise that's hard to clean up after the fact.
@@ -106,6 +117,18 @@ if (isDuplicate) {
 ## Expected Outcome
 
 When a duplicate Slack event arrives, you should see `Skipping duplicate message: <timestamp>` in your edge function logs. The function returns `200` immediately without generating embeddings, calling the LLM, or writing any database rows. Your `thoughts` table will contain exactly one row per Slack message.
+
+**Verify it's working:** Run this query to confirm you have exactly one row per unique `slack_ts`:
+
+```sql
+select metadata->>'slack_ts' as slack_ts, count(*)
+from thoughts
+where source = 'slack'
+group by metadata->>'slack_ts'
+having count(*) > 1;
+```
+
+If the query returns no rows, dedup is working correctly. If it returns rows, you have duplicates that were created before implementing this pattern.
 
 ## Troubleshooting
 
