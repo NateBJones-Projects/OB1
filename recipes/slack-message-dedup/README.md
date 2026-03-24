@@ -127,6 +127,6 @@ create index if not exists idx_thoughts_metadata on thoughts using gin (metadata
 
 | File | Purpose |
 |------|---------|
-| `index.ts` | Standalone example showing the dedup pattern extracted from `ingest-thought` |
+| `index.ts` | Reference implementation showing the dedup helper function and handler placement pattern |
 | `README.md` | This guide |
 | `metadata.json` | Contribution metadata for the OB1 repo |
