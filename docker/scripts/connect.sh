@@ -9,10 +9,11 @@ cd "$DOCKER_DIR"
 
 ACCESS_KEY=$(grep MCP_ACCESS_KEY .env | cut -d= -f2)
 
-# Detect LAN IP for cross-machine access
-LAN_IP=$(hostname -I | awk '{print $1}')
-MCP_HTTP="http://${LAN_IP}:3000"
-MCP_HTTPS="https://${LAN_IP}:3443"
+# Use localhost for same-machine access (stable across IP changes).
+# Set OB1_HOST to a LAN/public IP if clients connect from other machines.
+MCP_HOST="${OB1_HOST:-localhost}"
+MCP_HTTP="http://${MCP_HOST}:3000"
+MCP_HTTPS="https://${MCP_HOST}:3443"
 
 # ── Claude Code (HTTP — works natively) ────────────────────────────────────
 echo "Connecting Claude Code to OB1..."
@@ -50,7 +51,8 @@ with open('$CONFIG_FILE') as f:
 cfg.setdefault('mcpServers', {})
 cfg['mcpServers']['open-brain'] = {
     'command': 'npx',
-    'args': ['mcp-remote', '$CONNECTOR_URL']
+    'args': ['mcp-remote', '$CONNECTOR_URL'],
+    'env': {'NODE_TLS_REJECT_UNAUTHORIZED': '0'}
 }
 with open('$CONFIG_FILE', 'w') as f:
     json.dump(cfg, f, indent=2)
@@ -62,7 +64,8 @@ cfg = {
     'mcpServers': {
         'open-brain': {
             'command': 'npx',
-            'args': ['mcp-remote', '$CONNECTOR_URL']
+            'args': ['mcp-remote', '$CONNECTOR_URL'],
+            'env': {'NODE_TLS_REJECT_UNAUTHORIZED': '0'}
         }
     }
 }

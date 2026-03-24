@@ -1,0 +1,20 @@
+{
+  "name": "Fully Local Docker Setup",
+  "description": "Self-hosted Open Brain stack with PostgreSQL, pgvector, Ollama, and zero cloud dependencies. Everything runs locally in Docker.",
+  "category": "integrations",
+  "author": {
+    "name": "cyb5r67",
+    "github": "cyb5r67"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Docker Desktop or Docker Engine", "NVIDIA GPU + Container Toolkit (optional)"]
+  },
+  "tags": ["docker", "self-hosted", "local", "ollama", "pgvector", "privacy"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-03-23",
+  "updated": "2026-03-23"
+}
