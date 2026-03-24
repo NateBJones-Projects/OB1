@@ -1,5 +1,15 @@
 # Claudeception
 
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@jaredirish](https://github.com/jaredirish)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
 *Skills that create other skills.*
 
 A continuous learning system that extracts reusable knowledge from work sessions and codifies it into new AI coding tool skills. When you discover something non-obvious (a debugging technique, a workaround, an error resolution), Claudeception evaluates whether it's worth preserving and creates a structured skill file automatically.

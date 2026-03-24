@@ -1,5 +1,15 @@
 # Perplexity Conversation Import
 
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@demarant](https://github.com/demarant)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
 Import your Perplexity AI search history and memory entries into Open Brain as searchable thoughts.
 
 ## What It Does

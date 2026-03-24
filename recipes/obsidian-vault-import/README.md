@@ -1,5 +1,15 @@
 # Obsidian Vault Import
 
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@snapsynapse](https://github.com/snapsynapse)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
 > Parse your Obsidian vault and import notes into Open Brain as searchable, embedded thoughts.
 
 ## What It Does

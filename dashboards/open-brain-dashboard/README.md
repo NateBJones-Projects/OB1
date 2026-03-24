@@ -1,5 +1,15 @@
 # Open Brain Dashboard
 
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@headcrest](https://github.com/headcrest) | Auth fixes by [@matthallett1](https://github.com/matthallett1)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
 > Search, filter, and capture your thoughts from a production-ready SvelteKit UI.
 
 ## What it does
