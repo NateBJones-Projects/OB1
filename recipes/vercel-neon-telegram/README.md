@@ -137,18 +137,16 @@ https://your-project.vercel.app/api/mcp?key=YOUR_ACCESS_KEY
 
 Set auth to "None" (key is in the URL). Note: enabling Developer Mode in ChatGPT disables its built-in Memory — Open Brain replaces it.
 
-**Claude Desktop** (`claude_desktop_config.json`):
+**Claude Desktop** (Settings > Connectors > Add custom connector):
 
-```json
-{
-  "mcpServers": {
-    "open-brain": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://your-project.vercel.app/api/mcp?key=YOUR_ACCESS_KEY"]
-    }
-  }
-}
-```
+1. Open Claude Desktop
+2. Go to **Settings** > **Connectors**
+3. Click **Add custom connector**
+4. Name: `Open Brain`
+5. Remote MCP server URL: `https://your-project.vercel.app/api/mcp?key=YOUR_ACCESS_KEY`
+6. Click **Add**
+
+The connector will appear as "Open Brain" in your MCP tools list. Enable it per conversation via the "+" button > Connectors.
 
 **Claude Code:**
 
@@ -297,18 +295,13 @@ The Neon HTTP driver can't execute multiple SQL statements in a single call. The
 
 ### MCP connection fails in Claude Desktop
 
-Claude Desktop requires MCP servers to have a `command` field. Use `mcp-remote` as a bridge:
+Make sure you're using the custom connectors UI, not a JSON config file:
 
-```json
-{
-  "mcpServers": {
-    "open-brain": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://your-project.vercel.app/api/mcp?key=YOUR_KEY"]
-    }
-  }
-}
-```
+1. Open **Settings** > **Connectors** > **Add custom connector**
+2. Paste the full URL including the key: `https://your-project.vercel.app/api/mcp?key=YOUR_KEY`
+3. If the connector shows "disconnected," verify your Vercel deployment is running (`curl https://your-project.vercel.app/api/health`)
+
+If your Claude Desktop doesn't have the Connectors option, update to the latest version.
 
 ### Telegram webhook returns 503
 
