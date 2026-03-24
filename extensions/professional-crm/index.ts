@@ -377,7 +377,6 @@ app.post("*", async (c) => {
         .from("thoughts")
         .select("*")
         .eq("id", thought_id)
-        .eq("user_id", userId)
         .single();
 
       if (thoughtError) {
