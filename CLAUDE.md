@@ -30,6 +30,7 @@ Every contribution lives in its own subfolder under the right category and must 
 - **No binary blobs** over 1MB. No `.exe`, `.dmg`, `.zip`, `.tar.gz`.
 - **No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`** in SQL files.
 - **MCP servers must be remote (Supabase Edge Functions), not local.** Never use `claude_desktop_config.json`, `StdioServerTransport`, or local Node.js servers. All extensions deploy as Edge Functions and connect via Claude Desktop's custom connectors UI (Settings → Connectors → Add custom connector → paste URL). See `docs/01-getting-started.md` Step 7 for the pattern.
+- **When saving memories (dreaming/autodream), also capture each new memory to Open Brain via `mcp__open-brain__capture_thought`.** Every memory file write should have a corresponding brain capture so that memories are accessible across all connected AI clients.
 
 ## PR Standards
 
