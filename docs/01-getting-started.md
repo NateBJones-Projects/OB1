@@ -687,7 +687,30 @@ claude mcp add --transport http open-brain \
 </details>
 
 <details>
-<summary>🤖 <strong>7.4 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
+<summary>🤖 <strong>7.4 — OpenAI Codex</strong></summary>
+
+Codex uses `mcp-remote` to bridge to remote MCP servers. Add the following to your `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.open-brain]
+command = "npx"
+args = [
+  "-y",
+  "mcp-remote",
+  "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+]
+startup_timeout_sec = 30
+```
+
+> [!CAUTION]
+> The `startup_timeout_sec = 30` line is required. Without it, Codex times out after 10 seconds because `mcp-remote` needs longer to establish the connection to the remote Supabase edge function. If you see `MCP client for open-brain timed out after 10 seconds`, add or increase this value.
+
+Restart Codex and the four Open Brain tools should be available immediately.
+
+</details>
+
+<details>
+<summary>🤖 <strong>7.5 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
 
 Every MCP client handles remote servers slightly differently. The server accepts your access key two ways — pick whichever your client supports:
 
