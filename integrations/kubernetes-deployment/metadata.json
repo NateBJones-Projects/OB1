@@ -1,0 +1,20 @@
+{
+  "name": "Kubernetes Self-Hosted Deployment",
+  "description": "Deploy Open Brain on Kubernetes with self-hosted PostgreSQL + pgvector, replacing Supabase with fully self-managed infrastructure.",
+  "category": "integrations",
+  "author": {
+    "name": "Marvin",
+    "github": "velo"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Kubernetes", "PostgreSQL", "pgvector"],
+    "tools": ["kubectl", "Docker"]
+  },
+  "tags": ["kubernetes", "k8s", "self-hosted", "postgresql", "pgvector", "deployment", "infrastructure"],
+  "difficulty": "advanced",
+  "estimated_time": "60 minutes",
+  "created": "2026-03-22",
+  "updated": "2026-03-22"
+}

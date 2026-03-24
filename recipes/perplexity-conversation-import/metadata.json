@@ -1,0 +1,20 @@
+{
+  "name": "Perplexity Conversation Import",
+  "description": "Import your Perplexity conversations and memories from a data export (.xlsx) into Open Brain as searchable thoughts with embeddings and metadata.",
+  "category": "recipes",
+  "author": {
+    "name": "Antonio De Marinis",
+    "github": "demarant"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Python 3.10+"]
+  },
+  "tags": ["perplexity", "import", "conversations", "memory", "migration", "summarization"],
+  "difficulty": "beginner",
+  "estimated_time": "20 minutes",
+  "created": "2026-03-22",
+  "updated": "2026-03-22"
+}
