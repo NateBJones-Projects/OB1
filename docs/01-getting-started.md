@@ -2,6 +2,8 @@
 
 This is the core of Open Brain — the foundation everything else builds on. Once this is running, you'll have a personal knowledge system that any AI can read from and write to. Every extension, recipe, and integration in this repo starts here.
 
+> **Prefer video?** Watch the [Open Brain Startup Guide](https://vimeo.com/1174979042/f883f6489a) (~27 min) for a full video walkthrough of this setup process. Follow along with the video or use this written guide — they cover the same steps.
+
 About 30 minutes. Zero coding experience. Two services:
 
 - **[Supabase](https://supabase.com)** — Your database (free tier)
@@ -371,6 +373,9 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
+> **If you ever rotate your OpenRouter key:** you must re-run the `supabase secrets set` command above with the new key, AND update any local `.env` files that reference it. The edge function reads from Supabase secrets at runtime — updating the key on openrouter.ai alone won't propagate here. See the [FAQ on key rotation](03-faq.md#api-key-rotation) for the full checklist.
+
+### Create the Function
 ![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
 Three commands, run them one at a time in order:
@@ -685,7 +690,30 @@ claude mcp add --transport http open-brain \
 </details>
 
 <details>
-<summary>🤖 <strong>7.4 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
+<summary>🤖 <strong>7.4 — OpenAI Codex</strong></summary>
+
+Codex uses `mcp-remote` to bridge to remote MCP servers. Add the following to your `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.open-brain]
+command = "npx"
+args = [
+  "-y",
+  "mcp-remote",
+  "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+]
+startup_timeout_sec = 30
+```
+
+> [!CAUTION]
+> The `startup_timeout_sec = 30` line is required. Without it, Codex times out after 10 seconds because `mcp-remote` needs longer to establish the connection to the remote Supabase edge function. If you see `MCP client for open-brain timed out after 10 seconds`, add or increase this value.
+
+Restart Codex and the four Open Brain tools should be available immediately.
+
+</details>
+
+<details>
+<summary>🤖 <strong>7.5 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
 
 Every MCP client handles remote servers slightly differently. The server accepts your access key two ways — pick whichever your client supports:
 

@@ -1,0 +1,11 @@
+{
+  "name": "fingerprint-dedup-backfill",
+  "version": "1.0.0",
+  "description": "Backfill content fingerprints and remove duplicates from Open Brain thoughts table",
+  "type": "module",
+  "scripts": {
+    "backfill": "node backfill-fingerprints.mjs",
+    "report": "node delete-duplicates.mjs --report-only",
+    "cleanup": "node delete-duplicates.mjs"
+  }
+}
