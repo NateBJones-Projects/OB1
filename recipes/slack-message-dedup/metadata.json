@@ -1,0 +1,20 @@
+{
+  "name": "Slack Message Deduplication Pattern",
+  "description": "Idempotency guard for Slack-based thought ingestion. Uses the slack_ts stored in the thoughts table metadata column to prevent duplicate processing when Slack delivers the same webhook event multiple times.",
+  "category": "recipes",
+  "author": {
+    "name": "Clay Dunker",
+    "github": "claydunker"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Slack Events API"],
+    "tools": []
+  },
+  "tags": ["slack", "deduplication", "idempotency", "ingest", "webhook"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-03-19",
+  "updated": "2026-03-19"
+}
