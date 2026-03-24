@@ -74,6 +74,31 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
+// delete_thought - delete one or more thoughts by id
+server.registerTool(
+  "delete_thought",
+  {
+    description: "Delete one or more thoughts by id",
+    inputSchema: {
+      id: z.string().optional().describe("Single thought id to delete"),
+      ids: z.array(z.string()).optional().describe("Array of thought ids to delete"),
+    },
+  },
+  async ({ id, ids }) => {
+    try {
+      const idsArr = ids || (id ? [id] : []);
+      if (!idsArr || idsArr.length === 0) {
+        return { content: [{ type: "text" as const, text: "id or ids is required" }] };
+      }
+      const { error } = await supabase.from("thoughts").delete().in("id", idsArr);
+      if (error) return { content: [{ type: "text" as const, text: `Delete error: ${error.message}` }], isError: true };
+      return { content: [{ type: "text" as const, text: `Deleted ${idsArr.length} thought(s)` }] };
+    } catch (err) {
+      return { content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }], isError: true };
+    }
+  }
+);
+
 // Tool 1: Semantic Search
 server.registerTool(
   "search_thoughts",
@@ -85,9 +110,19 @@ server.registerTool(
       query: z.string().describe("What to search for"),
       limit: z.number().optional().default(10),
       threshold: z.number().optional().default(0.5),
+      includeMachine: z.boolean().optional().describe("Return machine-only metadata when true"),
+    },
+    outputSchema: {
+      items: z.array(z.object({
+        id: z.string(),
+        content: z.string(),
+        metadata: z.record(z.string(), z.unknown()),
+        created_at: z.string(),
+        similarity: z.number().optional(),
+      }))
     },
   },
-  async ({ query, limit, threshold }) => {
+  async ({ query, limit, threshold, includeMachine }) => {
     try {
       const qEmb = await getEmbedding(query);
       const { data, error } = await supabase.rpc("match_thoughts", {
@@ -107,12 +142,14 @@ server.registerTool(
       if (!data || data.length === 0) {
         return {
           content: [{ type: "text" as const, text: `No thoughts found matching "${query}".` }],
+          structuredContent: { items: [] },
         };
       }
 
       const results = data.map(
         (
           t: {
+            id: string;
             content: string;
             metadata: Record<string, unknown>;
             similarity: number;
@@ -126,12 +163,15 @@ server.registerTool(
             `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
             `Type: ${m.type || "unknown"}`,
           ];
-          if (Array.isArray(m.topics) && m.topics.length)
-            parts.push(`Topics: ${(m.topics as string[]).join(", ")}`);
-          if (Array.isArray(m.people) && m.people.length)
-            parts.push(`People: ${(m.people as string[]).join(", ")}`);
-          if (Array.isArray(m.action_items) && m.action_items.length)
-            parts.push(`Actions: ${(m.action_items as string[]).join("; ")}`);
+          // hide machine-only metadata unless caller explicitly asked for it
+          if (!(m.machineOnly === true) || includeMachine) {
+            if (Array.isArray(m.topics) && m.topics.length)
+              parts.push(`Topics: ${(m.topics as string[]).join(", ")}`);
+            if (Array.isArray(m.people) && m.people.length)
+              parts.push(`People: ${(m.people as string[]).join(", ")}`);
+            if (Array.isArray(m.action_items) && m.action_items.length)
+              parts.push(`Actions: ${(m.action_items as string[]).join("; ")}`);
+          }
           parts.push(`\n${t.content}`);
           return parts.join("\n");
         }
@@ -144,6 +184,7 @@ server.registerTool(
             text: `Found ${data.length} thought(s):\n\n${results.join("\n\n")}`,
           },
         ],
+        structuredContent: { items: data },
       };
     } catch (err: unknown) {
       return {
@@ -167,13 +208,22 @@ server.registerTool(
       topic: z.string().optional().describe("Filter by topic tag"),
       person: z.string().optional().describe("Filter by person mentioned"),
       days: z.number().optional().describe("Only thoughts from the last N days"),
+      includeMachine: z.boolean().optional().describe("Return machine-only metadata when true"),
+    },
+    outputSchema: {
+      items: z.array(z.object({
+        id: z.string(),
+        content: z.string(),
+        metadata: z.record(z.string(), z.unknown()),
+        created_at: z.string(),
+      }))
     },
   },
-  async ({ limit, type, topic, person, days }) => {
+  async ({ limit, type, topic, person, days, includeMachine }) => {
     try {
       let q = supabase
         .from("thoughts")
-        .select("content, metadata, created_at")
+        .select("id, content, metadata, created_at")
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -201,12 +251,14 @@ server.registerTool(
 
       const results = data.map(
         (
-          t: { content: string; metadata: Record<string, unknown>; created_at: string },
+          t: { id: string; content: string; metadata: Record<string, unknown>; created_at: string },
           i: number
         ) => {
           const m = t.metadata || {};
-          const tags = Array.isArray(m.topics) ? (m.topics as string[]).join(", ") : "";
-          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
+          // hide machine-only metadata unless requested
+          const tags = Array.isArray(m.topics) && (!(m.machineOnly === true) || includeMachine) ? (m.topics as string[]).join(", ") : "";
+          const typeLabel = (!(m.machineOnly === true) || includeMachine) ? (m.type || "??") : "unknown";
+          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${typeLabel}${tags ? " - " + tags : ""})\n   ${t.content}`;
         }
       );
 
@@ -217,6 +269,7 @@ server.registerTool(
             text: `${data.length} recent thought(s):\n\n${results.join("\n\n")}`,
           },
         ],
+        structuredContent: { items: data },
       };
     } catch (err: unknown) {
       return {
@@ -307,19 +360,23 @@ server.registerTool(
       "Save a new thought to the Open Brain. Generates an embedding and extracts metadata automatically. Use this when the user wants to save something to their brain directly from any AI client — notes, insights, decisions, or migrated content from other systems.",
     inputSchema: {
       content: z.string().describe("The thought to capture — a clear, standalone statement that will make sense when retrieved later by any AI"),
+      machineOnly: z.boolean().optional().describe("If true, mark stored metadata as machine-only (hidden by default)")
     },
   },
-  async ({ content }) => {
+  async ({ content, machineOnly }) => {
     try {
       const [embedding, metadata] = await Promise.all([
         getEmbedding(content),
         extractMetadata(content),
       ]);
 
+      const insertMetadata = { ...metadata, source: "mcp" } as Record<string, unknown>;
+      if (machineOnly === true) insertMetadata.machineOnly = true;
+
       const { error } = await supabase.from("thoughts").insert({
         content,
         embedding,
-        metadata: { ...metadata, source: "mcp" },
+        metadata: insertMetadata,
       });
 
       if (error) {

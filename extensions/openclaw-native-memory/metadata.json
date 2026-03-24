@@ -3,7 +3,7 @@
   "description": "OpenClaw memory-kind plugin that connects a live OpenBrain MCP server as the active native memory backend, with MCP-aligned tools for search, capture, list, stats, and delete.",
   "category": "integrations",
   "author": {
-    "name": "Leon",
+    "name": "NomLom",
     "github": "NomLom"
   },
   "version": "1.0.0",
