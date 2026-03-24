@@ -41,7 +41,7 @@ Security notes:
 ### 1. Install the package
 
 ```bash
-openclaw plugins install /path/to/openclaw-openbrain-native-<version>.tgz --pin
+openclaw plugins install /path/to/downloads/openclaw-openbrain-native-<version>.tgz --pin
 openclaw plugins enable openbrain-native
 ```
 

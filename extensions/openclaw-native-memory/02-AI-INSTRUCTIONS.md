@@ -4,7 +4,7 @@ Use this if you are an AI or operator and need the shortest working path.
 
 ## Do this in order
 
-1. Deploy or update the MCP server using [`03-03-MCP-SERVER.md`](./03-03-MCP-SERVER.md)
+1. Deploy or update the MCP server using [`03-MCP-SERVER.md`](./03-MCP-SERVER.md)
 2. Download the extension from:
    - https://github.com/NomLom/openbrain-native-openclaw
    - https://github.com/NomLom/openbrain-native-openclaw/releases

@@ -17,7 +17,7 @@ If you want this working quickly:
 5. Run the smoke test
 
 For the exact install steps, use [`04-04-OPENCLAW-NATIVE-MEMORY-EXTENSION.md`](./04-04-OPENCLAW-NATIVE-MEMORY-EXTENSION.md).
-For the MCP server contract and deploy steps, use [`03-03-MCP-SERVER.md`](./03-03-MCP-SERVER.md).
+For the MCP server contract and deploy steps, use [`03-MCP-SERVER.md`](./03-MCP-SERVER.md).
 If anything fails, use [`05-05-TROUBLESHOOTING.md`](./05-05-TROUBLESHOOTING.md).
 
 ## Why this exists
@@ -76,7 +76,7 @@ That is the source of truth for the packaged extension artifact people should do
 ## Files in this integration
 
 - [`02-02-AI-INSTRUCTIONS.md`](./02-02-AI-INSTRUCTIONS.md) — one-shot handoff for an AI or operator
-- [`03-03-MCP-SERVER.md`](./03-03-MCP-SERVER.md) — build, deploy, and validate the MCP server side
+- [`03-MCP-SERVER.md`](./03-MCP-SERVER.md) — build, deploy, and validate the MCP server side
 - [`04-04-OPENCLAW-NATIVE-MEMORY-EXTENSION.md`](./04-04-OPENCLAW-NATIVE-MEMORY-EXTENSION.md) — install the extension into OpenClaw and verify it works
 - [`05-05-TROUBLESHOOTING.md`](./05-05-TROUBLESHOOTING.md) — practical fixes first, deeper diagnostics after
 - [`metadata.json`](./metadata.json) — contribution metadata

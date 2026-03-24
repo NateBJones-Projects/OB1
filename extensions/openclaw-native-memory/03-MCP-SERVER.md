@@ -108,7 +108,7 @@ supabase functions deploy open-brain-mcp --no-verify-jwt
 ## Step 4: validate tool list
 
 ```bash
-curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY' \
+curl -s -X POST 'https://PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=MCP_KEY' \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
@@ -124,7 +124,7 @@ Expected tools include:
 ## Step 5: validate search output shape
 
 ```bash
-curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY' \
+curl -s -X POST 'https://PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=MCP_KEY' \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_thoughts","arguments":{"query":"where NomLom lives","limit":1}}}'
@@ -156,7 +156,7 @@ Expected shape:
 ## Step 6: validate list output shape
 
 ```bash
-curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY' \
+curl -s -X POST 'https://PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=MCP_KEY' \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_thoughts","arguments":{"limit":1}}}'
@@ -187,7 +187,7 @@ Expected shape:
 ## Step 7: validate thought_stats
 
 ```bash
-curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY' \
+curl -s -X POST 'https://PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=MCP_KEY' \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"thought_stats","arguments":{}}}'
@@ -200,7 +200,7 @@ Expected result: a successful text response summarising totals and breakdowns.
 Capture a row:
 
 ```bash
-curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY' \
+curl -s -X POST 'https://PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=MCP_KEY' \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"capture_thought","arguments":{"content":"smoke test delete by id"}}}'
@@ -209,7 +209,7 @@ curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mc
 Search for it and copy the returned id from `structuredContent.items[]`, then delete it:
 
 ```bash
-curl -s -X POST 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_MCP_ACCESS_KEY' \
+curl -s -X POST 'https://PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=MCP_KEY' \
   -H 'content-type: application/json' \
   -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"delete_thought","arguments":{"id":"UUID_HERE"}}}'
