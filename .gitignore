@@ -2,3 +2,15 @@ node_modules/
 .DS_Store
 .planning/
 supabase/
+
+# Credentials & runtime state
+.env
+.env.local
+.env.*.local
+credentials.json
+token.json
+gmail-sync-log.json
+sync-log.json
+
+# Build artifacts
+deno.lock

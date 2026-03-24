@@ -5,7 +5,7 @@
 -- Organizations you're tracking in your job search
 CREATE TABLE IF NOT EXISTS companies (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     industry TEXT,
     website TEXT,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS companies (
 CREATE TABLE IF NOT EXISTS job_postings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id UUID REFERENCES companies(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     title TEXT NOT NULL,
     url TEXT,
     salary_min INTEGER,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS job_postings (
 CREATE TABLE IF NOT EXISTS applications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     job_posting_id UUID REFERENCES job_postings(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     status TEXT DEFAULT 'applied' CHECK (status IN ('draft', 'applied', 'screening', 'interviewing', 'offer', 'accepted', 'rejected', 'withdrawn')),
     applied_date DATE,
     response_date DATE,
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS applications (
 CREATE TABLE IF NOT EXISTS interviews (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     application_id UUID REFERENCES applications(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     interview_type TEXT CHECK (interview_type IN ('phone_screen', 'technical', 'behavioral', 'system_design', 'hiring_manager', 'team', 'final')),
     scheduled_at TIMESTAMPTZ,
     duration_minutes INTEGER,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS interviews (
 -- People associated with your job search
 CREATE TABLE IF NOT EXISTS job_contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     company_id UUID REFERENCES companies(id) ON DELETE SET NULL,
     name TEXT NOT NULL,
     title TEXT,

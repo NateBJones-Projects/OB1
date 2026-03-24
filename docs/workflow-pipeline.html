@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Open Brain &mdash; Contribution Pipeline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface-2: #1a1a26;
+    --border: #2a2a3a;
+    --text: #e4e4ef;
+    --text-muted: #8888a0;
+    --accent: #7c5cfc;
+    --accent-glow: rgba(124, 92, 252, 0.15);
+    --green: #34d399;
+    --green-glow: rgba(52, 211, 153, 0.12);
+    --amber: #fbbf24;
+    --amber-glow: rgba(251, 191, 36, 0.12);
+    --blue: #60a5fa;
+    --blue-glow: rgba(96, 165, 250, 0.12);
+    --pink: #f472b6;
+    --pink-glow: rgba(244, 114, 182, 0.12);
+    --red: #f87171;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 3rem 2rem 6rem;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    margin-bottom: 4rem;
+  }
+
+  header .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--accent-glow);
+    border: 1px solid rgba(124, 92, 252, 0.25);
+    padding: 0.35rem 1rem;
+    border-radius: 100px;
+    margin-bottom: 1.5rem;
+  }
+
+  header h1 {
+    font-size: 2.8rem;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    background: linear-gradient(135deg, #e4e4ef 40%, var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+  }
+
+  header p {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  /* ── Section titles ── */
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+    margin-top: 3.5rem;
+  }
+
+  .section-label .icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .section-label h2 {
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .section-label p {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+  }
+
+  /* ── Pipeline ── */
+  .pipeline {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .pipeline::before {
+    content: '';
+    position: absolute;
+    left: 22px;
+    top: 24px;
+    bottom: 24px;
+    width: 2px;
+    background: linear-gradient(to bottom, var(--border), rgba(42,42,58,0.3));
+  }
+
+  .step {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    position: relative;
+    padding: 0.75rem 0;
+  }
+
+  .step-dot {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    flex-shrink: 0;
+    z-index: 1;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+
+  .step:hover .step-dot {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 20px var(--accent-glow);
+  }
+
+  .step-dot.auto {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-glow);
+  }
+
+  .step-dot.human {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: var(--amber-glow);
+  }
+
+  .step-dot.ai {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+  }
+
+  .step-content {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.1rem 1.4rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .step:hover .step-content {
+    border-color: rgba(124, 92, 252, 0.3);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .step-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.4rem;
+  }
+
+  .step-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .step-tag {
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.6rem;
+    border-radius: 100px;
+  }
+
+  .tag-auto {
+    color: var(--green);
+    background: var(--green-glow);
+    border: 1px solid rgba(52, 211, 153, 0.2);
+  }
+
+  .tag-human {
+    color: var(--amber);
+    background: var(--amber-glow);
+    border: 1px solid rgba(251, 191, 36, 0.2);
+  }
+
+  .tag-ai {
+    color: var(--accent);
+    background: var(--accent-glow);
+    border: 1px solid rgba(124, 92, 252, 0.2);
+  }
+
+  .step-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    line-height: 1.55;
+  }
+
+  .step-file {
+    display: inline-block;
+    margin-top: 0.5rem;
+    font-size: 0.72rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    color: var(--blue);
+    background: var(--blue-glow);
+    padding: 0.2rem 0.55rem;
+    border-radius: 4px;
+    border: 1px solid rgba(96, 165, 250, 0.15);
+  }
+
+  /* ── Roles grid ── */
+  .roles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .role-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.5rem;
+  }
+
+  .role-card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .role-card .subtitle {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+  }
+
+  .role-card ul {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .role-card li {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .role-card li .bullet {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    margin-top: 3rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+  }
+
+  /* ── Checks grid ── */
+  .checks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .check-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+  }
+
+  .check-item .num {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+  }
+
+  .check-item .name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.2rem;
+  }
+
+  .check-item .desc {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    line-height: 1.4;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+  }
+
+  footer a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  footer a:hover { text-decoration: underline; }
+
+  /* ── Responsive ── */
+  @media (max-width: 700px) {
+    header h1 { font-size: 2rem; }
+    .roles { grid-template-columns: 1fr; }
+    .checks { grid-template-columns: 1fr; }
+    .legend { flex-direction: column; align-items: center; gap: 0.75rem; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="badge">Open Brain &middot; OB1</div>
+    <h1>Contribution Pipeline</h1>
+    <p>From first idea to community celebration &mdash; every step automated or guided, nothing falls through the cracks.</p>
+  </header>
+
+  <!-- ════ CONTRIBUTOR JOURNEY ════ -->
+  <div class="section-label">
+    <div class="icon" style="background: var(--blue-glow); color: var(--blue);">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </div>
+    <div>
+      <h2>Contributor Journey</h2>
+      <p>What happens when someone has an idea for Open Brain</p>
+    </div>
+  </div>
+
+  <div class="pipeline">
+
+    <div class="step">
+      <div class="step-dot human">1</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Open an Issue</span>
+          <span class="step-tag tag-human">Contributor</span>
+        </div>
+        <div class="step-desc">
+          Pick from 8 issue templates &mdash; recipe submission, bug report, extension proposal, or free-form. Templates guide the contributor to provide exactly what reviewers need.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot ai">2</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Claude Triages Automatically</span>
+          <span class="step-tag tag-ai">AI &middot; Automated</span>
+        </div>
+        <div class="step-desc">
+          Within 60 seconds, Claude classifies the issue (bug, recipe idea, schema, extension, question), checks for duplicates, assesses scope fit, suggests labels, and posts a welcoming comment with next steps.
+        </div>
+        <span class="step-file">claude-issue-triage.yml</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot human">3</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Build the Contribution</span>
+          <span class="step-tag tag-human">Contributor</span>
+        </div>
+        <div class="step-desc">
+          Fork the repo, create a branch (<code>contrib/username/feature</code>), write the code. Every contribution gets its own folder with a <code>README.md</code> and <code>metadata.json</code>.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot human">4</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Open a Pull Request</span>
+          <span class="step-tag tag-human">Contributor</span>
+        </div>
+        <div class="step-desc">
+          Fill out the PR template &mdash; what it does, what it requires, confirmation of testing. The title follows <code>[category] Short description</code> format. Labels are applied automatically.
+        </div>
+        <span class="step-file">auto-label.yml</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot auto">5</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">14 Mechanical Checks Run</span>
+          <span class="step-tag tag-auto">Automated</span>
+        </div>
+        <div class="step-desc">
+          Folder structure, required files, metadata validation, credential scanning, SQL safety, category-specific artifacts, PR title format, binary blob detection, README completeness, primitive dependencies, scope isolation, link resolution, remote MCP pattern.
+        </div>
+        <span class="step-file">ob1-review.yml</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot ai">6</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Claude Reviews for Quality</span>
+          <span class="step-tag tag-ai">AI &middot; Automated</span>
+        </div>
+        <div class="step-desc">
+          Claude reads the full PR and evaluates 7 dimensions: alignment with OB1's mission, clarity of instructions, completeness, safety, unique value, design pattern compliance (remote MCP, RLS, JSONB metadata), and scope fit (flags contributions that should be standalone projects).
+        </div>
+        <span class="step-file">claude-review.yml</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot human">7</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Admin Review</span>
+          <span class="step-tag tag-human">Repo Manager</span>
+        </div>
+        <div class="step-desc">
+          Repo manager runs <code>/review-pr</code> in Claude Code for the human-judgment layer &mdash; security deep scan (beyond CI's pattern matching), mission fit assessment, naming consistency, and PR quality. Generates a checklist, verdict, Discord draft, and post-merge tasks.
+        </div>
+        <span class="step-file">.claude/skills/review-pr.md</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot human">8</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Merge</span>
+          <span class="step-tag tag-human">Repo Manager</span>
+        </div>
+        <div class="step-desc">
+          Admin approves and merges. Squash merge keeps the history clean. This triggers the next three automated steps.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot auto">9</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Release Notes Drafted</span>
+          <span class="step-tag tag-auto">Automated</span>
+        </div>
+        <div class="step-desc">
+          Every merge to main auto-updates a draft release in the Releases tab. Contributions are categorized (Recipes, Extensions, Schemas, etc.) using the labels already applied by auto-label. Contributors are credited automatically.
+        </div>
+        <span class="step-file">release-drafter.yml</span>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot human">10</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Publish Release</span>
+          <span class="step-tag tag-human">Repo Manager</span>
+        </div>
+        <div class="step-desc">
+          When ready, the repo manager reviews the accumulated draft release notes and publishes. This can batch multiple merged contributions into one release.
+        </div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-dot auto">11</div>
+      <div class="step-content">
+        <div class="step-header">
+          <span class="step-title">Discord Announcement</span>
+          <span class="step-tag tag-auto">Automated</span>
+        </div>
+        <div class="step-desc">
+          Publishing a release automatically posts a rich embed to the <strong>#show-and-tell</strong> Discord channel &mdash; with the release title, categorized changes, and contributor credits. No manual copy-paste needed.
+        </div>
+        <span class="step-file">discord-announce.yml</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════ LEGEND ════ -->
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background: var(--amber);"></div>
+      Human action
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: var(--accent);"></div>
+      AI-powered (Claude)
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: var(--green);"></div>
+      Fully automated
+    </div>
+  </div>
+
+  <!-- ════ ROLES ════ -->
+  <div class="section-label" style="margin-top: 4rem;">
+    <div class="icon" style="background: var(--pink-glow); color: var(--pink);">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+    <div>
+      <h2>Who Does What</h2>
+      <p>Clear responsibilities for contributors and repo managers</p>
+    </div>
+  </div>
+
+  <div class="roles">
+    <div class="role-card">
+      <h3>Contributor</h3>
+      <div class="subtitle">Anyone in the community</div>
+      <ul>
+        <li><span class="bullet" style="color: var(--blue);">&#9654;</span> Open an issue describing the idea</li>
+        <li><span class="bullet" style="color: var(--blue);">&#9654;</span> Build the contribution in a fork</li>
+        <li><span class="bullet" style="color: var(--blue);">&#9654;</span> Open a PR with the template filled out</li>
+        <li><span class="bullet" style="color: var(--blue);">&#9654;</span> Address feedback from CI + reviewers</li>
+        <li><span class="bullet" style="color: var(--blue);">&#9654;</span> Celebrate in Discord when it ships</li>
+      </ul>
+    </div>
+    <div class="role-card">
+      <h3>Repo Manager</h3>
+      <div class="subtitle">Admin / maintainer</div>
+      <ul>
+        <li><span class="bullet" style="color: var(--amber);">&#9654;</span> Review Claude's issue triage, adjust labels</li>
+        <li><span class="bullet" style="color: var(--amber);">&#9654;</span> Run <code>/review-pr</code> for security + mission fit</li>
+        <li><span class="bullet" style="color: var(--amber);">&#9654;</span> Approve, request changes, or reject</li>
+        <li><span class="bullet" style="color: var(--amber);">&#9654;</span> Merge when ready</li>
+        <li><span class="bullet" style="color: var(--amber);">&#9654;</span> Publish release notes periodically</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- ════ WHAT GETS CHECKED ════ -->
+  <div class="section-label" style="margin-top: 4rem;">
+    <div class="icon" style="background: var(--green-glow); color: var(--green);">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    </div>
+    <div>
+      <h2>Every PR Gets 21 Checks</h2>
+      <p>14 mechanical rules + 7 AI judgment dimensions</p>
+    </div>
+  </div>
+
+  <div class="checks">
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 1</div>
+      <div class="name">Folder Structure</div>
+      <div class="desc">Files only in allowed directories</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 2</div>
+      <div class="name">Required Files</div>
+      <div class="desc">README.md + metadata.json present</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 3</div>
+      <div class="name">Metadata Valid</div>
+      <div class="desc">All required fields, correct types</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 4</div>
+      <div class="name">No Credentials</div>
+      <div class="desc">Blocks API keys, tokens, connection strings</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 5</div>
+      <div class="name">SQL Safety</div>
+      <div class="desc">No DROP, TRUNCATE, or unqualified DELETE</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 6</div>
+      <div class="name">Category Artifacts</div>
+      <div class="desc">Right file types for the contribution type</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 7</div>
+      <div class="name">PR Title Format</div>
+      <div class="desc"><code>[category] Short description</code></div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 8</div>
+      <div class="name">No Binary Blobs</div>
+      <div class="desc">Max 1MB, no .exe/.dmg/.zip</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 9</div>
+      <div class="name">README Completeness</div>
+      <div class="desc">Prerequisites, steps, expected outcome</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 10</div>
+      <div class="name">Primitive Dependencies</div>
+      <div class="desc">Declared primitives exist and are linked</div>
+    </div>
+    <div class="check-item">
+      <div class="num">Mechanical &middot; 11&ndash;14</div>
+      <div class="name">Scope, Links, MCP Pattern</div>
+      <div class="desc">Changes within scope, links resolve, remote MCP only</div>
+    </div>
+    <div class="check-item">
+      <div class="num">AI &middot; 1&ndash;7</div>
+      <div class="name">Alignment, Clarity, Value, Design, Scope</div>
+      <div class="desc">Claude reviews what machines can't &mdash; judgment calls</div>
+    </div>
+  </div>
+
+  <footer>
+    <p>
+      <a href="https://github.com/NateBJones-Projects/OB1">github.com/NateBJones-Projects/OB1</a>
+      &nbsp;&middot;&nbsp;
+      <a href="https://discord.gg/Cgh9WJEkeG">Join the Discord</a>
+      &nbsp;&middot;&nbsp;
+      Built with claude-code-action
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>

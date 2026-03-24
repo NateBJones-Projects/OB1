@@ -1,5 +1,18 @@
 # Journals/Blogger Import
 
+<<<<<<< HEAD
+=======
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@alanshurafa](https://github.com/alanshurafa)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
+>>>>>>> origin/main
 > Import blog posts from Google Blogger Atom XML exports into Open Brain.
 
 ## What It Does
@@ -9,6 +22,10 @@ Parses Google Blogger's Atom XML export format and imports blog posts and commen
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
+<<<<<<< HEAD
+=======
+- The **content-fingerprint-dedup** primitive installed (provides the `upsert_thought` RPC function used for deduplication)
+>>>>>>> origin/main
 - **Blogger export files** — `.atom` files from Google Blogger
 - **Node.js 18+** installed
 - **OpenRouter API key** for embedding generation

@@ -48,6 +48,22 @@ And don't forget the Supabase AI assistant covered in the [setup guide](01-getti
 
 ---
 
+## Importing Data
+
+### "Can I import my Gmail into the Open Brain?"
+
+Yes. The [Email History Import](../recipes/email-history-import/) recipe connects to Gmail via OAuth, pulls emails by label and time window, strips noise (signatures, quoted replies, auto-generated messages), and loads each email as a thought with sender, subject, and date metadata. Takes about 30 minutes to set up. You need a Google Cloud project with Gmail API enabled.
+
+### "How do I import my ChatGPT conversations?"
+
+Export your data from ChatGPT (Settings → Data controls → Export data), then use the [ChatGPT Conversation Import](../recipes/chatgpt-conversation-import/) recipe. It processes the JSON export, extracts the meaningful exchanges, and loads them as thoughts. Unlike the manual approach described in the FAQ above, this handles the full export automatically.
+
+### "What other data sources can I import?"
+
+Check [`/recipes`](../recipes/) for the current list. The community is actively building importers for Google Activity (Takeout), Twitter/X archives, Claude conversations, Gemini, and more. Each recipe is a standalone build — pick the ones that match your data.
+
+---
+
 ## "How does this work with Obsidian?"
 
 Short answer: it doesn't, and it's not supposed to.
@@ -145,6 +161,35 @@ That's the whole point of the Open Brain. It's a foundation, not a finished prod
 ### "The agent's experience of pulling from the Open Brain felt like 'remembering' vs 'reading someone else's notes'"
 
 This is a precise description of what vector retrieval does differently from file reads. When an agent reads a file, it's processing someone else's organized structure. When it pulls from vector search, the retrieval is associative — finding what's relevant to the current context by meaning, not by where it was filed. That IS closer to how recall works.
+
+---
+
+## API Key Rotation
+
+### "I rotated my OpenRouter API key and now nothing works"
+
+When you generate a new key on openrouter.ai/keys, the old key is revoked immediately. But your Open Brain uses that key in multiple places — and updating it in one spot doesn't update the others. Everything downstream of the old key breaks silently.
+
+**Places your OpenRouter key lives (update ALL of them):**
+
+1. **Supabase Edge Function secrets** — This is the most common one to miss. Your MCP server reads the key from here at runtime.
+   ```bash
+   supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-new-key
+   ```
+
+2. **Local `.env` files** — Any recipes or integrations you run locally (e.g., `recipes/chatgpt-conversation-import/.env`). Open each one and replace the old key value.
+
+3. **CI/CD or deployment configs** — If you've set the key in any deployment pipeline, update it there too.
+
+**How to verify the new key works:**
+
+```bash
+curl https://openrouter.ai/api/v1/models -H "Authorization: Bearer sk-or-v1-your-new-key"
+```
+
+If you get a JSON list of models back, the key is valid. If you get a 401, the key is wrong or not yet active.
+
+**Tip:** After rotating a key, test your Open Brain immediately — capture a test thought and search for it. Don't wait days to discover it's broken.
 
 ---
 

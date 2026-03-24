@@ -6,7 +6,9 @@ Database table extensions and metadata schemas for your Supabase database. Drop 
 
 | Schema | What It Does |
 | ------ | ------------ |
-| [CRM Contacts](crm-contacts/) | Track people, interactions, and relationship context |
+| *(none yet — contributions welcome!)* | |
+
+> **Looking for CRM?** See [`extensions/professional-crm`](../extensions/professional-crm/) — it includes schema + a full MCP server.
 
 ## Ideas
 

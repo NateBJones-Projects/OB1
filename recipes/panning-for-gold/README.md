@@ -1,5 +1,15 @@
 # Panning for Gold
 
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@jaredirish](https://github.com/jaredirish)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
 *Brain dump processor for Open Brain*
 
 Turn raw brain dumps, voice transcripts, and stream-of-consciousness notes into structured, evaluated thought inventories that get captured into Open Brain automatically. Every line gets examined. The gold is in the tangents.

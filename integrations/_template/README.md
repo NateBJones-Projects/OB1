@@ -52,3 +52,7 @@ Solution: [How to fix it]
 
 **Issue: [Third common problem]**
 Solution: [How to fix it]
+
+## Tool Surface Area
+
+> If this integration exposes MCP tools, it adds to your AI's context weight. See the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on managing your tool count as your Open Brain grows.

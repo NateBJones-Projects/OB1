@@ -58,18 +58,79 @@ Your contribution's README must include these sections:
 4. **Expected outcome** — What should the user see when it's working? Be specific.
 5. **Troubleshooting** — At least 2-3 common issues and how to fix them.
 
-**Extensions** additionally require:
+### Visual Formatting Requirements
+
+These patterns are required for **extensions** and strongly recommended for all other contributions. They match the [Getting Started guide](docs/01-getting-started.md) and make guides scannable, beginner-friendly, and consistent across the repo.
+
+**Step badges** — Every major step gets a [shields.io](https://shields.io) badge as its header. Sub-steps get inverted badges (colored label, grey title). Pick one color per guide and use it consistently. See the extension template for the exact URL format.
+
+```markdown
+<!-- Main step badge -->
+![Step 1](https://img.shields.io/badge/Step_1-Create_the_Database_Tables-1E88E5?style=for-the-badge)
+
+<!-- Sub-step badge (inverted: color on left, grey on right) -->
+![1.1](https://img.shields.io/badge/1.1-Create_the_Tables-555?style=for-the-badge&labelColor=1E88E5)
+```
+
+**Verification checkpoints** — Every step ends with a `✅ **Done when:**` line telling the user exactly what to check before moving on.
+
+**Collapsible SQL blocks** — Wrap SQL in `<details>` with a descriptive summary so the page stays scannable:
+
+```markdown
+<details>
+<summary>📋 <strong>SQL: Description here</strong> (click to expand)</summary>
+
+\```sql
+-- your SQL here
+\```
+
+</details>
+```
+
+**GitHub alert callouts** — Use these for warnings, tips, and critical information:
+
+```markdown
+> [!CAUTION]    ← Stop-and-read-this-now errors
+> [!WARNING]    ← Things that can go wrong
+> [!IMPORTANT]  ← Required steps that are easy to skip
+> [!TIP]        ← Helpful but optional context
+> [!NOTE]       ← Additional background information
+```
+
+**Numbered commands** — When a step has 2+ commands that must run in order, number them with bold labels:
+
+```markdown
+**1. Create the function folder:**
+\```bash
+supabase functions new my-function
+\```
+
+**2. Download the server code:**
+\```bash
+curl -o supabase/functions/my-function/index.ts https://...
+\```
+```
+
+**GRANT step** — Every extension that creates tables MUST include a GRANT step. Supabase no longer auto-grants CRUD permissions to `service_role` on new projects:
+
+```sql
+grant select, insert, update, delete on table public.your_table to service_role;
+```
+
+### Extension-Specific Requirements
+
 - **"Why This Matters"** section leading with the human pain point
 - **"Learning Path"** table showing position in the 6-extension sequence
 - **"What You'll Learn"** listing new concepts introduced
 - **"Cross-Extension Integration"** prominently documenting connections to other extensions
 - **"Next Steps"** linking to the next extension
+- **Tool audit link** — Any extension or integration that exposes MCP tools must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in its "Next Steps" or closing section. This helps users manage their tool surface area as they add extensions. The link is checked by the automated review.
 - **Remote MCP setup** — MCP servers must be deployed as Supabase Edge Functions and connected via custom connectors (URL-based). Do NOT use local Node.js servers or `claude_desktop_config.json`. See the [extension template](extensions/_template/) for the correct pattern.
 
 **Primitives** additionally require:
 - **"Extensions That Use This"** section listing which extensions reference this primitive
 
-Check the `_template/` folder in each category for a starter README.
+Check the `_template/` folder in each category for a starter README. The extension template contains HTML comments with detailed instructions for both human contributors and AI assistants.
 
 ## metadata.json
 
@@ -174,7 +235,7 @@ As you contribute, you'll progress through these levels. Every level is achievab
 
 Non-code contributions count at every level. Testing recipes, mentoring non-technical contributors, improving documentation, and triaging issues all count toward progression.
 
-## The 11 Automated Review Rules
+## The Automated Review Rules
 
 Every PR is checked against these rules. All must pass before human review.
 
@@ -192,3 +253,4 @@ Every PR is checked against these rules. All must pass before human review.
 12. **Scope check** — All changes are within the contribution folder(s)
 13. **Internal links** — All relative links in READMEs resolve to existing files
 14. **Remote MCP pattern** — Extensions and integrations must use remote MCP via Supabase Edge Functions. No `claude_desktop_config.json`, no local Node.js stdio servers. See the [Getting Started guide](docs/01-getting-started.md) for the correct pattern
+15. **Tool audit link** — Extensions and integrations must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in their README. This ensures users are aware of tool surface area management as they add capabilities
