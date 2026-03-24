@@ -70,11 +70,33 @@ supabase functions deploy open-brain-mcp --no-verify-jwt
 supabase functions new open-brain-mcp
 ```
 
-## Step 2: copy the server files
+## Step 2: use the correct server files
+
+### If this PR is not merged yet
+
+Use the files from this PR branch or a local checkout of this branch, because the older server shape will not include the MCP changes this extension expects.
+
+Direct fetch example:
 
 ```bash
-cp /path/to/OB1/server/index.ts supabase/functions/open-brain-mcp/index.ts
-cp /path/to/OB1/server/deno.json supabase/functions/open-brain-mcp/deno.json
+curl -o supabase/functions/open-brain-mcp/index.ts   https://raw.githubusercontent.com/NomLom/OB1/feat/openclaw-native-memory-docs/server/index.ts
+curl -o supabase/functions/open-brain-mcp/deno.json   https://raw.githubusercontent.com/NomLom/OB1/feat/openclaw-native-memory-docs/server/deno.json
+```
+
+Local checkout example:
+
+```bash
+cp server/index.ts supabase/functions/open-brain-mcp/index.ts
+cp server/deno.json supabase/functions/open-brain-mcp/deno.json
+```
+
+### After this PR is merged
+
+Use the merged main-branch files:
+
+```bash
+curl -o supabase/functions/open-brain-mcp/index.ts   https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts
+curl -o supabase/functions/open-brain-mcp/deno.json   https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json
 ```
 
 ## Step 3: deploy
