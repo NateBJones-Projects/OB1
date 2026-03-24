@@ -1,5 +1,16 @@
 # Schema-Aware Routing Pattern
 
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@claydunker-yalc](https://github.com/claydunker-yalc)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
+
 A pattern for using LLM-extracted metadata to route unstructured text into the correct database tables automatically. One input message becomes writes to four different tables — `thoughts`, `people`, `interactions`, and `action_items` — based entirely on what the LLM finds in the text.
 
 > [!NOTE]
@@ -277,6 +288,6 @@ alter table interactions alter column embedding type vector(YOUR_DIMENSION);
 
 ## Credits
 
-Built by Clay Dunker ([@claydunker](https://github.com/claydunker)) — an elementary school teacher who builds with Claude Code. This pattern emerged from building a personal knowledge management system (Open Brain / OB1) that captures thoughts from Slack and routes them into a structured database.
+Built by Clay Dunker ([@claydunker-yalc](https://github.com/claydunker-yalc)) — an elementary school teacher who builds with Claude Code. This pattern emerged from building a personal knowledge management system (Open Brain / OB1) that captures thoughts from Slack and routes them into a structured database.
 
-If you want to learn more about the project, check out the main [OB1 repository](https://github.com/claydunker/ob1).
+If you want to learn more about the project, check out the main [OB1 repository](https://github.com/NateBJones-Projects/OB1).
