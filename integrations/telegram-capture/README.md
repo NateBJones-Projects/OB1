@@ -173,7 +173,7 @@ Then open Supabase dashboard → Table Editor → thoughts. You should see one r
 
 Every message you send to your Telegram bot automatically gets:
 - Embedded with a 1536-dimensional vector for semantic search
-- Classified by type (observation, task, idea, reference, person_note)
+- Classified by type (idea, task, person_note, reference, decision, lesson, meeting, journal)
 - Tagged with topics, people, action items, and dates (where applicable)
 - Stored in your Supabase `thoughts` table
 - Confirmed with a reply message showing the extracted metadata
