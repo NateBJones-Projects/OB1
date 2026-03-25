@@ -16,7 +16,7 @@ Parses Claude's conversation export (JSON format) and imports each conversation 
 - **Claude data export** — JSON file from Anthropic
 - **Node.js 18+** installed
 - **OpenRouter API key** for embedding generation
-- **`upsert_thought` RPC function** — This recipe calls the `upsert_thought` RPC function for idempotent imports. If you haven't set this up, see the [Content Fingerprint Dedup](../content-fingerprint-dedup/) recipe for the function definition.
+- **`upsert_thought` RPC function** — This recipe calls the `upsert_thought` RPC function for idempotent imports. If you haven't set this up, see the [Content Fingerprint Dedup](../../primitives/content-fingerprint-dedup/) guide for the function definition.
 
 ## Credential Tracker
 
