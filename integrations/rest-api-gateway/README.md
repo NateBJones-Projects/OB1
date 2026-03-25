@@ -85,7 +85,7 @@ curl -X POST "https://YOUR-PROJECT-REF.supabase.co/functions/v1/open-brain-rest/
 
 Expected response:
 ```json
-{"thought_id": "abc-123", "action": "inserted", "type": "observation", "message": "Captured new thought as observation"}
+{"thought_id": "abc-123", "action": "inserted", "type": "idea", "message": "Captured new thought as idea"}
 ```
 
 **Search your brain:**

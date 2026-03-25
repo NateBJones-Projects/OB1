@@ -55,7 +55,7 @@ async function extractMetadata(text: string): Promise<Record<string, unknown>> {
 - "action_items": array of implied to-dos (empty if none)
 - "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
 - "topics": array of 1-3 short topic tags (always at least one)
-- "type": one of "observation", "task", "idea", "reference", "person_note"
+- "type": one of "idea", "task", "person_note", "reference", "decision", "lesson", "meeting", "journal"
 Only extract what's explicitly there.`,
           },
           { role: "user", content: text.slice(0, 4000) },
