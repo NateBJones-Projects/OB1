@@ -724,4 +724,6 @@ app.post("*", async (c) => {
   return transport.handleRequest(c);
 });
 
+app.get("*", (c) => c.json({ status: "ok", service: "Open Brain MCP", version: "1.0.0" }));
+
 Deno.serve(app.fetch);
