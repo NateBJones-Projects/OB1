@@ -17,6 +17,11 @@ PostgreSQL has a built-in full-text search engine that:
 2. Ranks results by relevance
 3. Runs entirely in the database — no external service needed
 
+## Prerequisites
+
+- Working Open Brain setup ([guide](../../docs/01-getting-started.md))
+- The `thoughts` table must already exist
+
 ## Setup
 
 ### Step 1: Add a text search index
