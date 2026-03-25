@@ -181,6 +181,8 @@ order by created_at desc
 limit 5;
 ```
 
+> **Tool hygiene:** This integration adds MCP tools to your AI's context window. As you add more integrations, the total tool count grows. See the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on managing your tool surface area.
+
 ## Troubleshooting
 
 **Issue: `No LLM API key configured`**
