@@ -6,12 +6,17 @@
 
 Parses Claude's conversation export (JSON format) and imports each conversation as a thought with embeddings. Handles both `chat_messages` array and nested `content` block formats.
 
+## Security
+
+> **Security warning:** Claude conversation exports may contain API keys, tokens, or other secrets that were shared during conversations. Review your export files before importing to ensure no sensitive credentials are captured as thoughts.
+
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - **Claude data export** — JSON file from Anthropic
 - **Node.js 18+** installed
 - **OpenRouter API key** for embedding generation
+- **`upsert_thought` RPC function** — This recipe calls the `upsert_thought` RPC function for idempotent imports. If you haven't set this up, see the [Content Fingerprint Dedup](../content-fingerprint-dedup/) recipe for the function definition.
 
 ## Credential Tracker
 
