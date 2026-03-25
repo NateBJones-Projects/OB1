@@ -3,7 +3,7 @@
 A guide to connecting your Open Brain extensions to any AI client. Deploy once as a Supabase Edge Function, connect from anywhere.
 
 **Jump to your client:**
-[Claude Desktop](#claude-desktop) | [ChatGPT](#chatgpt) | [Claude Code](#claude-code) | [Cursor / Windsurf / VS Code / Zed](#other-clients-cursor-windsurf-vs-code-zed) | [Troubleshooting](#troubleshooting)
+[Claude Desktop](#claude-desktop) | [ChatGPT](#chatgpt) | [Claude Code](#claude-code) | [Cursor](#cursor) | [Other Clients](#other-clients-windsurf-vs-code-zed) | [Troubleshooting](#troubleshooting)
 
 ## What You Need
 
@@ -55,13 +55,31 @@ claude mcp add --transport http extension-name \
 
 Replace `extension-name` with a short name (e.g., `household-knowledge`, `family-calendar`), the URL with your MCP Server URL (without the `?key=` part), and `your-access-key` with your MCP Access Key.
 
-## Other Clients (Cursor, Windsurf, VS Code, Zed)
+## Cursor
+
+Cursor supports remote MCP servers natively. Add this to your `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "extension-name": {
+      "url": "https://YOUR_PROJECT_REF.supabase.co/functions/v1/extension-mcp?key=your-access-key"
+    }
+  }
+}
+```
+
+Restart Cursor and the extension's tools should appear in Settings → Features → MCP.
+
+> Do **not** use `mcp-remote` for Cursor. Newer versions of `mcp-remote` attempt OAuth client registration, which fails against Open Brain's simple key-based auth. Cursor's native `url` field works directly.
+
+## Other Clients (Windsurf, VS Code, Zed)
 
 Every MCP client handles remote servers slightly differently. Your extension accepts the access key two ways — pick whichever your client supports:
 
 **Option A: URL with key (easiest).** If your client has a field for a remote MCP server URL, paste the full MCP Connection URL including `?key=your-access-key`. This works for any client that supports remote MCP without requiring headers.
 
-**Option B: mcp-remote bridge.** If your client only supports local stdio servers (configured via a JSON config file), use `mcp-remote` to bridge to the remote server. This requires Node.js installed.
+**Option B: mcp-remote bridge (if your client only supports stdio).** Use `mcp-remote` to bridge to the remote server. This requires Node.js installed. Pass the access key via the URL query parameter (not a header) to avoid OAuth discovery issues with newer versions of `mcp-remote`:
 
 ```json
 {
@@ -69,20 +87,16 @@ Every MCP client handles remote servers slightly differently. Your extension acc
     "extension-name": {
       "command": "npx",
       "args": [
+        "-y",
         "mcp-remote",
-        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/extension-mcp",
-        "--header",
-        "x-access-key:${ACCESS_KEY}"
-      ],
-      "env": {
-        "ACCESS_KEY": "your-access-key"
-      }
+        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/extension-mcp?key=your-access-key"
+      ]
     }
   }
 }
 ```
 
-> Note: no space after the colon in `x-access-key:${ACCESS_KEY}`. Some clients have a bug where spaces inside args get mangled.
+> Older examples pass the access key via `--header`. This breaks with `mcp-remote@latest` because it now attempts OAuth client registration before sending custom headers. Pass the key via the `?key=` query parameter instead.
 
 ## Troubleshooting
 
@@ -99,7 +113,8 @@ Every MCP client handles remote servers slightly differently. Your extension acc
 **Getting 401 errors**
 - The access key doesn't match what's stored in Supabase secrets
 - Double-check that the `?key=` value in your URL matches your MCP Access Key exactly
-- If using the header approach (Claude Code or mcp-remote), the header must be `x-access-key` (lowercase, with the dash)
+- If using the header approach (Claude Code), the core Open Brain server uses `x-brain-key` while extension servers use `x-access-key`
+- Prefer the `?key=` query parameter approach to avoid header name confusion
 
 **Tools work but responses are slow**
 - First request on a cold Edge Function takes a few seconds to warm up
