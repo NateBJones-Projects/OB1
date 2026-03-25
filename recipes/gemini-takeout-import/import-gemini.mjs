@@ -14,6 +14,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { createHash } from "crypto";
+import { existsSync } from "fs";
 import { readFile } from "fs/promises";
 import { config } from "dotenv";
 
@@ -43,6 +44,13 @@ const limit = parseInt(args[args.indexOf("--limit") + 1]) || Infinity;
 
 if (!filePath) {
   console.error("Usage: node import-gemini.mjs /path/to/gemini-export.html [--dry-run] [--skip N] [--limit N]");
+  process.exit(1);
+}
+
+if (!existsSync(filePath)) {
+  console.error(`Error: Input file not found: ${filePath}`);
+  console.error("Make sure the path to your Gemini Takeout export is correct.");
+  console.error("Download it from Google Takeout → Gemini Apps → My Activity.");
   process.exit(1);
 }
 
