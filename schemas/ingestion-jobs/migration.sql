@@ -129,6 +129,7 @@ $$;
 -- Grant access to service_role
 grant select, insert, update, delete on table public.ingestion_jobs to service_role;
 grant select, insert, update, delete on table public.ingestion_items to service_role;
+grant execute on function public.append_thought_evidence to service_role;
 
 -- RLS: enable row-level security (no policies = service-role only by default)
 alter table public.ingestion_jobs enable row level security;

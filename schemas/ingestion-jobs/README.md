@@ -13,21 +13,6 @@ Jobs support a **dry-run workflow**: extract and reconcile without writing to `t
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - The `thoughts` table must already exist
 
-## Credential Tracker
-
-Copy this block into a text editor and fill it in as you go.
-
-```text
-INGESTION JOBS -- CREDENTIAL TRACKER
---------------------------------------
-
-SUPABASE (from your Open Brain setup)
-  Project URL:           ____________
-  Service role key:      ____________
-
---------------------------------------
-```
-
 ## Schema Overview
 
 ### `ingestion_jobs` table
@@ -120,11 +105,37 @@ After running the migration:
 - Row-level security enabled on both tables (service-role access only)
 - The `input_hash` unique constraint prevents duplicate job creation for the same input document
 
+## Lifecycle Flow
+
+A typical ingestion follows this sequence:
+
+```
+1. CREATE JOB          status='pending'
+       │
+2. EXTRACT             status='extracting'
+   LLM splits doc      Items created with action='pending', status='pending'
+   into atomic items
+       │
+3. RECONCILE           status='extracting'
+   Each item compared   Items updated: action='add'|'skip'|'append_evidence'|'create_revision'
+   to existing thoughts                  status='ready'
+       │
+4. DRY-RUN COMPLETE    status='dry_run_complete'
+   Pause for review     All items have action + reason set
+       │
+5. EXECUTE             status='executing'
+   Approved items       Items: status='executed' or 'failed'
+   written to thoughts
+       │
+6. COMPLETE            status='complete'
+   Counts tallied       added_count, skipped_count, appended_count, revised_count updated
+```
+
 ## Design Notes
 
 - All IDs are `uuid` to match Open Brain's standard ID types.
 - `input_hash` has a unique constraint for idempotency — submitting the same document twice returns the existing job instead of creating a duplicate.
-- The `action` field on items captures the reconciliation decision *before* execution, making dry-run previews possible. The `status` field tracks whether that decision has been carried out.
+- The `action` and `status` fields on items serve different purposes: `action` captures the reconciliation decision (what *should* happen — `add`, `skip`, `append_evidence`, `create_revision`), while `status` tracks execution progress (whether that decision *has been* carried out — `pending`, `ready`, `executed`, `failed`). Both default to `'pending'` but at different lifecycle stages.
 - `matched_thought_id` and `result_thought_id` are nullable `uuid` references rather than formal foreign keys, allowing the schema to work even if referenced thoughts are deleted.
 
 ## Troubleshooting
