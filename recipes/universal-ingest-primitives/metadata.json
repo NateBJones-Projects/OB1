@@ -1,0 +1,20 @@
+{
+  "name": "Universal Ingest Primitives",
+  "description": "Shared structured capture parsing and thought payload preparation contract for consistent ingestion across all capture paths.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["ingestion", "capture", "normalization", "structured-input", "pipeline"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-03-22",
+  "updated": "2026-03-22"
+}
