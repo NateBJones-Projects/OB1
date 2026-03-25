@@ -1,0 +1,16 @@
+{
+  "name": "Reflections",
+  "description": "Structured reasoning traces linked to thoughts — capture deliberation processes with trigger context, options considered, factors weighed, and conclusions reached.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true
+  },
+  "tags": ["reasoning", "decisions", "analysis", "deliberation"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes"
+}
