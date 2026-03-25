@@ -32,7 +32,7 @@ Adds a `sensitivity_tier` column to your `thoughts` table and provides a reusabl
 
 ### Credential Tracker
 
-No credentials needed. This primitive is pure pattern matching with no external API calls.
+No credentials needed. This recipe is pure pattern matching with no external API calls.
 
 ## Steps
 

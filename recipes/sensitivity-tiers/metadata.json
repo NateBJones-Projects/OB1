@@ -1,7 +1,7 @@
 {
   "name": "Sensitivity Tiers",
   "description": "Three-tier content sensitivity classification (restricted/personal/standard) using regex pattern matching. Detects SSNs, API keys, passwords, credit cards, medication dosages, health data, and financial details. Includes migration SQL and a reusable detection function.",
-  "category": "primitives",
+  "category": "recipes",
   "author": {
     "name": "Alan Shurafa",
     "github": "alanshurafa"
