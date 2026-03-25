@@ -9,7 +9,7 @@
   "version": "1.0.0",
   "requires": {
     "open_brain": true,
-    "services": ["Anthropic API or OpenAI API or OpenRouter"],
+    "services": ["OpenAI API or OpenRouter (embeddings)", "Anthropic API or OpenAI API or OpenRouter (extraction)"],
     "tools": ["Supabase CLI"]
   },
   "tags": ["ingestion", "extraction", "llm", "deduplication", "edge-function", "smart-ingest"],

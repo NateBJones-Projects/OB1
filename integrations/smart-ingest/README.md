@@ -13,11 +13,29 @@ The reconciliation engine makes four possible decisions per extracted thought:
 - **append_evidence** — Similar thought exists and is richer; add this as corroborating evidence
 - **create_revision** — Similar thought exists but this version has more information; create a new revision
 
+**Deduplication thresholds** (configurable in `index.ts`):
+
+| Threshold | Value | Meaning |
+|-----------|-------|---------|
+| `SEMANTIC_SKIP_THRESHOLD` | 0.92 | Above this similarity, the thought is considered a duplicate and skipped. Set high to avoid false positives — only near-identical thoughts are auto-skipped. |
+| `SEMANTIC_MATCH_THRESHOLD` | 0.85 | Above this (but below skip), the thought is considered related to an existing one. The engine then compares content richness to decide between `append_evidence` and `create_revision`. |
+
+Below 0.85, the thought is treated as entirely new (`add`).
+
+## Use Cases
+
+- **Meeting notes** — Paste raw meeting transcripts to extract decisions, action items, and key facts as individual thoughts
+- **Journal entries** — Import daily journal entries and let the LLM split them into atomic, searchable thoughts
+- **Article/blog ingestion** — Extract key insights from articles you've read, automatically deduped against what you already know
+- **Email thread processing** — Turn long email threads into discrete actionable items and reference facts
+- **Bulk import** — Process large documents with dry-run preview to ensure quality before committing
+
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - Ingestion Jobs schema (see `schemas/ingestion-jobs` contribution) applied to your database
-- At least one LLM API key: Anthropic, OpenAI, or OpenRouter
+- At least one LLM API key for extraction: Anthropic, OpenAI, or OpenRouter
+- An embedding API key: OpenAI or OpenRouter (Anthropic does not provide embeddings)
 - Supabase CLI installed
 
 ## Cost
