@@ -113,6 +113,7 @@ server.registerTool(
       const results = data.map(
         (
           t: {
+            id: string;
             content: string;
             metadata: Record<string, unknown>;
             similarity: number;
@@ -123,6 +124,7 @@ server.registerTool(
           const m = t.metadata || {};
           const parts = [
             `--- Result ${i + 1} (${(t.similarity * 100).toFixed(1)}% match) ---`,
+            `ID: ${t.id}`,
             `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
             `Type: ${m.type || "unknown"}`,
           ];
@@ -173,7 +175,7 @@ server.registerTool(
     try {
       let q = supabase
         .from("thoughts")
-        .select("content, metadata, created_at")
+        .select("id, content, metadata, created_at")
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -201,12 +203,12 @@ server.registerTool(
 
       const results = data.map(
         (
-          t: { content: string; metadata: Record<string, unknown>; created_at: string },
+          t: { id: string; content: string; metadata: Record<string, unknown>; created_at: string },
           i: number
         ) => {
           const m = t.metadata || {};
           const tags = Array.isArray(m.topics) ? (m.topics as string[]).join(", ") : "";
-          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
+          return `${i + 1}. [${t.id}] [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
         }
       );
 
@@ -352,6 +354,66 @@ server.registerTool(
 
       return {
         content: [{ type: "text" as const, text: confirmation }],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Tool 5: Delete Thought
+server.registerTool(
+  "delete_thought",
+  {
+    title: "Delete Thought",
+    description:
+      "Delete a thought from the Open Brain by its ID. Use search_thoughts or list_thoughts first to find the ID of the thought to delete.",
+    inputSchema: {
+      id: z.string().describe("The UUID of the thought to delete (from search_thoughts or list_thoughts output)"),
+    },
+  },
+  async ({ id }) => {
+    try {
+      // First fetch the thought so we can confirm what was deleted
+      const { data: existing, error: fetchError } = await supabase
+        .from("thoughts")
+        .select("id, content, metadata")
+        .eq("id", id)
+        .single();
+
+      if (fetchError || !existing) {
+        return {
+          content: [{ type: "text" as const, text: `No thought found with ID: ${id}` }],
+          isError: true,
+        };
+      }
+
+      const { error } = await supabase
+        .from("thoughts")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Failed to delete: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      const m = (existing.metadata || {}) as Record<string, unknown>;
+      const preview = existing.content.length > 100
+        ? existing.content.substring(0, 100) + "..."
+        : existing.content;
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Deleted thought ${id} (${m.type || "unknown"}):\n${preview}`,
+          },
+        ],
       };
     } catch (err: unknown) {
       return {
