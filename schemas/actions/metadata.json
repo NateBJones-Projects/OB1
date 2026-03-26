@@ -1,20 +1,20 @@
 {
   "name": "Actions",
-  "description": "Trackable work items extracted from thoughts or captured directly. Supports status tracking, due dates, blocking relationships, and completion notes.",
+  "description": "Trackable work items extracted from thoughts or captured directly. Supports status tracking, due dates, blocking relationships, completion notes, and recurring schedules (daily/weekly/monthly).",
   "category": "schemas",
   "author": {
     "name": "Nate B. Jones",
     "github": "NateBJones-Projects"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "requires": {
     "open_brain": true,
     "services": [],
     "tools": []
   },
-  "tags": ["actions", "tasks", "tracking", "phase-1"],
+  "tags": ["actions", "tasks", "tracking", "recurrence", "phase-1"],
   "difficulty": "beginner",
   "estimated_time": "5 minutes",
   "created": "2026-03-25",
-  "updated": "2026-03-25"
+  "updated": "2026-03-26"
 }

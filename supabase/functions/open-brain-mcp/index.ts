@@ -68,6 +68,22 @@ Only extract what's explicitly there.`,
   }
 }
 
+function calculateNextDue(currentDue: string | null, recurrence: string): string {
+  const base = currentDue ? new Date(currentDue) : new Date();
+  switch (recurrence) {
+    case "daily":
+      base.setDate(base.getDate() + 1);
+      break;
+    case "weekly":
+      base.setDate(base.getDate() + 7);
+      break;
+    case "monthly":
+      base.setMonth(base.getMonth() + 1);
+      break;
+  }
+  return base.toISOString().split("T")[0];
+}
+
 // --- MCP Server Setup ---
 
 const server = new McpServer({
@@ -369,9 +385,10 @@ server.registerTool(
       thought_id: z.string().optional().describe("UUID of the source thought to link"),
       blocked_by: z.string().optional().describe("What is blocking this action"),
       unblocks: z.string().optional().describe("What this action unblocks when done"),
+      recurrence: z.enum(["daily", "weekly", "monthly"]).optional().describe("Recurrence schedule: daily, weekly, or monthly"),
     },
   },
-  async ({ content, due_date, tags, thought_id, blocked_by, unblocks }) => {
+  async ({ content, due_date, tags, thought_id, blocked_by, unblocks, recurrence }) => {
     try {
       const row: Record<string, unknown> = { content };
       if (due_date) row.due_date = due_date;
@@ -379,11 +396,12 @@ server.registerTool(
       if (thought_id) row.thought_id = thought_id;
       if (blocked_by) row.blocked_by = blocked_by;
       if (unblocks) row.unblocks = unblocks;
+      if (recurrence) row.recurrence = recurrence;
 
       const { data, error } = await supabase
         .from("actions")
         .insert(row)
-        .select("id, content, status, due_date, tags")
+        .select("id, content, status, due_date, tags, recurrence")
         .single();
 
       if (error) {
@@ -396,6 +414,7 @@ server.registerTool(
       let msg = `Action created (${data.id}):\n"${data.content}"`;
       if (data.due_date) msg += `\nDue: ${data.due_date}`;
       if (data.tags?.length) msg += `\nTags: ${data.tags.join(", ")}`;
+      if (data.recurrence) msg += `\nRecurrence: ${data.recurrence}`;
       if (blocked_by) msg += `\nBlocked by: ${blocked_by}`;
       if (unblocks) msg += `\nUnblocks: ${unblocks}`;
 
@@ -493,7 +512,7 @@ server.registerTool(
           completion_note,
         })
         .eq("id", id)
-        .select("id, content, completed_at, completion_note")
+        .select("id, content, completed_at, completion_note, recurrence, due_date, tags, thought_id")
         .single();
 
       if (error) {
@@ -503,13 +522,36 @@ server.registerTool(
         };
       }
 
+      let msg = `Action completed (${data.id}):\n"${data.content}"\nCompleted: ${new Date(data.completed_at).toLocaleDateString()}\nNote: ${data.completion_note}`;
+
+      // Auto-spawn next instance for recurring actions
+      if (data.recurrence) {
+        const nextDue = calculateNextDue(data.due_date, data.recurrence);
+        const nextRow: Record<string, unknown> = {
+          content: data.content,
+          status: "open",
+          due_date: nextDue,
+          recurrence: data.recurrence,
+          recurrence_source_id: data.id,
+        };
+        if (data.tags?.length) nextRow.tags = data.tags;
+        if (data.thought_id) nextRow.thought_id = data.thought_id;
+
+        const { data: spawned, error: spawnErr } = await supabase
+          .from("actions")
+          .insert(nextRow)
+          .select("id, due_date")
+          .single();
+
+        if (spawnErr) {
+          msg += `\n\nWarning: Failed to spawn next recurring instance: ${spawnErr.message}`;
+        } else {
+          msg += `\n\nNext ${data.recurrence} instance created (${spawned.id}):\nDue: ${spawned.due_date}`;
+        }
+      }
+
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Action completed (${data.id}):\n"${data.content}"\nCompleted: ${new Date(data.completed_at).toLocaleDateString()}\nNote: ${data.completion_note}`,
-          },
-        ],
+        content: [{ type: "text" as const, text: msg }],
       };
     } catch (err: unknown) {
       return {
@@ -531,14 +573,15 @@ server.registerTool(
       status: z.enum(["open", "in_progress", "done", "cancelled"]).optional().describe("Filter by status (default: open)"),
       days: z.number().optional().describe("Only actions from the last N days"),
       tag: z.string().optional().describe("Filter by tag"),
+      recurring_only: z.boolean().optional().describe("Only show recurring actions"),
       limit: z.number().optional().default(20).describe("Max results"),
     },
   },
-  async ({ status, days, tag, limit }) => {
+  async ({ status, days, tag, recurring_only, limit }) => {
     try {
       let q = supabase
         .from("actions")
-        .select("id, content, status, due_date, tags, blocked_by, unblocks, created_at, completed_at, completion_note")
+        .select("id, content, status, due_date, tags, blocked_by, unblocks, created_at, completed_at, completion_note, recurrence")
         .limit(limit);
 
       // Default to open if no status specified
@@ -556,6 +599,10 @@ server.registerTool(
 
       if (tag) {
         q = q.contains("tags", [tag]);
+      }
+
+      if (recurring_only) {
+        q = q.not("recurrence", "is", null);
       }
 
       // Sort by due_date ascending (nulls last) for open/in_progress, by completed_at desc for done
@@ -592,8 +639,10 @@ server.registerTool(
           created_at: string;
           completed_at: string | null;
           completion_note: string | null;
+          recurrence: string | null;
         }, i: number) => {
-          const parts = [`${i + 1}. [${a.status}] ${a.content}`];
+          const badge = a.recurrence ? ` (recurring: ${a.recurrence})` : "";
+          const parts = [`${i + 1}. [${a.status}] ${a.content}${badge}`];
           parts.push(`   ID: ${a.id}`);
           if (a.due_date) parts.push(`   Due: ${a.due_date}`);
           if (a.tags?.length) parts.push(`   Tags: ${a.tags.join(", ")}`);
