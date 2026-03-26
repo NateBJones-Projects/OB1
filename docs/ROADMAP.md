@@ -18,11 +18,14 @@
 
 ## Phase 1: Close the loops
 
-### Feature 1.1: Actions table
+### Feature 1.1: Actions table ✅ COMPLETE
+
+**Status:** Deployed. Schema and MCP tools (`create_action`, `update_action`, `complete_action`, `list_actions`, `search_actions`) are live.
 
 **Category:** `schemas/actions` + MCP tool additions to `supabase/functions/open-brain-mcp/index.ts`
 
-**What to build:**
+<details>
+<summary>Original spec (reference)</summary>
 
 A separate `actions` table for trackable work items extracted from thoughts. The current system stores action items as metadata inside the `thoughts` table JSONB — they can't be updated, completed, or queried independently.
 
@@ -62,56 +65,371 @@ create trigger actions_updated_at
   for each row execute function update_actions_timestamp();
 ```
 
-**MCP tools to add to `open-brain-mcp/index.ts`:**
+**MCP tools:**
 
 | Tool | Params | Description |
 |------|--------|-------------|
 | `create_action` | `content`, `due_date?`, `tags?`, `thought_id?`, `blocked_by?`, `unblocks?` | Create a new action. If `thought_id` provided, links to source thought. |
 | `update_action` | `id`, `status?`, `due_date?`, `blocked_by?`, `unblocks?`, `tags?` | Update any mutable field. |
-| `complete_action` | `id`, `completion_note` | Sets status=done, completed_at=now(). `completion_note` is required — must include what was done, who was unblocked, and what deadline was met. |
-| `list_actions` | `status?`, `days?`, `tag?`, `limit?` | List actions filtered by status, recency, or tag. Default: open actions sorted by due_date nulls last. |
+| `complete_action` | `id`, `completion_note` | Sets status=done, completed_at=now(). `completion_note` is required. |
+| `list_actions` | `status?`, `days?`, `tag?`, `limit?` | List actions filtered by status, recency, or tag. |
 | `search_actions` | `query`, `limit?` | Full-text search across action content and completion notes. |
 
-**Key decisions:**
-- `thought_id` is nullable — actions can exist independently (captured directly) or linked to a source thought.
-- `completion_note` is required on `complete_action` — this is deliberate. Logging completions with date, context, who was unblocked, and what deadline was met keeps the brain clean.
-- No embedding column on actions — they're short, structured, and queried by status/date, not semantically.
+</details>
+
+---
+
+### Feature 1.1a: UUID exposure in retrieval tools
+
+**Category:** Patch to `supabase/functions/open-brain-mcp/index.ts`
+
+**What to build:**
+
+Add the `id` (UUID) field to the output of `search_thoughts`, `list_thoughts`, and `capture_thought`. Currently these tools don't return the thought's UUID, which makes it impossible to link a thought to an action via `thought_id` in a single conversational turn.
+
+**Changes to `open-brain-mcp/index.ts`:**
+
+1. **`list_thoughts`** — add `id` to the select statement and output:
+```typescript
+// Change this:
+.select("content, metadata, created_at")
+// To this:
+.select("id, content, metadata, created_at")
+```
+Update the output format to include the ID:
+```typescript
+return `${i + 1}. [${t.id}] [${new Date(t.created_at).toLocaleDateString()}] ...`
+```
+
+2. **`search_thoughts`** — add `id` to the type annotation and output:
+```typescript
+// The match_thoughts RPC already returns id — just include it in the output.
+t: { id: string; content: string; metadata: Record<string, unknown>; similarity: number; created_at: string; }
+parts.unshift(`ID: ${t.id}`);
+```
+
+3. **`capture_thought`** — return the new thought's UUID after insert:
+```typescript
+const { data: inserted, error } = await supabase.from("thoughts").insert({...}).select("id").single();
+confirmation = `[${inserted.id}] ` + confirmation;
+```
+
+4. **`list_actions`** and **`search_actions`** — verify these already return `id`. If not, apply the same pattern.
+
+**Why this matters:**
+Without UUIDs in the output, a workflow like "find the thought about HVAC ductwork and create an action linked to it" requires the user to manually look up the ID in Supabase. With UUIDs exposed, Claude can do `search_thoughts` → grab the ID → pass it as `thought_id` to `create_action` in one turn.
 
 **Test prompts after deploy:**
 ```
-Create an action: Schedule call with Integrity Air for HVAC ductwork repair. Tag: home, mold-remediation. Due: next Friday.
+Search my thoughts for "Integrity Air"
+→ Should return results with UUID visible
 
-List my open actions.
-
-Complete action [id]: Called Integrity Air, scheduled inspection for April 2. Unblocks Breathe Easy starting crawl space work.
+Create an action from that thought: "Call Integrity Air for ductwork estimate"
+→ Claude should use the UUID from the search result as thought_id
 ```
 
 ---
 
-### Feature 1.2: Thought visualization dashboard
+### Feature 1.1b: Recurring actions
 
-**Category:** `dashboards/thought-explorer`
+**Category:** Schema migration + MCP tool updates in `supabase/functions/open-brain-mcp/index.ts`
 
 **What to build:**
 
-Next.js dashboard showing all thoughts with multiple view modes. Clone `dashboards/data-browser/` as the starting skeleton.
+Add recurrence support to the `actions` table so repeating tasks (weekly reviews, monthly maintenance checks, daily standup prep) automatically generate new instances when completed.
 
-**Views:**
+**Schema migration (`schemas/actions/002_recurring.sql`):**
 
-1. **Timeline view** (default): Reverse-chronological list of thoughts. Each card shows content, type badge, topic tags, people mentioned, and timestamp. Click to expand full content + metadata.
+```sql
+-- Add recurrence columns to actions table
+alter table actions add column recurrence text check (recurrence in ('daily', 'weekly', 'monthly'));
+alter table actions add column recurrence_source_id uuid references actions(id) on delete set null;
 
-2. **Activity heatmap**: GitHub-style contribution grid. X-axis = weeks, Y-axis = days. Cell color intensity = number of thoughts captured that day. Hovering a cell shows the count and date.
+-- Index for finding recurring actions due for regeneration
+create index idx_actions_recurrence on actions(recurrence) where recurrence is not null;
+```
 
-3. **Topic clusters**: Group thoughts by their primary topic tag. Show each cluster as a card with count badge. Click a cluster to filter the timeline to that topic.
+**Column definitions:**
+- `recurrence`: `null` = one-time action. `'daily'` / `'weekly'` / `'monthly'` = repeating.
+- `recurrence_source_id`: When a recurring action is completed and a new instance is spawned, the new instance points back to the completed one. This creates a chain for completion history.
+
+**MCP tool changes:**
+
+1. **`create_action`** — add optional `recurrence` param.
+
+2. **`complete_action`** — when completing a recurring action, auto-spawn the next instance:
+```typescript
+if (completedAction.recurrence) {
+  const nextDue = calculateNextDue(completedAction.due_date, completedAction.recurrence);
+  await supabase.from("actions").insert({
+    content: completedAction.content,
+    status: 'open',
+    due_date: nextDue,
+    recurrence: completedAction.recurrence,
+    recurrence_source_id: completedAction.id,
+    tags: completedAction.tags,
+  });
+}
+```
+
+3. **Due date calculation logic:**
+```typescript
+function calculateNextDue(currentDue: string | null, recurrence: string): string {
+  const base = currentDue ? new Date(currentDue) : new Date();
+  switch (recurrence) {
+    case 'daily':
+      base.setDate(base.getDate() + 1);
+      break;
+    case 'weekly':
+      base.setDate(base.getDate() + 7);
+      break;
+    case 'monthly':
+      base.setMonth(base.getMonth() + 1);
+      break;
+  }
+  return base.toISOString().split('T')[0];
+}
+```
+
+4. **`list_actions`** — add optional `recurring_only` boolean filter. Show `(recurring: weekly)` badge in output.
+
+**Key decisions:**
+- Recurrence lives on the action itself, not a separate schedule table.
+- New instances spawn on completion, not on a cron. Avoids guilt-pile-up of stacked copies.
+- `recurrence_source_id` chain gives you completion history for any recurring task.
+- Due dates anchor to the schedule, not completion date: "Weekly review" due Sunday March 29, completed Friday March 27 → next due Sunday April 5.
+
+**Test prompts after deploy:**
+```
+Create a recurring action: Weekly review. Recurrence: weekly. Due: Sunday. Tag: productivity.
+
+Complete action [id]: Completed weekly review — surfaced 3 stale loops, captured 2 new action items.
+→ Should confirm completion AND show that next instance was created with due date = next Sunday.
+
+List my open actions.
+→ Should show the newly spawned weekly review with next Sunday's due date.
+```
+
+---
+
+### Feature 1.1c: Due dates on recurring actions
+
+**Category:** Included in Feature 1.1b — this is a design note, not a separate build.
+
+**Clarification:**
+
+Feature 1.1b already handles due dates on recurring actions. When `complete_action` spawns the next instance, it calculates `due_date` from the current instance's due date (not from today). This means:
+
+- If "Weekly review" is due Sunday March 29 and you complete it on Friday March 27, the next instance is due Sunday April 5 (7 days from the *due date*, not from *today*).
+- If you complete it late on Tuesday April 1, the next instance is still due Sunday April 5 — it anchors to the schedule, not your completion date.
+- If `due_date` is null on the source action, it falls back to calculating from today.
+
+**The daily prioritization prompt should weight recurring actions with approaching due dates the same as one-time actions.** No special treatment.
+
+---
+
+### Feature 1.1d: Scheduled task engine
+
+**Category:** `schemas/scheduled-tasks` + `supabase/functions/task-runner/index.ts`
+
+**What to build:**
+
+A general-purpose engine for "Claude takes action based on a trigger." The Andrea deck prep, morning briefing, stale loop detection, alerting — these are all the same shape:
+
+```
+Trigger (date, cron, event) → Data gathering (query brain) → Execution (LLM + output) → Delivery (email, Slack, file)
+```
+
+Building each one as a standalone Edge Function creates maintenance sprawl. Instead, build one task runner that executes registered task definitions.
+
+**Schema (`schemas/scheduled-tasks/schema.sql`):**
+
+```sql
+create table scheduled_tasks (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  description text,
+  enabled boolean default true,
+
+  -- Trigger configuration
+  trigger_type text not null check (trigger_type in ('cron', 'due_date', 'event', 'manual')),
+  cron_expression text,                    -- for cron triggers: '0 7 * * *'
+  due_date_source text,                    -- for due_date triggers: 'actions', 'important_dates', 'maintenance_tasks'
+  due_date_lead_days int default 1,        -- how many days before due_date to fire
+  event_source text,                       -- for event triggers: 'google_calendar'
+  event_lead_hours int default 2,          -- how many hours before event to fire
+
+  -- Data gathering configuration (what to pull from the brain)
+  gather_config jsonb not null default '{}',
+
+  -- Execution configuration (what to do with the gathered data)
+  task_type text not null check (task_type in (
+    'llm_prompt',        -- send gathered data to LLM with a prompt template
+    'alert_digest',      -- format as notification digest
+    'deck_builder',      -- generate a slide deck from template
+    'stale_loop_scan',   -- specialized: find stale actions/questions
+    'trend_analysis'     -- specialized: compute weekly metrics
+  )),
+  prompt_template text,            -- for llm_prompt: the system prompt to use
+  deck_template_id text,           -- for deck_builder: reference to a template config
+  output_format text default 'markdown' check (output_format in ('markdown', 'html', 'pptx', 'json')),
+
+  -- Delivery configuration
+  delivery_channel text not null default 'email' check (delivery_channel in ('email', 'telegram', 'slack', 'file', 'mcp_response')),
+  delivery_config jsonb default '{}',
+
+  -- Metadata
+  last_run_at timestamptz,
+  last_run_status text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table task_run_log (
+  id uuid primary key default gen_random_uuid(),
+  task_id uuid references scheduled_tasks(id) on delete cascade,
+  started_at timestamptz default now(),
+  completed_at timestamptz,
+  status text not null default 'running' check (status in ('running', 'success', 'error')),
+  input_summary text,       -- what data was gathered
+  output_summary text,      -- what was produced
+  error_message text,
+  delivery_status text       -- 'sent', 'failed', 'skipped'
+);
+
+create index idx_task_runs_task_id on task_run_log(task_id);
+create index idx_scheduled_tasks_trigger on scheduled_tasks(trigger_type) where enabled = true;
+```
+
+**Edge Function: `supabase/functions/task-runner/index.ts`**
+
+One function, called by `pg_cron` on a regular interval (every 15 minutes or hourly). On each run:
+
+```
+1. Query scheduled_tasks where enabled = true
+2. For each task, evaluate trigger:
+   - cron: does cron_expression match current time window?
+   - due_date: are there items in due_date_source due within due_date_lead_days?
+   - event: are there calendar events within event_lead_hours?
+   - manual: skip (only fires via MCP tool)
+3. For triggered tasks, execute gather phase using gather_config
+4. Execute task_type handler with gathered data
+5. Deliver output via delivery_channel
+6. Log to task_run_log
+```
+
+**MCP tools:**
+
+| Tool | Params | Description |
+|------|--------|-------------|
+| `create_scheduled_task` | `name`, `trigger_type`, `task_type`, `gather_config`, `delivery_channel`, + trigger-specific params | Register a new scheduled task. |
+| `update_scheduled_task` | `id`, any mutable field | Update task configuration. |
+| `list_scheduled_tasks` | `enabled_only?` (default true) | Show all registered tasks with last run status. |
+| `run_task_now` | `id` or `name` | Manually trigger any task regardless of schedule. |
+| `task_run_history` | `task_id?`, `limit?` (default 10) | View recent task execution logs. |
+
+**Pre-built task types (register as seed data):**
+
+| Task name | trigger_type | task_type | Description |
+|-----------|-------------|-----------|-------------|
+| `morning-briefing` | `cron` (`0 7 * * 1-5`) | `llm_prompt` | Weekday morning prioritization |
+| `weekly-review` | `cron` (`0 9 * * 0`) | `llm_prompt` | Sunday weekly review |
+| `stale-loop-scan` | `cron` (`0 9 * * 1`) | `stale_loop_scan` | Monday scan for stale actions/questions |
+| `alert-digest` | `cron` (`0 7 * * *`) | `alert_digest` | Daily scan of approaching due dates |
+| `andrea-deck-prep` | `event` | `deck_builder` | Pre-populate Andrea deck before calendar events |
+| `weekly-trends` | `cron` (`0 9 * * 0`) | `trend_analysis` | Compute topic velocity, sentiment shifts |
+
+**Build order within this feature:**
+
+```
+Step 1: Schema + task runner Edge Function with manual trigger only
+Step 2: Add cron trigger evaluation
+Step 3: Implement llm_prompt task type (powers morning briefing + weekly review)
+Step 4: Implement alert_digest task type (replaces standalone alerting)
+Step 5: Implement stale_loop_scan task type (scheduled mode of 3.2)
+Step 6: Implement deck_builder task type (Andrea deck — BLOCKED on template)
+Step 7: Add event trigger (Google Calendar integration)
+Step 8: Implement trend_analysis task type (scheduled mode of 4.2)
+```
+
+**Dependencies:**
+- Feature 1.1a (UUID exposure) — tasks that reference specific thoughts/actions need IDs.
+- Feature 1.1b (recurring actions) — the task engine itself should be testable as a recurring action.
+- Delivery infra: at minimum, email via Resend or Telegram via existing bot.
+
+**TODO before deck_builder task type can be built:**
+```
+- Upload or describe the Andrea deck template:
+  - How many slides?
+  - What content goes on each slide?
+  - What's the visual layout / branding?
+  - Is it a standard PPTX template file, or a structure you recreate each time?
+```
+
+**Test prompts after deploy:**
+```
+List my scheduled tasks.
+→ Should show all registered tasks with enabled/disabled status and last run time.
+
+Run the morning briefing task now.
+→ Should gather today's actions + calendar + recent thoughts, run the prioritization prompt, deliver via configured channel.
+
+Create a new scheduled task: "Friday project status" — cron every Friday at 3pm,
+gathers open actions tagged "litmus" and thoughts from the last 7 days about Litmus,
+runs an LLM prompt to summarize status and blockers, delivers via email.
+→ Should register the task. Then "Run Friday project status now" to test it.
+```
+
+---
+
+### Feature 1.2: Action dashboard (command center)
+
+> **⚠️ CONFLICT NOTE:** The original roadmap defined Feature 1.2 as "Thought visualization dashboard" (`dashboards/thought-explorer`) and Feature 1.3 as "Calendar view" (extending thought-explorer). **Both have been built and deployed.** The chat version reframes 1.2 as an action-oriented "command center" (`dashboards/command-center`) that absorbs the calendar view as its "Upcoming" tab and repositions the thought feed as secondary. **Resolution:** Build the command center as the new primary dashboard. The existing `thought-explorer` remains deployed and functional — it can be deprecated later or kept as the read-only thought review tool while the command center handles action-driving workflows.
+
+**Category:** `dashboards/command-center`
+
+**Design intent:**
+
+This is not a thought explorer. It's a cognitive load reducer. The dashboard exists to answer two questions: **"What needs my attention?"** and **"What do I do next?"** Every view should drive toward action.
+
+Clone `dashboards/data-browser/` as the starting skeleton.
+
+**Primary views:**
+
+1. **Today view** (default landing page): A single screen showing everything that needs attention right now. Not a timeline of thoughts — a prioritized action surface.
+   - **Due today / overdue:** Actions with `due_date <= today` and `status = 'open'`. Red if overdue, amber if due today.
+   - **Upcoming this week:** Actions due within 7 days, maintenance tasks due within 7 days, important dates within 7 days.
+   - **Unprocessed thoughts:** Recent thoughts (last 48 hours) of type `action_item` or `question` that don't have a linked action yet. Each one gets a "Create action" button that pre-fills `create_action` with the thought content and links via `thought_id`.
+   - **Stale loops:** Actions open > 14 days with no recent related captures (same logic as Feature 3.2 MCP tool).
+
+2. **Upcoming view** (calendar): A unified date-based view. One place to see everything with a date across all tables.
+
+   | Source | Table | Date field | Display |
+   |--------|-------|------------|---------|
+   | Actions | `actions` | `due_date` | Colored by status: blue=open, amber=in_progress, green=done |
+   | Family activities | `activities` | `date` or `day_of_week` for recurring | Purple |
+   | Important dates | `important_dates` | `date` | Red |
+   | Maintenance tasks | `maintenance_tasks` | `next_due` | Coral |
+
+   Layout: Monthly grid with item counts per day. Click a day to expand a detail panel. Week view toggle for denser look-ahead. Thoughts are deliberately excluded — this view is about commitments, not captures.
+
+3. **Thoughts view** (secondary): Reverse-chronological thought feed with filters. This exists for review and retrieval, not as a landing page. Key interaction: select a thought → "Convert to action" to promote it into the actions system.
 
 **Shared components:**
-- Filter bar: type dropdown, topic autocomplete, person autocomplete, date range picker.
-- Search bar: hits the `match_thoughts` RPC for semantic search. Debounced 300ms.
-- Stats header: total thoughts, thoughts this week, most active topic, most mentioned person.
+- **Quick action bar:** Persistent at top. Text input that captures a thought directly (hits `ingest-thought`). Toggle for "capture as thought" vs "create as action."
+- **Filter bar:** Type, topic, person, date range filters. Shared across views.
+- **Search bar:** Semantic search via `match_thoughts` RPC. Results show a "Create action from this" affordance.
+- **Stats header:** Open actions count, overdue count, thoughts captured this week, stale loops count. Health indicators, not vanity metrics.
+
+**Action-driving interactions:**
+- Every thought card has a "→ Action" button that creates a linked action.
+- Every action card has status controls: mark in_progress, complete (prompts for completion note), cancel.
+- Completing a recurring action shows the auto-spawned next instance immediately.
+- Stale loop items have "Snooze 7 days", "Cancel", or "Do now" buttons.
 
 **Data access:**
-- Use Supabase JS client with the anon key.
-- Direct table queries for listing/filtering.
+- Supabase JS client with anon key.
+- Direct table queries for actions, maintenance, calendar tables.
 - `match_thoughts` RPC for semantic search.
 - No RLS needed yet (single user) — add in Phase 2.
 
@@ -119,12 +437,11 @@ Next.js dashboard showing all thoughts with multiple view modes. Clone `dashboar
 - Next.js 14 App Router
 - Tailwind CSS
 - `@supabase/supabase-js`
-- `recharts` for the heatmap (or a simple CSS grid — your call)
 - Deploy to Vercel
 
 **File structure:**
 ```
-dashboards/thought-explorer/
+dashboards/command-center/
 ├── README.md
 ├── metadata.json
 ├── package.json
@@ -135,52 +452,40 @@ dashboards/thought-explorer/
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx
-│   │   ├── page.tsx          # Timeline view (default)
-│   │   ├── heatmap/page.tsx
-│   │   └── topics/page.tsx
+│   │   ├── page.tsx              # Today view (default)
+│   │   ├── upcoming/page.tsx     # Calendar / upcoming view
+│   │   └── thoughts/page.tsx     # Thought feed (review & retrieval)
 │   ├── components/
-│   │   ├── ThoughtCard.tsx
+│   │   ├── TodayView.tsx
+│   │   ├── ActionCard.tsx        # Action with status controls
+│   │   ├── ThoughtCard.tsx       # Thought with "→ Action" button
+│   │   ├── UnprocessedQueue.tsx  # Thoughts needing conversion to actions
+│   │   ├── StaleLoops.tsx        # Stale loop surface
+│   │   ├── CalendarGrid.tsx      # Monthly upcoming view
+│   │   ├── DayDetail.tsx         # Expanded single-day panel
+│   │   ├── QuickActionBar.tsx    # Capture thought / create action input
 │   │   ├── FilterBar.tsx
 │   │   ├── SearchBar.tsx
-│   │   ├── StatsHeader.tsx
-│   │   ├── Heatmap.tsx
-│   │   └── TopicClusters.tsx
+│   │   └── StatsHeader.tsx
 │   └── lib/
 │       └── supabase.ts
 ```
 
 ---
 
-### Feature 1.3: Calendar view
+### Feature 1.2-legacy: Thought visualization dashboard ✅ COMPLETE
 
-**Category:** Extends `dashboards/thought-explorer` — add as a route.
+**Status:** Deployed at `dashboards/thought-explorer/`. Timeline, heatmap, topic clusters, and calendar views are all functional.
 
-**What to build:**
+> This was the original Feature 1.2 + 1.3 from the first roadmap. It remains deployed and usable. The command center (new Feature 1.2) supersedes it as the primary dashboard but doesn't replace it — thought-explorer is the read-only review tool, command center is the action-driving tool.
 
-A unified date-based view that pulls from multiple tables onto one calendar.
+---
 
-**Data sources:**
+### Feature 1.3-legacy: Calendar view ✅ COMPLETE
 
-| Source | Table | Date field | Display |
-|--------|-------|------------|---------|
-| Thoughts | `thoughts` | `created_at` | Gray dot |
-| Actions | `actions` | `due_date` | Colored by status: blue=open, amber=in_progress, green=done |
-| Family activities | `activities` | `date` or `day_of_week` for recurring | Purple dot |
-| Important dates | `important_dates` | `date` | Red dot |
-| Maintenance tasks | `maintenance_tasks` | `next_due` | Coral dot |
+**Status:** Deployed as a tab within `dashboards/thought-explorer/`. Monthly grid, week view, day detail panel, multi-table aggregation (thoughts, actions, activities, important dates, maintenance tasks) with colored dot indicators.
 
-**Layout:**
-- Monthly grid (default) with dot indicators per day.
-- Click a day to expand into a detail panel showing all items for that date.
-- Week view toggle showing hour-by-hour layout.
-- Legend bar at top mapping colors to sources.
-
-**Route:** `dashboards/thought-explorer/src/app/calendar/page.tsx`
-
-**New components:**
-- `CalendarGrid.tsx` — monthly view with dots
-- `DayDetail.tsx` — expanded single-day panel
-- `WeekView.tsx` — horizontal weekly layout
+> The command center's "Upcoming view" (new Feature 1.2) covers the same calendar concept but excludes thoughts (commitments only). The thought-explorer calendar including thoughts remains useful for review sessions.
 
 ---
 
@@ -280,16 +585,16 @@ Export the `shopping_lists` table into a format that works with Instacart. Two o
 MCP tool `export_shopping_list` that:
 1. Queries `shopping_lists` for a given week, joins to `recipes` for ingredient details.
 2. Aggregates duplicate ingredients (2 recipes both need chicken → one line item with combined quantity).
-3. Groups by category (produce, protein, dairy, pantry, etc.) — derive from ingredient names or add a `category` field to the recipe ingredients JSONB.
+3. Groups by category (produce, protein, dairy, pantry, etc.).
 4. Returns a formatted text block that can be pasted into Instacart's search or any grocery app.
 
 **Option B: Instacart deep links (future)**
 
-Instacart supports URLs like `https://www.instacart.com/store/search_v3/[item]`. Generate a list of links, one per ingredient. This is fragile (URL scheme may change) but convenient.
+Instacart supports URLs like `https://www.instacart.com/store/search_v3/[item]`. Generate a list of links, one per ingredient.
 
 **Output format for Option A:**
 ```
-🛒 Shopping List — Week of March 24
+Shopping List — Week of March 24
 
 PRODUCE
 - Broccoli, 4 cups
@@ -308,73 +613,86 @@ PANTRY
 
 ## Phase 3: Proactive brain
 
+> **Architecture note:** Features 3.1, 3.2, and 3.3 are implemented as **task types within the scheduled task engine** (Feature 1.1d). The specs below describe the task-type-specific logic. Build the task engine first (1.1d Steps 1-2), then implement these as task type handlers. Features 3.2 and 4.2 also have **standalone MCP tool modes** that can be built immediately without the task engine.
+
 ### Feature 3.1: Alerting / reminders
 
-**Category:** `integrations/alerting`
+**Category:** Task type `alert_digest` within Feature 1.1d
 
 **What to build:**
 
-A Supabase Edge Function triggered by `pg_cron` that scans for upcoming items and sends notifications.
+A task type handler in the task runner that scans for upcoming items and formats a notification digest.
 
-**Scan targets:**
+**Scan targets (configured via `gather_config`):**
 - `actions` where `status = 'open'` and `due_date` is within N days
 - `important_dates` where `date` is within N days
 - `maintenance_tasks` where `next_due` is within N days
 - `thoughts` where `metadata->>'dates_mentioned'` contains dates within N days
 
-**Notification channels (pick one to start, add others later):**
+**Task registration:**
+```sql
+insert into scheduled_tasks (name, trigger_type, cron_expression, task_type, gather_config, delivery_channel, delivery_config)
+values (
+  'alert-digest',
+  'cron',
+  '0 7 * * *',
+  'alert_digest',
+  '{"scan_tables": ["actions", "important_dates", "maintenance_tasks"], "thresholds_days": [1, 3, 7]}',
+  'email',
+  '{"email": "lee@example.com"}'
+);
+```
+
+**Handler logic:**
+- Query all scan targets for items due within the max threshold.
+- Group by urgency tier (due today, due in 3 days, due this week).
+- Format as a clean digest with section headers per tier.
+- Deliver via the task's configured `delivery_channel`.
+
+**Notification channels (delivery infra shared by all task types):**
 - Email via Resend (simplest — free tier, no phone number needed)
-- Alternatively: Telegram message via existing bot integration in `ingest-thought`
+- Telegram message via existing bot integration in `ingest-thought`
+- Slack webhook (if configured)
 
-**Configuration:**
-```sql
-create table alert_preferences (
-  user_id uuid primary key references auth.users(id),
-  channels text[] default '{"email"}',
-  thresholds_days int[] default '{1, 3, 7}',
-  digest_time time default '07:00',
-  enabled boolean default true
-);
-```
-
-**Edge Function: `integrations/alerting/index.ts`**
-- Runs daily at `digest_time` via `pg_cron`.
-- Queries all scan targets for items due within the max threshold.
-- Groups by urgency tier (due today, due in 3 days, due this week).
-- Formats and sends via configured channel.
-
-**Cron setup (SQL):**
-```sql
-select cron.schedule(
-  'daily-alerts',
-  '0 7 * * *',  -- 7 AM daily
-  $$select net.http_post(
-    url := 'https://YOUR_PROJECT.supabase.co/functions/v1/alerting',
-    headers := '{"x-brain-key": "YOUR_KEY"}'::jsonb
-  )$$
-);
-```
+**Corresponds to:** 1.1d Step 4.
 
 ---
 
 ### Feature 3.2: Stale loop detector
 
-**Category:** MCP tool addition to `open-brain-mcp/index.ts`
+**Category:** Dual-mode — MCP tool (on-demand) + task type `stale_loop_scan` within Feature 1.1d (scheduled)
 
 **What to build:**
 
-A new MCP tool `detect_stale_loops` that surfaces action items and questions going cold.
+The stale loop detection logic exists in two places:
 
-**Logic:**
+1. **MCP tool `detect_stale_loops`** — called on-demand during daily/weekly reviews. Added directly to `open-brain-mcp/index.ts`. Quick win, no task engine dependency.
+
+2. **Task type `stale_loop_scan`** — runs on a schedule (e.g., Monday mornings) via the task engine and delivers results via email/Telegram. Same logic, different trigger and delivery.
+
+**Logic (shared by both modes):**
 1. Query `actions` where `status = 'open'` and `created_at < now() - interval 'N days'` (default N=14).
 2. For each stale action, search `thoughts` for any captures mentioning the same topics/people since the action was created. If none found → truly stale. If found → the user is thinking about it but hasn't closed the loop.
 3. Query `thoughts` where `metadata->>'type' = 'question'` and `created_at < now() - interval 'N days'` with no subsequent thought on the same topic.
 
-**MCP tool:**
+**MCP tool (build immediately — no task engine dependency):**
 
 | Tool | Params | Description |
 |------|--------|-------------|
 | `detect_stale_loops` | `days?` (default 14), `limit?` (default 20) | Returns stale actions and unanswered questions with context on last related activity. |
+
+**Task registration (build after 1.1d Step 5):**
+```sql
+insert into scheduled_tasks (name, trigger_type, cron_expression, task_type, gather_config, delivery_channel)
+values (
+  'stale-loop-scan',
+  'cron',
+  '0 9 * * 1',
+  'stale_loop_scan',
+  '{"stale_threshold_days": 14, "limit": 20}',
+  'email'
+);
+```
 
 **Output format:**
 ```
@@ -393,27 +711,44 @@ A new MCP tool `detect_stale_loops` that surfaces action items and questions goi
    → Active topic, but this specific action hasn't moved
 ```
 
+**Corresponds to:** MCP tool is standalone (build anytime). Scheduled mode is 1.1d Step 5.
+
 ---
 
 ### Feature 3.3: Morning briefing agent
 
-**Category:** `integrations/morning-briefing`
+**Category:** Task type `llm_prompt` within Feature 1.1d
 
 **What to build:**
 
-Automated version of the daily prioritization prompt. **Build this AFTER you've validated the manual daily review process.** The value of this feature comes from encoding what you've learned works — not from automating the first draft.
+A registered task that runs the daily prioritization prompt automatically each weekday morning. **Build this AFTER you've validated the manual daily review process.**
 
-**Architecture:**
-- Supabase Edge Function triggered by `pg_cron` at your preferred morning time.
-- Calls the same MCP tools the daily review uses: `list_thoughts` (type=action_item, days=1), `search_thoughts` (deadlines, blockers), `list_actions` (status=open).
-- Also fetches today's Google Calendar events (requires OAuth token storage or a calendar sync integration).
-- Sends the raw data to an LLM (via OpenRouter) with the daily prioritization prompt from `docs/Daily_Prioritization_Prompt.md`.
-- Delivers the formatted output via email or Telegram.
+**Task registration:**
+```sql
+insert into scheduled_tasks (name, trigger_type, cron_expression, task_type, prompt_template, gather_config, delivery_channel)
+values (
+  'morning-briefing',
+  'cron',
+  '0 7 * * 1-5',
+  'llm_prompt',
+  'You are a personal productivity assistant... [contents of Daily_Prioritization_Prompt.md]',
+  '{"thought_filters": {"types": ["action_item", "question"], "days": 7}, "search_queries": ["deadlines blockers decisions pending urgent"], "include_actions": {"status": "open"}, "include_calendar": true, "calendar_days_ahead": 1}',
+  'email'
+);
+```
+
+**Handler logic (within `llm_prompt` task type):**
+1. Execute all queries defined in `gather_config`.
+2. Format gathered data as context.
+3. Send to LLM (via OpenRouter) with `prompt_template` as system prompt.
+4. Deliver the LLM's response via `delivery_channel`.
 
 **Why this is Phase 3, not Phase 1:**
-You explicitly chose to keep running the manual daily review first to validate what's worth automating. This feature should encode the patterns you discover, not replace the discovery process.
+You explicitly chose to keep running the manual daily review first to validate what's worth automating. This task should encode the patterns you discover, not replace the discovery process.
 
-**Prerequisite features:** 1.1 (actions table), 3.1 (alerting infra for delivery), and several weeks of manual daily reviews to calibrate the prompt.
+**Corresponds to:** 1.1d Step 3.
+
+**Prerequisites:** 1.1a (UUIDs), 1.1b (recurring actions), 1.1d Steps 1-2 (task engine core), and several weeks of manual daily reviews to calibrate the prompt.
 
 ---
 
@@ -421,7 +756,7 @@ You explicitly chose to keep running the manual daily review first to validate w
 
 ### Feature 4.1: Thought graph / connection map
 
-**Category:** `dashboards/thought-explorer` — add as a route
+**Category:** Add as a route to `dashboards/command-center`
 
 **What to build:**
 
@@ -441,7 +776,7 @@ Force-directed graph visualization where each node is a thought and edges connec
 - Drag to rearrange. Zoom/pan.
 - Filter by type/topic/date range — same filter bar as Feature 1.2.
 
-**Route:** `dashboards/thought-explorer/src/app/graph/page.tsx`
+**Route:** `dashboards/command-center/src/app/graph/page.tsx`
 
 **Performance note:** For >500 thoughts, compute similarity server-side and cache the edge list. Add an RPC function:
 
@@ -461,11 +796,14 @@ $$ language sql;
 
 ### Feature 4.2: Weekly trend analysis
 
-**Category:** MCP tool addition to `open-brain-mcp/index.ts`
+**Category:** Dual-mode — MCP tool (on-demand) + task type `trend_analysis` within Feature 1.1d (scheduled)
 
 **What to build:**
 
-Replace LLM guesswork in the weekly review's "pattern detection" section with computed metrics.
+Replace LLM guesswork in the weekly review's "pattern detection" section with computed metrics. Like Feature 3.2, this exists in two modes:
+
+1. **MCP tool `weekly_trends`** — called on-demand during weekly reviews. Build immediately.
+2. **Task type `trend_analysis`** — runs on a schedule (Sunday mornings) via the task engine. Corresponds to 1.1d Step 8.
 
 **MCP tool:**
 
@@ -503,17 +841,15 @@ PEOPLE: Alexis (6 mentions, +3), Matt V (4, +2), Ingrid (0, was 2)
 
 1. **Quick capture PWA** (`integrations/quick-capture/`)
    - Single-page web app: one text field, one submit button.
-   - Hits the `ingest-thought` Edge Function directly (same endpoint Telegram uses, minus the Telegram-specific parts — add an HTTP POST handler).
+   - Hits the `ingest-thought` Edge Function directly.
    - Install as PWA on phone for home-screen access.
-   - Useful when away from Claude.
 
 2. **Voice memo capture** (`integrations/voice-capture/`)
    - Audio file → Whisper transcription → `capture_thought`.
-   - Could be a Telegram voice message handler (extend `ingest-thought`) or a standalone endpoint.
+   - Could be a Telegram voice message handler or standalone endpoint.
 
 3. **Browser extension** (`integrations/browser-capture/`)
    - Highlight text on any page → right-click → "Capture to Open Brain".
-   - Sends highlighted text + page URL + title as thought content.
    - Chrome extension with a simple popup for adding context before capture.
 
 **Note:** Slack and Discord capture integrations already exist in the repo under `integrations/`.
@@ -525,17 +861,26 @@ PEOPLE: Alexis (6 mentions, +3), Matt V (4, +2), Ingrid (0, was 2)
 If working through these with Claude Code, this sequence maximizes compounding:
 
 ```
-1.1  Actions table          ← everything else builds on this
-1.2  Thought explorer        ← you'll want to see your data
-1.3  Calendar view           ← extends 1.2
+1.1  Actions table          ✅ COMPLETE
+1.2L Thought explorer       ✅ COMPLETE (legacy — now read-only review tool)
+1.3L Calendar view          ✅ COMPLETE (legacy — tab in thought-explorer)
+1.1a UUID exposure           ← patch, do first — everything downstream needs it
+1.1b Recurring actions       ← schema migration + MCP tool update
+1.1c Due dates on recurring  ← design note, included in 1.1b
+1.2  Command center          ← today view + upcoming + thoughts (new primary dashboard)
+3.2  Stale loop detector     ← MCP tool mode, quick win, no dependencies
+4.2  Weekly trends           ← MCP tool mode, quick win, improves weekly review immediately
+1.1d Task engine (Steps 1-2) ← schema + runner with manual trigger only
+1.1d Step 3: llm_prompt      ← powers morning briefing (3.3) — only after manual review validated
+1.1d Step 4: alert_digest    ← powers alerting (3.1)
+1.1d Step 5: stale_loop_scan ← scheduled mode of 3.2
+1.1d Step 6: deck_builder    ← Andrea deck — BLOCKED on template
+1.1d Step 7: event trigger   ← Google Calendar integration
+1.1d Step 8: trend_analysis  ← scheduled mode of 4.2
 2.1  Multi-user auth         ← required before Liv gets access
 2.2  Liv's dashboard         ← requires 2.1
 2.3  Instacart export        ← standalone, can do anytime after meal-planning exists
-3.2  Stale loop detector     ← quick win, just a query tool
-3.1  Alerting                ← infra for 3.3
-3.3  Morning briefing        ← only after manual process is validated
-4.2  Weekly trends           ← improves weekly review immediately
-4.1  Thought graph           ← coolest but least urgent
+4.1  Thought graph           ← add as route to command center dashboard
 4.3  Capture sources         ← modular, do whenever
 ```
 
@@ -546,13 +891,13 @@ If working through these with Claude Code, this sequence maximizes compounding:
 Reference a specific feature when starting a session:
 
 ```bash
-claude "Build Feature 1.1: Actions table. Read docs/ROADMAP.md for the full spec. Follow the guard rails in CLAUDE.md."
+claude "Build Feature 1.1a: UUID exposure. Read docs/ROADMAP.md for the full spec. Follow the guard rails in CLAUDE.md."
 ```
 
 Or for a multi-step session:
 
 ```bash
-claude "I'm working through the BigOleBrain roadmap. Next up is Feature 1.2: Thought visualization dashboard. Read docs/ROADMAP.md for the spec, clone dashboards/data-browser as the starting skeleton, and build it out."
+claude "I'm working through the BigOleBrain roadmap. Next up is Feature 1.2: Command center. Read docs/ROADMAP.md for the spec, clone dashboards/data-browser as the starting skeleton, and build it out."
 ```
 
 Each feature spec includes enough detail for Claude Code to produce a working implementation without ambiguity. If a spec says "your call" on a decision, it means both options work — pick one and move.
