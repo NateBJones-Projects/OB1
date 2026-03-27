@@ -1,0 +1,25 @@
+{
+  "name": "Open Brain REST API",
+  "description": "REST API gateway providing search, capture, browse, CRUD, stats, reflections, duplicates, and ingest endpoints for the Open Brain thoughts database.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [
+      "OpenAI (embeddings + classification) or OpenRouter (embeddings only)",
+      "Anthropic (optional, preferred classifier)"
+    ],
+    "tools": [
+      "Supabase CLI"
+    ]
+  },
+  "tags": ["rest-api", "edge-function", "dashboard", "search", "capture", "ingest"],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-03-27",
+  "updated": "2026-03-27"
+}
