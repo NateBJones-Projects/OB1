@@ -90,6 +90,15 @@ Standalone capabilities that make your Open Brain smarter.
 | [Life Engine Video](recipes/life-engine-video/) | Add-on that renders Life Engine briefings as short animated videos with voiceover | [@justfinethanku](https://github.com/justfinethanku) |
 | [Daily Digest](recipes/daily-digest/) | Automated daily summary of recent thoughts delivered via email or Slack | OB1 Team |
 
+### [`/skills`](skills/) — Agent Skills
+
+Plain-text skill packs you can drop into Claude Code, Codex, or other AI clients that support reusable prompts/rules.
+
+| Skill | What It Does | Contributor |
+| ----- | ------------ | ----------- |
+| [Panning for Gold Skill Pack](skills/panning-for-gold/) | Turns brain dumps and transcripts into evaluated idea inventories | [@jaredirish](https://github.com/jaredirish) |
+| [Claudeception Skill Pack](skills/claudeception/) | Extracts reusable lessons from work sessions into new skills | [@jaredirish](https://github.com/jaredirish) |
+
 ### [`/dashboards`](dashboards/) — Frontend Templates
 
 Host on Vercel or Netlify, pointed at your Supabase backend. Two community-built options — pick the framework you prefer.
@@ -128,8 +137,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
 
 - **Extensions** are curated — discuss with maintainers before submitting
 - **Primitives** should be referenced by 2+ extensions to justify extraction
-- **Recipes, schemas, dashboards, integrations** are open for community contributions
-- Every PR runs through an automated review agent that checks 11 rules (file structure, no secrets, SQL safety, primitive dependencies, etc.)
+- **Recipes, schemas, dashboards, integrations, and skills** are open for community contributions
+- Every PR runs through an automated review agent that checks structure, secrets, SQL safety, dependencies, and documentation quality
 - If the agent passes, a human admin reviews for quality and clarity
 - Your contribution needs a README with real instructions and a `metadata.json` with structured info
 

@@ -32,6 +32,7 @@ jobs:
                - Primitive proposal (new reusable concept guide)
                - Dashboard idea (new frontend template)
                - Integration idea (new MCP extension, webhook, or capture source)
+               - Skill idea (new reusable AI client skill or prompt pack)
                - Documentation improvement
                - Question (not a contribution, needs help)
 
@@ -46,13 +47,13 @@ jobs:
 
             4. **Suggest labels** — Based on classification, suggest which labels
                should be applied (recipe, schema, extension, primitive, dashboard,
-               integration, documentation, bug, question, good-first-issue).
+               integration, skill, documentation, bug, question, good-first-issue).
 
             5. **Helpful response** — Post a welcoming, constructive comment:
                - Acknowledge the idea
                - If they used the blank template, point them to the right
                  specific template for better structure
-               - If it's a recipe/schema/integration idea, link to
+               - If it's a recipe/schema/integration/skill idea, link to
                  CONTRIBUTING.md's "What Goes Where" section
                - If it looks like a duplicate, link the existing issue
                - If it's a question, try to answer or point to docs/FAQ

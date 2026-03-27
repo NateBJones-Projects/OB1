@@ -36,7 +36,7 @@ jobs:
 
           # Identify contribution folders (e.g., recipes/email-import/)
           # Exclude _template folders and top-level files
-          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations|primitives|extensions)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
+          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations|skills|primitives|extensions)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
           echo "contrib_dirs<<EOF" >> $GITHUB_OUTPUT
           echo "$contrib_dirs" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -83,7 +83,7 @@ jobs:
           # ─── Rule 1: Folder structure ───
           rule1_pass=true
           bad_files=""
-          allowed_pattern='^(recipes|schemas|dashboards|integrations|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
+          allowed_pattern='^(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             if ! echo "$f" | grep -qE "$allowed_pattern"; then
@@ -286,6 +286,13 @@ jobs:
                   rule6_pass=false
                 fi
                 ;;
+              skills)
+                has_skill=$(echo "$dir_files" | grep -iE '(^|/)(SKILL\.md|[^/]+[.-]skill\.md)$' || true)
+                if [ -z "$has_skill" ]; then
+                  rule6_detail="${rule6_detail}  - \`$dir\`: skills must contain a plain-text skill file (\`SKILL.md\`, \`*.skill.md\`, or \`*-skill.md\`)\n"
+                  rule6_pass=false
+                fi
+                ;;
               primitives)
                 # Primitives must have substantial README (200+ words)
                 if [ -f "$dir/README.md" ]; then
@@ -319,10 +326,10 @@ jobs:
           fi
 
           # ─── Rule 7: PR format ───
-          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|primitives|extensions|docs)\] '; then
+          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs)\] '; then
             pass_check "PR format" "Title follows \`[category] Description\` format"
           else
-            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, \`[primitives]\`, \`[extensions]\`, or \`[docs]\` followed by a space and description"
+            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, \`[skills]\`, \`[primitives]\`, \`[extensions]\`, or \`[docs]\` followed by a space and description"
           fi
 
           # ─── Rule 8: No binary blobs ───
