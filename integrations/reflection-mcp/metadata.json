@@ -1,0 +1,18 @@
+{
+  "name": "Reflection MCP Tools",
+  "description": "MCP tool handlers for capturing and searching structured reasoning traces. Requires the reflections schema.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenAI API or compatible embedding provider"],
+    "tools": ["Deno or Node.js 18+"]
+  },
+  "tags": ["mcp", "reasoning", "reflections", "tools"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes"
+}
