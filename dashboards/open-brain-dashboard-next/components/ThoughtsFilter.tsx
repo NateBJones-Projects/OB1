@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 const IMPORTANCE_OPTIONS = [1, 2, 3, 4, 5];
 
@@ -18,6 +18,8 @@ export function ThoughtsFilter({
 }) {
   const router = useRouter();
   const [sourceInput, setSourceInput] = useState(currentSource);
+
+  useEffect(() => { setSourceInput(currentSource); }, [currentSource]);
 
   const applyFilters = useCallback(
     (overrides: Record<string, string>) => {
