@@ -1,0 +1,21 @@
+{
+  "name": "Auto-Capture Protocol",
+  "description": "Automatically capture evaluated ideas and session summaries to Open Brain at session close. No manual step. The system closes its own loop.",
+  "category": "recipes",
+  "author": {
+    "name": "Jared Irish",
+    "github": "jaredirish"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Claude Code or similar AI coding tool with skill/system prompt support"]
+  },
+  "tags": ["capture", "auto-save", "session-close", "flywheel", "skill", "workflow"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "companion_recipes": ["panning-for-gold"],
+  "created": "2026-03-15",
+  "updated": "2026-03-15"
+}
