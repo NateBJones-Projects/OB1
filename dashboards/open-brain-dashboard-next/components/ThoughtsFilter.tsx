@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 
 const IMPORTANCE_OPTIONS = [1, 2, 3, 4, 5];
 
@@ -17,6 +17,7 @@ export function ThoughtsFilter({
   currentImportance: number | undefined;
 }) {
   const router = useRouter();
+  const [sourceInput, setSourceInput] = useState(currentSource);
 
   const applyFilters = useCallback(
     (overrides: Record<string, string>) => {
@@ -58,8 +59,16 @@ export function ThoughtsFilter({
         <label className="block text-xs text-text-muted mb-1">Source</label>
         <input
           type="text"
-          value={currentSource}
-          onChange={(e) => applyFilters({ source_type: e.target.value })}
+          value={sourceInput}
+          onChange={(e) => setSourceInput(e.target.value)}
+          onBlur={() => {
+            if (sourceInput !== currentSource)
+              applyFilters({ source_type: sourceInput });
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter")
+              applyFilters({ source_type: sourceInput });
+          }}
           placeholder="e.g. chatgpt_import"
           className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-violet w-44"
         />
@@ -89,9 +98,10 @@ export function ThoughtsFilter({
 
       {(currentType || currentSource || currentImportance) && (
         <button
-          onClick={() =>
-            applyFilters({ type: "", source_type: "", importance_min: "" })
-          }
+          onClick={() => {
+            setSourceInput("");
+            applyFilters({ type: "", source_type: "", importance_min: "" });
+          }}
           className="text-xs text-text-muted hover:text-danger transition-colors pb-2"
         >
           Clear filters
