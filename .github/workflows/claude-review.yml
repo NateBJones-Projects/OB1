@@ -26,11 +26,28 @@ jobs:
        contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login))
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR code
+      - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
+
+      - name: Checkout PR branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Determine PR number based on event type
+          if [ "${{ github.event_name }}" = "issue_comment" ]; then
+            PR_NUMBER="${{ github.event.issue.number }}"
+          else
+            PR_NUMBER="${{ github.event.pull_request.number }}"
+          fi
+
+          # Fetch PR head via refs/pull/N/head (works for both fork and same-repo PRs)
+          git fetch origin "pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
+
+          # Get the branch name the action expects and check it out locally
+          BRANCH=$(gh pr view "${PR_NUMBER}" --json headRefName -q .headRefName)
+          git checkout -B "${BRANCH}" refs/remotes/origin/pr-head
 
       - uses: anthropics/claude-code-action@v1
         with:
