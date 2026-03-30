@@ -645,6 +645,27 @@ Pick your AI client below:
 
 That's it. Start a new conversation, and Claude will have access to your Open Brain tools. You can enable or disable it per conversation via the "+" button → Connectors.
 
+> [!TIP]
+> **Prefer JSON config?** If you'd rather use `claude_desktop_config.json` instead of the Connectors UI, use `supergateway` (not `mcp-remote` — see note below):
+>
+> ```json
+> {
+>   "mcpServers": {
+>     "open-brain": {
+>       "command": "npx",
+>       "args": [
+>         "-y",
+>         "supergateway",
+>         "--streamableHttp",
+>         "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+>       ]
+>     }
+>   }
+> }
+> ```
+>
+> ⚠️ **Do not use `mcp-remote` for Claude Desktop.** It performs OAuth discovery against the Supabase domain, which returns a 404 that causes the connection to fail before Claude Desktop's short startup timeout. `supergateway --streamableHttp` connects directly with no OAuth handshake. (`mcp-remote` works fine in Codex because its `startup_timeout_sec = 30` gives enough time for the OAuth fallback.)
+
 </details>
 
 <details>
@@ -719,7 +740,7 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 **Option A: URL with key (easiest).** If your client has a field for a remote MCP server URL, paste the full MCP Connection URL including `?key=your-access-key`. This works for any client that supports remote MCP without requiring headers.
 
-**Option B: mcp-remote bridge.** If your client only supports local stdio servers (configured via a JSON config file), use `mcp-remote` to bridge to the remote server. This requires Node.js installed.
+**Option B: supergateway bridge (recommended).** If your client only supports local stdio servers (configured via a JSON config file), use `supergateway` to bridge to the remote server. This requires Node.js installed.
 
 ```json
 {
@@ -727,6 +748,25 @@ Every MCP client handles remote servers slightly differently. The server accepts
     "open-brain": {
       "command": "npx",
       "args": [
+        "-y",
+        "supergateway",
+        "--streamableHttp",
+        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+      ]
+    }
+  }
+}
+```
+
+**Option C: mcp-remote bridge (alternative).** `mcp-remote` also works but performs OAuth discovery on startup, which can cause timeouts with Supabase Edge Function URLs. If you use it, set a generous startup timeout (30+ seconds) in clients that support it.
+
+```json
+{
+  "mcpServers": {
+    "open-brain": {
+      "command": "npx",
+      "args": [
+        "-y",
         "mcp-remote",
         "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp",
         "--header",
@@ -804,6 +844,10 @@ First, confirm Developer Mode is enabled (Settings → Apps & Connectors → Adv
 **❌ "Permission denied for table thoughts"**
 
 Your `service_role` doesn't have table-level permissions. This happens on newer Supabase projects where CRUD grants are no longer automatic. Go back to Step 2.5 and run the `GRANT` SQL, then retry.
+
+**❌ Claude Desktop JSON config: "Couldn't reach the MCP server"**
+
+If you're using `claude_desktop_config.json` with `mcp-remote`, switch to `supergateway --streamableHttp` instead. `mcp-remote` performs OAuth discovery against the Supabase domain (`/.well-known/oauth-authorization-server`), which returns a 404 that stalls the connection past Claude Desktop's startup timeout. `supergateway` connects directly with no OAuth handshake. See Step 7.1 for the config. (This does not affect Codex, which has a configurable `startup_timeout_sec` that gives `mcp-remote` enough time to fall back.)
 
 **❌ Getting 401 errors**
 
