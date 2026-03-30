@@ -66,6 +66,12 @@ jobs:
                If it seems too big, suggest it could be a standalone project
                that integrates with OB1 instead.
 
+            Before writing your review, read any existing PR comments and
+            review discussion. If maintainers or contributors have already
+            flagged issues, asked questions, or discussed changes, acknowledge
+            them in your review rather than duplicating. Build on the existing
+            conversation instead of starting from scratch.
+
             Be constructive and welcoming. If a contribution needs work, explain
             what specifically needs to change. If it looks good, approve the PR.
 
