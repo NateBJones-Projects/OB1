@@ -1,1 +1,24 @@
-
+{
+  "name": "Tacoma Gear Pattern Assist",
+  "slug": "tacoma-gear-pattern-assist",
+  "category": "skills",
+  "summary": "AI-assisted ring and pinion gear setup workflow with pattern interpretation, confirmation passes, and safety gating.",
+  "author": "Rodney Elder",
+  "version": "0.1.0",
+  "tags": [
+    "toyota",
+    "tacoma",
+    "gear-setup",
+    "ring-and-pinion",
+    "automotive",
+    "technician",
+    "workflow",
+    "diagnostics"
+  ],
+  "clients": [
+    "Claude Code",
+    "Codex",
+    "MCP-compatible agents"
+  ],
+  "status": "experimental"
+}
