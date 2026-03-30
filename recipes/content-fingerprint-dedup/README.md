@@ -10,7 +10,12 @@ A `content_fingerprint` column on the `thoughts` table that stores a SHA-256 has
 
 Without dedup, bulk imports create duplicates. If you import the same ChatGPT export twice, you get double the rows. If Slack retries a webhook delivery (which it does on any timeout), you get two rows for the same message. If you capture from both a Chrome extension and the MCP server, overlapping content creates duplicates.
 
-This primitive solves all of that at the database level. Re-running any import produces zero new rows for content that already exists.
+Content fingerprint dedup solves all of that at the database level. Re-running any import produces zero new rows for content that already exists.
+
+## Prerequisites
+
+- Working Open Brain setup ([guide](../../docs/01-getting-started.md))
+- The `thoughts` table must already exist
 
 ## How It Works
 
@@ -140,18 +145,18 @@ Use the batched approach from Step 3. Run it in chunks of 5,000 rows. Each batch
 SHA-256 collisions are practically impossible (1 in 2^128). If you see this, the content is likely identical after normalization. Check for leading/trailing whitespace or casing differences in the original content.
 
 **Issue: content_fingerprint is NULL for some rows**
-Rows inserted before this primitive was added will have NULL fingerprints. Run the backfill query from Step 3.
+Rows inserted before fingerprint dedup was added will have NULL fingerprints. Run the backfill query from Step 3.
 
-## Extensions That Use This
+## Works Well With
 
-- **[Email History Import](../../recipes/email-history-import/README.md)** — Gmail import computes SHA-256 fingerprints on each email and sends them to the ingest endpoint. With this primitive deployed, re-running an import produces zero duplicates.
-- All other import recipes (ChatGPT, Google Activity, etc.) benefit from this primitive — it makes any import safely re-runnable.
+- **[Email History Import](../../recipes/email-history-import/README.md)** — Gmail import computes SHA-256 fingerprints on each email. With fingerprint dedup deployed, re-running an import produces zero duplicates.
+- All other import recipes (ChatGPT, Google Activity, etc.) become safely re-runnable.
 - Webhook-based capture (Slack, Telegram) is protected against retry-induced duplicates.
 - Multi-source capture (Chrome extension + MCP server) avoids cross-channel duplicates.
 
 ## Scale Reference
 
-This primitive has been tested against **75,000+ thoughts** across 9 sources (ChatGPT, Claude, Gemini, Grok, X/Twitter, Instagram, Google Activity, Limitless, Journals) with zero duplicates in production.
+This recipe has been tested against **75,000+ thoughts** across 9 sources (ChatGPT, Claude, Gemini, Grok, X/Twitter, Instagram, Google Activity, Limitless, Journals) with zero duplicates in production.
 
 ## Further Reading
 

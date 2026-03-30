@@ -1,7 +1,7 @@
 {
   "name": "Content Fingerprint Dedup",
   "description": "SHA-256 content fingerprinting to prevent duplicate thoughts during bulk imports and multi-source capture.",
-  "category": "primitives",
+  "category": "recipes",
   "author": {
     "name": "Alan Shurafa",
     "github": "alanshurafa"
@@ -14,5 +14,7 @@
   },
   "tags": ["deduplication", "fingerprint", "sha256", "import", "data-quality"],
   "difficulty": "beginner",
-  "estimated_time": "5 minutes"
+  "estimated_time": "5 minutes",
+  "created": "2026-03-16",
+  "updated": "2026-03-25"
 }
