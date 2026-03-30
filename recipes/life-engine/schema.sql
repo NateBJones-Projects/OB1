@@ -110,7 +110,7 @@ COMMENT ON TABLE life_engine_evolution IS 'Self-improvement history — tracks s
 -- Runtime state (key-value)
 -- ----------------------------------------
 -- System state that doesn't belong in user-facing tables.
--- Examples: cron_job_id, cron_interval, wake_time, sleep_time.
+-- Examples: cron_job_id, cron_interval, wake_time, sleep_time, latitude, longitude.
 
 CREATE TABLE IF NOT EXISTS life_engine_state (
   key TEXT PRIMARY KEY,

@@ -32,6 +32,7 @@ All times are in the user's local timezone. Use the system clock — do not assu
 - Count meetings, identify the first event and any key ones
 - Query `life_engine_habits` for active morning habits
 - Check habit completion log for today
+- Check today's rain forecast (see [Weather](#weather) below)
 - Send morning briefing via `reply`
 
 ### Pre-Meeting (15–45 minutes before any calendar event)
@@ -100,6 +101,9 @@ All times are in the user's local timezone. Use the system clock — do not assu
 • [Habit name] — not yet today
 • [Habit name] — not yet today
 
+🌧️ Rain: [time range] ([probability]%)
+   — or "No rain expected" if all hours are below 30%
+
 Have a great day!
 ```
 
@@ -146,6 +150,24 @@ Suggestion: [proposed change]
 
 Reply YES to apply or NO to skip.
 ```
+
+## Weather
+
+During the morning briefing, check today's rain forecast using Open-Meteo (free, no API key):
+
+```bash
+curl -s "https://api.open-meteo.com/v1/forecast?latitude=45.52&longitude=-122.68&hourly=precipitation_probability,precipitation&forecast_days=1&timezone=auto"
+```
+
+Read `latitude` and `longitude` from `life_engine_state` if set (defaults: `45.52`, `-122.68` for Portland, OR).
+
+**How to interpret the response:**
+- The response contains `hourly.time` (array of ISO timestamps) and `hourly.precipitation_probability` (array of percentages, 0-100)
+- Scan hours from the current hour through end of day
+- If any hour has precipitation_probability >= 30%, include a rain line in the briefing
+- Group consecutive rainy hours into time ranges (e.g., "2-5 PM, 60-80%")
+- If all hours are below 30%, say "No rain expected"
+- Only include in the morning briefing — do not repeat in other briefing types
 
 ## Dynamic Loop Timing
 
