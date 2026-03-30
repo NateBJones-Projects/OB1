@@ -3,8 +3,8 @@ name: OB1 PR Follow-Ups
 on:
   workflow_run:
     workflows:
-      - "OB1 Automated Review"
-      - ".github/workflows/ob1-pr-review.yml"
+      - "OB1 PR Gate"
+      - ".github/workflows/ob1-gate.yml"
     types: [completed]
 
 permissions:

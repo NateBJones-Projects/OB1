@@ -1,8 +1,8 @@
-name: OB1 Automated Review
+name: OB1 PR Gate
 
 # Branch protection recommendation:
 # After this action is working, enable branch protection on main:
-# - Require the "OB1 Automated Review" status check to pass
+# - Require the "OB1 PR Gate" workflow to pass its checks
 # - Require at least 1 approving review from a maintainer
 # This means: automated agent passes → human admin approves → merge allowed
 
@@ -78,7 +78,7 @@ jobs:
           if [ "$is_docs_pr" = true ]; then
             results="This PR modifies docs or repo governance files. Contribution checks skipped.\n\n✅ No issues found."
             echo "comment<<EOF" >> $GITHUB_OUTPUT
-            echo -e "## OB1 Automated Review\n\n${results}" >> $GITHUB_OUTPUT
+            echo -e "## OB1 PR Gate\n\n${results}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "failed=false" >> $GITHUB_OUTPUT
             exit 0
@@ -440,7 +440,7 @@ jobs:
           # ─── Rule 11: LLM clarity review ───
           # Clarity, alignment, and design pattern reviews are handled by the
           # Claude PR Review workflow (claude-review.yml) using claude-code-action.
-          # This keeps ob1-review.yml fast and deterministic.
+          # This keeps the PR gate fast and deterministic.
           pass_check "LLM clarity review" "Covered by Claude PR Review workflow"
 
           # ─── Rule 14: No local MCP pattern ───
@@ -615,7 +615,7 @@ jobs:
 
           echo "secret_blocked=$secret_blocked" >> $GITHUB_OUTPUT
 
-          comment="## OB1 Automated Review\n\n${results}\n${summary}"
+          comment="## OB1 PR Gate\n\n${results}\n${summary}"
 
           # Append post-merge reminders (non-blocking, for admins)
           if [ -n "$reminders" ]; then
