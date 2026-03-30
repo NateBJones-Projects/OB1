@@ -7,6 +7,7 @@ Step-by-step builds that add a new capability to your Open Brain. Follow the ins
 | Recipe | What It Does |
 | ------ | ------------ |
 | [Email History Import](email-history-import/) | Pull your Gmail archive into searchable thoughts |
+| [Outlook Email Import](outlook-email-import/) | Pull your Outlook archive into searchable thoughts via Microsoft Graph API |
 | [ChatGPT Conversation Import](chatgpt-conversation-import/) | Ingest your ChatGPT data export |
 | [Daily Digest](daily-digest/) | Automated summary of recent thoughts via email or Slack |
 
