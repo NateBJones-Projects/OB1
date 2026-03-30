@@ -40,14 +40,14 @@ This guide contains everything Claude Code needs to set up your entire Life Engi
 5. Pause for you to complete Telegram pairing (requires your phone)
 6. Run a test cycle to confirm everything works
 
-After setup, exit and relaunch with your channel:
+After setup, exit and relaunch with your channel (permissions are handled by `settings.json` — see Step 6):
 
 ```bash
 # Telegram
-claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:telegram@claude-plugins-official
 
 # Discord
-claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:discord@claude-plugins-official
 ```
 
 Then start your loop: `/loop 30m /life-engine`
@@ -505,51 +505,14 @@ Life Engine runs autonomously via `/loop`. If Claude encounters a tool it doesn'
 
 | Approach | Best For | Risk Level |
 |----------|----------|------------|
-| **`--dangerously-skip-permissions`** | Always-on setups on a dedicated, trusted machine | High — bypasses ALL checks |
+| **`settings.json` allowlist** *(recommended)* | Scoped permissions that persist across sessions | Low — scoped + persistent |
+| **`--allowedTools` (CLI flag)** | Same scoping, but must be re-typed each launch | Low — scoped |
 | **`--permission-mode auto`** | A middle ground — automatic but with some guardrails | Medium |
-| **`--allowedTools` (CLI flag)** | Fine-grained — approve only the tools Life Engine needs | Low — scoped |
-| **`settings.json` allowlist** | Same as above, but persisted in config instead of CLI | Low — scoped + persistent |
+| **`--dangerously-skip-permissions`** | Quick testing on a dedicated, trusted machine | High — bypasses ALL checks |
 
-### 6.2 Option A: Skip Permissions (Simplest for Dedicated Machines)
+### 6.2 Option A: settings.json Allowlist (Recommended)
 
-For a machine you fully trust (e.g., a Mac Mini running Life Engine in a persistent terminal):
-
-```bash
-# Use whichever channel you set up in Step 1
-claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
-claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
-```
-
-> [!CAUTION]
-> This means Claude can run any tool, any bash command, write any file — without asking. Only use this on a machine and in an environment you fully trust.
-
-### 6.3 Option B: Auto Permission Mode
-
-A less extreme alternative. Claude can take actions automatically but still respects certain guardrails:
-
-```bash
-claude --channels plugin:telegram@claude-plugins-official --permission-mode auto
-```
-
-(Swap `telegram` for `discord` if using Discord.)
-
-### 6.4 Option C: Allowlisted Tools (Most Precise)
-
-Pre-approve only the specific tools Life Engine uses. You can pass them on the CLI:
-
-```bash
-claude --channels plugin:telegram@claude-plugins-official \
-  --allowedTools "Bash Read Write Edit \
-    mcp__plugin_telegram_telegram__reply \
-    mcp__plugin_telegram_telegram__react \
-    mcp__plugin_telegram_telegram__edit_message \
-    mcp__google-calendar__gcal_list_events \
-    mcp__google-calendar__gcal_get_event \
-    mcp__open-brain__* \
-    mcp__supabase__*"
-```
-
-Or persist them in `.claude/settings.json`:
+Pre-approve only the specific tools Life Engine needs, persisted in your config so you don't have to re-type them every session. Create or update `.claude/settings.json`:
 
 ```json
 {
@@ -560,18 +523,69 @@ Or persist them in `.claude/settings.json`:
       "mcp__plugin_telegram_telegram__edit_message",
       "mcp__google-calendar__gcal_list_events",
       "mcp__google-calendar__gcal_get_event",
-      "mcp__open-brain__*",
-      "mcp__supabase__*"
+      "mcp__open-brain__search_thoughts",
+      "mcp__open-brain__list_thoughts",
+      "mcp__open-brain__thought_stats",
+      "mcp__supabase__execute_sql",
+      "CronCreate",
+      "CronDelete"
     ]
   }
 }
 ```
 
-> **Note:** The exact tool names depend on how you named your MCP servers. Run `/mcp` in Claude Code to see your server names, then match them here. The `__*` wildcard approves all tools from that server.
+Then launch with just the channel flag:
 
-If you're using the [Dynamic Loop Timing](#dynamic-loop-timing) feature from the skill, also add `CronCreate` and `CronDelete`.
+```bash
+# Telegram
+claude --channels plugin:telegram@claude-plugins-official
 
-### 6.5 Test Before You Walk Away
+# Discord
+claude --channels plugin:discord@claude-plugins-official
+```
+
+> **Note:** The exact tool names depend on how you named your MCP servers. Run `/mcp` in Claude Code to see your server names, then match them here. If you use Discord instead of Telegram, replace the `mcp__plugin_telegram_telegram__` entries with the corresponding Discord tool names.
+
+### 6.3 Option B: --allowedTools (CLI Flag)
+
+Same scoping as Option A, but passed on the command line instead of persisted in config. Useful if you want different permission sets for different sessions:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official \
+  --allowedTools "mcp__plugin_telegram_telegram__reply \
+    mcp__plugin_telegram_telegram__react \
+    mcp__plugin_telegram_telegram__edit_message \
+    mcp__google-calendar__gcal_list_events \
+    mcp__google-calendar__gcal_get_event \
+    mcp__open-brain__search_thoughts \
+    mcp__open-brain__list_thoughts \
+    mcp__open-brain__thought_stats \
+    mcp__supabase__execute_sql \
+    CronCreate CronDelete"
+```
+
+### 6.4 Option C: Auto Permission Mode
+
+A middle ground. Claude can take actions automatically but still respects certain guardrails:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official --permission-mode auto
+```
+
+(Swap `telegram` for `discord` if using Discord.)
+
+### 6.5 Option D: Skip Permissions (Testing Only)
+
+For initial setup and testing on a machine you fully trust:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+```
+
+> [!CAUTION]
+> This means Claude can run any tool, any bash command, write any file — without asking. Use this for initial testing, then switch to Option A for daily operation.
+
+### 6.6 Test Before You Walk Away
 
 1. Start Claude Code with your chosen permission strategy
 2. Run `/life-engine` manually
@@ -589,15 +603,17 @@ If you're using the [Dynamic Loop Timing](#dynamic-loop-timing) feature from the
 
 ### 7.1 Start Claude Code with Channels and Permissions
 
+If you configured `settings.json` in Step 6 (recommended), just launch with the channel flag:
+
 ```bash
 # Telegram
-claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:telegram@claude-plugins-official
 
 # Discord
-claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:discord@claude-plugins-official
 ```
 
-Or swap `--dangerously-skip-permissions` for your preferred permission strategy from Step 6.
+Or append your preferred permission flag from Step 6 if you didn't use `settings.json`.
 
 ### 7.2 Test the Skill Manually
 
