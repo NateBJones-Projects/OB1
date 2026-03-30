@@ -7,7 +7,7 @@ name: OB1 Automated Review
 # This means: automated agent passes → human admin approves → merge allowed
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
     branches: [main]
 
@@ -20,9 +20,10 @@ jobs:
     name: OB1 Review
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR
+      - name: Checkout PR code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Get changed files
