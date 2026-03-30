@@ -13,11 +13,6 @@ jobs:
   label:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Detect contribution types and apply labels
         uses: actions/github-script@v7
         with:

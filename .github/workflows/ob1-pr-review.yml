@@ -7,24 +7,26 @@ name: OB1 Automated Review
 # This means: automated agent passes → human admin approves → merge allowed
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened]
     branches: [main]
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   review:
     name: OB1 Review
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR code
+      - name: Checkout PR head safely
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
           fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
 
       - name: Get changed files
         id: changed
@@ -52,6 +54,7 @@ jobs:
           pass_count=0
           fail_count=0
           results=""
+          secret_blocked=false
 
           # Helper functions
           pass_check() {
@@ -179,17 +182,21 @@ jobs:
           # ─── Rule 4: No credentials ───
           rule4_pass=true
           rule4_detail=""
-          # Scan only changed files for credential patterns
+          # Scan all changed text files for credential patterns.
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
-            # Skip metadata.json and markdown files for secret scanning
-            case "$f" in *.md|*.json) continue ;; esac
 
-            matches=$(grep -nE '(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|xoxb-[0-9]|xoxp-[0-9]|SUPABASE_SERVICE_ROLE_KEY\s*=\s*"?ey)' "$f" 2>/dev/null || true)
+            # Skip binary files to avoid noisy false positives.
+            if ! grep -Iq . "$f"; then
+              continue
+            fi
+
+            matches=$(grep -nE '(sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|SUPABASE_SERVICE_ROLE_KEY\s*=\s*"?ey)' "$f" 2>/dev/null || true)
             if [ -n "$matches" ]; then
               rule4_detail="${rule4_detail}  - \`$f\`: potential credential found\n"
               rule4_pass=false
+              secret_blocked=true
             fi
 
             # Check for .env files with actual values
@@ -198,6 +205,7 @@ jobs:
               if [ -n "$has_values" ]; then
                 rule4_detail="${rule4_detail}  - \`$f\`: .env file appears to contain real values\n"
                 rule4_pass=false
+                secret_blocked=true
               fi
             fi
           done <<< "$CHANGED_FILES"
@@ -605,6 +613,8 @@ jobs:
             echo "failed=false" >> $GITHUB_OUTPUT
           fi
 
+          echo "secret_blocked=$secret_blocked" >> $GITHUB_OUTPUT
+
           comment="## OB1 Automated Review\n\n${results}\n${summary}"
 
           # Append post-merge reminders (non-blocking, for admins)
@@ -616,39 +626,50 @@ jobs:
           echo -e "$comment" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Post review comment
-        uses: actions/github-script@v7
+      - name: Write gate artifact
         env:
           REVIEW_COMMENT: ${{ steps.review.outputs.comment }}
+          REVIEW_FAILED: ${{ steps.review.outputs.failed }}
+          SECRET_BLOCKED: ${{ steps.review.outputs.secret_blocked }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p gate-artifact
+
+          printf '%s\n' "$REVIEW_COMMENT" > gate-artifact/ob1-review-summary.md
+          printf '%s\n' "$REVIEW_COMMENT" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "${{ steps.changed.outputs.files }}" > gate-artifact/changed-files.txt
+          printf '%s\n' "${{ steps.changed.outputs.contrib_dirs }}" > gate-artifact/contribution-dirs.txt
+
+          jq -n \
+            --argjson pr_number "${{ github.event.pull_request.number }}" \
+            --arg pr_url "${{ github.event.pull_request.html_url }}" \
+            --arg title "${{ github.event.pull_request.title }}" \
+            --arg head_sha "${{ github.event.pull_request.head.sha }}" \
+            --arg author_login "${{ github.event.pull_request.user.login }}" \
+            --arg author_association "${{ github.event.pull_request.author_association }}" \
+            --arg is_draft "${{ github.event.pull_request.draft }}" \
+            --arg failed "$REVIEW_FAILED" \
+            --arg secret_blocked "$SECRET_BLOCKED" \
+            '{
+              pr_number: $pr_number,
+              pr_url: $pr_url,
+              title: $title,
+              head_sha: $head_sha,
+              author_login: $author_login,
+              author_association: $author_association,
+              is_draft: ($is_draft == "true"),
+              failed: ($failed == "true"),
+              secret_blocked: ($secret_blocked == "true")
+            }' > gate-artifact/ob1-review-context.json
+
+      - name: Upload gate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const body = process.env.REVIEW_COMMENT;
-
-            // Find existing bot comment to update (avoid spam)
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const botComment = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('OB1 Automated Review')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body,
-              });
-            }
+          name: ob1-pr-gate-context
+          path: gate-artifact/
+          retention-days: 7
 
       - name: Fail if checks failed
         if: steps.review.outputs.failed == 'true'

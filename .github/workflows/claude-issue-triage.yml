@@ -18,45 +18,43 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
-            You are triaging a new issue for Open Brain (OB1), an open-source
-            persistent AI memory system. Read CLAUDE.md and CONTRIBUTING.md for
-            full project context.
+            You are triaging a new issue for Open Brain (OB1). Read CLAUDE.md
+            and CONTRIBUTING.md first.
 
-            Analyze this issue and:
+            Your job is simple:
 
-            1. **Classify** — What type of contribution is this?
-               - Bug report (something broken in an existing contribution)
-               - Recipe idea (new data import or capability)
-               - Schema idea (new database table extension)
-               - Extension proposal (new guided build for the learning path)
-               - Primitive proposal (new reusable concept guide)
-               - Dashboard idea (new frontend template)
-               - Integration idea (new MCP extension, webhook, or capture source)
-               - Skill idea (new reusable AI client skill or prompt pack)
-               - Documentation improvement
-               - Question (not a contribution, needs help)
+            1. Classify the issue into exactly one type:
+               - bug
+               - recipe idea
+               - schema idea
+               - extension proposal
+               - primitive proposal
+               - dashboard idea
+               - integration idea
+               - skill idea
+               - documentation improvement
+               - question
 
-            2. **Duplicate check** — Does this overlap with an existing open issue
-               or a contribution that already exists in the repo? Check the
-               issues list and the relevant category folder.
+            2. Check if it is probably a duplicate of:
+               - an existing open issue
+               - or an existing contribution already in the repo
 
-            3. **Scope fit** — Does this belong in OB1? It should relate to
-               capturing, storing, retrieving, or processing thoughts in the
-               Open Brain system. If it seems like it would be better as its
-               own standalone project, say so politely.
+            3. Decide whether it fits OB1.
+               OB1 issues should relate to capturing, storing, retrieving, or
+               processing thoughts in the Open Brain system.
 
-            4. **Suggest labels** — Based on classification, suggest which labels
-               should be applied (recipe, schema, extension, primitive, dashboard,
-               integration, skill, documentation, bug, question, good-first-issue).
+            4. Pick a short label set from existing repo labels only.
 
-            5. **Helpful response** — Post a welcoming, constructive comment:
-               - Acknowledge the idea
-               - If they used the blank template, point them to the right
-                 specific template for better structure
-               - If it's a recipe/schema/integration/skill idea, link to
-                 CONTRIBUTING.md's "What Goes Where" section
-               - If it looks like a duplicate, link the existing issue
-               - If it's a question, try to answer or point to docs/FAQ
+            5. Post one helpful comment that:
+               - acknowledges the issue
+               - says what category it appears to be
+               - points to the right template or docs when useful
+               - links a duplicate if you find one
+               - politely says when something seems out of scope
 
-            Be warm and encouraging. OB1 is a community project and every
-            idea matters, even if it needs refinement.
+            Keep the output practical and brief.
+            Do not over-explain.
+            Do not invent labels that do not exist.
+            If unsure, prefer fewer labels and a cautious comment.
+          claude_args: |
+            --model haiku
