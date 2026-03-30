@@ -18,7 +18,7 @@ https://github.com/user-attachments/assets/85208d73-112b-4204-82fd-d03b6c397a8b
 
 Never built an Open Brain? Start here:
 
-1. **[Setup Guide](docs/01-getting-started.md)** — Build the full system (database, AI gateway, Slack capture, MCP server) in about 45 minutes. No coding experience needed.
+1. **[Setup Guide](docs/01-getting-started.md)** — Build the full system (database, AI gateway, Slack capture, MCP server) in about 45 minutes. No coding experience needed. Or watch the [video walkthrough](https://vimeo.com/1174979042/f883f6489a) (~27 min).
 2. **[AI-Assisted Setup](docs/04-ai-assisted-setup.md)** — Prefer building with Cursor, Claude Code, or another AI coding tool? Point it at this repo and go. Same system, different workflow.
 3. **[Companion Prompts](docs/02-companion-prompts.md)** — Five prompts that help you migrate your memories, discover use cases, and build the capture habit.
 4. **Then pick Extension 1** and start building.
@@ -57,42 +57,79 @@ Some concepts show up in multiple extensions. Learn them once, apply them everyw
 
 https://github.com/user-attachments/assets/9454662f-2648-4928-8723-f7d52e94e9b8
 
-Beyond the curated learning path, the community builds and shares:
+Beyond the curated learning path, the community builds and shares real tools that real people use. Every contribution below was reviewed, approved, and merged by the maintainer team. Look for the **Community Contribution** badge in each README.
 
-### [`/recipes`](recipes/) — Step-by-step builds
+### [`/recipes`](recipes/) — Import Your Data
 
-Each recipe teaches you how to add a new capability to your Open Brain. Follow the instructions, run the code, get a new feature.
-- Email history import (pull your Gmail archive into searchable thoughts)
-- ChatGPT conversation import (ingest your ChatGPT data export)
-- Daily digest generator (automated summary of recent thoughts via email or Slack)
+Pull your digital life into Open Brain. Each recipe handles a specific data source — parsing, deduplication, embedding, and ingestion included.
 
-### [`/schemas`](schemas/) — Database extensions
+| Recipe | What It Does | Contributor |
+| ------ | ------------ | ----------- |
+| [ChatGPT Import](recipes/chatgpt-conversation-import/) | Parse ChatGPT data exports, filter trivial conversations, summarize via LLM | [@matthallett1](https://github.com/matthallett1) |
+| [Perplexity Import](recipes/perplexity-conversation-import/) | Import Perplexity AI search history and memory entries | [@demarant](https://github.com/demarant) |
+| [Obsidian Vault Import](recipes/obsidian-vault-import/) | Parse and import Obsidian vault notes with full metadata | [@snapsynapse](https://github.com/snapsynapse) |
+| [X/Twitter Import](recipes/x-twitter-import/) | Import tweets, DMs, and Grok chats from X data exports | [@alanshurafa](https://github.com/alanshurafa) |
+| [Instagram Import](recipes/instagram-import/) | Import DMs, comments, and captions from Instagram exports | [@alanshurafa](https://github.com/alanshurafa) |
+| [Google Activity Import](recipes/google-activity-import/) | Import Google Search, Gmail, Maps, YouTube, Chrome history from Takeout | [@alanshurafa](https://github.com/alanshurafa) |
+| [Grok (xAI) Import](recipes/grok-export-import/) | Import Grok conversation exports with MongoDB-style date handling | [@alanshurafa](https://github.com/alanshurafa) |
+| [Journals/Blogger Import](recipes/journals-blogger-import/) | Import Atom XML blog archives from Blogger/Journals | [@alanshurafa](https://github.com/alanshurafa) |
+| [Email History Import](recipes/email-history-import/) | Pull your Gmail archive into searchable thoughts | [@matthallett1](https://github.com/matthallett1) |
 
-New tables, metadata schemas, and column extensions for your Supabase database. Drop them in alongside your existing `thoughts` table.
-- CRM contact layer (track people, interactions, and relationship context)
-- Taste preferences tracker
-- Reading list with rating metadata
+### [`/recipes`](recipes/) — Tools & Workflows
 
-### [`/dashboards`](dashboards/) — Frontend templates
+Standalone capabilities that make your Open Brain smarter.
 
-Host these on Vercel or Netlify, pointed at your Supabase backend. Instant UI for your brain.
-- Personal knowledge dashboard
-- Weekly review view
-- Mobile-friendly capture UI
+| Recipe | What It Does | Contributor |
+| ------ | ------------ | ----------- |
+| [Panning for Gold](recipes/panning-for-gold/) | Mine brain dumps and voice transcripts for actionable ideas — battle-tested across 13+ sessions | [@jaredirish](https://github.com/jaredirish) |
+| [Claudeception](recipes/claudeception/) | Self-improving system that creates new skills from work sessions — skills that create other skills | [@jaredirish](https://github.com/jaredirish) |
+| [Schema-Aware Routing](recipes/schema-aware-routing/) | LLM-powered routing that distributes unstructured text across multiple database tables | [@claydunker-yalc](https://github.com/claydunker-yalc) |
+| [Fingerprint Dedup Backfill](recipes/fingerprint-dedup-backfill/) | Backfill content fingerprints and safely remove duplicate thoughts | [@alanshurafa](https://github.com/alanshurafa) |
+| [Source Filtering](recipes/source-filtering/) | Filter thoughts by source and backfill missing metadata for early imports | [@matthallett1](https://github.com/matthallett1) |
+| [Life Engine](recipes/life-engine/) | Self-improving personal assistant — calendar, habits, health, proactive briefings via Telegram or Discord | [@justfinethanku](https://github.com/justfinethanku) |
+| [Life Engine Video](recipes/life-engine-video/) | Add-on that renders Life Engine briefings as short animated videos with voiceover | [@justfinethanku](https://github.com/justfinethanku) |
+| [Daily Digest](recipes/daily-digest/) | Automated daily summary of recent thoughts delivered via email or Slack | OB1 Team |
 
-### [`/integrations`](integrations/) — New connections
+### [`/skills`](skills/) — Agent Skills
 
-MCP server extensions, webhook receivers, and capture sources beyond Slack.
-- Discord capture bot
-- Email forwarding handler
-- Browser extension connector
+Plain-text skill packs you can drop into Claude Code, Codex, or other AI clients that support reusable prompts/rules.
+
+| Skill | What It Does | Contributor |
+| ----- | ------------ | ----------- |
+| [Panning for Gold Skill Pack](skills/panning-for-gold/) | Turns brain dumps and transcripts into evaluated idea inventories | [@jaredirish](https://github.com/jaredirish) |
+| [Claudeception Skill Pack](skills/claudeception/) | Extracts reusable lessons from work sessions into new skills | [@jaredirish](https://github.com/jaredirish) |
+
+### [`/dashboards`](dashboards/) — Frontend Templates
+
+Host on Vercel or Netlify, pointed at your Supabase backend. Two community-built options — pick the framework you prefer.
+
+| Dashboard | What It Does | Contributor |
+| --------- | ------------ | ----------- |
+| [Open Brain Dashboard](dashboards/open-brain-dashboard/) | SvelteKit dashboard with MCP proxy and Supabase auth | [@headcrest](https://github.com/headcrest) |
+| [Open Brain Dashboard (Next.js)](dashboards/open-brain-dashboard-next/) | Full-featured Next.js dashboard — 8 pages, dark theme, smart ingest, quality auditing | [@alanshurafa](https://github.com/alanshurafa) |
+
+### [`/integrations`](integrations/) — New Connections
+
+MCP server extensions, alternative deployment targets, and capture sources beyond Slack.
+
+| Integration | What It Does | Contributor |
+| ----------- | ------------ | ----------- |
+| [Kubernetes Deployment](integrations/kubernetes-deployment/) | Fully self-hosted K8s deployment with PostgreSQL + pgvector — no Supabase required | [@velo](https://github.com/velo) |
+| [Slack Capture](integrations/slack-capture/) | Quick-capture thoughts via Slack messages with auto-embedding and classification | Core |
+| [Discord Capture](integrations/discord-capture/) | Discord bot that captures messages into Open Brain, mirroring the Slack pattern | Core |
+
+### [`/primitives`](primitives/) — Reusable Patterns
+
+| Primitive | What It Does | Contributor |
+| --------- | ------------ | ----------- |
+| [Content Fingerprint Dedup](primitives/content-fingerprint-dedup/) | SHA-256 deduplication for thought ingestion — prevents duplicates across all import recipes | [@alanshurafa](https://github.com/alanshurafa) |
 
 ## Using a Contribution
 
-1. Browse the category folders above
-2. Find what you want and open its folder
-3. Read the README — it has prerequisites, step-by-step instructions, and troubleshooting
-4. Most contributions involve running SQL against your Supabase database, deploying an edge function, or hosting frontend code. The README will tell you exactly what to do.
+1. Browse the category tables above or the folders in the repo
+2. Open the contribution's folder and read the README
+3. Every README has prerequisites, step-by-step instructions, expected outcomes, and troubleshooting
+4. Most contributions involve running SQL, deploying an edge function, or hosting frontend code — the README tells you exactly what to do
 
 ## Contributing
 
@@ -100,8 +137,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
 
 - **Extensions** are curated — discuss with maintainers before submitting
 - **Primitives** should be referenced by 2+ extensions to justify extraction
-- **Recipes, schemas, dashboards, integrations** are open for community contributions
-- Every PR runs through an automated review agent that checks 11 rules (file structure, no secrets, SQL safety, primitive dependencies, etc.)
+- **Recipes, schemas, dashboards, integrations, and skills** are open for community contributions
+- Every PR runs through an automated review agent that checks structure, secrets, SQL safety, dependencies, and documentation quality
 - If the agent passes, a human admin reviews for quality and clarity
 - Your contribution needs a README with real instructions and a `metadata.json` with structured info
 

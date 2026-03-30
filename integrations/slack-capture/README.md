@@ -182,6 +182,14 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const messageTs: string = event.ts;
     if (!messageText || messageText.trim() === "") return new Response("ok", { status: 200 });
 
+    // Deduplicate: Slack retries webhooks if response takes >3s, so check if we already captured this message
+    const { data: existing } = await supabase
+      .from("thoughts")
+      .select("id")
+      .contains("metadata", { slack_ts: messageTs })
+      .limit(1);
+    if (existing && existing.length > 0) return new Response("ok", { status: 200 });
+
     const [embedding, metadata] = await Promise.all([
       getEmbedding(messageText),
       extractMetadata(messageText),
@@ -231,6 +239,8 @@ Replace the values with:
 - Your Slack Channel ID from Step 1 above
 
 > SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are automatically available inside Edge Functions — you don't need to set them.
+
+> **If you ever rotate your OpenRouter key:** you must re-run `supabase secrets set OPENROUTER_API_KEY=...` with the new key. This Edge Function reads the key from Supabase secrets at runtime — updating it on openrouter.ai alone won't propagate here. See the [FAQ on key rotation](../../docs/03-faq.md#api-key-rotation) for the full checklist.
 
 ### Deploy
 
@@ -306,7 +316,7 @@ Check Event Subscriptions — make sure both `message.channels` and `message.gro
 
 ### Slack creates duplicate database entries
 
-Slack retries webhook delivery if it doesn't get a response within 3 seconds. If your Edge Function takes longer than that (embedding + metadata extraction can take 4-5 seconds), Slack sends the event again, and you get two rows. This is a known edge case. The captures are identical, so it doesn't affect search — but if it bothers you, you can delete the duplicate row in the Supabase Table Editor.
+Slack retries webhook delivery if it doesn't get a response within 3 seconds. The Edge Function includes built-in deduplication — it checks for existing rows with the same `slack_ts` before processing. If you're still seeing duplicates, make sure you're on the latest version of the code (see Step 3) and have redeployed.
 
 ### Function runs but nothing in the database
 

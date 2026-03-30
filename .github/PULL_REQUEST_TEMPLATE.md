@@ -5,6 +5,7 @@
 - [ ] Schema (`/schemas`)
 - [ ] Dashboard (`/dashboards`)
 - [ ] Integration (`/integrations`)
+- [ ] Skill (`/skills`)
 - [ ] Repo improvement (docs, CI, templates)
 
 ## What does this do?

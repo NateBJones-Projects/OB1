@@ -1,0 +1,11 @@
+{
+  "name": "open-brain-google-activity-import",
+  "version": "1.0.0",
+  "description": "Import Google Takeout activity history into Open Brain",
+  "type": "module",
+  "scripts": {
+    "import": "node import-google-activity.mjs",
+    "dry-run": "node import-google-activity.mjs --dry-run --limit 5"
+  },
+  "dependencies": {}
+}

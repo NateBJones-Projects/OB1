@@ -39,7 +39,7 @@ A complete job search management system — companies, postings, applications, i
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project ref and Secret key, plus a new MCP Access Key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project ref, Secret key, and MCP Access Key — reuse the key from your core setup.
 
 ```text
 JOB HUNT PIPELINE -- CREDENTIAL TRACKER
@@ -50,7 +50,8 @@ SUPABASE (from your Open Brain setup)
   Secret key:            ____________
 
 MCP SERVER (new for this extension)
-  MCP Access Key:        ____________
+  Default User ID:       ____________
+  MCP Access Key:        ____________  (same key for all extensions)
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
 
@@ -70,7 +71,26 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run. This creates five RLS-enabled tables with proper foreign key relationships and cascading deletes.
 
-### 2. Deploy the MCP Server
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
+
+```bash
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
+```
+
+Set it as an environment variable for your Edge Function:
+
+```bash
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
+```
+
+> If you already set `DEFAULT_USER_ID` for a previous extension, you can skip this step — all extensions share the same user ID.
+
+### 3. Deploy the MCP Server
 
 Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
@@ -79,7 +99,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Function name | `job-hunt-mcp` |
 | Download path | `extensions/job-hunt` |
 
-### 3. Connect to Your AI
+### 4. Connect to Your AI
 
 Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
@@ -88,7 +108,7 @@ Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connec
 | Connector name | `Job Hunt Pipeline` |
 | URL | Your **MCP Connection URL** from the credential tracker |
 
-### 4. Test the Extension
+### 5. Test the Extension
 
 Try these commands with Claude:
 
@@ -214,9 +234,10 @@ All wired together through your Open Brain, with cross-extension tools that let 
 
 ### What's Next?
 
-1. **Build your own extensions** — Use these 6 as templates for domains specific to your life
-2. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Remote MCP](../../primitives/remote-mcp/), and other patterns
-3. **Create compound queries** — Build tools that reason across multiple extensions simultaneously
-4. **Share your extensions** — Contribute back to the OB1 community
+1. **Audit and optimize your tools** — You now have ~40 MCP tool definitions across 6 extensions. That's a lot of context weight. Run the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) to identify redundancies, merge CRUD tools, and scope your servers by workflow. This is the single highest-impact thing you can do to keep your AI performing well.
+2. **Build your own extensions** — Use these 6 as templates for domains specific to your life
+3. **Explore primitives** — Dive deeper into [Row Level Security](../../primitives/rls/), [Remote MCP](../../primitives/remote-mcp/), and other patterns
+4. **Create compound queries** — Build tools that reason across multiple extensions simultaneously
+5. **Share your extensions** — Contribute back to the OB1 community
 
 [Explore Primitives →](../../primitives/)

@@ -1,6 +1,6 @@
 # Resources
 
-Companion tools and files for Open Brain.
+Official companion files and packaged exports for Open Brain. Community-contributed plain-text skill packs live in [`../skills/`](../skills/).
 
 | Resource | What It Is |
 | -------- | ---------- |

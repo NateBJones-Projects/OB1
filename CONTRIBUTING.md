@@ -30,18 +30,20 @@ This is a first-class path, not a workaround. Some of the best contributions com
 | `schemas/` | Database table extensions and metadata schemas | CRM contacts table, taste tracker, reading list schema | Open |
 | `dashboards/` | Frontend templates for Vercel/Netlify hosting | Knowledge dashboard, weekly review, mobile capture UI | Open |
 | `integrations/` | MCP extensions, webhooks, capture sources | Discord bot, email handler, browser extension, calendar sync | Open |
+| `skills/` | Reusable AI client skills and prompt packs | Meeting triage assistant, code review protocol, transcript processor | Open |
 
-### Extensions vs Primitives vs Recipes
+### Extensions vs Primitives vs Recipes vs Skills
 
 - **Extensions** are curated, ordered builds that form a progressive learning path. Each teaches new concepts through practical use. They include database schemas, MCP server code, and step-by-step instructions. If you want to propose a new extension, [open an issue](../../issues/new?template=extension-submission.yml) first.
 - **Primitives** are reusable concept guides that get referenced by multiple extensions. They teach a pattern (like RLS or shared access) once, so extensions can link to them instead of re-explaining. A primitive should be referenced by at least 2 extensions. [Propose one here](../../issues/new?template=primitive-submission.yml).
 - **Recipes** are standalone builds — they add a capability without being part of the learning path. No ordering, no prerequisites beyond a working Open Brain. Open for community contributions.
+- **Skills** are standalone agent behaviors packaged as plain-text prompt/skill files. They are smaller than recipes: no full build required, just a reusable behavior you can install into Claude Code, Codex, Cursor, or a similar client. Open for community contributions.
 
 Not sure where yours fits? Open a discussion issue first.
 
 ## Required Files
 
-Every contribution lives in its own subfolder under the right category (e.g., `recipes/my-cool-recipe/`) and must include:
+Every contribution lives in its own subfolder under the right category (e.g., `recipes/my-cool-recipe/` or `skills/my-cool-skill/`) and must include:
 
 - **`README.md`** — What it does, prerequisites, step-by-step setup, expected outcome, troubleshooting
 - **`metadata.json`** — Structured metadata (see template below)
@@ -58,18 +60,86 @@ Your contribution's README must include these sections:
 4. **Expected outcome** — What should the user see when it's working? Be specific.
 5. **Troubleshooting** — At least 2-3 common issues and how to fix them.
 
-**Extensions** additionally require:
+### Visual Formatting Requirements
+
+These patterns are required for **extensions** and strongly recommended for all other contributions. They match the [Getting Started guide](docs/01-getting-started.md) and make guides scannable, beginner-friendly, and consistent across the repo.
+
+**Step badges** — Every major step gets a [shields.io](https://shields.io) badge as its header. Sub-steps get inverted badges (colored label, grey title). Pick one color per guide and use it consistently. See the extension template for the exact URL format.
+
+```markdown
+<!-- Main step badge -->
+![Step 1](https://img.shields.io/badge/Step_1-Create_the_Database_Tables-1E88E5?style=for-the-badge)
+
+<!-- Sub-step badge (inverted: color on left, grey on right) -->
+![1.1](https://img.shields.io/badge/1.1-Create_the_Tables-555?style=for-the-badge&labelColor=1E88E5)
+```
+
+**Verification checkpoints** — Every step ends with a `✅ **Done when:**` line telling the user exactly what to check before moving on.
+
+**Collapsible SQL blocks** — Wrap SQL in `<details>` with a descriptive summary so the page stays scannable:
+
+```markdown
+<details>
+<summary>📋 <strong>SQL: Description here</strong> (click to expand)</summary>
+
+\```sql
+-- your SQL here
+\```
+
+</details>
+```
+
+**GitHub alert callouts** — Use these for warnings, tips, and critical information:
+
+```markdown
+> [!CAUTION]    ← Stop-and-read-this-now errors
+> [!WARNING]    ← Things that can go wrong
+> [!IMPORTANT]  ← Required steps that are easy to skip
+> [!TIP]        ← Helpful but optional context
+> [!NOTE]       ← Additional background information
+```
+
+**Numbered commands** — When a step has 2+ commands that must run in order, number them with bold labels:
+
+```markdown
+**1. Create the function folder:**
+\```bash
+supabase functions new my-function
+\```
+
+**2. Download the server code:**
+\```bash
+curl -o supabase/functions/my-function/index.ts https://...
+\```
+```
+
+**GRANT step** — Every extension that creates tables MUST include a GRANT step. Supabase no longer auto-grants CRUD permissions to `service_role` on new projects:
+
+```sql
+grant select, insert, update, delete on table public.your_table to service_role;
+```
+
+### Extension-Specific Requirements
+
 - **"Why This Matters"** section leading with the human pain point
 - **"Learning Path"** table showing position in the 6-extension sequence
 - **"What You'll Learn"** listing new concepts introduced
 - **"Cross-Extension Integration"** prominently documenting connections to other extensions
 - **"Next Steps"** linking to the next extension
+- **Tool audit link** — Any extension or integration that exposes MCP tools must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in its "Next Steps" or closing section. This helps users manage their tool surface area as they add extensions. The link is checked by the automated review.
 - **Remote MCP setup** — MCP servers must be deployed as Supabase Edge Functions and connected via custom connectors (URL-based). Do NOT use local Node.js servers or `claude_desktop_config.json`. See the [extension template](extensions/_template/) for the correct pattern.
 
 **Primitives** additionally require:
 - **"Extensions That Use This"** section listing which extensions reference this primitive
 
-Check the `_template/` folder in each category for a starter README.
+**Skills** additionally require:
+- At least one plain-text skill artifact (`SKILL.md`, `*.skill.md`, or `*-skill.md`)
+- **"Supported Clients"** section listing which AI tools the skill is designed for
+- **"Installation"** steps showing exactly where the file goes
+- **"Trigger Conditions"** explaining when the skill should fire
+- Plain-text, reviewable source files only. Do not submit zipped/exported skill bundles in `skills/`.
+
+Check the `_template/` folder in each category for a starter README. The extension template contains HTML comments with detailed instructions for both human contributors and AI assistants.
 
 ## metadata.json
 
@@ -140,6 +210,7 @@ Example for an extension:
 - Example: `[schemas] CRM contacts table with interaction tracking`
 - Example: `[extensions] Household Knowledge Base`
 - Example: `[primitives] Row Level Security guide`
+- Example: `[skills] Panning for Gold standalone skill pack`
 
 **Description must include:**
 - What the contribution does
@@ -174,17 +245,17 @@ As you contribute, you'll progress through these levels. Every level is achievab
 
 Non-code contributions count at every level. Testing recipes, mentoring non-technical contributors, improving documentation, and triaging issues all count toward progression.
 
-## The 11 Automated Review Rules
+## The Automated Review Rules
 
 Every PR is checked against these rules. All must pass before human review.
 
-1. **Folder structure** — Contribution is in the correct category directory (`recipes/`, `schemas/`, `dashboards/`, `integrations/`, `primitives/`, `extensions/`)
+1. **Folder structure** — Contribution is in the correct category directory (`recipes/`, `schemas/`, `dashboards/`, `integrations/`, `skills/`, `primitives/`, `extensions/`)
 2. **Required files** — Both `README.md` and `metadata.json` exist in the contribution folder
 3. **Metadata valid** — `metadata.json` parses as valid JSON and contains all required fields
 4. **No credentials** — No API keys, tokens, passwords, or secrets in any file
 5. **SQL safety** — No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`. No modifications to core `thoughts` table columns (adding columns is fine, altering/dropping existing ones is not)
-6. **Category-specific artifacts** — `recipes/` have code or detailed instructions, `schemas/` have SQL files, `dashboards/` have frontend code or `package.json`, `integrations/` have code files, `primitives/` have substantial READMEs (200+ words), `extensions/` have both SQL and code files
-7. **PR format** — Title starts with `[recipes]`, `[schemas]`, `[dashboards]`, `[integrations]`, `[primitives]`, or `[extensions]`
+6. **Category-specific artifacts** — `recipes/` have code or detailed instructions, `schemas/` have SQL files, `dashboards/` have frontend code or `package.json`, `integrations/` have code files, `skills/` have at least one plain-text skill file, `primitives/` have substantial READMEs (200+ words), `extensions/` have both SQL and code files
+7. **PR format** — Title starts with `[recipes]`, `[schemas]`, `[dashboards]`, `[integrations]`, `[skills]`, `[primitives]`, or `[extensions]`
 8. **No binary blobs** — No files over 1MB, no `.exe`, `.dmg`, `.zip`, `.tar.gz`
 9. **README completeness** — Contribution README includes Prerequisites, step-by-step instructions, and expected outcome sections
 10. **Primitive dependencies** — If a contribution declares `requires_primitives`, the primitives must exist in the repo and be linked in the README
@@ -192,3 +263,4 @@ Every PR is checked against these rules. All must pass before human review.
 12. **Scope check** — All changes are within the contribution folder(s)
 13. **Internal links** — All relative links in READMEs resolve to existing files
 14. **Remote MCP pattern** — Extensions and integrations must use remote MCP via Supabase Edge Functions. No `claude_desktop_config.json`, no local Node.js stdio servers. See the [Getting Started guide](docs/01-getting-started.md) for the correct pattern
+15. **Tool audit link** — Extensions and integrations must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in their README. This ensures users are aware of tool surface area management as they add capabilities

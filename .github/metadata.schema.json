@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/NateBJones-Projects/OB1/blob/main/.github/metadata.schema.json",
   "title": "Open Brain Source Contribution Metadata",
-  "description": "Schema for metadata.json files in OB1 contributions (recipes, schemas, dashboards, integrations, primitives, extensions).",
+  "description": "Schema for metadata.json files in OB1 contributions (recipes, schemas, dashboards, integrations, skills, primitives, extensions).",
   "type": "object",
   "required": [
     "name",
@@ -28,7 +28,7 @@
     },
     "category": {
       "type": "string",
-      "enum": ["recipes", "schemas", "dashboards", "integrations", "primitives", "extensions"],
+      "enum": ["recipes", "schemas", "dashboards", "integrations", "skills", "primitives", "extensions"],
       "description": "Which contribution directory this belongs to."
     },
     "author": {

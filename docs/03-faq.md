@@ -164,6 +164,35 @@ This is a precise description of what vector retrieval does differently from fil
 
 ---
 
+## API Key Rotation
+
+### "I rotated my OpenRouter API key and now nothing works"
+
+When you generate a new key on openrouter.ai/keys, the old key is revoked immediately. But your Open Brain uses that key in multiple places — and updating it in one spot doesn't update the others. Everything downstream of the old key breaks silently.
+
+**Places your OpenRouter key lives (update ALL of them):**
+
+1. **Supabase Edge Function secrets** — This is the most common one to miss. Your MCP server reads the key from here at runtime.
+   ```bash
+   supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-new-key
+   ```
+
+2. **Local `.env` files** — Any recipes or integrations you run locally (e.g., `recipes/chatgpt-conversation-import/.env`). Open each one and replace the old key value.
+
+3. **CI/CD or deployment configs** — If you've set the key in any deployment pipeline, update it there too.
+
+**How to verify the new key works:**
+
+```bash
+curl https://openrouter.ai/api/v1/models -H "Authorization: Bearer sk-or-v1-your-new-key"
+```
+
+If you get a JSON list of models back, the key is valid. If you get a 401, the key is wrong or not yet active.
+
+**Tip:** After rotating a key, test your Open Brain immediately — capture a test thought and search for it. Don't wait days to discover it's broken.
+
+---
+
 ## Rate Limits and API Issues
 
 ### "My suite of agents keeps hitting per-minute rate limits"

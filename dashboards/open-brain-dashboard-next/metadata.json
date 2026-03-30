@@ -1,0 +1,29 @@
+{
+  "name": "Open Brain Dashboard",
+  "description": "Full-featured web dashboard for browsing, searching, capturing, and managing thoughts with session auth, smart ingest, reflections, and quality auditing.",
+  "category": "dashboards",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "tags": [
+    "dashboard",
+    "web-ui",
+    "nextjs",
+    "search",
+    "capture",
+    "ingest",
+    "browse",
+    "audit"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-03-23",
+  "updated": "2026-03-23"
+}

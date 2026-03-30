@@ -362,15 +362,42 @@ server.registerTool(
   }
 );
 
-// --- Hono App with Auth Check ---
+// --- Hono App with Auth + CORS ---
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-brain-key, accept, mcp-session-id",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+};
 
 const app = new Hono();
+
+// CORS preflight — required for browser/Electron-based clients (Claude Desktop, claude.ai)
+app.options("*", (c) => {
+  return c.text("ok", 200, corsHeaders);
+});
 
 app.all("*", async (c) => {
   // Accept access key via header OR URL query parameter
   const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401);
+    return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
+  }
+
+  // Fix: Claude Desktop connectors don't send the Accept header that
+  // StreamableHTTPTransport requires. Build a patched request if missing.
+  // See: https://github.com/NateBJones-Projects/OB1/issues/33
+  if (!c.req.header("accept")?.includes("text/event-stream")) {
+    const headers = new Headers(c.req.raw.headers);
+    headers.set("Accept", "application/json, text/event-stream");
+    const patched = new Request(c.req.raw.url, {
+      method: c.req.raw.method,
+      headers,
+      body: c.req.raw.body,
+      // @ts-ignore -- duplex required for streaming body in Deno
+      duplex: "half",
+    });
+    Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
   const transport = new StreamableHTTPTransport();

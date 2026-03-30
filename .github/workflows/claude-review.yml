@@ -1,7 +1,7 @@
 name: Claude PR Review
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
     types: [created]
@@ -17,7 +17,7 @@ permissions:
 jobs:
   claude-review:
     if: >
-      github.event_name == 'pull_request' ||
+      github.event_name == 'pull_request_target' ||
       ((github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@claude')) &&
        contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login)) ||
@@ -26,10 +26,18 @@ jobs:
        contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login))
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
       - uses: anthropics/claude-code-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Read,Glob,Grep"'
           prompt: |
             You are reviewing a contribution to Open Brain (OB1), an open-source
             persistent AI memory system. Read CLAUDE.md, CONTRIBUTING.md, and
@@ -58,6 +66,12 @@ jobs:
                needs independent deployment, or introduces its own auth system.
                If it seems too big, suggest it could be a standalone project
                that integrates with OB1 instead.
+
+            Before writing your review, read any existing PR comments and
+            review discussion. If maintainers or contributors have already
+            flagged issues, asked questions, or discussed changes, acknowledge
+            them in your review rather than duplicating. Build on the existing
+            conversation instead of starting from scratch.
 
             Be constructive and welcoming. If a contribution needs work, explain
             what specifically needs to change. If it looks good, approve the PR.

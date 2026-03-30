@@ -7,7 +7,7 @@ name: OB1 Automated Review
 # This means: automated agent passes → human admin approves → merge allowed
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
     branches: [main]
 
@@ -20,9 +20,10 @@ jobs:
     name: OB1 Review
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR
+      - name: Checkout PR code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Get changed files
@@ -36,7 +37,7 @@ jobs:
 
           # Identify contribution folders (e.g., recipes/email-import/)
           # Exclude _template folders and top-level files
-          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations|primitives|extensions)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
+          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations|skills|primitives|extensions)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
           echo "contrib_dirs<<EOF" >> $GITHUB_OUTPUT
           echo "$contrib_dirs" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -83,7 +84,7 @@ jobs:
           # ─── Rule 1: Folder structure ───
           rule1_pass=true
           bad_files=""
-          allowed_pattern='^(recipes|schemas|dashboards|integrations|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
+          allowed_pattern='^(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             if ! echo "$f" | grep -qE "$allowed_pattern"; then
@@ -286,6 +287,13 @@ jobs:
                   rule6_pass=false
                 fi
                 ;;
+              skills)
+                has_skill=$(echo "$dir_files" | grep -iE '(^|/)(SKILL\.md|[^/]+[.-]skill\.md)$' || true)
+                if [ -z "$has_skill" ]; then
+                  rule6_detail="${rule6_detail}  - \`$dir\`: skills must contain a plain-text skill file (\`SKILL.md\`, \`*.skill.md\`, or \`*-skill.md\`)\n"
+                  rule6_pass=false
+                fi
+                ;;
               primitives)
                 # Primitives must have substantial README (200+ words)
                 if [ -f "$dir/README.md" ]; then
@@ -319,10 +327,10 @@ jobs:
           fi
 
           # ─── Rule 7: PR format ───
-          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|primitives|extensions|docs)\] '; then
+          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs)\] '; then
             pass_check "PR format" "Title follows \`[category] Description\` format"
           else
-            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, \`[primitives]\`, \`[extensions]\`, or \`[docs]\` followed by a space and description"
+            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, \`[skills]\`, \`[primitives]\`, \`[extensions]\`, or \`[docs]\` followed by a space and description"
           fi
 
           # ─── Rule 8: No binary blobs ───
@@ -454,6 +462,33 @@ jobs:
             pass_check "Remote MCP pattern" "No local MCP server patterns detected — uses remote MCP correctly"
           else
             fail_check "Remote MCP pattern" "Local MCP patterns found (must use remote MCP via Edge Functions):\n${rule14_detail}See the [Getting Started guide](docs/01-getting-started.md) for the correct remote MCP pattern."
+          fi
+
+          # ─── Rule 15: Tool audit link ───
+          # Extensions and integrations that expose MCP tools must link to the
+          # tool audit guide so users know how to manage their tool surface area.
+          rule15_pass=true
+          rule15_detail=""
+          while IFS= read -r dir; do
+            [ -z "$dir" ] && continue
+            category=$(echo "$dir" | cut -d'/' -f1)
+            case "$category" in
+              extensions|integrations) ;;
+              *) continue ;;
+            esac
+            [ ! -f "$dir/README.md" ] && continue
+
+            # Check for any link to the tool audit guide
+            if ! grep -q '05-tool-audit' "$dir/README.md"; then
+              rule15_detail="${rule15_detail}  - \`$dir/README.md\`: missing link to [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md). Required for extensions and integrations that expose MCP tools.\n"
+              rule15_pass=false
+            fi
+          done <<< "$CONTRIB_DIRS"
+
+          if [ "$rule15_pass" = true ]; then
+            pass_check "Tool audit link" "Extensions/integrations link to the MCP Tool Audit guide"
+          else
+            fail_check "Tool audit link" "Missing tool audit guide link:\n${rule15_detail}See the extension template for the recommended format."
           fi
 
           # ─── Additional automated checks ────────────────────────────────

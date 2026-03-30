@@ -39,7 +39,7 @@ A professional contact management system with interaction logging, opportunity t
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
 
-> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL and Secret key, plus you'll generate a new MCP Access Key.
+> **Already have your Supabase credentials from the [Setup Guide](../../docs/01-getting-started.md)?** You just need the same Project URL, Secret key, and MCP Access Key — reuse the key from your core setup.
 
 ```text
 PROFESSIONAL CRM -- CREDENTIAL TRACKER
@@ -51,7 +51,8 @@ SUPABASE (from your Open Brain setup)
   Secret key:            ____________
 
 MCP SERVER (you'll create these)
-  MCP Access Key:        ____________
+  Default User ID:       ____________
+  MCP Access Key:        ____________  (same key for all extensions)
   MCP Server URL:        ____________
   MCP Connection URL:    ____________
 
@@ -71,7 +72,26 @@ Run the SQL in `schema.sql` in your Supabase SQL Editor:
 
 Copy and paste the contents of `schema.sql` and click Run. This creates three RLS-enabled tables with proper foreign key relationships.
 
-### 2. Deploy the MCP Server
+### 2. Generate Your User ID
+
+The extension needs a user ID to scope your data. Generate a UUID and save it in your credential tracker:
+
+```bash
+# macOS / Linux
+uuidgen | tr '[:upper:]' '[:lower:]'
+
+# Or use any UUID generator — the value just needs to be unique to you
+```
+
+Set it as an environment variable for your Edge Function:
+
+```bash
+supabase secrets set DEFAULT_USER_ID=your-generated-uuid-here
+```
+
+> If you already set `DEFAULT_USER_ID` for a previous extension, you can skip this step — all extensions share the same user ID.
+
+### 3. Deploy the MCP Server
 
 Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) guide using these values:
 
@@ -80,7 +100,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Function name | `professional-crm-mcp` |
 | Download path | `extensions/professional-crm` |
 
-### 3. Connect to Your AI
+### 4. Connect to Your AI
 
 Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connect this extension to Claude Desktop, ChatGPT, Claude Code, or any other MCP client.
 
@@ -89,7 +109,7 @@ Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connec
 | Connector name | `Professional CRM` |
 | URL | Your **MCP Connection URL** from the credential tracker |
 
-### 4. Test the Extension
+### 5. Test the Extension
 
 Try these commands with Claude:
 
@@ -179,3 +199,5 @@ For common issues (connection errors, 401s, deployment problems), see [Common Tr
 **Extension 6: Job Hunt Pipeline** — The most complex build in the learning path. You'll create a complete job search management system with 5 RLS-protected tables (companies, postings, applications, interviews, contacts) and bridge it back to this CRM. You'll learn advanced pipeline tracking, conversion rate analysis, and cross-extension integration at scale.
 
 [Continue to Extension 6 →](../job-hunt/README.md)
+
+> **32 tools and counting.** With 5 extensions connected, your AI is holding ~32 tool definitions in context. If you're noticing the AI picking the wrong tool or ignoring some entirely, the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) has prompt kits that audit your tools, suggest merges, and help you scope servers by workflow (capture vs. query vs. admin).
