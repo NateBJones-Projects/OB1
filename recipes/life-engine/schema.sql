@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS life_engine_briefings (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id TEXT NOT NULL,
   briefing_type TEXT NOT NULL
-    CHECK (briefing_type IN ('morning', 'pre_meeting', 'checkin', 'evening', 'habit_reminder', 'weekly_review', 'cron_state', 'custom')),
+    CHECK (briefing_type IN ('morning', 'pre_meeting', 'checkin', 'evening', 'habit_reminder', 'weekly_review', 'custom')),
   content TEXT NOT NULL,
   delivered_via TEXT DEFAULT 'telegram',
   user_responded BOOLEAN DEFAULT false,
@@ -107,14 +107,32 @@ CREATE TABLE IF NOT EXISTS life_engine_evolution (
 COMMENT ON TABLE life_engine_evolution IS 'Self-improvement history — tracks skill changes over time';
 
 -- ----------------------------------------
+-- Runtime state (key-value)
+-- ----------------------------------------
+-- System state that doesn't belong in user-facing tables.
+-- Examples: cron_job_id, cron_interval, wake_time, sleep_time.
+
+CREATE TABLE IF NOT EXISTS life_engine_state (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+COMMENT ON TABLE life_engine_state IS 'Key-value store for Life Engine runtime state (cron ID, sleep schedule, etc.)';
+
+-- ----------------------------------------
 -- Row Level Security
 -- ----------------------------------------
+-- No row-level policies needed — Life Engine accesses all
+-- tables via service_role, which bypasses RLS. RLS is enabled
+-- as a safety net to block anon/authenticated access.
 
 ALTER TABLE life_engine_habits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE life_engine_habit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE life_engine_checkins ENABLE ROW LEVEL SECURITY;
 ALTER TABLE life_engine_briefings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE life_engine_evolution ENABLE ROW LEVEL SECURITY;
+ALTER TABLE life_engine_state ENABLE ROW LEVEL SECURITY;
 
 -- ----------------------------------------
 -- GRANT permissions to service_role
@@ -126,6 +144,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.life_engine_habit_log TO se
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.life_engine_checkins TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.life_engine_briefings TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.life_engine_evolution TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.life_engine_state TO service_role;
 
 -- ----------------------------------------
 -- Indexes for performance
@@ -166,6 +185,11 @@ CREATE TRIGGER life_engine_habits_updated
   FOR EACH ROW
   EXECUTE FUNCTION update_life_engine_updated_at();
 
+CREATE TRIGGER life_engine_state_updated
+  BEFORE UPDATE ON life_engine_state
+  FOR EACH ROW
+  EXECUTE FUNCTION update_life_engine_updated_at();
+
 -- ----------------------------------------
 -- Verification
 -- ----------------------------------------
@@ -175,9 +199,10 @@ CREATE TRIGGER life_engine_habits_updated
 -- WHERE table_name LIKE 'life_engine_%'
 -- ORDER BY table_name;
 --
--- Expected: 5 tables
+-- Expected: 6 tables
 --   life_engine_briefings
 --   life_engine_checkins
 --   life_engine_evolution
 --   life_engine_habit_log
 --   life_engine_habits
+--   life_engine_state

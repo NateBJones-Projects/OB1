@@ -24,6 +24,8 @@ Messages arrive as `<channel source="telegram" chat_id="..." message_id="..." us
 
 ## Time Windows
 
+All times are in the user's local timezone. Use the system clock — do not assume UTC.
+
 ### Early Morning (6:00 AM – 8:00 AM)
 **Action:** Morning briefing (if not already sent today)
 - Fetch today's calendar events with `gcal_list_events`
@@ -152,30 +154,35 @@ Reply YES to apply or NO to skip.
 ### How It Works
 
 1. After completing your action (or deciding to do nothing), check the current time.
-2. Look up the user's sleep schedule (see defaults below).
-3. Determine the correct interval for the current time zone from the table below.
-4. **Delete the current cron job** (`CronDelete`) and **create a new one** (`CronCreate`) with the appropriate interval and the prompt `/life-engine`.
+2. Read `wake_time` and `sleep_time` from `life_engine_state` (defaults: `06:00` and `22:00`).
+3. Determine the correct interval from the table below.
+4. Read `cron_job_id` from `life_engine_state` and **delete the current cron job** (`CronDelete`).
+5. **Create a new one** (`CronCreate`) with the appropriate interval and the prompt `/life-engine`.
+6. Upsert the new job ID and interval into `life_engine_state`:
+   ```sql
+   INSERT INTO life_engine_state (key, value) VALUES ('cron_job_id', '<new_id>')
+   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+   INSERT INTO life_engine_state (key, value) VALUES ('cron_interval', '<interval>')
+   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+   ```
 
-### Default Sleep Schedule
+### Schedule Defaults
 
-| Parameter | Default | Notes |
-|-----------|---------|-------|
-| Wake time | 6:00 AM | Start of active monitoring |
-| Wind-down | 7:00 PM | Begin stretching intervals |
-| Sleep time | 10:00 PM | Stop all non-emergency messages |
+| Key | Default | Notes |
+|-----|---------|-------|
+| `wake_time` | `06:00` | Start of active monitoring |
+| `sleep_time` | `22:00` | Stop all non-emergency messages |
 
-The Self-Improvement Protocol can propose changes to these times based on observed patterns (e.g., if the user consistently responds to messages before 6 AM or after 10 PM, suggest adjusting the schedule). Store the current sleep schedule in `life_engine_evolution` with `suggestion_type = 'schedule_update'` when the user approves a change.
+The Self-Improvement Protocol can propose changes to these times based on observed patterns (e.g., if the user consistently responds before 6 AM or after 10 PM). When the user approves a schedule change, update `life_engine_state` directly (`wake_time` or `sleep_time`).
 
 ### Interval Table
 
 | Time Window | Interval | Rationale |
 |-------------|----------|-----------|
-| Wake → +2 hours (e.g., 6–8 AM) | **10 minutes** | Morning briefing, habit prompts, first-meeting prep — high density |
-| Morning active (e.g., 8 AM – 12 PM) | **15 minutes** | Pre-meeting prep needs tight timing |
-| Afternoon (e.g., 12–5 PM) | **20 minutes** | Still active but lower urgency |
-| Wind-down (e.g., 5–7 PM) | **30 minutes** | Evening summary, then back off |
-| Quiet hours (e.g., 7–10 PM) | **60 minutes** | Only fire for imminent meetings |
-| Sleep (e.g., 10 PM – 6 AM) | **Next wake time (one-shot)** | Schedule a single cron for wake time instead of a recurring job. No messages during sleep. |
+| 6 AM – 12 PM | **15 minutes** | Morning briefing, first meeting prep, pre-meeting prep needs tight timing |
+| 12 PM – 7 PM | **30 minutes** | Pre-meeting prep, active but lower urgency |
+| 7 PM – 10 PM | **60 minutes** | Only checking for imminent meetings |
+| 10 PM – 6 AM | **One-shot at wake time** | No recurring job — single trigger at wake time |
 
 ### Reschedule Logic
 
@@ -183,21 +190,22 @@ The Self-Improvement Protocol can propose changes to these times based on observ
 After executing the current loop iteration:
 
 1. current_time = now()
-2. Determine which time window current_time falls in
-3. Look up the interval from the table above
-4. If sleep window:
-     → CronDelete(current_job_id)
+2. Read wake_time and sleep_time from life_engine_state (default 06:00, 22:00)
+3. Read cron_job_id from life_engine_state
+4. Determine which time window current_time falls in
+5. If sleep window (sleep_time → wake_time):
+     → CronDelete(cron_job_id)
      → CronCreate(cron: "{wake_minute} {wake_hour} * * *",
                    prompt: "/life-engine", recurring: false)
      This creates a one-shot that fires at wake time and restarts the cycle.
-5. Else:
-     → CronDelete(current_job_id)
+6. Else:
+     → CronDelete(cron_job_id)
      → CronCreate(cron: "*/{interval_minutes} * * * *",
                    prompt: "/life-engine", recurring: true)
-6. Log the new job ID so you can delete it on the next iteration.
+7. Upsert cron_job_id and cron_interval into life_engine_state.
 ```
 
-**Important:** When creating cron jobs, avoid the :00 and :30 minute marks. Offset by a few minutes (e.g., `*/15` starting at minute 7 → `7,22,37,52`). Store the current cron job ID in the briefing log so the next iteration can find and delete it.
+**Important:** When creating cron jobs, avoid the :00 and :30 minute marks. Offset by a few minutes (e.g., `*/15` starting at minute 7 → `7,22,37,52`).
 
 ## Rules
 
@@ -207,5 +215,5 @@ After executing the current loop iteration:
 4. **Log everything.** Every briefing sent gets a row in `life_engine_briefings`.
 5. **One suggestion per week.** Don't overwhelm with changes.
 6. **Respect quiet hours.** 7 PM to 6 AM is off-limits unless a meeting is imminent.
-7. **Respond to Telegram replies.** When a `<channel source="telegram">` event arrives (check-in response, habit confirmation, improvement approval), `react` to acknowledge, log it to the appropriate table, and `reply` immediately.
+7. **Respond to Telegram replies.** When a `<channel source="telegram">` event arrives (check-in response, habit confirmation, improvement approval), `react` to acknowledge, log it to the appropriate table, `reply` immediately, and UPDATE the most recent matching briefing's `user_responded = true` so the self-improvement protocol can measure engagement.
 8. **Always reschedule.** Every loop iteration must end with a reschedule. Never exit without setting the next cron job.
