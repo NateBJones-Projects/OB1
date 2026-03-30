@@ -316,15 +316,27 @@ server.registerTool(
         extractMetadata(content),
       ]);
 
-      const { error } = await supabase.from("thoughts").insert({
-        content,
-        embedding,
-        metadata: { ...metadata, source: "mcp" },
+      const { data: upsertResult, error: upsertError } = await supabase.rpc("upsert_thought", {
+        p_content: content,
+        p_payload: { metadata: { ...metadata, source: "mcp" } },
       });
 
-      if (error) {
+      if (upsertError) {
         return {
-          content: [{ type: "text" as const, text: `Failed to capture: ${error.message}` }],
+          content: [{ type: "text" as const, text: `Failed to capture: ${upsertError.message}` }],
+          isError: true,
+        };
+      }
+
+      const thoughtId = upsertResult?.id;
+      const { error: embError } = await supabase
+        .from("thoughts")
+        .update({ embedding })
+        .eq("id", thoughtId);
+
+      if (embError) {
+        return {
+          content: [{ type: "text" as const, text: `Failed to save embedding: ${embError.message}` }],
           isError: true,
         };
       }
