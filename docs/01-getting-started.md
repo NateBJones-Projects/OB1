@@ -713,13 +713,35 @@ Restart Codex and the four Open Brain tools should be available immediately.
 </details>
 
 <details>
-<summary>🤖 <strong>7.5 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
+<summary>🤖 <strong>7.5 — Cursor</strong></summary>
+
+Cursor supports remote MCP servers natively. Add this to your `~/.cursor/mcp.json` (create the file if it doesn't exist):
+
+```json
+{
+  "mcpServers": {
+    "open-brain": {
+      "url": "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+    }
+  }
+}
+```
+
+Restart Cursor and the four Open Brain tools should appear in your MCP panel (Settings → Features → MCP).
+
+> [!CAUTION]
+> Do **not** use `mcp-remote` for Cursor. Newer versions of `mcp-remote` attempt OAuth client registration, which fails against Open Brain's simple key-based auth. Cursor's native `url` field works directly.
+
+</details>
+
+<details>
+<summary>🤖 <strong>7.6 — Other Clients (VS Code Copilot, Windsurf, Zed)</strong></summary>
 
 Every MCP client handles remote servers slightly differently. The server accepts your access key two ways — pick whichever your client supports:
 
 **Option A: URL with key (easiest).** If your client has a field for a remote MCP server URL, paste the full MCP Connection URL including `?key=your-access-key`. This works for any client that supports remote MCP without requiring headers.
 
-**Option B: mcp-remote bridge.** If your client only supports local stdio servers (configured via a JSON config file), use `mcp-remote` to bridge to the remote server. This requires Node.js installed.
+**Option B: mcp-remote bridge (if your client only supports stdio).** Use `mcp-remote` to bridge to the remote server. This requires Node.js installed. Pass the access key via the URL query parameter (not a header) to avoid OAuth discovery issues with newer versions of `mcp-remote`:
 
 ```json
 {
@@ -727,21 +749,17 @@ Every MCP client handles remote servers slightly differently. The server accepts
     "open-brain": {
       "command": "npx",
       "args": [
+        "-y",
         "mcp-remote",
-        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp",
-        "--header",
-        "x-brain-key:${BRAIN_KEY}"
-      ],
-      "env": {
-        "BRAIN_KEY": "your-access-key-from-step-5"
-      }
+        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+      ]
     }
   }
 }
 ```
 
-> [!NOTE]
-> No space after the colon in `x-brain-key:${BRAIN_KEY}`. Some clients have a bug where spaces inside args get mangled.
+> [!WARNING]
+> Older `mcp-remote` examples pass the access key via `--header`. This breaks with `mcp-remote@latest` because it now attempts OAuth client registration before sending custom headers. Pass the key via the `?key=` query parameter instead.
 
 </details>
 
