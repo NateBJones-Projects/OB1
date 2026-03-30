@@ -67,7 +67,9 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://vzgecdkapehmkvydcjxg.supabase.co/functions/v1/household-knowledge-mcp\")",
       "mcp__81c5a201-cbc0-460f-adde-9ee2d89ece86__create_action",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ls \"C:/Users/tinkl/OneDrive/Documents/GitHub/BigOleBrain/dashboards/command-center/.env\"*)"
     ]
   }
 }
