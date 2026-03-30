@@ -1,20 +1,14 @@
 {
-  "name": "Scheduled Tasks",
-  "description": "General-purpose task engine for automated workflows (morning briefings, weekly reviews, stale loop scans, alert digests). Stores task definitions with trigger, gather, execute, and delivery configuration.",
-  "category": "schemas",
-  "author": {
-    "name": "Nate B. Jones",
-    "github": "NateBJones-Projects"
-  },
+  "name": "scheduled-tasks",
+  "description": "General-purpose task engine for scheduled and manual execution of registered task definitions (briefings, alerts, scans, deck prep).",
   "version": "1.0.0",
-  "requires": {
-    "open_brain": true,
-    "services": [],
-    "tools": ["scheduled-tasks-mcp", "task-runner"]
-  },
-  "tags": ["scheduled-tasks", "automation", "cron", "task-engine", "phase-1"],
-  "difficulty": "intermediate",
-  "estimated_time": "10 minutes",
-  "created": "2026-03-27",
-  "updated": "2026-03-27"
+  "tables": [
+    "scheduled_tasks",
+    "task_run_log"
+  ],
+  "dependencies": [
+    "actions",
+    "thoughts"
+  ],
+  "mcp_function": "scheduled-tasks-mcp"
 }

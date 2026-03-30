@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-import { Hono } from "hono";
-import { createClient } from "@supabase/supabase-js";
+import { Hono } from "npm:hono";
+import { createClient } from "npm:@supabase/supabase-js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -85,6 +85,8 @@ interface GatherQuery {
 
 interface GatherConfig {
   queries?: GatherQuery[];
+  scan_tables?: string[];
+  thresholds_days?: number[];
 }
 
 async function gatherData(config: GatherConfig): Promise<Record<string, unknown[]>> {
@@ -104,7 +106,7 @@ async function gatherData(config: GatherConfig): Promise<Record<string, unknown[
 }
 
 async function runGatherQuery(q: GatherQuery): Promise<unknown[]> {
-  const allowedSources = ["actions", "thoughts", "scheduled_tasks"];
+  const allowedSources = ["actions", "thoughts", "scheduled_tasks", "important_dates", "maintenance_tasks"];
   if (!allowedSources.includes(q.source)) {
     console.warn(`Unknown gather source: ${q.source}`);
     return [];
@@ -175,6 +177,12 @@ function formatGatheredData(gathered: Record<string, unknown[]>): string {
       } else if (source === "thoughts") {
         const date = r.created_at ? new Date(r.created_at as string).toLocaleDateString() : "";
         sections.push(`- [${date}] ${r.content}`);
+      } else if (source === "important_dates") {
+        const date = r.date ?? r.event_date ?? "";
+        sections.push(`- ${r.name ?? r.title ?? r.description ?? "Untitled"} (${date})`);
+      } else if (source === "maintenance_tasks") {
+        const due = r.next_due ?? "";
+        sections.push(`- ${r.name ?? r.task ?? r.description ?? "Untitled"} (next due: ${due})`);
       } else {
         sections.push(`- ${JSON.stringify(r)}`);
       }
@@ -216,6 +224,146 @@ async function handleLlmPrompt(
 
   const d = await r.json();
   return d.choices?.[0]?.message?.content ?? "(empty LLM response)";
+}
+
+async function handleAlertDigest(task: Record<string, unknown>): Promise<string> {
+  const config = (task.gather_config ?? {}) as GatherConfig;
+  const thresholds = config.thresholds_days ?? [1, 3, 7];
+  const maxDays = Math.max(...thresholds);
+
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+  const horizonDate = new Date(today);
+  horizonDate.setDate(horizonDate.getDate() + maxDays);
+  const horizonStr = horizonDate.toISOString().split("T")[0];
+
+  interface DigestItem {
+    source: string;
+    label: string;
+    dueDate: string;
+    daysUntil: number;
+  }
+
+  const items: DigestItem[] = [];
+
+  // Query actions with due dates in range
+  const { data: actions } = await supabase
+    .from("actions")
+    .select("*")
+    .eq("status", "open")
+    .gte("due_date", todayStr)
+    .lte("due_date", horizonStr)
+    .order("due_date", { ascending: true });
+
+  if (actions) {
+    for (const a of actions) {
+      const daysUntil = Math.ceil(
+        (new Date(a.due_date).getTime() - today.getTime()) / 86_400_000
+      );
+      items.push({
+        source: "action",
+        label: a.content ?? a.name ?? "Untitled action",
+        dueDate: a.due_date,
+        daysUntil,
+      });
+    }
+  }
+
+  // Query important_dates in range
+  const { data: dates } = await supabase
+    .from("important_dates")
+    .select("*")
+    .gte("date", todayStr)
+    .lte("date", horizonStr)
+    .order("date", { ascending: true });
+
+  if (dates) {
+    for (const d of dates) {
+      const dateField = d.date ?? d.event_date;
+      const daysUntil = Math.ceil(
+        (new Date(dateField).getTime() - today.getTime()) / 86_400_000
+      );
+      items.push({
+        source: "important_date",
+        label: d.name ?? d.title ?? d.description ?? "Untitled date",
+        dueDate: dateField,
+        daysUntil,
+      });
+    }
+  }
+
+  // Query maintenance_tasks in range
+  const { data: maintenance } = await supabase
+    .from("maintenance_tasks")
+    .select("*")
+    .gte("next_due", todayStr)
+    .lte("next_due", horizonStr)
+    .order("next_due", { ascending: true });
+
+  if (maintenance) {
+    for (const m of maintenance) {
+      const daysUntil = Math.ceil(
+        (new Date(m.next_due).getTime() - today.getTime()) / 86_400_000
+      );
+      items.push({
+        source: "maintenance",
+        label: m.name ?? m.task ?? m.description ?? "Untitled task",
+        dueDate: m.next_due,
+        daysUntil,
+      });
+    }
+  }
+
+  if (!items.length) {
+    return `# Alert Digest — ${todayStr}\n\nNo items due in the next ${maxDays} days.`;
+  }
+
+  // Group by urgency tier using thresholds (sorted ascending)
+  const sortedThresholds = [...thresholds].sort((a, b) => a - b);
+
+  interface Tier {
+    label: string;
+    emoji: string;
+    items: DigestItem[];
+  }
+
+  const tiers: Tier[] = [
+    { label: "Due Today", emoji: "\uD83D\uDD34", items: [] },
+    { label: `Due in ${sortedThresholds[1] ?? 3} Days`, emoji: "\uD83D\uDFE1", items: [] },
+    { label: "Due This Week", emoji: "\uD83D\uDFE2", items: [] },
+  ];
+
+  for (const item of items) {
+    if (item.daysUntil <= sortedThresholds[0]) {
+      tiers[0].items.push(item);
+    } else if (item.daysUntil <= sortedThresholds[1]) {
+      tiers[1].items.push(item);
+    } else {
+      tiers[2].items.push(item);
+    }
+  }
+
+  // Format digest
+  const lines: string[] = [`# Alert Digest — ${todayStr}\n`];
+
+  for (const tier of tiers) {
+    if (!tier.items.length) continue;
+    lines.push(`## ${tier.emoji} ${tier.label}`);
+    for (const item of tier.items) {
+      lines.push(`- [${item.source}] ${item.label} (due ${item.dueDate})`);
+    }
+    lines.push("");
+  }
+
+  const counts = tiers
+    .filter((t) => t.items.length > 0)
+    .map((t) => `${t.items.length} ${t.label.toLowerCase()}`)
+    .join(" · ");
+
+  lines.push("---");
+  lines.push(counts);
+
+  return lines.join("\n");
 }
 
 // ──────────────────────────────────────────────
@@ -265,6 +413,8 @@ async function executeTask(task: Record<string, unknown>): Promise<TaskResult> {
         output = await handleLlmPrompt(task, gatheredText);
         break;
       case "alert_digest":
+        output = await handleAlertDigest(task);
+        break;
       case "stale_loop_scan":
       case "deck_builder":
       case "trend_analysis":

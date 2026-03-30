@@ -1,6 +1,3 @@
--- Schema: Scheduled Tasks
--- General-purpose task engine for trigger → gather → execute → deliver workflows.
-
 create table scheduled_tasks (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
@@ -9,28 +6,24 @@ create table scheduled_tasks (
 
   -- Trigger configuration
   trigger_type text not null check (trigger_type in ('cron', 'due_date', 'event', 'manual')),
-  cron_expression text,                    -- for cron triggers: '0 7 * * *'
-  due_date_source text,                    -- for due_date triggers: 'actions', 'important_dates', 'maintenance_tasks'
-  due_date_lead_days int default 1,        -- how many days before due_date to fire
-  event_source text,                       -- for event triggers: 'google_calendar'
-  event_lead_hours int default 2,          -- how many hours before event to fire
+  cron_expression text,
+  due_date_source text,
+  due_date_lead_days int default 1,
+  event_source text,
+  event_lead_hours int default 2,
 
-  -- Data gathering configuration (what to pull from the brain)
+  -- Data gathering
   gather_config jsonb not null default '{}',
 
-  -- Execution configuration (what to do with the gathered data)
+  -- Execution
   task_type text not null check (task_type in (
-    'llm_prompt',        -- send gathered data to LLM with a prompt template
-    'alert_digest',      -- format as notification digest
-    'deck_builder',      -- generate a slide deck from template
-    'stale_loop_scan',   -- specialized: find stale actions/questions
-    'trend_analysis'     -- specialized: compute weekly metrics
+    'llm_prompt', 'alert_digest', 'deck_builder', 'stale_loop_scan', 'trend_analysis'
   )),
-  prompt_template text,            -- for llm_prompt: the system prompt to use
-  deck_template_id text,           -- for deck_builder: reference to a template config
+  prompt_template text,
+  deck_template_id text,
   output_format text default 'markdown' check (output_format in ('markdown', 'html', 'pptx', 'json')),
 
-  -- Delivery configuration
+  -- Delivery
   delivery_channel text not null default 'email' check (delivery_channel in ('email', 'telegram', 'slack', 'file', 'mcp_response')),
   delivery_config jsonb default '{}',
 
@@ -47,24 +40,11 @@ create table task_run_log (
   started_at timestamptz default now(),
   completed_at timestamptz,
   status text not null default 'running' check (status in ('running', 'success', 'error')),
-  input_summary text,       -- what data was gathered
-  output_summary text,      -- what was produced
+  input_summary text,
+  output_summary text,
   error_message text,
-  delivery_status text       -- 'sent', 'failed', 'skipped'
+  delivery_status text
 );
 
 create index idx_task_runs_task_id on task_run_log(task_id);
 create index idx_scheduled_tasks_trigger on scheduled_tasks(trigger_type) where enabled = true;
-
--- Auto-update updated_at
-create or replace function update_scheduled_tasks_timestamp()
-returns trigger as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$ language plpgsql;
-
-create trigger scheduled_tasks_updated_at
-  before update on scheduled_tasks
-  for each row execute function update_scheduled_tasks_timestamp();
