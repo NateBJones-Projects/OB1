@@ -1,7 +1,7 @@
 name: Claude PR Review
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
   pull_request_review_comment:
     types: [created]
@@ -17,7 +17,7 @@ permissions:
 jobs:
   claude-review:
     if: >
-      github.event_name == 'pull_request' ||
+      github.event_name == 'pull_request_target' ||
       ((github.event_name == 'issue_comment' &&
         contains(github.event.comment.body, '@claude')) &&
        contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login)) ||
