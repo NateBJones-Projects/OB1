@@ -1,0 +1,67 @@
+---
+title: OB1 — Fully Local Open Brain
+---
+graph TD
+    subgraph clients["AI Clients"]
+        CD["Claude Desktop"]
+        CC["Claude Code"]
+        CU["Cursor / VS Code"]
+    end
+
+    subgraph ob1["OB1 Docker Stack"]
+        MCP["ob1-mcp<br/><i>Deno MCP Server</i><br/>port 3000"]
+
+        subgraph core["Core Services"]
+            PG["ob1-postgres<br/><i>PostgreSQL 17 + pgvector</i><br/>port 5432"]
+            OL["ob1-ollama<br/><i>Ollama (GPU)</i><br/>port 11434"]
+        end
+
+        subgraph admin["Admin UIs"]
+            PGA["ob1-pgadmin<br/><i>pgAdmin 4</i><br/>port 5050"]
+            WUI["ob1-webui<br/><i>Open WebUI</i><br/>port 8080"]
+        end
+    end
+
+    subgraph models["Ollama Models"]
+        EMB["nomic-embed-text<br/><i>768-dim embeddings</i>"]
+        LLM["llama3<br/><i>Metadata extraction</i>"]
+    end
+
+    subgraph storage["Docker Volumes"]
+        V1[("ob1-pgdata<br/><i>Thoughts + embeddings</i>")]
+        V2[("ob1-ollama<br/><i>Model weights</i>")]
+        V3[("ob1-webui<br/><i>WebUI config</i>")]
+        V4[("ob1-pgadmin<br/><i>pgAdmin config</i>")]
+    end
+
+    CD -- "MCP over HTTP" --> MCP
+    CC -- "MCP over HTTP" --> MCP
+    CU -- "MCP over HTTP" --> MCP
+
+    MCP -- "SQL queries<br/>(insert, select, match_thoughts)" --> PG
+    MCP -- "Embeddings API<br/>(/api/embed)" --> OL
+    MCP -- "Chat API<br/>(/api/chat)" --> OL
+
+    OL --- EMB
+    OL --- LLM
+
+    PGA -- "PostgreSQL protocol" --> PG
+    WUI -- "Ollama API" --> OL
+
+    PG --- V1
+    OL --- V2
+    WUI --- V3
+    PGA --- V4
+
+    style clients fill:#f0f4ff,stroke:#4a6fa5,stroke-width:2px
+    style ob1 fill:#f8f9fa,stroke:#333,stroke-width:2px
+    style core fill:#e8f5e9,stroke:#43a047,stroke-width:1px
+    style admin fill:#fff3e0,stroke:#fb8c00,stroke-width:1px
+    style models fill:#fce4ec,stroke:#e53935,stroke-width:1px
+    style storage fill:#f3e5f5,stroke:#8e24aa,stroke-width:1px
+
+    style MCP fill:#1e88e5,color:#fff,stroke:#1565c0
+    style PG fill:#43a047,color:#fff,stroke:#2e7d32
+    style OL fill:#e53935,color:#fff,stroke:#c62828
+    style PGA fill:#fb8c00,color:#fff,stroke:#ef6c00
+    style WUI fill:#8e24aa,color:#fff,stroke:#6a1b9a

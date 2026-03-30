@@ -1,0 +1,97 @@
+name: ob1
+
+services:
+  ob1-postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: openbrain
+      POSTGRES_USER: openbrain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openbrain}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ob1-pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openbrain"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  ob1-ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ob1-ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  ob1-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    ports:
+      - "8080:8080"
+    volumes:
+      - ob1-webui:/app/backend/data
+    environment:
+      OLLAMA_BASE_URL: http://ob1-ollama:11434
+    depends_on:
+      ob1-ollama:
+        condition: service_healthy
+
+  ob1-pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@openbrain.dev
+      PGADMIN_DEFAULT_PASSWORD: ${POSTGRES_PASSWORD:-openbrain}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    volumes:
+      - ob1-pgadmin:/var/lib/pgadmin
+    depends_on:
+      ob1-postgres:
+        condition: service_healthy
+
+  ob1-mcp:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://openbrain:${POSTGRES_PASSWORD:-openbrain}@ob1-postgres:5432/openbrain
+      OLLAMA_URL: http://ob1-ollama:11434
+      EMBED_MODEL: nomic-embed-text
+      LLM_MODEL: llama3
+      MCP_ACCESS_KEY: ${MCP_ACCESS_KEY}
+    depends_on:
+      ob1-postgres:
+        condition: service_healthy
+      ob1-ollama:
+        condition: service_healthy
+
+  ob1-https:
+    image: nginx:alpine
+    ports:
+      - "3443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - ob1-mcp
+
+volumes:
+  ob1-pgdata:
+  ob1-ollama:
+  ob1-webui:
+  ob1-pgadmin:
