@@ -49,6 +49,13 @@ jobs:
           BRANCH=$(gh pr view "${PR_NUMBER}" --json headRefName -q .headRefName)
           git checkout -B "${BRANCH}" refs/remotes/origin/pr-head
 
+          # Point origin to the fork repo so claude-code-action can fetch the branch.
+          # For same-repo PRs this is a no-op (URL stays the same).
+          FORK_URL=$(gh pr view "${PR_NUMBER}" --json headRepository -q '.headRepository.url')
+          if [ -n "$FORK_URL" ]; then
+            git remote set-url origin "${FORK_URL}"
+          fi
+
       - uses: anthropics/claude-code-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
