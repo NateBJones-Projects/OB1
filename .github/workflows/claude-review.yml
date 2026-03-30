@@ -26,9 +26,10 @@ jobs:
        contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login))
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout PR code
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - uses: anthropics/claude-code-action@v1
