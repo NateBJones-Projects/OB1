@@ -44,7 +44,7 @@ export function KanbanCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    touchAction: "pan-y",
+    touchAction: "pan-y pinch-zoom",
   };
 
   const title = thought.content.split("\n")[0].slice(0, 60);
