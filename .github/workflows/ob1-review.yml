@@ -435,49 +435,56 @@ jobs:
             rule11_detail=""
             llm_notes=""
 
-            # Collect all contribution READMEs
-            readmes=""
+            # Collect all contribution READMEs into a temp file
+            readmes_file=$(mktemp)
             while IFS= read -r dir; do
               [ -z "$dir" ] && continue
               [ ! -f "$dir/README.md" ] && continue
-              readmes="${readmes}--- ${dir}/README.md ---\n$(cat "$dir/README.md")\n\n"
+              echo "--- ${dir}/README.md ---" >> "$readmes_file"
+              cat "$dir/README.md" >> "$readmes_file"
+              echo "" >> "$readmes_file"
             done <<< "$CONTRIB_DIRS"
 
-            if [ -n "$readmes" ]; then
-              # Build the prompt with repo context from CLAUDE.md Rule 11 criteria
-              review_prompt="You are reviewing Open Brain (OB1) community contributions. Evaluate each README below and report issues.
+            if [ -s "$readmes_file" ]; then
+              # Build the prompt in a temp file to avoid YAML escaping issues
+              prompt_file=$(mktemp)
+              cat > "$prompt_file" << 'PROMPT_END'
+          You are reviewing Open Brain (OB1) community contributions. Evaluate each README below and report issues.
 
-Check for:
-1. Are instructions clear enough for someone with only the stated prerequisites?
-2. Are there missing steps, ambiguous references, or assumed knowledge?
-3. Do code snippets look correct and copy-paste ready?
-4. Is the expected outcome specific enough to verify success?
-5. For SQL: do statements look syntactically correct? Do they reference the right tables?
+          Check for:
+          1. Are instructions clear enough for someone with only the stated prerequisites?
+          2. Are there missing steps, ambiguous references, or assumed knowledge?
+          3. Do code snippets look correct and copy-paste ready?
+          4. Is the expected outcome specific enough to verify success?
+          5. For SQL: do statements look syntactically correct? Do they reference the right tables?
 
-Respond with ONLY a JSON object (no markdown fences):
-{
-  \"pass\": true/false,
-  \"issues\": [\"issue 1\", \"issue 2\"],
-  \"notes\": \"Brief summary of clarity feedback\"
-}
+          Respond with ONLY a JSON object (no markdown fences):
+          {"pass": true or false, "issues": ["issue 1", "issue 2"], "notes": "Brief summary of clarity feedback"}
 
-Set pass=true if instructions are generally clear and usable, even with minor suggestions.
-Set pass=false only if there are significant clarity problems that would block a user.
+          Set pass=true if instructions are generally clear and usable, even with minor suggestions.
+          Set pass=false only if there are significant clarity problems that would block a user.
 
-READMEs to review:
-$(echo -e "$readmes")"
+          READMEs to review:
+          PROMPT_END
+              cat "$readmes_file" >> "$prompt_file"
+
+              # Build JSON payload using jq (handles all escaping)
+              payload_file=$(mktemp)
+              jq -n --rawfile prompt "$prompt_file" '{
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 1024,
+                "messages": [{"role": "user", "content": $prompt}]
+              }' > "$payload_file"
 
               # Call Claude API
               llm_response=$(curl -s --max-time 30 \
                 -H "x-api-key: $ANTHROPIC_API_KEY" \
                 -H "anthropic-version: 2023-06-01" \
                 -H "content-type: application/json" \
-                "https://api.anthropic.com/v1/messages" \
-                -d "$(jq -n --arg prompt "$review_prompt" '{
-                  "model": "claude-haiku-4-5-20251001",
-                  "max_tokens": 1024,
-                  "messages": [{"role": "user", "content": $prompt}]
-                }')" 2>/dev/null || echo "")
+                -d @"$payload_file" \
+                "https://api.anthropic.com/v1/messages" 2>/dev/null || echo "")
+
+              rm -f "$readmes_file" "$prompt_file" "$payload_file"
 
               if [ -z "$llm_response" ]; then
                 pass_check "LLM clarity review" "*(Skipped — API call failed)*"
@@ -514,6 +521,7 @@ $(echo -e "$readmes")"
                 fi
               fi
             else
+              rm -f "$readmes_file"
               pass_check "LLM clarity review" "No contribution READMEs to review"
             fi
           fi
