@@ -53,16 +53,17 @@ supabase db push --file schema.sql
 
 ### Step 2: Configure your capture types
 
-In `classifier_prompt.md`, edit the `{types}` list to match your Open Brain schema. The
-default OB1 types are a reasonable starting point:
+In `classifier_prompt.md`, edit the `{types}` list to match your Open Brain schema. OB1's
+canonical types are:
 
 ```json
-["thought", "task", "note", "decision", "question", "event"]
+["idea", "task", "person_note", "reference", "decision", "lesson", "meeting", "journal"]
 ```
 
-Add or remove types to match how you actually use your brain. The classifier and threshold
-system will adapt to whatever list you set — per-type rows in `capture_thresholds` are
-created on first use.
+Remove types you don't use, but do not add values outside this list unless you have added
+corresponding type support to your `thoughts` table. The classifier and threshold system
+will adapt to whatever list you set — per-type rows in `capture_thresholds` are created on
+first use.
 
 ---
 
@@ -82,9 +83,13 @@ audit, Q2 mobile app. Domain terms: Figma, Lottie, handoff, A11y, WCAG.
 
 ### Step 4: Wrap your capture call with the gating logic
 
+> [!NOTE]
+> This recipe provides a pseudocode description of the gating pattern plus a minimal
+> TypeScript reference implementation (`capture-with-gating.ts`). You will need to adapt
+> the implementation to your own capture interface — the logic is intentionally kept
+> separate from any specific bot, CLI, or workflow framework.
+
 Replace your current direct call to the OB1 `capture` MCP tool with the following pattern.
-The pseudocode is language-agnostic — adapt it to Python, TypeScript, n8n, or whatever your
-interface uses.
 
 ```
 CONSTANTS:

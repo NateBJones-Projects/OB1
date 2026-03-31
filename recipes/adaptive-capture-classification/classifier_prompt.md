@@ -40,10 +40,13 @@ Return a JSON object with exactly these fields:
 
 ## Notes on the prompt
 
-**`{types}`** — replace with your list of capture types, e.g.:
+**`{types}`** — OB1's canonical types are:
 ```
-["thought", "task", "note", "decision", "question", "event"]
+["idea", "task", "person_note", "reference", "decision", "lesson", "meeting", "journal"]
 ```
+Use this list as-is or remove types you don't use. Do not add types that don't exist in your
+`thoughts` table schema — the classifier will hallucinate values outside this list if the
+prompt doesn't constrain it.
 
 **`{user_context}`** — inject a short description of the user's active projects and domain so
 the classifier can recognise project names and domain-specific terms without being confused
