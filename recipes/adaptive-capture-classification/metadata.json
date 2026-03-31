@@ -1,0 +1,29 @@
+{
+  "name": "Adaptive Capture Classification",
+  "description": "Adds confidence gating and a per-type learning loop to OB1's capture flow. The classifier reports a confidence score; a threshold gates whether to auto-classify or ask the user; every user response nudges the threshold up or down. Includes optional A/B model comparison and spell correction learning tables.",
+  "category": "recipes",
+  "author": {
+    "name": "Matthew Hardy",
+    "github": "mjh756"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Any OpenAI-compatible LLM gateway (OpenRouter, Ollama, etc.)"],
+    "tools": ["Supabase CLI or Supabase Studio"]
+  },
+  "tags": [
+    "classification",
+    "confidence",
+    "learning",
+    "capture",
+    "thresholds",
+    "a/b-testing",
+    "spell-correction",
+    "feedback-loop"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "60–90 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}
