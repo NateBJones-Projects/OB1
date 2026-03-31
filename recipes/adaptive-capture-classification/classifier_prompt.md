@@ -53,8 +53,7 @@ the classifier can recognise project names and domain-specific terms without bei
 by jargon. Example:
 
 ```
-Matt is a water resources engineer based in Melbourne. Active projects: NPR drainage
-upgrade, Werribee catchment study. Domain terms: ARR, WSUD, subcatchment, hydrograph.
+Bruce is a engineer based in Melbourne. Active projects: MCG redesign, Werribee precinct master plan study. Domain terms: PMP, PPP.
 ```
 
 **`{content}`** — the raw (or spell-corrected) capture text from the user.

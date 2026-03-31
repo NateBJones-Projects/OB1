@@ -3,8 +3,7 @@
 ## What This Does
 
 OB1's `capture` MCP tool classifies your input once and moves on — there is no mechanism to
-tell it when it got the type wrong, and it treats every capture type with the same confidence
-threshold. This recipe adds a learning loop on top of the existing capture flow: the
+tell it when it got the type wrong. This recipe adds a learning loop on top of the existing capture flow: the
 classifier reports a confidence score, a per-type threshold gates whether to auto-classify or
 ask for confirmation, and every user response nudges that threshold up or down. Over time the
 system learns which capture types it can reliably auto-classify for you and becomes
