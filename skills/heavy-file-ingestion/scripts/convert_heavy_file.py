@@ -120,6 +120,8 @@ def gather_preview_lines(path: Path) -> list[str]:
 
 
 def infer_next_step(result: ConversionResult) -> str:
+    if "dependency_missing" in result.quality_flags:
+        return "install_dependency_and_retry"
     if "conversion_failed" in result.quality_flags:
         return "manual_review"
     if {"scanned_pdf_suspected", "low_text_density"} & set(result.quality_flags):
@@ -131,8 +133,6 @@ def infer_next_step(result: ConversionResult) -> str:
         ".xlsx",
     }:
         return "cheap_model_or_stronger_converter"
-    if "dependency_missing" in result.quality_flags:
-        return "install_dependency_and_retry"
     return "read_extracted_artifact"
 
 
@@ -584,6 +584,10 @@ def main() -> int:
         result = ConversionResult(source=source, output_dir=output_dir, converter="failed")
         result.warnings.append(str(exc))
         result.quality_flags.extend(["conversion_failed", "dependency_missing"])
+    except Exception as exc:
+        result = ConversionResult(source=source, output_dir=output_dir, converter="failed")
+        result.warnings.append(f"{exc.__class__.__name__}: {exc}")
+        result.quality_flags.extend(["conversion_failed", "unexpected_error"])
 
     result.stats.setdefault("source_extension", source.suffix.lower() or "none")
     result.stats.setdefault("source_size_bytes", source.stat().st_size)
