@@ -1,12 +1,6 @@
 ---
 name: claudeception
-description: |
-  Continuous learning system that extracts reusable knowledge from work sessions.
-  Triggers: (1) /claudeception command to review session learnings, (2) "save this as a skill"
-  or "extract a skill from this", (3) "what did we learn?", (4) After any task involving
-  non-obvious debugging, workarounds, or trial-and-error discovery. Creates new skills
-  when valuable, reusable knowledge is identified. Integrates with Open Brain to prevent
-  duplicates and share knowledge across sessions.
+description: "Continuous learning system that extracts reusable knowledge from work sessions. Triggers: (1) /claudeception command, (2) 'save this as a skill' or 'extract a skill from this', (3) 'what did we learn?', (4) after non-obvious debugging or trial-and-error discovery. Creates new skills when valuable reusable knowledge is identified. Integrates with Open Brain to prevent duplicates."
 author: Jared Irish
 version: 2.0.0
 ---
