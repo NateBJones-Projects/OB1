@@ -1,6 +1,7 @@
 import { fetchStats, fetchThoughts } from "@/lib/api";
 import { requireSessionOrRedirect, getSession } from "@/lib/auth";
 import { StatsWidget } from "@/components/StatsWidget";
+import { KanbanSummary } from "@/components/KanbanSummary";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { AddToBrain } from "@/components/AddToBrain";
 
@@ -42,6 +43,8 @@ export default async function DashboardPage() {
       </div>
 
       <StatsWidget stats={stats} />
+
+      <KanbanSummary />
 
       {/* Add to Brain */}
       <div>
