@@ -9,6 +9,7 @@ Step-by-step builds that add a new capability to your Open Brain. Follow the ins
 | [Email History Import](email-history-import/) | Pull your Gmail archive into searchable thoughts |
 | [ChatGPT Conversation Import](chatgpt-conversation-import/) | Ingest your ChatGPT data export |
 | [Daily Digest](daily-digest/) | Automated summary of recent thoughts via email or Slack |
+| [OAuth MCP Upgrade](oauth-mcp-upgrade/) | Migrate an existing Open Brain install from static MCP keys to OAuth 2.1 |
 | [Research-to-Decision Workflow](research-to-decision-workflow/) | Compose canonical skills into operator and investor paths for analysis, synthesis, meetings, and decision documents |
 
 ## Contributing

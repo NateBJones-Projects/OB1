@@ -4,9 +4,127 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SUPABASE_PUBLISHABLE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
+const OB1_OWNER_USER_ID = Deno.env.get("OB1_OWNER_USER_ID") ?? "";
+const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY") ?? "";
+const ALLOW_LEGACY_MCP_KEY = Deno.env.get("ALLOW_LEGACY_MCP_KEY") === "true";
+const DEFAULT_USER_ID = Deno.env.get("DEFAULT_USER_ID");
+
+const authClient = SUPABASE_PUBLISHABLE_KEY
+  ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    })
+  : null;
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-brain-key, x-access-key, accept, mcp-session-id",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+};
+
 const app = new Hono();
 
+function withCors(response: Response): Response {
+  for (const [header, value] of Object.entries(corsHeaders)) {
+    response.headers.set(header, value);
+  }
+  return response;
+}
+
+function getAuthorizationServerUrl(): string {
+  return `${SUPABASE_URL.replace(/\/$/, "")}/auth/v1`;
+}
+
+function getProtectedResourceMetadataUrl(requestUrl: string): string {
+  const url = new URL(requestUrl);
+  const path = url.pathname.replace(/\/$/, "");
+  return new URL(`${path}/.well-known/oauth-protected-resource`, url.origin).toString();
+}
+
+function buildProtectedResourceMetadata(requestUrl: string) {
+  const metadataUrl = new URL(requestUrl);
+  const resourcePath = metadataUrl.pathname.replace(/\/\.well-known\/oauth-protected-resource$/, "").replace(/\/$/, "");
+  return {
+    resource: new URL(resourcePath || "/", metadataUrl.origin).toString(),
+    authorization_servers: [getAuthorizationServerUrl()],
+    bearer_methods_supported: ["header"],
+    scopes_supported: ["openid", "email", "profile", "offline_access"],
+  };
+}
+
+function unauthorizedResponse(c: any, description: string): Response {
+  return c.json(
+    {
+      error: "invalid_token",
+      error_description: description,
+    },
+    401,
+    {
+      ...corsHeaders,
+      "WWW-Authenticate": `Bearer resource_metadata="${getProtectedResourceMetadataUrl(c.req.url)}"`,
+    },
+  );
+}
+
+async function authenticateRequest(c: any): Promise<Response | { mode: "oauth" | "legacy" }> {
+  const authHeader = c.req.header("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    if (!authClient) {
+      return c.json({ error: "SUPABASE_PUBLISHABLE_KEY not configured" }, 500, corsHeaders);
+    }
+    if (!OB1_OWNER_USER_ID) {
+      return c.json({ error: "OB1_OWNER_USER_ID not configured" }, 500, corsHeaders);
+    }
+
+    const token = authHeader.slice("Bearer ".length).trim();
+    const {
+      data: { user },
+      error,
+    } = await authClient.auth.getUser(token);
+
+    if (error || !user) {
+      return unauthorizedResponse(c, "The access token is invalid.");
+    }
+
+    if (user.id !== OB1_OWNER_USER_ID) {
+      return c.json({ error: "Forbidden" }, 403, corsHeaders);
+    }
+
+    return { mode: "oauth" };
+  }
+
+  if (ALLOW_LEGACY_MCP_KEY) {
+    const provided =
+      c.req.header("x-brain-key") ||
+      c.req.header("x-access-key") ||
+      new URL(c.req.url).searchParams.get("key");
+
+    if (provided && MCP_ACCESS_KEY && provided === MCP_ACCESS_KEY) {
+      return { mode: "legacy" };
+    }
+  }
+
+  return unauthorizedResponse(c, "Authorization required.");
+}
+
+app.options("*", (c) => c.text("ok", 200, corsHeaders));
+
+app.get("/.well-known/oauth-protected-resource", (c) => {
+  return c.json(buildProtectedResourceMetadata(c.req.url), 200, corsHeaders);
+});
+
 app.post("*", async (c) => {
+  const authResult = await authenticateRequest(c);
+  if (authResult instanceof Response) {
+    return authResult;
+  }
+
   // Fix: Claude Desktop connectors don't send the Accept header that
   // StreamableHTTPTransport requires. Build a patched request if missing.
   if (!c.req.header("accept")?.includes("text/event-stream")) {
@@ -22,21 +140,20 @@ app.post("*", async (c) => {
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
-
-  const key = c.req.query("key") || c.req.header("x-access-key");
-  const expected = Deno.env.get("MCP_ACCESS_KEY");
-  if (!key || key !== expected) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
   const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    },
   );
 
-  const userId = Deno.env.get("DEFAULT_USER_ID");
+  const userId = DEFAULT_USER_ID;
   if (!userId) {
-    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500, corsHeaders);
   }
 
   const server = new McpServer({ name: "family-calendar", version: "1.0.0" });
@@ -301,9 +418,11 @@ app.post("*", async (c) => {
 
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
-  return transport.handleRequest(c);
+  const response = await transport.handleRequest(c);
+  return response ? withCors(response) : c.body(null, 204, corsHeaders);
 });
 
-app.get("*", (c) => c.json({ status: "ok", service: "Family Calendar", version: "1.0.0" }));
+app.get("*", (c) =>
+  c.json({ status: "ok", service: "Family Calendar", version: "1.1.0", auth: "oauth-2.1" }, 200, corsHeaders));
 
 Deno.serve(app.fetch);

@@ -28,7 +28,7 @@ Some steps involve clicking through web UIs where your AI can't help directly. T
 - **Creating accounts** — Supabase, OpenRouter, Slack. Sign up in your browser.
 - **Supabase dashboard settings** — Enabling the vector extension, copying your Project URL and Secret key, checking Table Editor.
 - **Slack app configuration** — Creating the app, setting OAuth scopes, installing to workspace, enabling Event Subscriptions.
-- **Connecting AI clients** — Adding the MCP connector in Claude Desktop, ChatGPT, or other clients (Settings menus in each app).
+- **Connecting AI clients** — Adding the MCP connector in Claude Desktop, ChatGPT, or other clients and completing the OAuth flow through your auth portal.
 
 Your AI can tell you exactly what to click and where — it just can't click for you.
 
@@ -45,7 +45,8 @@ Now that the full guide lives in this repo, this shouldn't happen — your AI ca
 When something breaks, your AI's instinct is to rewrite code. Resist this. The Edge Function code in the guide works. Problems are almost always configuration:
 
 - A secret that doesn't match (`supabase secrets list` to check)
-- A URL that's missing the access key
+- A missing `SUPABASE_PUBLISHABLE_KEY` or `OB1_OWNER_USER_ID`
+- A Supabase OAuth authorization URL pointing to the wrong app
 - A Slack event subscription that's missing `message.groups`
 - A step that got skipped
 
@@ -60,7 +61,7 @@ The [setup guide](01-getting-started.md) has a credential tracker template near 
 - **Go step by step.** Don't ask your AI to "set up the whole thing." Walk through Part 1 (Capture), test it, then do Part 2 (Retrieval). The guide is structured this way for a reason.
 - **Test at Step 9.** The guide has a specific test message and expected response. Do it. If capture works, you know your database, Edge Function, and Slack connection are all solid before you move on to MCP.
 - **Use Supabase's built-in AI too.** The Supabase dashboard has its own AI assistant (chat icon, bottom-right). It knows Supabase's docs inside out and can help with anything database-specific. Your coding AI handles the big picture; the Supabase AI handles the Supabase details.
-- **Read the [FAQ](03-faq.md) when stuck.** It covers the most common issues people hit, including the exact auth error pattern that trips up Claude Desktop and ChatGPT connections.
+- **Read the [FAQ](03-faq.md) when stuck.** It covers the most common OAuth and connector issues people hit during the new MCP auth flow.
 
 ## After Setup
 

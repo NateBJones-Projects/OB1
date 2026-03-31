@@ -48,20 +48,25 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		}
 
 		const mcpUrl = privateEnv.MCP_URL || publicEnv.PUBLIC_MCP_URL;
-		const mcpKey = privateEnv.MCP_KEY || publicEnv.PUBLIC_MCP_KEY;
+		const accessToken = locals.session?.access_token;
 
-		if (!mcpUrl || !mcpKey) {
+		if (!mcpUrl) {
 			return json(
-				{ error: 'Missing MCP_URL/MCP_KEY (or PUBLIC_MCP_URL/PUBLIC_MCP_KEY) in your environment config' },
+				{ error: 'Missing MCP_URL (or PUBLIC_MCP_URL) in your environment config' },
 				{ status: 500 },
 			);
 		}
 
-		const upstream = await fetch(`${mcpUrl}?key=${mcpKey}`, {
+		if (!accessToken) {
+			return json({ error: 'Missing Supabase session access token' }, { status: 401 });
+		}
+
+		const upstream = await fetch(mcpUrl, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',
-				'Accept': 'application/json, text/event-stream'
+				'Accept': 'application/json, text/event-stream',
+				'Authorization': `Bearer ${accessToken}`
 			},
 			body: JSON.stringify({
 				jsonrpc: '2.0',

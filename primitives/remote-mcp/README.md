@@ -1,110 +1,83 @@
 # Remote MCP Connection
 
-A guide to connecting your Open Brain extensions to any AI client. Deploy once as a Supabase Edge Function, connect from anywhere.
+How to connect Open Brain MCP servers to Claude Desktop, ChatGPT, Claude Code, Codex, and other AI clients using OAuth 2.1.
 
-**Jump to your client:**
-[Claude Desktop](#claude-desktop) | [ChatGPT](#chatgpt) | [Claude Code](#claude-code) | [Cursor / Windsurf / VS Code / Zed](#other-clients-cursor-windsurf-vs-code-zed) | [Troubleshooting](#troubleshooting)
+## What Changed
+
+Open Brain used to embed a static access key directly in the MCP URL. That worked, but it pushed a long-lived secret into query strings, screenshots, config files, and browser history.
+
+The new pattern is:
+
+- MCP server URL stays clean
+- client receives `401 + WWW-Authenticate`
+- client runs OAuth against your Supabase project
+- client retries with `Authorization: Bearer <token>`
+
+This is now the canonical OB1 pattern for Supabase-backed remote MCP servers.
 
 ## What You Need
 
-- Your **MCP Connection URL** (from the extension's credential tracker — looks like `https://YOUR_REF.supabase.co/functions/v1/extension-mcp?key=your-access-key`)
-- The AI client you want to connect
+- Your MCP server URL
+  Example: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp`
+- Supabase OAuth 2.1 enabled
+- The [Open Brain Auth Portal](../../dashboards/open-brain-auth-portal/) deployed
+- Your server redeployed with:
+  - `SUPABASE_PUBLISHABLE_KEY`
+  - `OB1_OWNER_USER_ID`
+  - `ALLOW_LEGACY_MCP_KEY` set the way you want
 
-## Claude Desktop
+## Claude Desktop / Claude.ai
 
-1. Open Claude Desktop → **Settings** → **Connectors**
+1. Open Claude → **Settings** → **Connectors**
 2. Click **Add custom connector**
-3. Name: the extension name (e.g., `Household Knowledge`, `Family Calendar`)
-4. Remote MCP server URL: paste your **MCP Connection URL**
-5. Click **Add**
+3. Name it whatever you want
+4. Paste your MCP server URL
+5. Save
 
-Start a new conversation and enable the connector via the "+" button at the bottom of the chat → Connectors.
-
-> You can add multiple extensions as separate connectors and toggle them per conversation.
+On the first protected tool call, Claude should trigger the OAuth flow automatically and redirect you to your Open Brain auth portal.
 
 ## ChatGPT
 
-Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu). Works on the web at chatgpt.com — not available on mobile.
+1. Open ChatGPT → **Settings** → **Apps & Connectors**
+2. Turn on **Developer mode**
+3. Create a new MCP app
+4. Paste your MCP server URL
+5. Choose OAuth when prompted
 
-**Enable Developer Mode (one-time setup):**
-
-1. Go to chatgpt.com → click your profile icon → **Settings**
-2. Navigate to **Apps & Connectors** → **Advanced settings**
-3. Toggle **Developer mode** ON
-
-> Enabling Developer Mode disables ChatGPT's built-in Memory feature. Your Open Brain replaces that functionality — and it works across every AI, not just ChatGPT.
-
-**Add the connector:**
-
-1. In Settings → **Apps & Connectors**, click **Create**
-2. Name: the extension name
-3. Description: brief description of what it does (for your reference only)
-4. MCP endpoint URL: paste your **MCP Connection URL**
-5. Authentication: select **No Authentication** (your access key is embedded in the URL)
-6. Click **Create**
-
-**Using it:** Start a new conversation and make sure the connector is enabled in the tools/apps panel. ChatGPT sometimes needs explicit tool references: "Use the search_household_items tool to find my paint colors."
+Do not use "No Authentication" for the new OB1 pattern. If ChatGPT is still configured with an old key-bearing URL, delete that connector and recreate it cleanly.
 
 ## Claude Code
 
-```bash
-claude mcp add --transport http extension-name \
-  https://YOUR_PROJECT_REF.supabase.co/functions/v1/extension-mcp \
-  --header "x-access-key: your-access-key"
-```
+Use an OAuth-capable remote transport. The exact bridge depends on the client/runtime, but the important part is the transport must follow the remote server's `401` challenge and complete the OAuth flow instead of trying to stuff a static key into headers.
 
-Replace `extension-name` with a short name (e.g., `household-knowledge`, `family-calendar`), the URL with your MCP Server URL (without the `?key=` part), and `your-access-key` with your MCP Access Key.
+## Codex / Other Editor Clients
 
-## Other Clients (Cursor, Windsurf, VS Code, Zed)
-
-Every MCP client handles remote servers slightly differently. Your extension accepts the access key two ways — pick whichever your client supports:
-
-**Option A: URL with key (easiest).** If your client has a field for a remote MCP server URL, paste the full MCP Connection URL including `?key=your-access-key`. This works for any client that supports remote MCP without requiring headers.
-
-**Option B: mcp-remote bridge.** If your client only supports local stdio servers (configured via a JSON config file), use `mcp-remote` to bridge to the remote server. This requires Node.js installed.
-
-```json
-{
-  "mcpServers": {
-    "extension-name": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/extension-mcp",
-        "--header",
-        "x-access-key:${ACCESS_KEY}"
-      ],
-      "env": {
-        "ACCESS_KEY": "your-access-key"
-      }
-    }
-  }
-}
-```
-
-> Note: no space after the colon in `x-access-key:${ACCESS_KEY}`. Some clients have a bug where spaces inside args get mangled.
+Use the clean MCP server URL and an OAuth-capable remote bridge. If the client only knows how to pass static headers, it is still on the legacy path.
 
 ## Troubleshooting
 
-**Claude Desktop tools don't appear**
-- Make sure the connector is enabled for your conversation — click "+" → Connectors and check the toggle
-- Verify the MCP Connection URL is correct (it should end with `?key=your-access-key`)
-- Try removing and re-adding the connector in Settings → Connectors
+**OAuth discovery fails**
+- Verify Supabase OAuth 2.1 is enabled
+- Verify your auth portal authorization URL is correct
+- Verify your MCP server responds with `401` and `WWW-Authenticate`
 
-**ChatGPT doesn't use the tools**
-- Confirm Developer Mode is enabled (Settings → Apps & Connectors → Advanced settings)
-- Check that the connector is active for your current conversation in the tools/apps panel
-- Be explicit: "Use the [tool_name] tool to [do thing]." ChatGPT often needs direct tool references the first few times.
+**Consent screen never appears**
+- The client may still be using an old key-bearing URL
+- Remove the connector and re-add it with the clean server URL
+- Confirm the MCP server is returning protected-resource metadata
 
-**Getting 401 errors**
-- The access key doesn't match what's stored in Supabase secrets
-- Double-check that the `?key=` value in your URL matches your MCP Access Key exactly
-- If using the header approach (Claude Code or mcp-remote), the header must be `x-access-key` (lowercase, with the dash)
+**Authenticated but still forbidden**
+- The signed-in Supabase user does not match `OB1_OWNER_USER_ID`
 
-**Tools work but responses are slow**
-- First request on a cold Edge Function takes a few seconds to warm up
-- Subsequent calls are faster
-- Check your Supabase project region — pick the one closest to you
+## Legacy Key Migration Appendix
+
+If you already have working key-based connectors in the wild:
+
+- keep `ALLOW_LEGACY_MCP_KEY=true` while you reconnect clients
+- migrate each client to OAuth one by one
+- disable the fallback only after OAuth is stable
+
+For the full migration sequence, use the [OAuth MCP Upgrade recipe](../../recipes/oauth-mcp-upgrade/).
 
 ## Extensions That Use This
 
@@ -114,5 +87,3 @@ Every MCP client handles remote servers slightly differently. Your extension acc
 - [Meal Planning](../../extensions/meal-planning/) (Extension 4)
 - [Professional CRM](../../extensions/professional-crm/) (Extension 5)
 - [Job Hunt Pipeline](../../extensions/job-hunt/) (Extension 6)
-
-Every extension that deploys a remote MCP server uses this connection pattern.

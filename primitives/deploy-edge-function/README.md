@@ -72,31 +72,22 @@ Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1
 
 > Replace `FUNCTION_NAME` and `DOWNLOAD_PATH` with the values from the extension's deployment table.
 
-## Step 3: Generate an Access Key
+## Step 3: Set the OAuth Secrets
 
-> **Already have an access key from a previous extension?** You can reuse it — skip to Step 4 and use the same key. Or generate a new one if you prefer each extension to have its own key.
-
-🟩 **Mac/Linux:**
+These extensions now use the same OAuth-backed auth model as the core Open Brain server. Set:
 
 ```bash
-openssl rand -hex 32
+supabase secrets set SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+supabase secrets set OB1_OWNER_USER_ID=your-owner-user-id
 ```
 
-🟦 **Windows (PowerShell):**
-
-```powershell
--join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
-```
-
-Copy the output (64 characters). Save it in your credential tracker.
-
-Set it as a Supabase secret:
+Optional migration fallback:
 
 ```bash
-supabase secrets set MCP_ACCESS_KEY=your-generated-key-here
+supabase secrets set ALLOW_LEGACY_MCP_KEY=true
 ```
 
-> If you already set `MCP_ACCESS_KEY` for a previous extension or during the Getting Started guide, setting it again will overwrite it. All functions share the same secrets, so every deployed function will use the new key. If you want separate keys per extension, use a different secret name (e.g., `HOUSEHOLD_MCP_KEY`) and update the extension's `index.ts` to read from that name instead.
+Only keep `MCP_ACCESS_KEY` around if you're temporarily supporting old key-based connectors during migration.
 
 ## Step 4: Deploy
 
@@ -110,13 +101,7 @@ Your MCP server is now live at:
 https://YOUR_PROJECT_REF.supabase.co/functions/v1/FUNCTION_NAME
 ```
 
-Build your **MCP Connection URL** by adding your access key:
-
-```text
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/FUNCTION_NAME?key=your-access-key
-```
-
-Save this in your credential tracker, then follow the [Remote MCP Connection](../remote-mcp/) guide to connect it to your AI client.
+Save the clean MCP server URL in your credential tracker, then follow the [Remote MCP Connection](../remote-mcp/) guide to connect it through OAuth.
 
 ---
 
@@ -142,7 +127,7 @@ Then deploy:
 supabase functions deploy FUNCTION_NAME --no-verify-jwt
 ```
 
-The URL and access key stay the same — no need to reconfigure your AI clients.
+The URL stays the same. If you are already on OAuth, no client reconfiguration is needed after a normal code update.
 
 ---
 
@@ -158,7 +143,7 @@ The URL and access key stay the same — no need to reconfigure your AI clients.
 
 **Deploy succeeds but function returns errors**
 - Check Edge Function logs: Supabase Dashboard → Edge Functions → your function → Logs
-- Verify secrets are set: `supabase secrets list` should show `MCP_ACCESS_KEY`
+- Verify secrets are set: `supabase secrets list` should show `SUPABASE_PUBLISHABLE_KEY` and `OB1_OWNER_USER_ID`
 - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-injected — if they're missing, your Supabase project may need to be restarted
 
 **"Invalid JWT" or authentication errors**

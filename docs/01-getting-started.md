@@ -190,14 +190,15 @@ In the left sidebar: **Settings** (gear icon) → **API Keys**.
 You'll land on the **"Publishable and secret API keys"** tab. Copy these into your credential tracker:
 
 - 🔖 **Project URL** — Shown at the top of the page under "Project URL"
+- 🔖 **Publishable key** — Shown in the "Publishable and secret API keys" section. Safe to use in your auth portal and browser-based apps.
 - 🔖 **Secret key** — Scroll down to the **"Secret keys"** section on the same page. You'll see a `default` key. Click the copy button to copy it. (You can also click **"+ New secret key"** to create a dedicated one named `open-brain` — this makes it easier to revoke later without affecting other services, but using the default is fine too.)
 
 > [!WARNING]
-> Treat the Secret key like a password. Anyone with it has full access to your data. The "Publishable key" at the top of the page is safe to expose publicly — you don't need it for this setup.
+> Treat the Secret key like a password. Anyone with it has full access to your data. The "Publishable key" at the top of the page is safe to expose publicly, and you will use it for the auth portal in Step 6.8.
 >
 > You may also see a **"Legacy anon, service_role API keys"** tab — those are the old-style JWT keys. You don't need them. Everything in this guide uses the new key format.
 
-✅ **Done when:** Your credential tracker has both **Project URL** and **Secret key** filled in.
+✅ **Done when:** Your credential tracker has **Project URL**, **Publishable key**, and **Secret key** filled in.
 
 ---
 
@@ -217,36 +218,21 @@ Why OpenRouter instead of OpenAI directly? One account, one key, one billing rel
 
 ---
 
-![Step 5](https://img.shields.io/badge/Step_5-Create_an_Access_Key-00897B?style=for-the-badge)
+![Step 5](https://img.shields.io/badge/Step_5-Create_Your_Owner_User-00897B?style=for-the-badge)
 
-Your MCP server will be a public URL. The Supabase project ref in that URL is random enough that nobody will stumble onto it, but let's close the gap entirely. You'll generate a simple access key that the server checks on every request. Takes 30 seconds.
+The new Open Brain MCP flow uses OAuth 2.1 through Supabase Auth. That means your MCP server needs one real owner account to bind access to.
 
-> [!TIP]
-> **New to the terminal?** The "terminal" is the text-based command line on your computer. On Mac, open the app called **Terminal** (search for it in Spotlight). On Windows, open **PowerShell**. Everything below gets typed there, not in your browser.
+In Supabase Dashboard → **Authentication** → **Users**:
 
-In your terminal, generate a random key:
-
-🟩 **Mac/Linux** — open Terminal and run:
-
-```bash
-openssl rand -hex 32
-```
-
-🟦 **Windows** — open PowerShell and run:
-
-```powershell
--join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
-```
-
-Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters). Paste it into your credential tracker under MCP Access Key. You'll set this as a Supabase secret in the next step (after installing the CLI).
-
-> [!WARNING]
-> Copy and paste the command for **your operating system only**. The Mac command won't work on Windows and vice versa.
+1. Create one email/password user for Open Brain if you do not already have one.
+2. Save the email and password in your credential tracker.
+3. Open that user record and copy the UUID.
+4. Save that UUID as your **Owner User ID**.
 
 > [!IMPORTANT]
-> This is your **one access key for all of Open Brain** — core setup and every extension you add later. Save it somewhere permanent. Never generate a new one unless you want to replace it for ALL deployed functions.
+> This owner user is what your MCP server trusts. If you sign into the auth portal with a different Supabase user, the server will reject the request with `403 Forbidden`.
 
-✅ **Done when:** Your credential tracker has the **MCP Access Key** filled in.
+✅ **Done when:** Your credential tracker has the **Owner User ID**, email, and password filled in.
 
 ---
 
@@ -353,10 +339,16 @@ supabase link --project-ref YOUR_PROJECT_REF
 
 ![6.5](https://img.shields.io/badge/6.5-Set_Your_Secrets-555?style=for-the-badge&labelColor=1E88E5)
 
-Set your access key from Step 5:
+Set your publishable key from Step 3:
 
 ```bash
-supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
+supabase secrets set SUPABASE_PUBLISHABLE_KEY=your-publishable-key-from-step-3
+```
+
+Set your owner user ID from Step 5:
+
+```bash
+supabase secrets set OB1_OWNER_USER_ID=your-owner-user-id-from-step-5
 ```
 
 Set your OpenRouter key from Step 4:
@@ -369,9 +361,6 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
 
 <!-- -->
-
-> [!CAUTION]
-> Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
 > **If you ever rotate your OpenRouter key:** you must re-run the `supabase secrets set` command above with the new key, AND update any local `.env` files that reference it. The edge function reads from Supabase secrets at runtime — updating the key on openrouter.ai alone won't propagate here. See the [FAQ on key rotation](03-faq.md#api-key-rotation) for the full checklist.
 
@@ -429,18 +418,9 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
 
 Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1). Paste the full URL into your credential tracker as the MCP Server URL.
 
-Now build your **MCP Connection URL** by adding your access key to the end:
+Save that clean URL in your credential tracker as the **MCP Server URL**.
 
-```text
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5
-```
-
-Paste this into your credential tracker as the MCP Connection URL. This is what you'll give to AI clients that support remote MCP — one URL, no extra config.
-
-> [!TIP]
-> If you've been filling in your credential tracker as you go, the **MCP Server URL** and **MCP Connection URL** are already auto-generated for you in the Step 6 section of the spreadsheet. Just verify they match.
-
-✅ **Done when:** You have both the **MCP Server URL** and **MCP Connection URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
+✅ **Done when:** You have the **MCP Server URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
 
 </details>
 
@@ -532,10 +512,16 @@ supabase link --project-ref YOUR_PROJECT_REF
 
 ![6.5](https://img.shields.io/badge/6.5-Set_Your_Secrets-555?style=for-the-badge&labelColor=1E88E5)
 
-Set your access key from Step 5:
+Set your publishable key from Step 3:
 
 ```powershell
-supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
+supabase secrets set SUPABASE_PUBLISHABLE_KEY=your-publishable-key-from-step-3
+```
+
+Set your owner user ID from Step 5:
+
+```powershell
+supabase secrets set OB1_OWNER_USER_ID=your-owner-user-id-from-step-5
 ```
 
 Set your OpenRouter key from Step 4:
@@ -548,9 +534,6 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
 
 <!-- -->
-
-> [!CAUTION]
-> Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
 ![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
@@ -605,29 +588,42 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
 
 Replace `YOUR_PROJECT_REF` with the project ref from your credential tracker (Step 1). Paste the full URL into your credential tracker as the MCP Server URL.
 
-Now build your **MCP Connection URL** by adding your access key to the end:
+Save that clean URL in your credential tracker as the **MCP Server URL**.
 
-```text
-https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5
-```
-
-Paste this into your credential tracker as the MCP Connection URL. This is what you'll give to AI clients that support remote MCP — one URL, no extra config.
-
-> [!TIP]
-> If you've been filling in your credential tracker as you go, the **MCP Server URL** and **MCP Connection URL** are already auto-generated for you in the Step 6 section of the spreadsheet. Just verify they match.
-
-✅ **Done when:** You have both the **MCP Server URL** and **MCP Connection URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
+✅ **Done when:** You have the **MCP Server URL** in your credential tracker, and `supabase functions list` shows `open-brain-mcp` as `ACTIVE`.
 
 </details>
+
+![6.8](https://img.shields.io/badge/6.8-Deploy_the_Auth_Portal-555?style=for-the-badge&labelColor=1E88E5)
+
+Your MCP server now protects the tools, but Claude and ChatGPT still need a login + consent screen to complete OAuth. That is what the auth portal does.
+
+1. Go to [vercel.com](https://vercel.com) and sign in.
+2. Click **Add New → Project**.
+3. Import the `NateBJones-Projects/OB1` GitHub repository.
+4. Set the **Root Directory** to `dashboards/open-brain-auth-portal`.
+5. Add these environment variables:
+   - `NEXT_PUBLIC_SUPABASE_URL` = your Project URL from Step 3
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` = your Publishable key from Step 3
+6. Deploy the project.
+7. Copy the deployed URL and save it in your credential tracker as the **Auth Portal URL**.
+8. In Supabase Dashboard → **Authentication** → **OAuth**:
+   - Enable OAuth 2.1 for the project
+   - Set the authorization URL to `https://YOUR_AUTH_PORTAL_DOMAIN/oauth/consent`
+
+> [!IMPORTANT]
+> The auth portal, Supabase Auth project, and MCP server all need to point at the same Supabase project. Mixing projects is the fastest way to get stuck in a login loop.
+
+✅ **Done when:** You have a deployed **Auth Portal URL**, and Supabase OAuth points at `/oauth/consent` on that domain.
 
 ---
 
 ![Step 7](https://img.shields.io/badge/Step_7-Connect_to_Your_AI-5C6BC0?style=for-the-badge)
 
-You need your MCP Connection URL from the credential tracker — the one with `?key=` at the end.
+You need your clean MCP Server URL from the credential tracker. The OAuth redirect will use the auth portal you deployed in Step 6.8 behind the scenes.
 
 > [!TIP]
-> Your credential tracker spreadsheet has a **Step 7** section with ready-to-copy values for each AI client — including the full terminal command for Claude Code. If you've been filling it in, just copy from there.
+> Your credential tracker spreadsheet has a **Step 7** section with the clean MCP server URL and the auth values you need for supported clients. If you've been filling it in, copy from there instead of retyping.
 
 Pick your AI client below:
 
@@ -640,31 +636,10 @@ Pick your AI client below:
 1. Open Claude Desktop → **Settings** → **Connectors**
 2. Click **Add custom connector**
 3. Name: `Open Brain`
-4. Remote MCP server URL: paste your **MCP Connection URL** (the one ending in `?key=your-access-key`)
+4. Remote MCP server URL: paste your **MCP Server URL**
 5. Click **Add**
 
-That's it. Start a new conversation, and Claude will have access to your Open Brain tools. You can enable or disable it per conversation via the "+" button → Connectors.
-
-> [!TIP]
-> **Prefer JSON config?** If you'd rather use `claude_desktop_config.json` instead of the Connectors UI, use `supergateway` (not `mcp-remote` — see note below):
->
-> ```json
-> {
->   "mcpServers": {
->     "open-brain": {
->       "command": "npx",
->       "args": [
->         "-y",
->         "supergateway",
->         "--streamableHttp",
->         "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
->       ]
->     }
->   }
-> }
-> ```
->
-> ⚠️ **Do not use `mcp-remote` for Claude Desktop.** It performs OAuth discovery against the Supabase domain, which returns a 404 that causes the connection to fail before Claude Desktop's short startup timeout. `supergateway --streamableHttp` connects directly with no OAuth handshake. (`mcp-remote` works fine in Codex because its `startup_timeout_sec = 30` gives enough time for the OAuth fallback.)
+Claude should trigger the OAuth flow automatically on the first protected tool call. Sign in with the owner user you created in Step 5, approve access, then retry.
 
 </details>
 
@@ -688,8 +663,8 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 1. In Settings → **Apps & Connectors**, click **Create**
 2. Name: `Open Brain`
 3. Description: `Personal knowledge base with semantic search` (or whatever you want — this is just for your reference)
-4. MCP endpoint URL: paste your **MCP Connection URL** (the one ending in `?key=your-access-key`)
-5. Authentication: select **No Authentication** (your access key is embedded in the URL)
+4. MCP endpoint URL: paste your **MCP Server URL**
+5. Choose OAuth when prompted
 6. Click **Create**
 
 > [!TIP]
@@ -700,88 +675,21 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 <details>
 <summary>🤖 <strong>7.3 — Claude Code</strong></summary>
 
-One command:
-
-```bash
-claude mcp add --transport http open-brain \
-  https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp \
-  --header "x-brain-key: your-access-key-from-step-5"
-```
+Use the clean MCP server URL with an OAuth-capable remote transport. If your current bridge only knows how to inject a static key, it is still on the legacy path and should be treated as a temporary fallback, not the default.
 
 </details>
 
 <details>
 <summary>🤖 <strong>7.4 — OpenAI Codex</strong></summary>
 
-Codex uses `mcp-remote` to bridge to remote MCP servers. Add the following to your `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.open-brain]
-command = "npx"
-args = [
-  "-y",
-  "mcp-remote",
-  "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
-]
-startup_timeout_sec = 30
-```
-
-> [!CAUTION]
-> The `startup_timeout_sec = 30` line is required. Without it, Codex times out after 10 seconds because `mcp-remote` needs longer to establish the connection to the remote Supabase edge function. If you see `MCP client for open-brain timed out after 10 seconds`, add or increase this value.
-
-Restart Codex and the four Open Brain tools should be available immediately.
+Use the clean MCP server URL with an OAuth-capable remote bridge. Keep a generous startup timeout if your bridge performs discovery or browser handoff before the session is established.
 
 </details>
 
 <details>
 <summary>🤖 <strong>7.5 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
 
-Every MCP client handles remote servers slightly differently. The server accepts your access key two ways — pick whichever your client supports:
-
-**Option A: URL with key (easiest).** If your client has a field for a remote MCP server URL, paste the full MCP Connection URL including `?key=your-access-key`. This works for any client that supports remote MCP without requiring headers.
-
-**Option B: supergateway bridge (recommended).** If your client only supports local stdio servers (configured via a JSON config file), use `supergateway` to bridge to the remote server. This requires Node.js installed.
-
-```json
-{
-  "mcpServers": {
-    "open-brain": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "supergateway",
-        "--streamableHttp",
-        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
-      ]
-    }
-  }
-}
-```
-
-**Option C: mcp-remote bridge (alternative).** `mcp-remote` also works but performs OAuth discovery on startup, which can cause timeouts with Supabase Edge Function URLs. If you use it, set a generous startup timeout (30+ seconds) in clients that support it.
-
-```json
-{
-  "mcpServers": {
-    "open-brain": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "mcp-remote",
-        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp",
-        "--header",
-        "x-brain-key:${BRAIN_KEY}"
-      ],
-      "env": {
-        "BRAIN_KEY": "your-access-key-from-step-5"
-      }
-    }
-  }
-}
-```
-
-> [!NOTE]
-> No space after the colon in `x-brain-key:${BRAIN_KEY}`. Some clients have a bug where spaces inside args get mangled.
+Every MCP client handles remote servers slightly differently. Use the clean MCP server URL and an OAuth-capable remote bridge. If a client only supports static header injection, keep that path on the legacy fallback temporarily and plan to replace it.
 
 </details>
 
@@ -845,13 +753,9 @@ First, confirm Developer Mode is enabled (Settings → Apps & Connectors → Adv
 
 Your `service_role` doesn't have table-level permissions. This happens on newer Supabase projects where CRUD grants are no longer automatic. Go back to Step 2.5 and run the `GRANT` SQL, then retry.
 
-**❌ Claude Desktop JSON config: "Couldn't reach the MCP server"**
-
-If you're using `claude_desktop_config.json` with `mcp-remote`, switch to `supergateway --streamableHttp` instead. `mcp-remote` performs OAuth discovery against the Supabase domain (`/.well-known/oauth-authorization-server`), which returns a 404 that stalls the connection past Claude Desktop's startup timeout. `supergateway` connects directly with no OAuth handshake. See Step 7.1 for the config. (This does not affect Codex, which has a configurable `startup_timeout_sec` that gives `mcp-remote` enough time to fall back.)
-
 **❌ Getting 401 errors**
 
-The access key doesn't match what's stored in Supabase secrets. Double-check that the `?key=` value in your URL matches your MCP Access Key exactly. If you're using the header approach (Claude Code or mcp-remote), the header must be `x-brain-key` (lowercase, with the dash).
+Most 401s in the new setup come from one of four things: Supabase OAuth 2.1 is not enabled, your auth portal authorization URL is wrong, `SUPABASE_PUBLISHABLE_KEY` is missing, or the signed-in user does not match `OB1_OWNER_USER_ID`.
 
 **❌ Search returns no results**
 

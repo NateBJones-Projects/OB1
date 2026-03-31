@@ -95,7 +95,7 @@ kubectl exec -n openbrain openbrain-0 -c db -- \
 # Test MCP endpoint (via port-forward)
 kubectl port-forward -n openbrain svc/openbrain 8000:8000 &
 curl -X POST http://localhost:8000 \
-  -H "x-brain-key: YOUR_ACCESS_KEY" \
+  -H "Authorization: Bearer YOUR_ACCESS_KEY" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
@@ -111,7 +111,7 @@ For Claude Desktop or any MCP-compatible client, configure the remote MCP endpoi
       "url": "http://openbrain.openbrain.svc.cluster.local:8000",
       "transport": "http",
       "headers": {
-        "x-brain-key": "YOUR_ACCESS_KEY"
+        "Authorization": "Bearer YOUR_ACCESS_KEY"
       }
     }
   }
@@ -127,12 +127,14 @@ If you've configured an Ingress, use your external URL instead:
       "url": "https://brain.yourdomain.com",
       "transport": "http",
       "headers": {
-        "x-brain-key": "YOUR_ACCESS_KEY"
+        "Authorization": "Bearer YOUR_ACCESS_KEY"
       }
     }
   }
 }
 ```
+
+The self-hosted Kubernetes variant now treats `Authorization: Bearer ...` as the primary auth header. The older `x-brain-key`, `x-access-key`, and `?key=` forms are migration-only fallbacks when `ALLOW_LEGACY_MCP_KEY=true`.
 
 ## Using a Local LLM Instead of OpenRouter
 

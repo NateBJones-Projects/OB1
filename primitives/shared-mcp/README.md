@@ -45,9 +45,9 @@ Before building a shared MCP server:
 
 - Working Open Brain installation with your primary MCP server
 - Supabase project (or PostgreSQL database with RLS support)
-- Node.js 18+ installed
 - Understanding of database roles and permissions
-- The other person's Claude Desktop config access (or ability to share config)
+- A deployed auth portal for your Supabase OAuth flow
+- An MCP client that supports remote MCP connectors
 
 ## Build Guide
 
@@ -127,12 +127,9 @@ import { createClient } from "@supabase/supabase-js";
 const app = new Hono();
 
 app.post("/mcp", async (c) => {
-  // Authenticate with a SEPARATE access key for the shared server
-  const key = c.req.query("key") || c.req.header("x-access-key");
-  const expected = Deno.env.get("MCP_HOUSEHOLD_ACCESS_KEY");
-  if (!key || key !== expected) {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
+  // Shared servers still use OAuth-first auth, but they validate against an
+  // allowlist instead of a single owner ID.
+  // Keep the shared key only as a temporary migration fallback.
 
   // Use SCOPED credentials — not the service role key
   const supabase = createClient(
@@ -225,43 +222,24 @@ app.get("/", (c) => c.json({ status: "ok", service: "Household Shared", version:
 Deno.serve(app.fetch);
 ```
 
-### Step 4: Configure Separate Secrets
+### Step 4: Configure Shared Auth Secrets
 
 Set the shared server's secrets in Supabase (separate from your main server's secrets):
 
 ```bash
-# Generate a separate access key for the shared server
-openssl rand -hex 32
+# Required for the scoped DB client
+supabase secrets set SUPABASE_HOUSEHOLD_KEY=your-limited-supabase-key
 
-# Set secrets
-supabase secrets set MCP_HOUSEHOLD_ACCESS_KEY=your-generated-shared-key
-supabase secrets set SUPABASE_HOUSEHOLD_KEY=your-limited-supabase-key  # LIMITED KEY
+# Required for OAuth validation
+supabase secrets set SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+supabase secrets set MCP_HOUSEHOLD_ALLOWED_USER_IDS=user-uuid-1,user-uuid-2
 
-# Optional: Household ID for RLS
-SHARED_HOUSEHOLD_ID=uuid-here
+# Optional: keep only while migrating old static-key clients
+supabase secrets set MCP_HOUSEHOLD_ACCESS_KEY=your-legacy-shared-key
+supabase secrets set ALLOW_LEGACY_MCP_KEY=true
 ```
 
-Add to `package.json`:
-
-```json
-{
-  "name": "household-shared-server",
-  "version": "1.0.0",
-  "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "start": "node --env-file=.env.shared dist/shared-server.js"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^0.5.0",
-    "@supabase/supabase-js": "^2.39.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.3.0"
-  }
-}
-```
+Use `MCP_HOUSEHOLD_ACCESS_KEY` only as a temporary migration fallback. New shared-server installs should go straight to the allowlist-based OAuth flow.
 
 ### Step 5: Deploy as a Separate Edge Function
 
@@ -271,32 +249,31 @@ Deploy the shared server as its own Supabase Edge Function:
 supabase functions new household-shared-mcp
 ```
 
-Copy the shared server code into `supabase/functions/household-shared-mcp/index.ts`, generate a separate access key, and deploy:
+Copy the shared server code into `supabase/functions/household-shared-mcp/index.ts`, set the shared auth secrets, and deploy:
 
 ```bash
-# Generate a separate access key for the shared server
-openssl rand -hex 32
-
 # Set the shared server's secrets
-supabase secrets set MCP_HOUSEHOLD_ACCESS_KEY=generated-key-here
 supabase secrets set SUPABASE_HOUSEHOLD_KEY=household-scoped-api-key
+supabase secrets set SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+supabase secrets set MCP_HOUSEHOLD_ALLOWED_USER_IDS=user-uuid-1,user-uuid-2
+supabase secrets set ALLOW_LEGACY_MCP_KEY=true
 
 # Deploy
 supabase functions deploy household-shared-mcp --no-verify-jwt
 ```
 
-The other person connects via Claude Desktop:
+The other person connects with the clean MCP server URL in an OAuth-capable remote MCP client:
 
 1. Open Claude Desktop → **Settings** → **Connectors**
 2. Click **Add custom connector**
 3. Name: `Household Shared`
-4. Remote MCP server URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/household-shared-mcp?key=shared-access-key`
+4. Remote MCP server URL: `https://YOUR_PROJECT_REF.supabase.co/functions/v1/household-shared-mcp`
 5. Click **Add**
 
 **Key points:**
 - They connect via URL — no Node.js, no config files, no terminal needed on their end
-- They do NOT need access to your main MCP server or credentials
-- You can revoke access by changing the shared access key in Supabase secrets
+- They sign in through your hosted auth portal and must be listed in `MCP_HOUSEHOLD_ALLOWED_USER_IDS`
+- You can revoke access by removing their user ID from the allowlist or disabling the legacy fallback
 
 ### Step 6: Test the Access Boundaries
 
@@ -518,7 +495,8 @@ For Supabase: Create a custom JWT with limited claims, or use connection pooling
 
 4. Verify the connector URL is correct:
 
-   - Check that the `?key=` value matches the `MCP_HOUSEHOLD_ACCESS_KEY` secret exactly
+   - Check that the connector is using the clean shared-server URL
+   - Check that the signed-in user is included in `MCP_HOUSEHOLD_ALLOWED_USER_IDS`
    - Try removing and re-adding the connector in Settings → Connectors
    - Verify the Edge Function is deployed: `supabase functions list`
 

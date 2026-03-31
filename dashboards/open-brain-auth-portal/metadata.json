@@ -1,0 +1,19 @@
+{
+  "name": "Open Brain Auth Portal",
+  "description": "Minimal Next.js sign-in and consent portal for Supabase-backed Open Brain MCP OAuth flows.",
+  "category": "dashboards",
+  "author": {
+    "name": "Jonathan Edwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase Auth", "Vercel or another Next.js host"],
+    "tools": ["Node.js 20.9+"]
+  },
+  "tags": ["oauth", "mcp", "auth", "supabase", "nextjs"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}

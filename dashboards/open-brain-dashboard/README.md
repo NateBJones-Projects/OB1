@@ -24,9 +24,9 @@ This dashboard connects directly to your Open Brain MCP endpoint and gives you a
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - Supabase project URL + anon key for your Open Brain project
-- MCP function URL + access key for your Open Brain MCP function
+- MCP function URL for your Open Brain MCP function
 - Node.js 18+
-- A Supabase-authenticated user in your project (this dashboard uses email/password sign-in)
+- A Supabase-authenticated owner user in your project (this dashboard forwards that user's bearer token to MCP)
 
 ## Credential Tracker
 
@@ -40,7 +40,6 @@ FROM OPEN BRAIN
   Supabase URL:              ____________
   Supabase anon key:         ____________
   MCP Function URL:          ____________
-  MCP Access Key:            ____________
 
 HOSTING
   Deploy URL:                ____________
@@ -63,16 +62,15 @@ HOSTING
    cp .env.example .env.local
    ```
 
-3. Fill in your 4 values. You can find them at:
+3. Fill in your 3 values. You can find them at:
 
    | Variable | Where to get it |
    |----------|----------------|
    | `PUBLIC_SUPABASE_URL` | Supabase Dashboard → Settings → API → Project URL |
    | `PUBLIC_SUPABASE_ANON_KEY` | Supabase Dashboard → Settings → API → `anon` `public` key |
    | `MCP_URL` | Your deployed Edge Function URL (e.g. `https://<ref>.supabase.co/functions/v1/open-brain-mcp`) |
-   | `MCP_KEY` | The `MCP_ACCESS_KEY` you set during Open Brain setup. Also visible in Claude Desktop → Settings → Connectors → your connector URL after `?key=` |
 
-4. Create a sign-in user (if you don't have one). In Supabase Dashboard → Authentication → Add user → create with email + password + Auto Confirm.
+4. Create a sign-in user (if you don't have one). In Supabase Dashboard → Authentication → Add user → create with email + password + Auto Confirm. This should be the same owner user you configured as `OB1_OWNER_USER_ID` for the MCP server.
 
    > **Note:** If your existing user was created via OAuth, you won't have a password. Click "Send password recovery" from the user detail panel, or create a second user with email/password (e.g. `you+dashboard@gmail.com`).
 
@@ -86,8 +84,8 @@ HOSTING
 
 ## Deploy to Production
 
-- **Vercel:** Import this folder, set the same 4 environment variables.
-- **Netlify:** Deploy as a SvelteKit site, set the same 4 environment variables.
+- **Vercel:** Import this folder, set the same 3 environment variables.
+- **Netlify:** Deploy as a SvelteKit site, set the same 3 environment variables.
 
 ## Expected outcome
 
@@ -99,7 +97,7 @@ After setup, you should be able to:
 - open a thought for full text review,
 - capture a new thought and immediately persist it through MCP.
 
-If a value is missing in env, the app will show startup errors about missing `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` or missing MCP credentials.
+If a value is missing in env, the app will show startup errors about missing `PUBLIC_SUPABASE_URL` / `PUBLIC_SUPABASE_ANON_KEY` or a missing MCP URL.
 
 ## Troubleshooting
 
@@ -110,7 +108,7 @@ Solution: Ensure `.env.local` exists, both variables are set, and SvelteKit has 
 Solution: Confirm you have a valid Supabase user in the project and correct credentials; the app intentionally requires auth via `/signin`.
 
 **Issue: MCP calls fail with `Unauthorized` or 401**
-Solution: Verify `MCP_URL` points to the Supabase Edge Function for this project, and `MCP_KEY` matches the function key expected by `open-brain-mcp`.
+Solution: Verify `MCP_URL` points to the right Edge Function and that the signed-in dashboard user matches the owner user configured on the MCP server.
 
 **Issue: Search returns "No thoughts found" but stats show thoughts exist**
 Solution: Search uses semantic (vector) similarity, not keyword matching. Three things to check:

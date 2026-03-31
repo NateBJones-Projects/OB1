@@ -1,0 +1,19 @@
+{
+  "name": "OAuth MCP Upgrade",
+  "description": "Upgrade an existing Open Brain install from static MCP access keys to owner-bound OAuth 2.1 with a temporary legacy fallback.",
+  "category": "recipes",
+  "author": {
+    "name": "Jonathan Edwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase Auth", "Vercel or another Next.js host"],
+    "tools": ["Supabase CLI", "Node.js 18+"]
+  },
+  "tags": ["oauth", "mcp", "upgrade", "security", "supabase"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}

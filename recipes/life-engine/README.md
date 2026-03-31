@@ -448,9 +448,13 @@ Your Open Brain is already deployed as a remote MCP server from the Getting Star
 
 If not already connected:
 
-```bash
-claude mcp add open-brain --transport http --url "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_ACCESS_KEY"
+Use the clean MCP server URL with an OAuth-capable remote bridge:
+
+```text
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
 ```
+
+If your current Claude Code bridge only knows how to inject a static key, keep that path on the temporary legacy fallback and plan to replace it.
 
 ### 3.2 Verify Open Brain Access
 
@@ -936,7 +940,7 @@ After setup, you'll have:
 |---------|-------|----------------|
 | Supabase Project URL | `https://xxx.supabase.co` | Open Brain MCP, Life Engine tables |
 | Supabase Service Key | `eyJ...` | Database access |
-| OB1 MCP URL | `https://xxx.supabase.co/functions/v1/open-brain-mcp?key=xxx` | Knowledge search |
+| OB1 MCP URL | `https://xxx.supabase.co/functions/v1/open-brain-mcp` | Knowledge search |
 | Telegram Bot Token | `123456:ABC...` | Telegram channel plugin |
 | Google Calendar | (OAuth via Claude Code) | Calendar events |
 

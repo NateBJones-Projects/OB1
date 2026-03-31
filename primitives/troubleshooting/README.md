@@ -11,15 +11,14 @@ Solutions for issues that come up across any Open Brain extension. If your probl
 - Ensure Row Level Security (RLS) policies are configured correctly (service role bypasses RLS, but policies must exist for RLS-enabled tables)
 
 **"Getting 401 Unauthorized"**
-- The access key doesn't match what's stored in Supabase secrets
-- Double-check that the `?key=` value in your Connection URL matches your MCP Access Key exactly
-- If using header-based auth (Claude Code or mcp-remote), the header must be `x-access-key` (lowercase, with the dash)
-- Verify the secret is set: `supabase secrets list` should show `MCP_ACCESS_KEY`
-- Try regenerating the key: `openssl rand -hex 32`, then `supabase secrets set MCP_ACCESS_KEY=new-key` and update your Connection URL
+- The signed-in Supabase user does not match `OB1_OWNER_USER_ID`
+- `SUPABASE_PUBLISHABLE_KEY` or `OB1_OWNER_USER_ID` is missing from Edge Function secrets
+- Supabase OAuth 2.1 is disabled or pointed at the wrong authorization URL
+- If you are still mid-migration, confirm `ALLOW_LEGACY_MCP_KEY=true` before expecting old key-based clients to work
 
 **"Tools don't appear in Claude Desktop"**
 - Verify the connector is enabled for your conversation — click the "+" button at the bottom of the chat → Connectors → check the toggle
-- Check that the MCP Connection URL is correct and includes `?key=your-access-key`
+- Check that the MCP server URL is correct and does not include an old `?key=` suffix
 - Try removing and re-adding the connector in Settings → Connectors
 - Start a new conversation after adding the connector
 - Restart Claude Desktop after making changes
@@ -40,7 +39,7 @@ Solutions for issues that come up across any Open Brain extension. If your probl
 
 **"Invalid JWT" or JWT verification errors**
 - Make sure you deployed with `--no-verify-jwt` flag: `supabase functions deploy your-function --no-verify-jwt`
-- The MCP server handles its own authentication via the access key — JWT verification should be disabled
+- The MCP server handles its own OAuth bearer-token validation — Supabase Edge Function JWT verification should still be disabled
 
 **Deploy succeeds but function returns errors**
 - Check Edge Function logs: Supabase Dashboard → Edge Functions → your function → Logs

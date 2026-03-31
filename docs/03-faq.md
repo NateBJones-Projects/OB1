@@ -2,17 +2,16 @@
 
 ## Setup and Connection Issues
 
-### "Claude Desktop / ChatGPT gives me an auth error but Claude Code works fine"
+### "Claude Desktop / ChatGPT gives me an auth error when connecting Open Brain"
 
-This is the single most common issue. The tell is right in the pattern: Claude Code can send custom headers, but Claude Desktop, Claude Web, and ChatGPT can't.
+The old Open Brain setup used a static key in the MCP URL. The new setup uses OAuth 2.1 through Supabase Auth. If a modern client can't connect, the problem is usually one of these:
 
-The fix: use the MCP Connection URL with the key embedded as a query parameter (`?key=your-access-key`), not as a custom header. Your URL should look like:
+- Supabase OAuth 2.1 isn't enabled
+- your auth portal authorization URL is wrong
+- `SUPABASE_PUBLISHABLE_KEY` or `OB1_OWNER_USER_ID` is missing on the MCP server
+- you're signing into the portal with a user that does not match `OB1_OWNER_USER_ID`
 
-```text
-https://your-project-ref.supabase.co/functions/v1/open-brain-mcp?key=your-access-key
-```
-
-When adding the connector in Claude Desktop (Settings → Connectors) or ChatGPT (Settings → Apps & Connectors), paste that full URL. Set authentication to "none" — the key is already in the URL.
+The fix: use the clean MCP server URL, not a `?key=` URL, and make sure the OAuth flow can complete end to end.
 
 ### "ChatGPT disabled my memory when I added the Open Brain"
 
@@ -32,7 +31,7 @@ ChatGPT is less intuitive than Claude at picking the right MCP tool on its own. 
 
 ### "I'm stuck and Claude is rewriting my edge function code to fix the connection"
 
-Pause. The problems are almost never in the code. They're in the configuration: a secret that doesn't match, a URL that's missing the key, a step that got skipped. Letting an AI rewrite working code when the issue is a mismatched environment variable will make things harder to debug, not easier.
+Pause. The problems are almost never in the code. They're in the configuration: a missing owner user ID, a wrong authorization URL, a disabled OAuth flag, or a client still pointed at an old key-bearing connector. Letting an AI rewrite working code when the issue is a mismatched environment variable will make things harder to debug, not easier.
 
 Check your Supabase dashboard → Edge Functions → open-brain-mcp → Logs first. That'll tell you what's actually happening.
 
@@ -207,7 +206,7 @@ That said: check your usage tier in your provider's console, make sure your agen
 
 1. **Did you follow the guide step by step?** Most issues trace back to a skipped or modified step.
 2. **Check Edge Function logs.** Supabase dashboard → Edge Functions → your function → Logs. This tells you what's actually breaking.
-3. **Is your URL format correct?** Should be: `https://your-ref.supabase.co/functions/v1/open-brain-mcp?key=your-key`
+3. **Is your URL format correct?** For the new setup it should be the clean MCP server URL, no `?key=` attached.
 4. **Use the Supabase AI assistant.** Paste your error and it can help diagnose Supabase-specific issues.
 5. **Don't let AI rewrite your server code** unless you understand what it's changing. Configuration problems need configuration fixes.
 

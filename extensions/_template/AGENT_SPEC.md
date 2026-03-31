@@ -131,9 +131,17 @@ import { createClient } from "@supabase/supabase-js";
 // --- Environment Variables ---
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
+const SUPABASE_PUBLISHABLE_KEY = Deno.env.get("SUPABASE_PUBLISHABLE_KEY") ?? "";
+const OB1_OWNER_USER_ID = Deno.env.get("OB1_OWNER_USER_ID") ?? "";
+const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY") ?? "";
+const ALLOW_LEGACY_MCP_KEY = Deno.env.get("ALLOW_LEGACY_MCP_KEY") === "true";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+  },
+});
 
 // --- MCP Server ---
 const server = new McpServer({
@@ -148,10 +156,9 @@ const server = new McpServer({
 const app = new Hono();
 
 app.all("*", async (c) => {
-  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
-  if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401);
-  }
+  // Primary auth is Authorization: Bearer <token>, validated against
+  // Supabase Auth and bound to OB1_OWNER_USER_ID. Legacy key auth should
+  // only remain enabled during migration.
 
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);

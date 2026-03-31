@@ -14,6 +14,7 @@
  *   CHAT_API_KEY - API key for chat service (defaults to EMBEDDING_API_KEY)
  *   CHAT_MODEL - Model name for metadata extraction (default: gpt-4o-mini)
  *   MCP_ACCESS_KEY - Authentication key for MCP endpoint
+ *   ALLOW_LEGACY_MCP_KEY - Optional. When true, also accept x-brain-key / x-access-key / ?key=
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -38,7 +39,8 @@ const CHAT_API_BASE = Deno.env.get("CHAT_API_BASE") || EMBEDDING_API_BASE;
 const CHAT_API_KEY = Deno.env.get("CHAT_API_KEY") || EMBEDDING_API_KEY;
 const CHAT_MODEL = Deno.env.get("CHAT_MODEL") || "openai/gpt-4o-mini";
 
-const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
+const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY") ?? "";
+const ALLOW_LEGACY_MCP_KEY = Deno.env.get("ALLOW_LEGACY_MCP_KEY") === "true";
 
 // --- PostgreSQL Connection Pool ---
 
@@ -377,7 +379,7 @@ server.registerTool(
       ]);
 
       const embStr = `[${embedding.join(",")}]`;
-      const meta = { ...metadata, source: "mcp" };
+      const meta = { ...metadata, source: "mcp" } as Record<string, unknown>;
 
       const client = await pool.connect();
       try {
@@ -414,15 +416,82 @@ server.registerTool(
 
 const app = new Hono();
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-brain-key, x-access-key, accept, mcp-session-id",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+};
+
+function withCors(response: Response): Response {
+  for (const [header, value] of Object.entries(corsHeaders)) {
+    response.headers.set(header, value);
+  }
+  return response;
+}
+
+function unauthorizedResponse(c: any, description: string): Response {
+  return c.json(
+    {
+      error: "invalid_token",
+      error_description: description,
+    },
+    401,
+    {
+      ...corsHeaders,
+      "WWW-Authenticate": 'Bearer realm="open-brain-kubernetes"',
+    },
+  );
+}
+
+function authenticateRequest(c: any): Response | { mode: "bearer" | "legacy" } {
+  const authHeader = c.req.header("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.slice("Bearer ".length).trim();
+    if (token && token === MCP_ACCESS_KEY) {
+      return { mode: "bearer" };
+    }
+    return unauthorizedResponse(c, "The bearer token is invalid.");
+  }
+
+  if (ALLOW_LEGACY_MCP_KEY) {
+    const provided =
+      c.req.header("x-brain-key") ||
+      c.req.header("x-access-key") ||
+      new URL(c.req.url).searchParams.get("key");
+
+    if (provided && provided === MCP_ACCESS_KEY) {
+      return { mode: "legacy" };
+    }
+  }
+
+  return unauthorizedResponse(c, "Authorization required.");
+}
+
+app.options("*", (c) => c.text("ok", 200, corsHeaders));
+
+app.get("/", (c) =>
+  c.json(
+    {
+      status: "ok",
+      service: "Open Brain MCP (Kubernetes)",
+      version: "1.1.0",
+      auth: "bearer-token",
+    },
+    200,
+    corsHeaders,
+  ));
+
 app.all("*", async (c) => {
-  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
-  if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401);
+  const authResult = authenticateRequest(c);
+  if (authResult instanceof Response) {
+    return authResult;
   }
 
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
-  return transport.handleRequest(c);
+  const response = await transport.handleRequest(c);
+  return response ? withCors(response) : c.body(null, 204, corsHeaders);
 });
 
 Deno.serve({ port: parseInt(Deno.env.get("PORT") || "8000", 10) }, app.fetch);
