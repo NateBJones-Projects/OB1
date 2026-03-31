@@ -62,7 +62,7 @@ jobs:
                 '',
                 'Once the automated checks pass, a human admin will review for quality and clarity. Expect a response within a few days.',
                 '',
-                "If you have questions, check out [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) or open an issue.",
+                "If you have questions, check out [CONTRIBUTING.md](https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md) or open an issue.",
               ].join('\n');
             } else {
               body = [
@@ -70,7 +70,7 @@ jobs:
                 '',
                 'Thanks for opening your first issue. Someone from the community will take a look soon.',
                 '',
-                "If you're interested in contributing (code or not), check out [CONTRIBUTING.md](../blob/main/CONTRIBUTING.md) — we have paths for developers and non-developers alike.",
+                "If you're interested in contributing (code or not), check out [CONTRIBUTING.md](https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md) — we have paths for developers and non-developers alike.",
               ].join('\n');
             }
 
