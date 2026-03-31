@@ -79,6 +79,11 @@
       "items": { "type": "string" },
       "description": "Slugs of primitives this contribution depends on (e.g., [\"rls\", \"shared-mcp\"]). Primarily used by extensions."
     },
+    "requires_skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Slugs of canonical skills this contribution depends on (e.g., [\"auto-capture\"]). Use this when a contribution builds on reusable agent behavior from skills/."
+    },
     "learning_order": {
       "type": "integer",
       "minimum": 1,

@@ -10,6 +10,7 @@
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - List any additional requirements (API keys, tools, services)
+- If this recipe depends on a reusable skill from `skills/`, link it here and declare it in `metadata.json` via `requires_skills`
 
 ## Credential Tracker
 

@@ -38,6 +38,7 @@ This is a first-class path, not a workaround. Some of the best contributions com
 - **Primitives** are reusable concept guides that get referenced by multiple extensions. They teach a pattern (like RLS or shared access) once, so extensions can link to them instead of re-explaining. A primitive should be referenced by at least 2 extensions. [Propose one here](../../issues/new?template=primitive-submission.yml).
 - **Recipes** are standalone builds — they add a capability without being part of the learning path. No ordering, no prerequisites beyond a working Open Brain. Open for community contributions.
 - **Skills** are standalone agent behaviors packaged as plain-text prompt/skill files. They are smaller than recipes: no full build required, just a reusable behavior you can install into Claude Code, Codex, Cursor, or a similar client. Open for community contributions.
+- If a prompt/skill behavior is reusable across multiple contributions, its canonical home is `skills/`. Recipes and other contributions should depend on it with `requires_skills` instead of keeping the canonical copy in their own folder. Recipe-local `*.skill.md` files are still allowed for tightly coupled glue, but they are not the preferred pattern for reusable behavior.
 
 Not sure where yours fits? Open a discussion issue first.
 
@@ -139,6 +140,11 @@ grant select, insert, update, delete on table public.your_table to service_role;
 - **"Trigger Conditions"** explaining when the skill should fire
 - Plain-text, reviewable source files only. Do not submit zipped/exported skill bundles in `skills/`.
 
+**Dependency declarations**:
+- If a contribution depends on a canonical skill in `skills/`, declare it in `metadata.json` via `requires_skills`
+- If you declare `requires_skills`, your README must link to `skills/<slug>/` so users can install the dependency before following the rest of the guide
+- Keep reusable skill behavior in `skills/`. Use recipe-local skill files only when they are tightly coupled to that one contribution and not intended for reuse
+
 Check the `_template/` folder in each category for a starter README. The extension template contains HTML comments with detailed instructions for both human contributors and AI assistants.
 
 ## metadata.json
@@ -160,6 +166,7 @@ Every contribution needs a `metadata.json` file. Here's the template:
     "services": ["Gmail API"],
     "tools": ["Node.js 18+"]
   },
+  "requires_skills": [],
   "tags": ["email", "gmail", "import", "history"],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
@@ -170,10 +177,13 @@ Every contribution needs a `metadata.json` file. Here's the template:
 
 **Required fields:** `name`, `description`, `category`, `author` (with `name`), `version`, `requires.open_brain` (must be `true`), `tags` (at least 1), `difficulty` (one of: `beginner`, `intermediate`, `advanced`), `estimated_time`
 
-**Optional fields:** `author.github`, `requires.services`, `requires.tools`, `created`, `updated`
+**Optional fields:** `author.github`, `requires.services`, `requires.tools`, `requires_skills`, `created`, `updated`
 
-**Extension/primitive-specific fields:**
+**Additional structured dependency fields:**
+- `requires_skills` — array of skill slugs this contribution depends on (e.g., `["auto-capture"]`). Use this when the reusable behavior lives in `skills/<slug>/`
 - `requires_primitives` — array of primitive slugs this contribution depends on (e.g., `["rls", "shared-mcp"]`)
+
+**Extension-specific fields:**
 - `learning_order` — integer position in the extension learning path (1-6)
 
 Example for an extension:
@@ -200,6 +210,30 @@ Example for an extension:
   "estimated_time": "1 hour",
   "created": "2026-03-12",
   "updated": "2026-03-12"
+}
+```
+
+Example for a recipe that depends on a reusable skill:
+
+```json
+{
+  "name": "Auto-Capture Protocol",
+  "description": "Workflow guidance for automatically storing evaluated ideas and session summaries in Open Brain at session close.",
+  "category": "recipes",
+  "author": {
+    "name": "Your Name",
+    "github": "your-github-username"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code or similar AI coding tool"]
+  },
+  "requires_skills": ["auto-capture"],
+  "tags": ["capture", "workflow", "session-close"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes"
 }
 ```
 
@@ -251,14 +285,14 @@ Every PR is checked against these rules. All must pass before human review.
 
 1. **Folder structure** — Contribution is in the correct category directory (`recipes/`, `schemas/`, `dashboards/`, `integrations/`, `skills/`, `primitives/`, `extensions/`)
 2. **Required files** — Both `README.md` and `metadata.json` exist in the contribution folder
-3. **Metadata valid** — `metadata.json` parses as valid JSON and contains all required fields
+3. **Metadata valid** — `metadata.json` parses as valid JSON and passes the repo JSON Schema
 4. **No credentials** — No API keys, tokens, passwords, or secrets in any file
 5. **SQL safety** — No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`. No modifications to core `thoughts` table columns (adding columns is fine, altering/dropping existing ones is not)
 6. **Category-specific artifacts** — `recipes/` have code or detailed instructions, `schemas/` have SQL files, `dashboards/` have frontend code or `package.json`, `integrations/` have code files, `skills/` have at least one plain-text skill file, `primitives/` have substantial READMEs (200+ words), `extensions/` have both SQL and code files
 7. **PR format** — Title starts with `[recipes]`, `[schemas]`, `[dashboards]`, `[integrations]`, `[skills]`, `[primitives]`, or `[extensions]`
 8. **No binary blobs** — No files over 1MB, no `.exe`, `.dmg`, `.zip`, `.tar.gz`
 9. **README completeness** — Contribution README includes Prerequisites, step-by-step instructions, and expected outcome sections
-10. **Primitive dependencies** — If a contribution declares `requires_primitives`, the primitives must exist in the repo and be linked in the README
+10. **Contribution dependencies** — If a contribution declares `requires_primitives` or `requires_skills`, those folders must exist in the repo and be linked in the README
 11. **LLM clarity review** — *(Planned for v2)* Automated check that instructions are clear and complete
 12. **Scope check** — All changes are within the contribution folder(s)
 13. **Internal links** — All relative links in READMEs resolve to existing files

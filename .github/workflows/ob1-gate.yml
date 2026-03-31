@@ -28,6 +28,9 @@ jobs:
       - name: Fetch base branch
         run: git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
 
+      - name: Install metadata schema validator
+        run: python3 -m pip install check-jsonschema
+
       - name: Get changed files
         id: changed
         run: |
@@ -137,44 +140,15 @@ jobs:
               continue
             fi
 
-            # Check required fields
-            missing=""
-            for field in name description category version estimated_time; do
-              val=$(jq -r ".$field // empty" "$dir/metadata.json")
-              if [ -z "$val" ]; then
-                missing="${missing}$field, "
-              fi
-            done
-
-            # Check nested required fields
-            author_name=$(jq -r '.author.name // empty' "$dir/metadata.json")
-            if [ -z "$author_name" ]; then
-              missing="${missing}author.name, "
-            fi
-
-            ob_required=$(jq -r '.requires.open_brain // empty' "$dir/metadata.json")
-            if [ "$ob_required" != "true" ]; then
-              missing="${missing}requires.open_brain (must be true), "
-            fi
-
-            tags_count=$(jq -r '.tags | length // 0' "$dir/metadata.json")
-            if [ "$tags_count" -lt 1 ] 2>/dev/null; then
-              missing="${missing}tags (need at least 1), "
-            fi
-
-            difficulty=$(jq -r '.difficulty // empty' "$dir/metadata.json")
-            if ! echo "$difficulty" | grep -qE '^(beginner|intermediate|advanced)$'; then
-              missing="${missing}difficulty (must be beginner/intermediate/advanced), "
-            fi
-
-            if [ -n "$missing" ]; then
-              rule3_detail="${rule3_detail}  - \`$dir/metadata.json\` missing or invalid: ${missing%%, }\n"
+            if ! schema_output=$(check-jsonschema --schemafile .github/metadata.schema.json "$dir/metadata.json" 2>&1); then
+              indented_output=$(printf '%s\n' "$schema_output" | sed 's/^/      /')
+              rule3_detail="${rule3_detail}  - \`$dir/metadata.json\` failed schema validation\n${indented_output}\n"
               rule3_pass=false
             fi
           done <<< "$CONTRIB_DIRS"
 
           if [ "$rule3_pass" = true ]; then
-            pass_check "Metadata valid" "All metadata.json files have required fields"
+            pass_check "Metadata valid" "All metadata.json files passed JSON Schema validation"
           else
             fail_check "Metadata valid" "Metadata issues:\n${rule3_detail}"
           fi
@@ -400,7 +374,7 @@ jobs:
             fail_check "README completeness" "Incomplete READMEs:\n${rule9_detail}"
           fi
 
-          # ─── Rule 10: Primitive dependency validation ───
+          # ─── Rule 10: Contribution dependency validation ───
           rule10_pass=true
           rule10_detail=""
           while IFS= read -r dir; do
@@ -409,7 +383,6 @@ jobs:
 
             # Check if this contribution declares requires_primitives
             primitives=$(jq -r '.requires_primitives // [] | .[]' "$dir/metadata.json" 2>/dev/null || true)
-            [ -z "$primitives" ] && continue
 
             readme="$dir/README.md"
             while IFS= read -r prim; do
@@ -429,12 +402,32 @@ jobs:
                 fi
               fi
             done <<< "$primitives"
+
+            # Check if this contribution declares requires_skills
+            skills=$(jq -r '.requires_skills // [] | .[]' "$dir/metadata.json" 2>/dev/null || true)
+            while IFS= read -r skill; do
+              [ -z "$skill" ] && continue
+
+              # (a) Check that the skill directory exists in the repo
+              if [ ! -d "skills/$skill" ]; then
+                rule10_detail="${rule10_detail}  - \`$dir\`: requires skill \`$skill\` but \`skills/$skill/\` does not exist\n"
+                rule10_pass=false
+              fi
+
+              # (b) Check that the README links to the skill
+              if [ -f "$readme" ]; then
+                if ! grep -q "skills/$skill" "$readme"; then
+                  rule10_detail="${rule10_detail}  - \`$dir/README.md\`: declares dependency on skill \`$skill\` but does not link to it\n"
+                  rule10_pass=false
+                fi
+              fi
+            done <<< "$skills"
           done <<< "$CONTRIB_DIRS"
 
           if [ "$rule10_pass" = true ]; then
-            pass_check "Primitive dependencies" "All declared primitive dependencies exist and are linked in README"
+            pass_check "Contribution dependencies" "All declared skill and primitive dependencies exist and are linked in README"
           else
-            fail_check "Primitive dependencies" "Primitive dependency issues:\n${rule10_detail}"
+            fail_check "Contribution dependencies" "Dependency issues:\n${rule10_detail}"
           fi
 
           # ─── Rule 11: LLM clarity review ───

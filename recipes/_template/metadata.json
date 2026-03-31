@@ -12,6 +12,7 @@
     "services": [],
     "tools": []
   },
+  "requires_skills": [],
   "tags": ["tag1", "tag2"],
   "difficulty": "beginner",
   "estimated_time": "15 minutes",
