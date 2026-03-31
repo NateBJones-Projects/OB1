@@ -32,6 +32,7 @@ SLACK WORKSPACE INFO
 GENERATED DURING SETUP
   Channel name:          ____________
   Channel ID (Step 1):   C____________
+  Signing Secret:        ____________
   Bot OAuth Token:       xoxb-____________
   Edge Function URL:     https://____________.supabase.co/functions/v1/ingest-thought
 
@@ -108,134 +109,40 @@ Replace `YOUR_PROJECT_REF` with the project ref from your Supabase dashboard URL
 supabase functions new ingest-thought
 ```
 
-Open `supabase/functions/ingest-thought/index.ts` and replace its entire contents with:
+Copy [`index.ts`](./index.ts) from this directory into `supabase/functions/ingest-thought/index.ts`, replacing the generated boilerplate.
 
-```typescript
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+The implementation includes:
+- **Slack signature verification** — HMAC-SHA256 validation of every incoming request using `crypto.subtle`, with replay-attack protection (5-minute window)
+- **Event-level dedup** — writes to a `slack_events` table with a unique constraint on `event_id`, preventing duplicate processing when Slack retries
+- **Parallel enrichment** — embedding and metadata extraction run concurrently via `Promise.allSettled`, with graceful fallback if either fails
+- **upsert_thought RPC** — uses the standard Open Brain dedup-aware insert path
+- **CORS handling** — preflight support for browser-based testing
+- **waitUntil support** — returns 200 to Slack immediately and processes asynchronously when the Deno Edge Runtime supports it
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
-const SLACK_BOT_TOKEN = Deno.env.get("SLACK_BOT_TOKEN")!;
-const SLACK_CAPTURE_CHANNEL = Deno.env.get("SLACK_CAPTURE_CHANNEL")!;
+> **Monitoring:** The function logs all skip/error/capture events to `console.log`/`console.error`. If you want structured ingestion monitoring, you can add a `source_ingestion_events` table and write to it at each decision point — see the code comments for where those hooks would go.
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+### Create the Dedup Table
 
-async function getEmbedding(text: string): Promise<number[]> {
-  const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
-  });
-  const d = await r.json();
-  return d.data[0].embedding;
-}
+The function uses a `slack_events` table to prevent duplicate processing. Run this in the Supabase SQL Editor (Dashboard → SQL Editor → New Query):
 
-async function extractMetadata(text: string): Promise<Record<string, unknown>> {
-  const r = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: `Extract metadata from the user's captured thought. Return JSON with:
-- "people": array of people mentioned (empty if none)
-- "action_items": array of implied to-dos (empty if none)
-- "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
-- "topics": array of 1-3 short topic tags (always at least one)
-- "type": one of "observation", "task", "idea", "reference", "person_note"
-Only extract what's explicitly there.` },
-        { role: "user", content: text },
-      ],
-    }),
-  });
-  const d = await r.json();
-  try { return JSON.parse(d.choices[0].message.content); }
-  catch { return { topics: ["uncategorized"], type: "observation" }; }
-}
-
-async function replyInSlack(channel: string, threadTs: string, text: string): Promise<void> {
-  await fetch("https://slack.com/api/chat.postMessage", {
-    method: "POST",
-    headers: { "Authorization": `Bearer ${SLACK_BOT_TOKEN}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ channel, thread_ts: threadTs, text }),
-  });
-}
-
-Deno.serve(async (req: Request): Promise<Response> => {
-  try {
-    const body = await req.json();
-    if (body.type === "url_verification") {
-      return new Response(JSON.stringify({ challenge: body.challenge }), {
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-    const event = body.event;
-    if (!event || event.type !== "message" || event.subtype || event.bot_id
-        || event.channel !== SLACK_CAPTURE_CHANNEL) {
-      return new Response("ok", { status: 200 });
-    }
-    const messageText: string = event.text;
-    const channel: string = event.channel;
-    const messageTs: string = event.ts;
-    if (!messageText || messageText.trim() === "") return new Response("ok", { status: 200 });
-
-    // Deduplicate: Slack retries webhooks if response takes >3s, so check if we already captured this message
-    const { data: existing } = await supabase
-      .from("thoughts")
-      .select("id")
-      .contains("metadata", { slack_ts: messageTs })
-      .limit(1);
-    if (existing && existing.length > 0) return new Response("ok", { status: 200 });
-
-    const [embedding, metadata] = await Promise.all([
-      getEmbedding(messageText),
-      extractMetadata(messageText),
-    ]);
-
-    const { error } = await supabase.from("thoughts").insert({
-      content: messageText,
-      embedding,
-      metadata: { ...metadata, source: "slack", slack_ts: messageTs },
-    });
-
-    if (error) {
-      console.error("Supabase insert error:", error);
-      await replyInSlack(channel, messageTs, `Failed to capture: ${error.message}`);
-      return new Response("error", { status: 500 });
-    }
-
-    const meta = metadata as Record<string, unknown>;
-    let confirmation = `Captured as *${meta.type || "thought"}*`;
-    if (Array.isArray(meta.topics) && meta.topics.length > 0)
-      confirmation += ` - ${meta.topics.join(", ")}`;
-    if (Array.isArray(meta.people) && meta.people.length > 0)
-      confirmation += `\nPeople: ${meta.people.join(", ")}`;
-    if (Array.isArray(meta.action_items) && meta.action_items.length > 0)
-      confirmation += `\nAction items: ${meta.action_items.join("; ")}`;
-
-    await replyInSlack(channel, messageTs, confirmation);
-    return new Response("ok", { status: 200 });
-  } catch (err) {
-    console.error("Function error:", err);
-    return new Response("error", { status: 500 });
-  }
-});
+```sql
+CREATE TABLE IF NOT EXISTS slack_events (
+  event_id TEXT PRIMARY KEY,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ### Set Your Secrets
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
-supabase secrets set SLACK_BOT_TOKEN=xoxb-your-slack-bot-token-here
-supabase secrets set SLACK_CAPTURE_CHANNEL=C0your-channel-id-here
+supabase secrets set SLACK_SIGNING_SECRET=your-slack-signing-secret-here
+supabase secrets set SLACK_CAPTURE_CHANNEL_ID=C0your-channel-id-here
 ```
 
 Replace the values with:
 - Your OpenRouter API key from the main guide (Step 4)
-- Your Slack Bot OAuth Token from Step 2 above
+- Your Slack Signing Secret from Step 2 (App Settings → Basic Information → Signing Secret)
 - Your Slack Channel ID from Step 1 above
 
 > SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are automatically available inside Edge Functions — you don't need to set them.
