@@ -91,7 +91,7 @@ If a contribution's `metadata.json` declares `requires_primitives`, then:
 - The contribution's README must link to each required primitive
 
 ### Rule 11: LLM clarity review
-As the LLM reviewer, **this is your unique value**. Read the contribution's README and evaluate:
+This check runs automatically in CI via the Anthropic API (Claude Haiku). When you are invoked via `@claude` on a PR, provide a deeper version of this same review. Read the contribution's README and evaluate:
 - Are the instructions clear enough for someone with only the stated prerequisites?
 - Are there missing steps, ambiguous references, or assumed knowledge?
 - Do code snippets look correct and copy-paste ready?

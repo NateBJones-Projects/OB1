@@ -187,4 +187,4 @@ Every PR is checked against these rules. All must pass before human review.
 8. **No binary blobs** — No files over 1MB, no `.exe`, `.dmg`, `.zip`, `.tar.gz`
 9. **README completeness** — Contribution README includes Prerequisites, step-by-step instructions, and expected outcome sections
 10. **Primitive dependencies** — If a contribution declares `requires_primitives`, the primitives must exist in the repo and be linked in the README
-11. **LLM clarity review** — *(Planned for v2)* Automated check that instructions are clear and complete
+11. **LLM clarity review** — Claude reviews contribution READMEs for clarity, completeness, and correctness. Flags missing steps, ambiguous instructions, or SQL issues

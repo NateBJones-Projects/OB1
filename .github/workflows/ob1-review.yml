@@ -43,6 +43,8 @@ jobs:
 
       - name: Run review checks
         id: review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           CHANGED_FILES="${{ steps.changed.outputs.files }}"
           CONTRIB_DIRS="${{ steps.changed.outputs.contrib_dirs }}"
@@ -421,11 +423,100 @@ jobs:
             fail_check "Primitive dependencies" "Primitive dependency issues:\n${rule10_detail}"
           fi
 
-          # ─── Rule 11: LLM clarity review (stub) ───
-          # TODO: LLM clarity review — planned for v2. Requires API key secret.
-          # Will send contribution READMEs to an LLM API to check if instructions
-          # are clear and complete. For now, always passes.
-          pass_check "LLM clarity review" "*(Planned for v2)* Auto-pass"
+          # ─── Rule 11: LLM clarity review ───
+          # Sends contribution READMEs to Claude for clarity and completeness review.
+          # Requires ANTHROPIC_API_KEY secret. Gracefully skips if not configured.
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            pass_check "LLM clarity review" "*(Skipped — ANTHROPIC_API_KEY not configured)*"
+          elif [ "$is_docs_pr" = true ]; then
+            pass_check "LLM clarity review" "Docs PR — skipped"
+          else
+            rule11_pass=true
+            rule11_detail=""
+            llm_notes=""
+
+            # Collect all contribution READMEs
+            readmes=""
+            while IFS= read -r dir; do
+              [ -z "$dir" ] && continue
+              [ ! -f "$dir/README.md" ] && continue
+              readmes="${readmes}--- ${dir}/README.md ---\n$(cat "$dir/README.md")\n\n"
+            done <<< "$CONTRIB_DIRS"
+
+            if [ -n "$readmes" ]; then
+              # Build the prompt with repo context from CLAUDE.md Rule 11 criteria
+              review_prompt="You are reviewing Open Brain (OB1) community contributions. Evaluate each README below and report issues.
+
+Check for:
+1. Are instructions clear enough for someone with only the stated prerequisites?
+2. Are there missing steps, ambiguous references, or assumed knowledge?
+3. Do code snippets look correct and copy-paste ready?
+4. Is the expected outcome specific enough to verify success?
+5. For SQL: do statements look syntactically correct? Do they reference the right tables?
+
+Respond with ONLY a JSON object (no markdown fences):
+{
+  \"pass\": true/false,
+  \"issues\": [\"issue 1\", \"issue 2\"],
+  \"notes\": \"Brief summary of clarity feedback\"
+}
+
+Set pass=true if instructions are generally clear and usable, even with minor suggestions.
+Set pass=false only if there are significant clarity problems that would block a user.
+
+READMEs to review:
+$(echo -e "$readmes")"
+
+              # Call Claude API
+              llm_response=$(curl -s --max-time 30 \
+                -H "x-api-key: $ANTHROPIC_API_KEY" \
+                -H "anthropic-version: 2023-06-01" \
+                -H "content-type: application/json" \
+                "https://api.anthropic.com/v1/messages" \
+                -d "$(jq -n --arg prompt "$review_prompt" '{
+                  "model": "claude-haiku-4-5-20251001",
+                  "max_tokens": 1024,
+                  "messages": [{"role": "user", "content": $prompt}]
+                }')" 2>/dev/null || echo "")
+
+              if [ -z "$llm_response" ]; then
+                pass_check "LLM clarity review" "*(Skipped — API call failed)*"
+              else
+                # Extract the text content from Claude's response
+                llm_text=$(echo "$llm_response" | jq -r '.content[0].text // empty' 2>/dev/null)
+
+                if [ -z "$llm_text" ]; then
+                  # Check for API error
+                  api_error=$(echo "$llm_response" | jq -r '.error.message // empty' 2>/dev/null)
+                  if [ -n "$api_error" ]; then
+                    pass_check "LLM clarity review" "*(Skipped — API error: ${api_error})*"
+                  else
+                    pass_check "LLM clarity review" "*(Skipped — could not parse response)*"
+                  fi
+                else
+                  llm_pass=$(echo "$llm_text" | jq -r '.pass // empty' 2>/dev/null)
+                  llm_issues=$(echo "$llm_text" | jq -r '.issues // [] | .[]' 2>/dev/null)
+                  llm_notes=$(echo "$llm_text" | jq -r '.notes // empty' 2>/dev/null)
+
+                  if [ "$llm_pass" = "true" ]; then
+                    pass_check "LLM clarity review" "Instructions are clear and complete"
+                  elif [ "$llm_pass" = "false" ]; then
+                    issues_formatted=""
+                    while IFS= read -r issue; do
+                      [ -z "$issue" ] && continue
+                      issues_formatted="${issues_formatted}  - ${issue}\n"
+                    done <<< "$llm_issues"
+                    fail_check "LLM clarity review" "Clarity issues found:\n${issues_formatted}"
+                    rule11_pass=false
+                  else
+                    pass_check "LLM clarity review" "*(Skipped — unexpected response format)*"
+                  fi
+                fi
+              fi
+            else
+              pass_check "LLM clarity review" "No contribution READMEs to review"
+            fi
+          fi
 
           # ─── Build summary ───
           total=$((pass_count + fail_count))
@@ -437,7 +528,13 @@ jobs:
             echo "failed=false" >> $GITHUB_OUTPUT
           fi
 
-          comment="## OB1 Automated Review\n\n${results}\n${summary}"
+          # Append LLM clarity notes if available
+          llm_section=""
+          if [ -n "${llm_notes:-}" ]; then
+            llm_section="\n### Clarity Notes (AI Review)\n${llm_notes}\n"
+          fi
+
+          comment="## OB1 Automated Review\n\n${results}\n${summary}${llm_section}"
           echo "comment<<EOF" >> $GITHUB_OUTPUT
           echo -e "$comment" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
