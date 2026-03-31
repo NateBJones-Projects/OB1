@@ -13,7 +13,7 @@ See `CLAUDE.md` for the full list. Key rules:
 - No credentials in code. Use `Deno.env.get()`.
 - Follow the Edge Function pattern in `supabase/functions/open-brain-mcp/index.ts`.
 - Every new table needs `README.md` + `metadata.json` per `CONTRIBUTING.md`.
-- Dashboards: Next.js + Tailwind, deployed to Coolify. Template: `dashboards/data-browser/`.
+- Dashboards: Next.js + Tailwind, deployed to Vercel. Template: `dashboards/data-browser/`.
 - SQL: no `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`.
 
 ---
@@ -42,8 +42,17 @@ See `CLAUDE.md` for the full list. Key rules:
 | 1.1d-s7 Event trigger | 🔲 Ready | `docs/specs/1.1d-s7-event-trigger.md` |
 | 1.1d-s8 Trend analysis task type | 🔲 Blocked on 1.1d-s2, 4.2 | `docs/specs/1.1d-s8-trend-analysis.md` |
 | 2.1 Multi-user auth | ✅ Complete | `docs/specs/2.1-multi-user-auth.md` |
-| 2.2 Liv's dashboard | 🔲 Ready | `docs/specs/2.2-livs-dashboard.md` |
+| 2.2 Liv's dashboard | 🚫 Superseded by Phase 3 | `docs/specs/2.2-livs-dashboard.md` |
 | 2.3 Instacart export | 🔲 Standalone | `docs/specs/2.3-instacart-export.md` |
+| **Phase 3: Unified app** | | |
+| 3.0-s1 App shell + auth | 🔲 Ready | `docs/specs/3.0-s1-app-shell-auth.md` |
+| 3.0-s2 Shared components | 🔲 Blocked on 3.0-s1 | `docs/specs/3.0-s2-shared-components.md` |
+| 3.0-s3 Actions screen | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s3-actions-screen.md` |
+| 3.0-s4 Household screen | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s4-household-screen.md` |
+| 3.0-s5 Meals screen | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s5-meals-screen.md` |
+| 3.0-s6 Morning briefing | 🔲 Blocked on 3.0-s3, s4, s5 | `docs/specs/3.0-s6-morning-briefing.md` |
+| 3.0-s7 Agent feed | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s7-agent-feed.md` |
+| 3.0-s8 Polish + Vercel deploy | 🔲 Blocked on 3.0-s7 | `docs/specs/3.0-s8-polish-deploy.md` |
 | 4.1 Thought graph | 🔲 Phase 4 | `docs/specs/4.1-thought-graph.md` |
 | 4.3 Capture sources | 🔲 Modular | `docs/specs/4.3-capture-sources.md` |
 | **Phase 5: Agent pipeline** | | |
@@ -95,6 +104,16 @@ This sequence maximizes compounding. Each item = one Claude Code session.
 2.2   Liv's dashboard            ← requires 2.1
 2.3   Instacart export           ← standalone, anytime
 ```
+### Phase 3: Unified app (replaces legacy dashboards)
+```
+3.0-s1  App shell + auth          ← Next.js skeleton, Supabase auth, role-aware nav
+3.0-s2  Shared components         ← Card, DetailView, EditForm, FAB, badges
+3.0-s3  Actions screen            ← first CRUD screen, proves the pattern
+3.0-s4  Household screen          ← maintenance, items, vendors (3 sub-tabs)
+3.0-s5  Meals screen              ← meal plans, recipes, shopping lists
+3.0-s6  Morning briefing          ← composite home view, pulls from s3–s5
+3.0-s7  Agent feed                ← Lee-only pipeline oversight
+3.0-s8  Polish + Vercel deploy    ← responsive QA, PWA, env config
 
 ### Phase 4: Intelligence
 ```
