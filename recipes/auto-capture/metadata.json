@@ -15,7 +15,6 @@
   "tags": ["capture", "auto-save", "session-close", "flywheel", "skill", "workflow"],
   "difficulty": "beginner",
   "estimated_time": "10 minutes",
-  "companion_recipes": ["panning-for-gold"],
   "created": "2026-03-15",
   "updated": "2026-03-15"
 }
