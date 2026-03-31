@@ -49,9 +49,11 @@ export function KanbanCardModal({
     return () => document.removeEventListener("keydown", handleEscape);
   }, [hasChanges]);
 
-  // Lock body scroll when modal is open
+  // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    // Scroll to top so fixed positioning works on mobile
+    window.scrollTo(0, 0);
     return () => {
       document.body.style.overflow = "";
     };
@@ -115,9 +117,12 @@ export function KanbanCardModal({
       role="dialog"
       aria-modal="true"
       aria-label={`Edit thought: ${thought.content.split("\n")[0].slice(0, 40)}`}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-5"
+      className="fixed inset-0 z-50 bg-black/60 p-5 pt-16 pb-8 lg:p-0 lg:flex lg:items-center lg:justify-center"
     >
-      <div className="bg-bg-surface border border-border rounded-xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-bg-surface border border-border rounded-xl w-full max-h-full max-w-lg flex flex-col shadow-2xl overflow-hidden mx-auto"
+      >
         {/* Discard confirmation banner */}
         {showDiscardConfirm && (
           <div className="flex items-center justify-between px-5 py-2.5 bg-warning/10 border-b border-warning/20 shrink-0">
