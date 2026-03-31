@@ -20,11 +20,11 @@ Claude Desktop does not have the same local shell workflow as coding agents, so 
 ## Process
 
 1. Do not ingest the raw heavyweight file by default.
-2. First ask for the cheapest workable artifact:
+1. First ask for the cheapest workable artifact:
    - PDF or DOCX: markdown
    - PPTX: markdown slide outline
    - XLSX: CSV per sheet or a small sample plus sheet names
-3. If the user has not converted it yet, offer exact commands they can run outside Claude Desktop.
+1. If the user has not converted it yet, offer exact commands they can run outside Claude Desktop.
 
 ### Suggested Conversion Commands
 
@@ -41,16 +41,15 @@ If the script is not available, say so and ask the user for:
 - a CSV export
 - or a small representative excerpt
 
-4. Once the user provides the converted artifact, create a quick index:
+1. Once the user provides the converted artifact, create a quick index:
    - file type
    - sections, slides, or sheet names
    - row counts or page counts if available
    - any obvious extraction-quality problems
-5. Only then analyze the content.
+2. Only then analyze the content.
 
 ## Client Rules
 
 - Be explicit about the tradeoff: converting first is cheaper and usually better.
 - If the user insists on staying inside Claude Desktop, ask for a smaller excerpt rather than taking the whole file raw.
 - Use raw ingestion only for genuinely small files where conversion would cost more effort than it saves.
-

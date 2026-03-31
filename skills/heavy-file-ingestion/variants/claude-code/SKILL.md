@@ -20,14 +20,14 @@ Claude Code has the tools to convert files locally, so it should not waste conte
 ## Process
 
 1. Do not read the original heavyweight file directly into context if conversion is possible.
-2. Resolve the bundled converter relative to this skill directory: `scripts/convert_heavy_file.py`
-3. Run the converter first. Default command:
+1. Resolve the bundled converter relative to this skill directory: `scripts/convert_heavy_file.py`
+1. Run the converter first. Default command:
 
 ```bash
 python scripts/convert_heavy_file.py /absolute/path/to/file.ext
 ```
 
-4. If dependencies are missing, prefer:
+1. If dependencies are missing, prefer:
 
 ```bash
 uv run \
@@ -38,12 +38,12 @@ uv run \
   python scripts/convert_heavy_file.py /absolute/path/to/file.ext
 ```
 
-5. Read the generated `index.md` before reading any converted artifact.
-6. Use the index to decide the cheapest next step:
+1. Read the generated `index.md` before reading any converted artifact.
+2. Use the index to decide the cheapest next step:
    - `read_extracted_artifact`: read the markdown or CSV and continue
    - `install_dependency_and_retry`: install the missing deterministic dependency and rerun
    - `cheap_model_or_stronger_converter`: retry with a better converter or use a cheaper model only on the extracted artifact
-7. Only escalate to a stronger model after the file has already been compressed into markdown, CSV, or a short sampled subset.
+3. Only escalate to a stronger model after the file has already been compressed into markdown, CSV, or a short sampled subset.
 
 ## Client Rules
 
@@ -55,4 +55,3 @@ uv run \
 ## Bundled References
 
 - `references/open-source-stack.md` explains the tool choices and fallback strategy.
-

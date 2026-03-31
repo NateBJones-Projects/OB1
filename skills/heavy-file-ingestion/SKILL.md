@@ -21,12 +21,12 @@ Agents waste money and context when they read heavyweight files raw. This skill 
 ## Core Policy
 
 1. **Convert before reading.** Do not dump raw heavyweight files into model context if a deterministic converter can create a cheaper artifact.
-2. **Index before reasoning.** Read the generated `index.md` or `index.json` first. It should tell you what is in the file, how clean the extraction was, and whether escalation is justified.
-3. **Match the converter to the file type.**
+1. **Index before reasoning.** Read the generated `index.md` or `index.json` first. It should tell you what is in the file, how clean the extraction was, and whether escalation is justified.
+1. **Match the converter to the file type.**
    - PDFs and documents: markdown artifact
    - Presentations: markdown slide outline
    - Spreadsheets: CSV per sheet plus a markdown manifest
-4. **Escalate by cost tier, not instinct.**
+1. **Escalate by cost tier, not instinct.**
    - Tier 1: deterministic converter plus index
    - Tier 2: cheap model on the extracted artifact only if quality flags say the deterministic pass lost structure
    - Tier 3: expensive model only after the file has already been compressed into markdown, CSV, or a sampled subset
@@ -34,7 +34,7 @@ Agents waste money and context when they read heavyweight files raw. This skill 
 ## Process
 
 1. Identify the file path, extension, and rough size.
-2. Run the converter script instead of reading the original file directly:
+1. Run the converter script instead of reading the original file directly:
 
 ```bash
 uv run \
@@ -45,15 +45,15 @@ uv run \
   python skills/heavy-file-ingestion/scripts/convert_heavy_file.py /absolute/path/to/file.ext
 ```
 
-3. If you already have `markitdown` installed and want to prefer it for PDF or DOCX conversion, rerun with:
+1. If you already have `markitdown` installed and want to prefer it for PDF or DOCX conversion, rerun with:
 
 ```bash
 python skills/heavy-file-ingestion/scripts/convert_heavy_file.py /absolute/path/to/file.ext --prefer markitdown
 ```
 
-4. Read the generated `index.md` first.
-5. Only read the extracted markdown or CSV outputs that the index says are worth reading.
-6. If the index flags weak extraction, use a cheap fallback:
+1. Read the generated `index.md` first.
+2. Only read the extracted markdown or CSV outputs that the index says are worth reading.
+3. If the index flags weak extraction, use a cheap fallback:
    - Try an alternate deterministic converter
    - Use a small model to rebuild only the structure or outline from the extracted artifact
    - Escalate to a stronger model only when the cheaper passes still leave critical ambiguity

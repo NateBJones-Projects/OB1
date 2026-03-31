@@ -20,13 +20,13 @@ Codex can run local commands and inspect files, so direct ingestion of bulky doc
 ## Process
 
 1. Do not open the raw heavyweight file as your first move if a deterministic conversion path exists.
-2. Run the bundled converter from this skill directory:
+1. Run the bundled converter from this skill directory:
 
 ```bash
 python scripts/convert_heavy_file.py /absolute/path/to/file.ext
 ```
 
-3. If the environment is clean and needs packages, prefer:
+1. If the environment is clean and needs packages, prefer:
 
 ```bash
 uv run \
@@ -37,12 +37,12 @@ uv run \
   python scripts/convert_heavy_file.py /absolute/path/to/file.ext
 ```
 
-4. Read `index.md` first, not the original file.
-5. Follow the index recommendation:
+1. Read `index.md` first, not the original file.
+2. Follow the index recommendation:
    - `read_extracted_artifact`: inspect the generated markdown or CSV
    - `cheap_model_or_stronger_converter`: retry with a better deterministic tool or use a cheaper model on the extracted artifact only
    - `manual_review`: tell the user the deterministic route failed and propose the next cheapest fallback
-6. Use expensive model context only after the file has already been compressed into a smaller artifact.
+3. Use expensive model context only after the file has already been compressed into a smaller artifact.
 
 ## Client Rules
 
@@ -54,4 +54,3 @@ uv run \
 ## Bundled References
 
 - `references/open-source-stack.md` explains the tool choices and fallback tiers.
-

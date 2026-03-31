@@ -24,10 +24,10 @@ Heavy File Ingestion stops agents from wasting expensive context on raw PDFs, sl
 ## Installation
 
 1. Copy the entire [`heavy-file-ingestion`](./) folder into a place your AI client can access, not just `SKILL.md`. The skill expects the bundled `scripts/` and `references/` folders to stay next to it.
-2. For Claude Code, place the folder at `~/.claude/skills/heavy-file-ingestion/`.
-3. For Codex or Cursor, keep the folder in your workspace or copy the contents into that client's skills or rules location.
-4. Restart or reload the client so it picks up [`SKILL.md`](./SKILL.md).
-5. When you want the deterministic converters available, run the skill script with either:
+1. For Claude Code, place the folder at `~/.claude/skills/heavy-file-ingestion/`.
+1. For Codex or Cursor, keep the folder in your workspace or copy the contents into that client's skills or rules location.
+1. Restart or reload the client so it picks up [`SKILL.md`](./SKILL.md).
+1. When you want the deterministic converters available, run the skill script with either:
 
 ```bash
 uv run \
@@ -38,7 +38,7 @@ uv run \
   python skills/heavy-file-ingestion/scripts/convert_heavy_file.py /absolute/path/to/file.pdf
 ```
 
-6. If you already have `markitdown` installed and want to prefer it for rich document conversion, add `--prefer markitdown`.
+1. If you already have `markitdown` installed and want to prefer it for rich document conversion, add `--prefer markitdown`.
 
 ## Downloadable Variants
 
