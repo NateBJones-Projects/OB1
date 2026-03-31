@@ -177,9 +177,55 @@ grant select, insert, update, delete on table public.thoughts to service_role;
 > [!IMPORTANT]
 > This step is required. Supabase no longer grants full table permissions to `service_role` by default on new projects. Without this, your MCP server will return "permission denied for table thoughts" when trying to capture or search.
 
-![2.6](https://img.shields.io/badge/2.6-Verify-555?style=for-the-badge&labelColor=F4511E)
+![2.6](https://img.shields.io/badge/2.6-Add_Deduplication-555?style=for-the-badge&labelColor=F4511E)
 
-✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, created_at, updated_at. Database → Functions shows `match_thoughts`.
+New query → paste and Run:
+
+<details>
+<summary>📋 <strong>SQL: Content fingerprint column + upsert function</strong> (click to expand)</summary>
+
+```sql
+-- Add fingerprint column for deduplication
+ALTER TABLE thoughts ADD COLUMN content_fingerprint TEXT;
+
+-- Unique index so duplicate content is detected
+CREATE UNIQUE INDEX idx_thoughts_fingerprint
+  ON thoughts (content_fingerprint)
+  WHERE content_fingerprint IS NOT NULL;
+
+-- Upsert function: inserts new thoughts, merges metadata on duplicates
+CREATE OR REPLACE FUNCTION upsert_thought(p_content TEXT, p_payload JSONB DEFAULT '{}')
+RETURNS JSONB AS $$
+DECLARE
+  v_fingerprint TEXT;
+  v_result JSONB;
+  v_id UUID;
+BEGIN
+  v_fingerprint := encode(sha256(convert_to(
+    lower(trim(regexp_replace(p_content, '\s+', ' ', 'g'))),
+    'UTF8'
+  )), 'hex');
+
+  INSERT INTO thoughts (content, content_fingerprint, metadata)
+  VALUES (p_content, v_fingerprint, COALESCE(p_payload->'metadata', '{}'::jsonb))
+  ON CONFLICT (content_fingerprint) DO UPDATE
+  SET updated_at = now(),
+      metadata = thoughts.metadata || COALESCE(EXCLUDED.metadata, '{}'::jsonb)
+  RETURNING id INTO v_id;
+
+  v_result := jsonb_build_object('id', v_id, 'fingerprint', v_fingerprint);
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+</details>
+
+> This prevents duplicate thoughts from cluttering your database. When you capture the same thought twice, it merges the metadata instead of creating a second row.
+
+![2.7](https://img.shields.io/badge/2.7-Verify-555?style=for-the-badge&labelColor=F4511E)
+
+✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, content_fingerprint, created_at, updated_at. Database → Functions shows `match_thoughts` and `upsert_thought`.
 
 ---
 
