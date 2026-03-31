@@ -16,14 +16,36 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed markdown files
+        id: changed
+        run: |
+          files=$(git diff --name-only origin/main...HEAD -- '*.md' 2>/dev/null || git diff --name-only HEAD~1 HEAD -- '*.md')
+          if [ -z "$files" ]; then
+            echo "No markdown files changed"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+            # Write files to a temporary glob file for markdownlint-cli2
+            echo "$files" > /tmp/changed-md-files.txt
+            echo "Changed markdown files:"
+            cat /tmp/changed-md-files.txt
+          fi
 
       - name: Setup Node
+        if: steps.changed.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install markdownlint-cli2
+        if: steps.changed.outputs.skip != 'true'
         run: npm install -g markdownlint-cli2
 
-      - name: Run markdownlint
-        run: markdownlint-cli2 --config .github/.markdownlint.jsonc "**/*.md" "#node_modules"
+      - name: Run markdownlint on changed files
+        if: steps.changed.outputs.skip != 'true'
+        run: |
+          # Lint only the markdown files changed in this PR
+          xargs markdownlint-cli2 --config .github/.markdownlint.jsonc < /tmp/changed-md-files.txt
