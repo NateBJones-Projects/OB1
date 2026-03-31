@@ -11,6 +11,7 @@ See the [Contributor Ladder](CONTRIBUTING.md#contributor-ladder) for how progres
 | **Nate Jones** | Founder, project vision |
 | **Matt Hallett** | Community admin, content, contribution standards, repo governance |
 | **Jonathan Edwards** | Content, companion prompts, FAQ, community |
+| **Jared Irish** | Major community recipes and skills: Panning for Gold, Claudeception, Auto-Capture |
 | **Kaleab** | Initial repo scaffold, CI workflow, seed contributions |
 
 <!-- ALL-CONTRIBUTORS-LIST:END -->
