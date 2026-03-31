@@ -378,12 +378,16 @@ app.post("*", async (c) => {
       how_we_met: z.string().optional().describe("Updated context for how you met"),
       tags: z.array(z.string()).optional().describe("Replace tags (e.g., ['ai', 'consulting'])"),
       notes: z.string().optional().describe("Replace notes with new content"),
-      follow_up_date: z.string().optional().describe("Set or update follow-up date (YYYY-MM-DD)"),
+      follow_up_date: z.string().nullable().optional().describe("Set or update follow-up date (YYYY-MM-DD), or null/empty string to clear"),
     },
     async ({ contact_id, ...fields }) => {
       const updates: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(fields)) {
-        if (value !== undefined) updates[key] = value;
+        if (key === "follow_up_date" && (value === null || value === "")) {
+          updates[key] = null;
+        } else if (value !== undefined) {
+          updates[key] = value;
+        }
       }
 
       if (Object.keys(updates).length === 0) {
