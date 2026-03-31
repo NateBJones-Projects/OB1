@@ -4,7 +4,7 @@ This file helps AI coding tools (Claude Code, Codex, Cursor, etc.) work effectiv
 
 ## What This Repo Is
 
-Open Brain is a persistent AI memory system — one database (Supabase + pgvector), one MCP protocol, any AI client. This repo contains the extensions, recipes, schemas, dashboards, and integrations that the community builds on top of the core Open Brain setup.
+Open Brain is a persistent AI memory system — one database (Supabase + pgvector), one MCP protocol, any AI client. This repo contains the extensions, recipes, schemas, dashboards, integrations, and skills that the community builds on top of the core Open Brain setup.
 
 **License:** FSL-1.1-MIT. No commercial derivative works. Keep this in mind when generating code or suggesting dependencies.
 
@@ -17,8 +17,9 @@ recipes/        — Standalone capability builds. Open for community contributio
 schemas/        — Database table extensions. Open.
 dashboards/     — Frontend templates (Vercel/Netlify). Open.
 integrations/   — MCP extensions, webhooks, capture sources. Open.
+skills/         — Reusable AI client skills and prompt packs. Open.
 docs/           — Setup guides, FAQ, companion prompts.
-resources/      — Claude Skill, companion files.
+resources/      — Official companion files and packaged exports.
 ```
 
 Every contribution lives in its own subfolder under the right category and must include `README.md` + `metadata.json`.
@@ -33,7 +34,7 @@ Every contribution lives in its own subfolder under the right category and must 
 
 ## PR Standards
 
-- **Title format:** `[category] Short description` (e.g., `[recipes] Email history import via Gmail API`)
+- **Title format:** `[category] Short description` (e.g., `[recipes] Email history import via Gmail API`, `[skills] Panning for Gold standalone skill pack`)
 - **Branch convention:** `contrib/<github-username>/<short-description>`
 - **Commit prefixes:** `[category]` matching the contribution type
 - Every PR must pass the automated review checks in `.github/workflows/ob1-review.yml` before human review

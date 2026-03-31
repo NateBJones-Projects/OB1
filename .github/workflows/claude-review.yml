@@ -1,12 +1,20 @@
 name: Claude PR Review
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-  pull_request_review_comment:
-    types: [created]
-  issue_comment:
-    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review
+        required: true
+        type: number
+      extra_focus:
+        description: Optional extra review focus for this run
+        required: false
+        type: string
+
+concurrency:
+  group: claude-pr-review-${{ inputs.pr_number }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -16,53 +24,80 @@ permissions:
 
 jobs:
   claude-review:
-    if: >
-      github.event_name == 'pull_request' ||
-      ((github.event_name == 'issue_comment' &&
-        contains(github.event.comment.body, '@claude')) &&
-       contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login)) ||
-      ((github.event_name == 'pull_request_review_comment' &&
-        contains(github.event.comment.body, '@claude')) &&
-       contains('justfinethanku,matthallett1,adrienneaguirre,kaleab27', github.event.comment.user.login))
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch PR branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: |
+          set -euo pipefail
+
+          gh pr view "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json state,isDraft,title,url
+
+          pr_state=$(gh pr view "$PR_NUMBER" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json state \
+            --jq '.state')
+
+          if [ "$pr_state" != "OPEN" ]; then
+            echo "PR #$PR_NUMBER is not open."
+            exit 1
+          fi
+
+          git fetch origin "pull/$PR_NUMBER/head:pr-$PR_NUMBER"
+          git checkout "pr-$PR_NUMBER"
+
+      - name: Run Claude review
+        uses: anthropics/claude-code-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ inputs.pr_number }}
+            EXTRA REVIEW FOCUS: ${{ inputs.extra_focus }}
+
             You are reviewing a contribution to Open Brain (OB1), an open-source
             persistent AI memory system. Read CLAUDE.md, CONTRIBUTING.md, and
             SOUL.md (if it exists) for full project context.
 
             Review this PR for:
-            1. **Alignment** — Does this contribution fit OB1's mission? Is it a
-               capture pathway, retrieval pathway, schema extension, dashboard, or
-               teaching-through-building contribution?
-            2. **Clarity** — Will a user with the stated prerequisites actually be
-               able to follow the instructions and get a working result?
-            3. **Completeness** — README has prerequisites, numbered steps, and
-               expected outcome? metadata.json looks right?
-            4. **Safety** — No credentials, no destructive SQL, no core schema
-               modifications, no local MCP servers (must use remote Edge Functions)?
-            5. **Value** — Does this add something meaningfully different from
-               existing contributions?
-            6. **Design patterns** — Does this follow OB1's established patterns?
-               Check for: direct Supabase insert or MCP ingest endpoint (not
-               custom servers), remote Edge Functions (not local Node.js),
-               Row Level Security on new tables, JSONB metadata fields,
-               environment variables for credentials (not hardcoded).
-            7. **Scope fit** — Is this appropriately sized for OB1, or is it
-               growing into its own project? Red flags: own package.json with
-               many dependencies, doesn't interact with the thoughts table,
-               needs independent deployment, or introduces its own auth system.
-               If it seems too big, suggest it could be a standalone project
-               that integrates with OB1 instead.
+            1. Alignment with OB1's mission and contribution categories
+            2. Clarity for contributors following the README instructions
+            3. Completeness of README, metadata, and user guidance
+            4. Safety: no secrets, no destructive SQL, no core schema breakage,
+               no local MCP servers
+            5. Value: whether this adds something meaningfully useful
+            6. Design patterns: direct Supabase insert or MCP ingest endpoint,
+               remote Edge Functions, RLS on new tables, JSONB metadata fields,
+               env vars for credentials
+            7. Scope fit: whether this belongs in OB1 or is drifting into its
+               own standalone project
 
-            Be constructive and welcoming. If a contribution needs work, explain
-            what specifically needs to change. If it looks good, approve the PR.
-
-            Important: The mechanical checks (file structure, metadata validation,
-            SQL safety) are handled by a separate CI job. Focus your review on the
-            things that require judgment — clarity, alignment, value, design
+            The mechanical checks are already handled by a separate CI job.
+            Focus on judgment-heavy review: clarity, alignment, value, design
             patterns, scope fit, and quality.
+
+            Review behavior:
+            - Use `gh pr diff` and `gh pr view` for PR context.
+            - Use inline comments only for specific, actionable findings.
+            - Submit one final GitHub PR review with `gh pr review`.
+            - Be conservative with approvals. Approve only when there are no
+              substantive concerns left.
+            - If there are blocking issues, request changes and explain them
+              clearly.
+            - If feedback is non-blocking, submit a comment review instead of
+              cluttering the thread with extra top-level comments.
+            - Do not output the review as chat text. Put the feedback on GitHub.
+          claude_args: |
+            --model haiku --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr review:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git status:*)"

@@ -1,8 +1,8 @@
-name: OB1 Automated Review
+name: OB1 PR Gate
 
 # Branch protection recommendation:
 # After this action is working, enable branch protection on main:
-# - Require the "OB1 Automated Review" status check to pass
+# - Require the "OB1 PR Gate" workflow to pass its checks
 # - Require at least 1 approving review from a maintainer
 # This means: automated agent passes → human admin approves → merge allowed
 
@@ -13,17 +13,20 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 jobs:
   review:
     name: OB1 Review
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR
+      - name: Checkout PR head safely
         uses: actions/checkout@v4
         with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/head
           fetch-depth: 0
+
+      - name: Fetch base branch
+        run: git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
 
       - name: Get changed files
         id: changed
@@ -36,7 +39,7 @@ jobs:
 
           # Identify contribution folders (e.g., recipes/email-import/)
           # Exclude _template folders and top-level files
-          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations|primitives|extensions)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
+          contrib_dirs=$(echo "$changed" | grep -E '^(recipes|schemas|dashboards|integrations|skills|primitives|extensions)/' | grep -v '/_template/' | cut -d'/' -f1,2 | sort -u || true)
           echo "contrib_dirs<<EOF" >> $GITHUB_OUTPUT
           echo "$contrib_dirs" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -51,6 +54,7 @@ jobs:
           pass_count=0
           fail_count=0
           results=""
+          secret_blocked=false
 
           # Helper functions
           pass_check() {
@@ -74,7 +78,7 @@ jobs:
           if [ "$is_docs_pr" = true ]; then
             results="This PR modifies docs or repo governance files. Contribution checks skipped.\n\n✅ No issues found."
             echo "comment<<EOF" >> $GITHUB_OUTPUT
-            echo -e "## OB1 Automated Review\n\n${results}" >> $GITHUB_OUTPUT
+            echo -e "## OB1 PR Gate\n\n${results}" >> $GITHUB_OUTPUT
             echo "EOF" >> $GITHUB_OUTPUT
             echo "failed=false" >> $GITHUB_OUTPUT
             exit 0
@@ -83,7 +87,7 @@ jobs:
           # ─── Rule 1: Folder structure ───
           rule1_pass=true
           bad_files=""
-          allowed_pattern='^(recipes|schemas|dashboards|integrations|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
+          allowed_pattern='^(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             if ! echo "$f" | grep -qE "$allowed_pattern"; then
@@ -178,17 +182,21 @@ jobs:
           # ─── Rule 4: No credentials ───
           rule4_pass=true
           rule4_detail=""
-          # Scan only changed files for credential patterns
+          # Scan all changed text files for credential patterns.
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
-            # Skip metadata.json and markdown files for secret scanning
-            case "$f" in *.md|*.json) continue ;; esac
 
-            matches=$(grep -nE '(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36}|xoxb-[0-9]|xoxp-[0-9]|SUPABASE_SERVICE_ROLE_KEY\s*=\s*"?ey)' "$f" 2>/dev/null || true)
+            # Skip binary files to avoid noisy false positives.
+            if ! grep -Iq . "$f"; then
+              continue
+            fi
+
+            matches=$(grep -nE '(sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{20,}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|SUPABASE_SERVICE_ROLE_KEY\s*=\s*"?ey)' "$f" 2>/dev/null || true)
             if [ -n "$matches" ]; then
               rule4_detail="${rule4_detail}  - \`$f\`: potential credential found\n"
               rule4_pass=false
+              secret_blocked=true
             fi
 
             # Check for .env files with actual values
@@ -197,6 +205,7 @@ jobs:
               if [ -n "$has_values" ]; then
                 rule4_detail="${rule4_detail}  - \`$f\`: .env file appears to contain real values\n"
                 rule4_pass=false
+                secret_blocked=true
               fi
             fi
           done <<< "$CHANGED_FILES"
@@ -286,6 +295,13 @@ jobs:
                   rule6_pass=false
                 fi
                 ;;
+              skills)
+                has_skill=$(echo "$dir_files" | grep -iE '(^|/)(SKILL\.md|[^/]+[.-]skill\.md)$' || true)
+                if [ -z "$has_skill" ]; then
+                  rule6_detail="${rule6_detail}  - \`$dir\`: skills must contain a plain-text skill file (\`SKILL.md\`, \`*.skill.md\`, or \`*-skill.md\`)\n"
+                  rule6_pass=false
+                fi
+                ;;
               primitives)
                 # Primitives must have substantial README (200+ words)
                 if [ -f "$dir/README.md" ]; then
@@ -319,10 +335,10 @@ jobs:
           fi
 
           # ─── Rule 7: PR format ───
-          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|primitives|extensions|docs)\] '; then
+          if echo "$PR_TITLE" | grep -qE '^\[(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs)\] '; then
             pass_check "PR format" "Title follows \`[category] Description\` format"
           else
-            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, \`[primitives]\`, \`[extensions]\`, or \`[docs]\` followed by a space and description"
+            fail_check "PR format" "PR title must start with \`[recipes]\`, \`[schemas]\`, \`[dashboards]\`, \`[integrations]\`, \`[skills]\`, \`[primitives]\`, \`[extensions]\`, or \`[docs]\` followed by a space and description"
           fi
 
           # ─── Rule 8: No binary blobs ───
@@ -424,7 +440,7 @@ jobs:
           # ─── Rule 11: LLM clarity review ───
           # Clarity, alignment, and design pattern reviews are handled by the
           # Claude PR Review workflow (claude-review.yml) using claude-code-action.
-          # This keeps ob1-review.yml fast and deterministic.
+          # This keeps the PR gate fast and deterministic.
           pass_check "LLM clarity review" "Covered by Claude PR Review workflow"
 
           # ─── Rule 14: No local MCP pattern ───
@@ -597,7 +613,9 @@ jobs:
             echo "failed=false" >> $GITHUB_OUTPUT
           fi
 
-          comment="## OB1 Automated Review\n\n${results}\n${summary}"
+          echo "secret_blocked=$secret_blocked" >> $GITHUB_OUTPUT
+
+          comment="## OB1 PR Gate\n\n${results}\n${summary}"
 
           # Append post-merge reminders (non-blocking, for admins)
           if [ -n "$reminders" ]; then
@@ -608,39 +626,50 @@ jobs:
           echo -e "$comment" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Post review comment
-        uses: actions/github-script@v7
+      - name: Write gate artifact
         env:
           REVIEW_COMMENT: ${{ steps.review.outputs.comment }}
+          REVIEW_FAILED: ${{ steps.review.outputs.failed }}
+          SECRET_BLOCKED: ${{ steps.review.outputs.secret_blocked }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p gate-artifact
+
+          printf '%s\n' "$REVIEW_COMMENT" > gate-artifact/ob1-review-summary.md
+          printf '%s\n' "$REVIEW_COMMENT" >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' "${{ steps.changed.outputs.files }}" > gate-artifact/changed-files.txt
+          printf '%s\n' "${{ steps.changed.outputs.contrib_dirs }}" > gate-artifact/contribution-dirs.txt
+
+          jq -n \
+            --argjson pr_number "${{ github.event.pull_request.number }}" \
+            --arg pr_url "${{ github.event.pull_request.html_url }}" \
+            --arg title "${{ github.event.pull_request.title }}" \
+            --arg head_sha "${{ github.event.pull_request.head.sha }}" \
+            --arg author_login "${{ github.event.pull_request.user.login }}" \
+            --arg author_association "${{ github.event.pull_request.author_association }}" \
+            --arg is_draft "${{ github.event.pull_request.draft }}" \
+            --arg failed "$REVIEW_FAILED" \
+            --arg secret_blocked "$SECRET_BLOCKED" \
+            '{
+              pr_number: $pr_number,
+              pr_url: $pr_url,
+              title: $title,
+              head_sha: $head_sha,
+              author_login: $author_login,
+              author_association: $author_association,
+              is_draft: ($is_draft == "true"),
+              failed: ($failed == "true"),
+              secret_blocked: ($secret_blocked == "true")
+            }' > gate-artifact/ob1-review-context.json
+
+      - name: Upload gate artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            const body = process.env.REVIEW_COMMENT;
-
-            // Find existing bot comment to update (avoid spam)
-            const { data: comments } = await github.rest.issues.listComments({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-            });
-            const botComment = comments.find(c =>
-              c.user.type === 'Bot' && c.body.includes('OB1 Automated Review')
-            );
-
-            if (botComment) {
-              await github.rest.issues.updateComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: botComment.id,
-                body: body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: body,
-              });
-            }
+          name: ob1-pr-gate-context
+          path: gate-artifact/
+          retention-days: 7
 
       - name: Fail if checks failed
         if: steps.review.outputs.failed == 'true'

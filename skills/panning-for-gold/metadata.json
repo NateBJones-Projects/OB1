@@ -1,0 +1,20 @@
+{
+  "name": "Panning for Gold",
+  "description": "Standalone skill pack that turns transcripts, brain dumps, and raw multi-topic captures into evaluated idea inventories and Open Brain-ready outputs.",
+  "category": "skills",
+  "author": {
+    "name": "Jared Irish",
+    "github": "jaredirish"
+  },
+  "version": "2.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code or similar AI client with reusable skills/prompts"]
+  },
+  "tags": ["skill", "brain-dump", "transcript", "evaluation", "workflow"],
+  "difficulty": "intermediate",
+  "estimated_time": "5 minutes",
+  "created": "2026-03-27",
+  "updated": "2026-03-27"
+}
