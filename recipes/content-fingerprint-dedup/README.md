@@ -67,7 +67,7 @@ BEGIN
 
   INSERT INTO thoughts (content, content_fingerprint, metadata)
   VALUES (p_content, v_fingerprint, COALESCE(p_payload->'metadata', '{}'::jsonb))
-  ON CONFLICT (content_fingerprint) DO UPDATE
+  ON CONFLICT (content_fingerprint) WHERE content_fingerprint IS NOT NULL DO UPDATE
   SET updated_at = now(),
       metadata = thoughts.metadata || COALESCE(EXCLUDED.metadata, '{}'::jsonb)
   RETURNING id INTO v_id;
