@@ -1,0 +1,20 @@
+{
+  "name": "Deal Memo Drafting",
+  "description": "Standalone skill pack for drafting structured deal, IC, partnership, or acquisition memos from existing diligence materials.",
+  "category": "skills",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+  },
+  "tags": ["deal-memo", "investment-memo", "diligence", "ic-memo", "decision-doc"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}
