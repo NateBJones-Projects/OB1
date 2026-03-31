@@ -1,0 +1,20 @@
+{
+  "name": "Autodream Brain Sync",
+  "description": "Syncs Claude Code's local memory saves to Open Brain so memories are accessible from all AI clients and devices.",
+  "category": "skills",
+  "author": {
+    "name": "rumbitopi",
+    "github": "rumbitopi"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["mcp__open-brain__capture_thought"]
+  },
+  "tags": ["memory", "autodream", "sync", "multi-client"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}
