@@ -33,8 +33,11 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             var t = localStorage.getItem('theme');
-            if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            if (t === 'dark') {
               document.documentElement.classList.add('dark');
+            } else {
+              document.documentElement.classList.remove('dark');
+              if (!t) localStorage.setItem('theme', 'light');
             }
           })();
         `}} />

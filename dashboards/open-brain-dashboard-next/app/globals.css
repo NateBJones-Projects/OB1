@@ -1,7 +1,8 @@
 @import "tailwindcss";
 
-@theme inline {
-  /* Light mode (default) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
   --color-bg-primary: #fafaf9;
   --color-bg-surface: #ffffff;
   --color-bg-elevated: #f5f5f4;
@@ -19,12 +20,9 @@
   --color-warning: #ca8a04;
   --color-danger: #dc2626;
   --color-info: #2563eb;
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
 }
 
-/* Dark mode overrides */
-html.dark {
+.dark {
   --color-bg-primary: #0f0f13;
   --color-bg-surface: #18181f;
   --color-bg-elevated: #1e1e28;
@@ -44,26 +42,38 @@ html.dark {
   --color-info: #60a5fa;
 }
 
+@theme inline {
+  --color-bg-primary: var(--color-bg-primary);
+  --color-bg-surface: var(--color-bg-surface);
+  --color-bg-elevated: var(--color-bg-elevated);
+  --color-bg-hover: var(--color-bg-hover);
+  --color-border: var(--color-border);
+  --color-border-subtle: var(--color-border-subtle);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-light: var(--color-accent-light);
+  --color-accent-surface: var(--color-accent-surface);
+  --color-accent-border: var(--color-accent-border);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
 body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: var(--color-bg-primary);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-border-subtle);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-bg-primary); }
+::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }
 
 ::selection {
   background: var(--color-accent-surface);
