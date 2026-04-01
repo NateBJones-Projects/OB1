@@ -6,7 +6,7 @@
     "name": "Alan Shurafa",
     "github": "alanshurafa"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "requires": {
     "open_brain": true,
     "services": [],
@@ -20,10 +20,13 @@
     "capture",
     "ingest",
     "browse",
-    "audit"
+    "audit",
+    "kanban",
+    "workflow",
+    "drag-and-drop"
   ],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
   "created": "2026-03-23",
-  "updated": "2026-03-23"
+  "updated": "2026-03-31"
 }
