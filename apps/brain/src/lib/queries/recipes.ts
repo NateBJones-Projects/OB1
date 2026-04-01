@@ -9,6 +9,7 @@ export type Ingredient = {
 export type Recipe = {
   id: string
   user_id: string
+  household_id: string
   name: string
   cuisine: string | null
   prep_time_minutes: number | null
@@ -46,11 +47,14 @@ export async function getRecipe(id: string): Promise<Recipe> {
   return data as Recipe
 }
 
-export async function createRecipe(recipe: Omit<Recipe, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<Recipe> {
+export async function createRecipe(
+  recipe: Omit<Recipe, 'id' | 'user_id' | 'household_id' | 'created_at' | 'updated_at'>,
+  householdId: string,
+): Promise<Recipe> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('recipes')
-    .insert(recipe)
+    .insert({ ...recipe, household_id: householdId })
     .select()
     .single()
 

@@ -7,6 +7,7 @@ export const DAY_ORDER = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'
 export type MealPlanRow = {
   id: string
   user_id: string
+  household_id: string
   week_start: string
   day_of_week: string
   meal_type: MealType
@@ -45,11 +46,14 @@ export async function getMealPlanWeek(weekStart: string): Promise<MealPlanRow[]>
   return (data ?? []) as MealPlanRow[]
 }
 
-export async function addMeal(meal: Omit<MealPlanRow, 'id' | 'user_id' | 'created_at'>): Promise<MealPlanRow> {
+export async function addMeal(
+  meal: Omit<MealPlanRow, 'id' | 'user_id' | 'household_id' | 'created_at'>,
+  householdId: string,
+): Promise<MealPlanRow> {
   const supabase = createClient()
   const { data, error } = await supabase
     .from('meal_plans')
-    .insert(meal)
+    .insert({ ...meal, household_id: householdId })
     .select()
     .single()
 

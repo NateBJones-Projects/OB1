@@ -54,7 +54,7 @@ const TABS: { label: string; value: MealsTab }[] = [
 ]
 
 export default function MealsPage() {
-  const { isOwner } = useAuth()
+  const { isOwner, householdId } = useAuth()
 
   // ── Tab ───────────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<MealsTab>('week')
@@ -190,11 +190,11 @@ export default function MealsPage() {
     setAddToMealPlanRecipe(null)
   }
 
-  async function handleSaveMeal(payload: Omit<MealPlanRow, 'id' | 'user_id' | 'created_at'>) {
+  async function handleSaveMeal(payload: Omit<MealPlanRow, 'id' | 'user_id' | 'household_id' | 'created_at'>) {
     if (editingMeal) {
       await updateMeal(editingMeal.id, payload)
     } else {
-      await addMeal(payload)
+      await addMeal(payload, householdId!)
     }
     closeSlotPanel()
     await loadWeekMeals(weekStart)
@@ -231,13 +231,13 @@ export default function MealsPage() {
     setShowRecipeDelete(false)
   }
 
-  async function handleSaveRecipe(payload: Omit<Recipe, 'id' | 'user_id' | 'created_at' | 'updated_at'>) {
+  async function handleSaveRecipe(payload: Omit<Recipe, 'id' | 'user_id' | 'household_id' | 'created_at' | 'updated_at'>) {
     if (recipePanelMode === 'edit' && selectedRecipe) {
       const updated = await updateRecipe(selectedRecipe.id, payload)
       setSelectedRecipe(updated)
       setRecipePanelMode('detail')
     } else {
-      await createRecipe(payload)
+      await createRecipe(payload, householdId!)
       closeRecipePanel()
     }
     await loadRecipes(recipeSearch)
@@ -280,6 +280,7 @@ export default function MealsPage() {
       const saved = await upsertShoppingList(
         formatWeekStart(weekStart),
         aggregated,
+        householdId!,
         shoppingList?.id,
       )
       setShoppingList(saved)

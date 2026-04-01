@@ -9,7 +9,7 @@ type MealSlotFormProps = {
   initialDay?: string
   initialMeal?: MealPlanRow
   preselectedRecipe?: { id: string; name: string }
-  onSave: (payload: Omit<MealPlanRow, 'id' | 'user_id' | 'created_at'>) => Promise<void>
+  onSave: (payload: Omit<MealPlanRow, 'id' | 'user_id' | 'household_id' | 'created_at'>) => Promise<void>
   onDelete?: () => Promise<void>
   onCancel: () => void
 }

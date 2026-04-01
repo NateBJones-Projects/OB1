@@ -12,6 +12,7 @@ export type ShoppingItem = {
 export type ShoppingList = {
   id: string
   user_id: string
+  household_id: string
   week_start: string
   items: ShoppingItem[]
   notes: string | null
@@ -34,6 +35,7 @@ export async function getShoppingList(weekStart: string): Promise<ShoppingList |
 export async function upsertShoppingList(
   weekStart: string,
   items: ShoppingItem[],
+  householdId: string,
   existingId?: string,
 ): Promise<ShoppingList> {
   const supabase = createClient()
@@ -52,7 +54,7 @@ export async function upsertShoppingList(
 
   const { data, error } = await supabase
     .from('shopping_lists')
-    .insert({ week_start: weekStart, items })
+    .insert({ week_start: weekStart, items, household_id: householdId })
     .select()
     .single()
 

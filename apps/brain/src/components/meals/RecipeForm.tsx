@@ -7,7 +7,7 @@ import type { Recipe, Ingredient } from '@/lib/queries/recipes'
 
 type RecipeFormProps = {
   initialRecipe?: Recipe
-  onSave: (recipe: Omit<Recipe, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => Promise<void>
+  onSave: (recipe: Omit<Recipe, 'id' | 'user_id' | 'household_id' | 'created_at' | 'updated_at'>) => Promise<void>
   onCancel: () => void
 }
 
