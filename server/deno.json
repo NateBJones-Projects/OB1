@@ -4,6 +4,8 @@
     "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@1.24.3",
     "hono": "npm:hono@4.9.2",
     "zod": "npm:zod@4.1.13",
-    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.47.10"
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.47.10",
+    "fflate": "npm:fflate@0.8.2",
+    "unpdf": "npm:unpdf@0.12.1"
   }
 }
