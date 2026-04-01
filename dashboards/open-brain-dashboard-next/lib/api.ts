@@ -73,7 +73,7 @@ export async function fetchThoughts(
 
 export async function fetchThought(
   apiKey: string,
-  id: number,
+  id: number | string,
   excludeRestricted: boolean = true
 ): Promise<Thought> {
   const qs = excludeRestricted ? "" : "?exclude_restricted=false";
@@ -82,7 +82,7 @@ export async function fetchThought(
 
 export async function updateThought(
   apiKey: string,
-  id: number,
+  id: number | string,
   data: { content?: string; type?: string; importance?: number }
 ): Promise<{ id: number; action: string; message: string }> {
   return apiFetch<{ id: number; action: string; message: string }>(

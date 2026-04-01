@@ -106,7 +106,7 @@ export function RestrictedToggle() {
               onKeyDown={(e) => e.key === "Enter" && handleUnlock()}
               placeholder="Passphrase"
               autoFocus
-              className="w-full px-4 py-2.5 bg-bg-elevated border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 transition mb-3"
+              className="w-full px-4 py-2.5 bg-bg-elevated border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition mb-3"
             />
 
             {error && <p className="text-danger text-sm mb-3">{error}</p>}
@@ -125,7 +125,7 @@ export function RestrictedToggle() {
               <button
                 onClick={handleUnlock}
                 disabled={loading || !passphrase.trim()}
-                className="px-4 py-2 text-sm bg-violet hover:bg-violet-dim text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                className="px-4 py-2 text-sm bg-accent hover:bg-accent-dim text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
                 {loading ? "Verifying..." : "Unlock"}
               </button>

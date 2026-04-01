@@ -32,11 +32,11 @@ export function SearchBar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={placeholder}
-          className="flex-1 px-4 py-2.5 bg-bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 transition"
+          className="flex-1 px-4 py-2.5 bg-bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition"
         />
         <button
           type="submit"
-          className="px-5 py-2.5 bg-violet hover:bg-violet-dim text-white font-medium rounded-lg transition-colors"
+          className="px-5 py-2.5 bg-accent hover:bg-accent-dim text-white font-medium rounded-lg transition-colors"
         >
           Search
         </button>
@@ -50,7 +50,7 @@ export function SearchBar({
               value="semantic"
               checked={mode === "semantic"}
               onChange={() => setMode("semantic")}
-              className="accent-violet"
+              className="accent-accent"
             />
             <span className="text-sm text-text-secondary">Semantic</span>
           </label>
@@ -61,17 +61,17 @@ export function SearchBar({
               value="text"
               checked={mode === "text"}
               onChange={() => setMode("text")}
-              className="accent-violet"
+              className="accent-accent"
             />
             <span className="text-sm text-text-secondary">Full-text</span>
           </label>
         </div>
         {mode === "text" && (
           <span className="text-xs text-text-muted">
-            Supports: <code className="text-violet/70">&quot;exact phrase&quot;</code>{" "}
-            <code className="text-violet/70">AND</code>{" "}
-            <code className="text-violet/70">OR</code>{" "}
-            <code className="text-violet/70">-exclude</code>
+            Supports: <code className="text-accent/70">&quot;exact phrase&quot;</code>{" "}
+            <code className="text-accent/70">AND</code>{" "}
+            <code className="text-accent/70">OR</code>{" "}
+            <code className="text-accent/70">-exclude</code>
           </span>
         )}
       </div>

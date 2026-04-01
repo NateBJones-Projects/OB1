@@ -7,20 +7,19 @@ async function loginAction(formData: FormData) {
 
   const apiKey = formData.get("apiKey") as string;
   if (!apiKey?.trim()) {
-    return { error: "API key is required" };
+    return { error: "Access key is required" };
   }
 
-  // Validate key against health endpoint
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
   try {
     const res = await fetch(`${apiUrl}/health`, {
       headers: { "x-brain-key": apiKey },
     });
     if (!res.ok) {
-      return { error: "Invalid API key or service unavailable" };
+      return { error: "Invalid access key" };
     }
   } catch {
-    return { error: "Could not reach API. Check your connection." };
+    return { error: "Service unavailable. Check your connection." };
   }
 
   const session = await getSession();
@@ -41,14 +40,14 @@ export default async function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-bg-primary ml-0">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-xl bg-violet flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl font-bold">OB</span>
+          <div className="w-12 h-12 rounded-lg bg-accent flex items-center justify-center mx-auto mb-4">
+            <span className="text-white text-lg font-semibold">AS</span>
           </div>
-          <h1 className="text-2xl font-semibold text-text-primary">
-            Open Brain
+          <h1 className="text-xl font-semibold text-text-primary">
+            Amicus Superbrain
           </h1>
-          <p className="text-text-secondary text-sm mt-1">
-            Enter your API key to continue
+          <p className="text-text-muted text-sm mt-1">
+            Enter your access key to sign in
           </p>
         </div>
 

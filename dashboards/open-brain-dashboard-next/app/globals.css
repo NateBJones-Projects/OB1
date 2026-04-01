@@ -1,25 +1,47 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-bg-primary: #0a0a0f;
-  --color-bg-surface: #111118;
-  --color-bg-elevated: #1a1a24;
-  --color-bg-hover: #222230;
+  /* Light mode (default) */
+  --color-bg-primary: #fafaf9;
+  --color-bg-surface: #ffffff;
+  --color-bg-elevated: #f5f5f4;
+  --color-bg-hover: #f0eeec;
+  --color-border: #e7e5e4;
+  --color-border-subtle: #d6d3d1;
+  --color-text-primary: #1c1917;
+  --color-text-secondary: #44403c;
+  --color-text-muted: #78716c;
+  --color-accent: #1e3a5f;
+  --color-accent-light: #2563eb;
+  --color-accent-surface: rgba(30, 58, 95, 0.06);
+  --color-accent-border: rgba(30, 58, 95, 0.15);
+  --color-success: #16a34a;
+  --color-warning: #ca8a04;
+  --color-danger: #dc2626;
+  --color-info: #2563eb;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+/* Dark mode overrides */
+html.dark {
+  --color-bg-primary: #0f0f13;
+  --color-bg-surface: #18181f;
+  --color-bg-elevated: #1e1e28;
+  --color-bg-hover: #26263a;
   --color-border: #2a2a3a;
-  --color-border-subtle: #1e1e2e;
+  --color-border-subtle: #3a3a4e;
   --color-text-primary: #e8e8ef;
-  --color-text-secondary: #9090a8;
-  --color-text-muted: #606078;
-  --color-violet: #8b5cf6;
-  --color-violet-dim: #7c3aed;
-  --color-violet-glow: rgba(139, 92, 246, 0.15);
-  --color-violet-surface: rgba(139, 92, 246, 0.08);
+  --color-text-secondary: #a8a8b8;
+  --color-text-muted: #68687a;
+  --color-accent: #6b9fd4;
+  --color-accent-light: #93bbeb;
+  --color-accent-surface: rgba(107, 159, 212, 0.1);
+  --color-accent-border: rgba(107, 159, 212, 0.2);
   --color-success: #34d399;
   --color-warning: #fbbf24;
   --color-danger: #f87171;
   --color-info: #60a5fa;
-  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), monospace;
 }
 
 body {
@@ -28,7 +50,6 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -37,15 +58,14 @@ body {
   background: var(--color-bg-primary);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: var(--color-border-subtle);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-muted);
 }
 
-/* Selection */
 ::selection {
-  background: var(--color-violet-glow);
+  background: var(--color-accent-surface);
   color: var(--color-text-primary);
 }

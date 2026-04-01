@@ -3,36 +3,42 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RestrictedToggle } from "@/components/RestrictedToggle";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 const nav = [
-  { href: "/", label: "Dashboard", icon: DashboardIcon },
-  { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
+  { href: "/", label: "Overview", icon: OverviewIcon },
+  { href: "/thoughts", label: "Browse", icon: BrowseIcon },
   { href: "/search", label: "Search", icon: SearchIcon },
-  { href: "/audit", label: "Audit", icon: AuditIcon },
+  { href: "/documents", label: "Documents", icon: DocumentsIcon },
+  { href: "/ingest", label: "Capture", icon: CaptureIcon },
+  { href: "/audit", label: "Review", icon: ReviewIcon },
   { href: "/duplicates", label: "Duplicates", icon: DuplicatesIcon },
-  { href: "/ingest", label: "Add", icon: AddIcon },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
 
-  // Hide sidebar on login page
   if (pathname === "/login") return null;
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-56 bg-bg-surface border-r border-border flex flex-col z-40">
-      <div className="px-5 py-6 border-b border-border">
+      <div className="px-5 py-5 border-b border-border">
         <Link href="/" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-violet flex items-center justify-center">
-            <span className="text-white text-sm font-bold">OB</span>
+          <div className="w-8 h-8 rounded bg-accent flex items-center justify-center">
+            <span className="text-white text-xs font-semibold tracking-tight">AS</span>
           </div>
-          <span className="text-text-primary font-semibold text-lg tracking-tight">
-            Open Brain
-          </span>
+          <div className="flex flex-col">
+            <span className="text-text-primary font-semibold text-sm leading-tight">
+              Amicus
+            </span>
+            <span className="text-text-muted text-[11px] leading-tight">
+              Superbrain
+            </span>
+          </div>
         </Link>
       </div>
 
-      <nav className="flex-1 px-3 py-4 space-y-1">
+      <nav className="flex-1 px-3 py-4 space-y-0.5">
         {nav.map(({ href, label, icon: Icon }) => {
           const active =
             href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -40,9 +46,9 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors ${
                 active
-                  ? "bg-violet-surface text-violet border border-violet/20"
+                  ? "bg-accent-surface text-accent border border-accent-border"
                   : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               }`}
             >
@@ -53,13 +59,17 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="px-3 py-3 border-t border-border space-y-2">
+      <div className="px-3 py-3 border-t border-border space-y-1">
+        <ThemeToggle />
         <RestrictedToggle />
         <form action="/api/logout" method="POST">
           <button
             type="submit"
-            className="text-sm text-text-muted hover:text-danger transition-colors px-3 py-1"
+            className="flex items-center gap-2 px-3 py-1.5 text-[13px] text-text-muted hover:text-danger transition-colors rounded-md hover:bg-bg-hover w-full"
           >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-text-muted">
+              <path d="M6 2H3.5A1.5 1.5 0 002 3.5v9A1.5 1.5 0 003.5 14H6M10.5 11.5L14 8l-3.5-3.5M14 8H6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
             Sign out
           </button>
         </form>
@@ -68,56 +78,67 @@ export function Sidebar() {
   );
 }
 
-function DashboardIcon({ active }: { active: boolean }) {
+function OverviewIcon({ active }: { active: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
-      <rect x="1" y="1" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="10" y="1" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="1" y="10" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="10" y="10" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? "text-accent" : "text-text-muted"}>
+      <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }
 
-function ThoughtsIcon({ active }: { active: boolean }) {
+function BrowseIcon({ active }: { active: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
-      <path d="M3 4.5h12M3 9h8M3 13.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? "text-accent" : "text-text-muted"}>
+      <path d="M2.5 4h11M2.5 8h7M2.5 12h9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
 
 function SearchIcon({ active }: { active: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
-      <circle cx="7.5" cy="7.5" r="5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M11.5 11.5L16 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? "text-accent" : "text-text-muted"}>
+      <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M10 10l4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
 
-function AuditIcon({ active }: { active: boolean }) {
+function DocumentsIcon({ active }: { active: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
-      <path d="M9 1.5L2 5v4c0 4.4 3 8.5 7 9.5 4-1 7-5.1 7-9.5V5L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? "text-accent" : "text-text-muted"}>
+      <path d="M9 1.5H4A1.5 1.5 0 002.5 3v10A1.5 1.5 0 004 14.5h8a1.5 1.5 0 001.5-1.5V6L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M9 1.5V6h4.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M5.5 9h5M5.5 11.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CaptureIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? "text-accent" : "text-text-muted"}>
+      <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 5v6M5 8h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ReviewIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? "text-accent" : "text-text-muted"}>
+      <path d="M4.5 8l2.5 2.5 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="1" y="1" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }
 
 function DuplicatesIcon({ active }: { active: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
-      <rect x="1" y="3" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="6" y="4" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.5" fill="var(--bg-surface)" />
-    </svg>
-  );
-}
-
-function AddIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
-      <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M9 5.5v7M5.5 9h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className={active ? "text-accent" : "text-text-muted"}>
+      <rect x="1" y="3" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <rect x="5.5" y="3.5" width="9" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" fill="var(--color-bg-surface)" />
     </svg>
   );
 }

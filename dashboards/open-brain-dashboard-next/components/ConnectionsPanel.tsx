@@ -54,7 +54,7 @@ export function ConnectionsPanel({
             <Link
               key={c.id}
               href={`/thoughts/${c.id}`}
-              className="block p-3 rounded-lg border border-border hover:border-violet/50 transition-colors"
+              className="block p-3 rounded-lg border border-border hover:border-accent/50 transition-colors"
             >
               <div className="flex items-center gap-2 mb-1">
                 <TypeBadge type={c.type} />
@@ -69,7 +69,7 @@ export function ConnectionsPanel({
                 {c.shared_topics.map((t) => (
                   <span
                     key={t}
-                    className="px-1.5 py-0.5 rounded bg-violet-surface text-violet text-[10px]"
+                    className="px-1.5 py-0.5 rounded bg-accent-surface text-accent text-[10px]"
                   >
                     {t}
                   </span>

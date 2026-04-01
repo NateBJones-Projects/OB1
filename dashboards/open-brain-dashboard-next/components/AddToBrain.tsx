@@ -22,18 +22,18 @@ interface AddToBrainProps {
 const MODES: { value: AddToBrainMode; label: string; description: string }[] = [
   {
     value: "auto",
-    label: "Auto",
-    description: "Open Brain decides the best path",
+    label: "Auto (recommended)",
+    description: "Automatically choose the best approach",
   },
   {
     value: "single",
-    label: "Save as one thought",
-    description: "Save the entire input as a single thought",
+    label: "Save as one entry",
+    description: "Save the entire input as a single entry",
   },
   {
     value: "extract",
-    label: "Extract multiple thoughts",
-    description: "Run smart-ingest to extract atomic thoughts",
+    label: "Extract multiple entries",
+    description: "Break the text into separate searchable items",
   },
 ];
 
@@ -41,7 +41,7 @@ const ACTION_COLORS: Record<string, string> = {
   add: "text-success",
   skip: "text-text-muted",
   create_revision: "text-info",
-  append_evidence: "text-violet",
+  append_evidence: "text-accent",
 };
 
 const ACTION_LABELS: Record<string, string> = {
@@ -149,7 +149,7 @@ export function AddToBrain({
       // Update the result message
       setResult((prev) =>
         prev
-          ? { ...prev, status: "complete", message: "Thoughts committed to brain" }
+          ? { ...prev, status: "complete", message: "Entries saved successfully" }
           : prev
       );
     } catch (err) {
@@ -168,8 +168,8 @@ export function AddToBrain({
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={rows}
-          placeholder="Paste a thought, notes, or source text..."
-          className="w-full bg-bg-elevated border border-border rounded-lg px-4 py-3 text-text-primary placeholder-text-muted focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 transition resize-y"
+          placeholder="Paste notes, observations, or text to capture..."
+          className="w-full bg-bg-elevated border border-border rounded-lg px-4 py-3 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition resize-y"
         />
 
         {/* Advanced mode control */}
@@ -208,7 +208,7 @@ export function AddToBrain({
                       onClick={() => setMode(m.value)}
                       className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                         mode === m.value
-                          ? "bg-violet-surface text-violet border-violet/30"
+                          ? "bg-accent-surface text-accent border-accent-border"
                           : "bg-bg-surface text-text-secondary border-border hover:border-text-muted"
                       }`}
                       title={m.description}
@@ -226,9 +226,9 @@ export function AddToBrain({
                       type="checkbox"
                       checked={dryRun}
                       onChange={(e) => setDryRun(e.target.checked)}
-                      className="rounded border-border text-violet focus:ring-violet/30"
+                      className="rounded border-border text-accent focus:ring-accent/20"
                     />
-                    Preview before adding (dry run)
+                    Preview before saving (dry run)
                   </label>
                 )}
               </div>
@@ -246,9 +246,9 @@ export function AddToBrain({
             <button
               type="submit"
               disabled={submitting || !text.trim()}
-              className="px-5 py-2.5 bg-violet hover:bg-violet-dim text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2 bg-accent hover:bg-accent/90 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {submitting ? "Adding..." : "Add to Brain"}
+              {submitting ? "Saving..." : "Save"}
             </button>
           </div>
         </div>
@@ -287,9 +287,9 @@ export function AddToBrain({
           {result.path === "extract" && result.job_id && (
             <a
               href="/ingest"
-              className="text-xs text-violet hover:text-violet-dim transition-colors underline underline-offset-2"
+              className="text-xs text-accent hover:text-accent-dim transition-colors underline underline-offset-2"
             >
-              View in job history
+              View extraction history
             </a>
           )}
         </div>
@@ -300,7 +300,7 @@ export function AddToBrain({
       {/* Inline job detail (only when showJobDetail is true and we have data) */}
       {showJobDetail && loadingDetail && (
         <div className="flex items-center gap-2 text-text-muted text-sm">
-          <div className="w-4 h-4 border-2 border-violet/30 border-t-violet rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
           Loading extracted items...
         </div>
       )}
@@ -314,7 +314,7 @@ export function AddToBrain({
             <span
               className={`text-xs font-medium ${
                 jobDetail.job.status === "dry_run_complete"
-                  ? "text-violet"
+                  ? "text-accent"
                   : jobDetail.job.status === "complete"
                     ? "text-success"
                     : "text-text-muted"
@@ -362,9 +362,9 @@ export function AddToBrain({
                 type="button"
                 onClick={handleExecute}
                 disabled={executing}
-                className="px-4 py-2 bg-violet hover:bg-violet-dim text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-accent hover:bg-accent-dim text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {executing ? "Executing..." : "Review & Execute"}
+                {executing ? "Saving..." : "Confirm and save"}
               </button>
               {executeError && (
                 <p className="text-danger text-xs mt-1">{executeError}</p>

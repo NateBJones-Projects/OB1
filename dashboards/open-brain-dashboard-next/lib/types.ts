@@ -1,5 +1,5 @@
 export interface Thought {
-  id: number;
+  id: number | string;
   uuid?: string;
   content: string;
   type: string;

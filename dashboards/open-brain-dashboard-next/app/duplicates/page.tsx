@@ -144,7 +144,7 @@ export default function DuplicatesPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Duplicates</h1>
         <div className="flex items-center gap-2 text-text-muted text-sm">
-          <div className="w-4 h-4 border-2 border-violet/30 border-t-violet rounded-full animate-spin" />
+          <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
           Searching for near-duplicates...
         </div>
       </div>
@@ -185,8 +185,8 @@ export default function DuplicatesPage() {
         const deleteCount = Object.values(selections).filter(s => s === "keep_a" || s === "keep_b").length;
         const keepBothCount = Object.values(selections).filter(s => s === "keep_both").length;
         return (
-          <div className="flex items-center gap-3 bg-violet-surface border border-violet/20 rounded-lg px-4 py-3">
-            <span className="text-sm text-violet font-medium">
+          <div className="flex items-center gap-3 bg-accent-surface border border-accent/20 rounded-lg px-4 py-3">
+            <span className="text-sm text-accent font-medium">
               {selectedCount} pair{selectedCount > 1 ? "s" : ""} selected
               {deleteCount > 0 && keepBothCount > 0 && (
                 <span className="text-text-muted font-normal">
@@ -197,7 +197,7 @@ export default function DuplicatesPage() {
             <button
               disabled={batchProcessing}
               onClick={() => setConfirmBatch(true)}
-              className="px-4 py-1.5 text-sm font-medium bg-violet hover:bg-violet-dim text-white rounded-lg transition-colors disabled:opacity-50"
+              className="px-4 py-1.5 text-sm font-medium bg-accent hover:bg-accent-dim text-white rounded-lg transition-colors disabled:opacity-50"
             >
               {batchProcessing ? "Processing..." : `Resolve ${selectedCount} pair${selectedCount > 1 ? "s" : ""}`}
             </button>
@@ -240,7 +240,7 @@ export default function DuplicatesPage() {
                   <label
                     className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
                       selections[key] === "keep_both"
-                        ? "text-violet border-violet/30 bg-violet-surface"
+                        ? "text-accent border-accent/30 bg-accent-surface"
                         : "text-text-muted border-border hover:bg-bg-hover"
                     }`}
                   >
@@ -249,7 +249,7 @@ export default function DuplicatesPage() {
                       name={`pair-${key}`}
                       checked={selections[key] === "keep_both"}
                       onChange={() => toggleSelection(key, "keep_both")}
-                      className="accent-violet"
+                      className="accent-accent"
                     />
                     Keep Both
                   </label>
@@ -282,7 +282,7 @@ export default function DuplicatesPage() {
                       />
                       <Link
                         href={`/thoughts/${pair.thought_id_a}`}
-                        className="text-xs text-text-muted hover:text-violet"
+                        className="text-xs text-text-muted hover:text-accent"
                         onClick={(e) => e.stopPropagation()}
                       >
                         #{pair.thought_id_a}
@@ -347,7 +347,7 @@ export default function DuplicatesPage() {
                       />
                       <Link
                         href={`/thoughts/${pair.thought_id_b}`}
-                        className="text-xs text-text-muted hover:text-violet"
+                        className="text-xs text-text-muted hover:text-accent"
                         onClick={(e) => e.stopPropagation()}
                       >
                         #{pair.thought_id_b}

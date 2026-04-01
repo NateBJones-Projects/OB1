@@ -47,9 +47,9 @@ export default async function ThoughtsPage({
   } catch (err) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold">Thoughts</h1>
+        <h1 className="text-xl font-semibold">Browse</h1>
         <p className="text-danger text-sm">
-          Failed to load thoughts.{" "}
+          Failed to load entries.{" "}
           {err instanceof Error ? err.message : ""}
         </p>
       </div>
@@ -70,9 +70,9 @@ export default async function ThoughtsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold mb-1">Thoughts</h1>
-        <p className="text-text-secondary text-sm">
-          {data.total.toLocaleString()} total thoughts
+        <h1 className="text-xl font-semibold mb-0.5">Browse</h1>
+        <p className="text-text-muted text-sm">
+          {data.total.toLocaleString()} entries
         </p>
       </div>
 
@@ -104,7 +104,7 @@ export default async function ThoughtsPage({
                 <td className="px-4 py-3">
                   <Link
                     href={`/thoughts/${t.id}`}
-                    className="text-text-primary hover:text-violet transition-colors"
+                    className="text-text-primary hover:text-accent transition-colors"
                   >
                     {t.content.length > 120
                       ? t.content.slice(0, 120) + "..."

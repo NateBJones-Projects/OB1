@@ -19,9 +19,9 @@ export function LoginForm({
       <div>
         <label
           htmlFor="apiKey"
-          className="block text-sm font-medium text-text-secondary mb-1.5"
+          className="block text-[13px] font-medium text-text-secondary mb-1.5"
         >
-          MCP Access Key
+          Access key
         </label>
         <input
           id="apiKey"
@@ -29,8 +29,8 @@ export function LoginForm({
           type="password"
           required
           autoFocus
-          placeholder="your-api-key"
-          className="w-full px-4 py-2.5 bg-bg-surface border border-border rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 transition"
+          placeholder="Paste your access key"
+          className="w-full px-3.5 py-2.5 bg-bg-surface border border-border rounded-lg text-text-primary text-sm placeholder-text-muted focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition"
         />
       </div>
 
@@ -41,9 +41,9 @@ export function LoginForm({
       <button
         type="submit"
         disabled={pending}
-        className="w-full py-2.5 bg-violet hover:bg-violet-dim text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full py-2.5 bg-accent hover:bg-accent/90 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {pending ? "Verifying..." : "Sign in"}
+        {pending ? "Signing in..." : "Sign in"}
       </button>
     </form>
   );

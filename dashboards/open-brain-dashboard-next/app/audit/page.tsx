@@ -8,7 +8,7 @@ import type { Thought, BrowseResponse } from "@/lib/types";
 
 export default function AuditPage() {
   const [data, setData] = useState<BrowseResponse | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<number | string>>(new Set());
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showDelete, setShowDelete] = useState(false);
@@ -73,8 +73,8 @@ export default function AuditPage() {
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Audit</h1>
         <div className="flex items-center gap-2 text-text-muted text-sm">
-          <div className="w-4 h-4 border-2 border-violet/30 border-t-violet rounded-full animate-spin" />
-          Loading low-quality thoughts...
+          <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+          Loading entries for review...
         </div>
       </div>
     );
@@ -88,7 +88,7 @@ export default function AuditPage() {
         <div>
           <h1 className="text-2xl font-semibold mb-1">Audit</h1>
           <p className="text-text-secondary text-sm">
-            Review low quality thoughts (score &lt; 30)
+            Review and clean up entries
             {data && ` | ${data.total.toLocaleString()} total`}
           </p>
         </div>
@@ -117,12 +117,12 @@ export default function AuditPage() {
                       selected.size === data.data.length
                     }
                     onChange={toggleAll}
-                    className="accent-violet"
+                    className="accent-accent"
                   />
                 </th>
                 <th className="text-left px-4 py-3 font-medium">Content</th>
                 <th className="text-left px-4 py-3 font-medium w-24">Type</th>
-                <th className="text-left px-4 py-3 font-medium w-20">Score</th>
+                <th className="text-left px-4 py-3 font-medium w-20">Source</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle">
@@ -133,13 +133,13 @@ export default function AuditPage() {
                       type="checkbox"
                       checked={selected.has(t.id)}
                       onChange={() => toggleSelect(t.id)}
-                      className="accent-violet"
+                      className="accent-accent"
                     />
                   </td>
                   <td className="px-4 py-3">
                     <Link
                       href={`/thoughts/${t.id}`}
-                      className="text-text-primary hover:text-violet transition-colors"
+                      className="text-text-primary hover:text-accent transition-colors"
                     >
                       {t.content.length > 100
                         ? t.content.slice(0, 100) + "..."
@@ -149,8 +149,8 @@ export default function AuditPage() {
                   <td className="px-4 py-3">
                     <TypeBadge type={t.type} />
                   </td>
-                  <td className="px-4 py-3 text-warning font-mono text-xs">
-                    {t.quality_score}
+                  <td className="px-4 py-3 text-text-muted font-mono text-xs">
+                    {t.source_type || "—"}
                   </td>
                 </tr>
               ))}

@@ -129,7 +129,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="text-sm text-violet hover:text-violet-dim transition-colors"
+        className="text-sm text-accent hover:text-accent-dim transition-colors"
       >
         + Add Reflection
       </button>
@@ -139,7 +139,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-bg-surface border border-violet/30 rounded-lg p-5 space-y-4"
+      className="bg-bg-surface border border-accent/30 rounded-lg p-5 space-y-4"
     >
       <h3 className="text-sm font-medium text-text-primary">New Reflection</h3>
 
@@ -151,7 +151,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
           onChange={(e) =>
             setForm((f) => ({ ...f, reflection_type: e.target.value }))
           }
-          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-violet"
+          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
         >
           {REFLECTION_TYPES.map((t) => (
             <option key={t} value={t}>
@@ -172,7 +172,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
             setForm((f) => ({ ...f, trigger_context: e.target.value }))
           }
           rows={3}
-          className="w-full bg-bg-elevated border border-border rounded-lg px-4 py-3 text-text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 transition resize-y"
+          className="w-full bg-bg-elevated border border-border rounded-lg px-4 py-3 text-text-primary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition resize-y"
           placeholder="Context or trigger for this reflection..."
         />
       </div>
@@ -184,7 +184,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
           <button
             type="button"
             onClick={addOption}
-            className="text-xs text-violet hover:text-violet-dim transition-colors"
+            className="text-xs text-accent hover:text-accent-dim transition-colors"
           >
             + Add option
           </button>
@@ -196,7 +196,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
               value={opt.label}
               onChange={(e) => updateOption(i, e.target.value)}
               placeholder={`Option ${i + 1}`}
-              className="flex-1 bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-violet"
+              className="flex-1 bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
             />
             <button
               type="button"
@@ -216,7 +216,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
           <button
             type="button"
             onClick={addFactor}
-            className="text-xs text-violet hover:text-violet-dim transition-colors"
+            className="text-xs text-accent hover:text-accent-dim transition-colors"
           >
             + Add factor
           </button>
@@ -228,7 +228,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
               value={fac.label}
               onChange={(e) => updateFactor(i, "label", e.target.value)}
               placeholder={`Factor ${i + 1}`}
-              className="flex-1 bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-violet"
+              className="flex-1 bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
             />
             <div className="flex items-center gap-1">
               <input
@@ -240,7 +240,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
                 onChange={(e) =>
                   updateFactor(i, "weight", parseFloat(e.target.value))
                 }
-                className="w-20 accent-violet"
+                className="w-20 accent-accent"
               />
               <span className="text-xs text-text-muted w-7 text-right">
                 {fac.weight.toFixed(1)}
@@ -268,7 +268,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
             setForm((f) => ({ ...f, conclusion: e.target.value }))
           }
           rows={3}
-          className="w-full bg-bg-elevated border border-border rounded-lg px-4 py-3 text-text-primary focus:outline-none focus:border-violet focus:ring-1 focus:ring-violet/30 transition resize-y"
+          className="w-full bg-bg-elevated border border-border rounded-lg px-4 py-3 text-text-primary focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition resize-y"
           placeholder="Conclusion or lesson..."
         />
       </div>
@@ -283,7 +283,7 @@ export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
         <button
           type="submit"
           disabled={submitting}
-          className="px-4 py-2 text-sm font-medium bg-violet hover:bg-violet-dim text-white rounded-lg transition-colors disabled:opacity-50"
+          className="px-4 py-2 text-sm font-medium bg-accent hover:bg-accent-dim text-white rounded-lg transition-colors disabled:opacity-50"
         >
           {submitting ? "Saving..." : "Save Reflection"}
         </button>

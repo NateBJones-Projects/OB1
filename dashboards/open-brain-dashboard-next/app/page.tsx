@@ -20,11 +20,11 @@ export default async function DashboardPage() {
   } catch (err) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <div className="bg-danger/10 border border-danger/30 rounded-lg p-4 text-danger text-sm">
-          Failed to load dashboard data. Check API connection.
+        <h1 className="text-xl font-semibold">Overview</h1>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
+          Unable to load data. Check your connection.
           <br />
-          <span className="text-text-muted">
+          <span className="text-red-500 text-xs">
             {err instanceof Error ? err.message : "Unknown error"}
           </span>
         </div>
@@ -35,33 +35,27 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold mb-1">Dashboard</h1>
-        <p className="text-text-secondary text-sm">
-          Overview of your second brain
+        <h1 className="text-xl font-semibold mb-0.5">Overview</h1>
+        <p className="text-text-muted text-sm">
+          Your practice at a glance
         </p>
       </div>
 
       <StatsWidget stats={stats} />
 
-      {/* Add to Brain */}
       <div>
-        <h2 className="text-lg font-medium mb-1">Add to Brain</h2>
-        <p className="text-text-secondary text-sm mb-3">
-          Paste a thought, notes, or source text. Open Brain decides whether to
-          save one thought or extract several.
-        </p>
-        <AddToBrain rows={3} />
+        <h2 className="text-sm font-medium text-text-secondary mb-2">Quick capture</h2>
+        <AddToBrain rows={2} />
       </div>
 
-      {/* Recent activity */}
       <div>
-        <h2 className="text-lg font-medium mb-3">Recent Activity</h2>
-        <div className="space-y-3">
-          {recent.data.map((thought) => (
+        <h2 className="text-sm font-medium text-text-secondary mb-3">Recent entries</h2>
+        <div className="space-y-2">
+          {recent.data?.map((thought) => (
             <ThoughtCard key={thought.id} thought={thought} />
           ))}
-          {recent.data.length === 0 && (
-            <p className="text-text-muted text-sm">No thoughts yet.</p>
+          {(!recent.data || recent.data.length === 0) && (
+            <p className="text-text-muted text-sm">Nothing captured yet.</p>
           )}
         </div>
       </div>

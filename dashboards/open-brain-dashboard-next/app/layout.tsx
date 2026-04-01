@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Open Brain",
-  description: "Second brain dashboard",
+  title: "Amicus Superbrain",
+  description: "Practice management for legal professionals",
 };
 
 export default function RootLayout({
@@ -27,11 +27,22 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            var t = localStorage.getItem('theme');
+            if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+              document.documentElement.classList.add('dark');
+            }
+          })();
+        `}} />
+      </head>
       <body className="min-h-screen flex bg-bg-primary text-text-primary">
         <Sidebar />
         <main className="flex-1 ml-56 min-h-screen">
-          <div className="max-w-6xl mx-auto px-8 py-8">
+          <div className="max-w-5xl mx-auto px-8 py-8">
             {children}
           </div>
         </main>

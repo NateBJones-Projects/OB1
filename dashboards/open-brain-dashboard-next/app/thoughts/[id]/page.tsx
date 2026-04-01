@@ -26,8 +26,8 @@ export default async function ThoughtDetailPage({
   const session = await getSession();
   const excludeRestricted = !session.restrictedUnlocked;
   const { id } = await params;
-  const thoughtId = parseInt(id, 10);
-  if (isNaN(thoughtId)) notFound();
+  const thoughtId = id;
+  if (!thoughtId) notFound();
 
   let thought;
   try {
@@ -43,7 +43,7 @@ export default async function ThoughtDetailPage({
           </p>
           <Link
             href="/thoughts"
-            className="px-4 py-2 bg-violet hover:bg-violet-dim text-white text-sm rounded-lg transition-colors"
+            className="px-4 py-2 bg-accent hover:bg-accent-dim text-white text-sm rounded-lg transition-colors"
           >
             Back to Thoughts
           </Link>
@@ -132,7 +132,7 @@ export default async function ThoughtDetailPage({
                 {topics.map((t) => (
                   <span
                     key={t}
-                    className="px-2 py-0.5 rounded bg-violet-surface text-violet text-xs"
+                    className="px-2 py-0.5 rounded bg-accent-surface text-accent text-xs"
                   >
                     {t}
                   </span>
@@ -186,7 +186,7 @@ export default async function ThoughtDetailPage({
                 className="bg-bg-surface border border-border rounded-lg p-4"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xs text-violet font-medium">
+                  <span className="text-xs text-accent font-medium">
                     {r.reflection_type}
                   </span>
                   <span className="text-xs text-text-muted">

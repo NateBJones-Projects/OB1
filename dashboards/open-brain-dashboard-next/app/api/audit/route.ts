@@ -21,12 +21,11 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    // Server-side filter: quality_score_max=29, sorted by quality ascending
+    // Fetch shortest/oldest thoughts for review (no quality_score filter)
     const data = await fetchThoughts(apiKey, {
       page,
       per_page: 50,
-      quality_score_max: 29,
-      sort: "quality_score",
+      sort: "created_at",
       order: "asc",
       exclude_restricted: excludeRestricted,
     });

@@ -43,7 +43,7 @@ export function ThoughtsFilter({
         <select
           value={currentType}
           onChange={(e) => applyFilters({ type: e.target.value })}
-          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-violet"
+          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
         >
           <option value="">All types</option>
           {types.map((t) => (
@@ -61,7 +61,7 @@ export function ThoughtsFilter({
           value={currentSource}
           onChange={(e) => applyFilters({ source_type: e.target.value })}
           placeholder="e.g. chatgpt_import"
-          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-violet w-44"
+          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-accent w-44"
         />
       </div>
 
@@ -76,7 +76,7 @@ export function ThoughtsFilter({
               importance_min: e.target.value,
             })
           }
-          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-violet"
+          className="bg-bg-elevated border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent"
         >
           <option value="">All levels</option>
           {IMPORTANCE_OPTIONS.map((level) => (
