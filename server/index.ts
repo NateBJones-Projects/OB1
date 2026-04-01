@@ -990,9 +990,6 @@ server.registerTool(
 // Hono App with Auth + CORS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const transport = new StreamableHTTPTransport();
-await server.connect(transport);
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-brain-key, accept, mcp-session-id",
@@ -1034,6 +1031,8 @@ app.post("*", async (c) => {
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
+  const transport = new StreamableHTTPTransport();
+  await server.connect(transport);
   return transport.handleRequest(c);
 });
 
