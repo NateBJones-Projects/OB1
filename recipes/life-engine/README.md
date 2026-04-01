@@ -526,7 +526,10 @@ Pre-approve only the specific tools Life Engine needs, persisted in your config 
       "mcp__open-brain__search_thoughts",
       "mcp__open-brain__list_thoughts",
       "mcp__open-brain__thought_stats",
+      "mcp__open-brain__capture_thought",
       "mcp__supabase__execute_sql",
+      "Bash(date *)",
+      "Bash(curl -s *api.open-meteo.com*)",
       "CronCreate",
       "CronDelete"
     ]
@@ -560,7 +563,9 @@ claude --channels plugin:telegram@claude-plugins-official \
     mcp__open-brain__search_thoughts \
     mcp__open-brain__list_thoughts \
     mcp__open-brain__thought_stats \
+    mcp__open-brain__capture_thought \
     mcp__supabase__execute_sql \
+    'Bash(date *)' 'Bash(curl -s *api.open-meteo.com*)' \
     CronCreate CronDelete"
 ```
 

@@ -9,6 +9,33 @@
 -- ============================================
 
 -- ----------------------------------------
+-- UPGRADING FROM A PREVIOUS VERSION
+-- ----------------------------------------
+-- If you already have Life Engine tables from an earlier install,
+-- run these migration statements before re-running the full schema:
+--
+-- 1. user_id UUID → TEXT (needed for Telegram/Discord chat_id storage):
+--    ALTER TABLE life_engine_habits ALTER COLUMN user_id TYPE text;
+--    ALTER TABLE life_engine_habit_log ALTER COLUMN user_id TYPE text;
+--    ALTER TABLE life_engine_checkins ALTER COLUMN user_id TYPE text;
+--    ALTER TABLE life_engine_briefings ALTER COLUMN user_id TYPE text;
+--    ALTER TABLE life_engine_evolution ALTER COLUMN user_id TYPE text;
+--
+-- 2. Add delivered_via CHECK constraint (if column exists without one):
+--    ALTER TABLE life_engine_briefings
+--      ADD CONSTRAINT life_engine_briefings_delivered_via_check
+--      CHECK (delivered_via IN ('telegram', 'discord'));
+--
+-- 3. Remove cron_state from briefing_type CHECK (if present):
+--    ALTER TABLE life_engine_briefings
+--      DROP CONSTRAINT life_engine_briefings_briefing_type_check,
+--      ADD CONSTRAINT life_engine_briefings_briefing_type_check
+--      CHECK (briefing_type IN ('morning', 'pre_meeting', 'checkin',
+--             'evening', 'habit_reminder', 'weekly_review', 'custom'));
+--
+-- 4. Create life_engine_state table (see below — CREATE IF NOT EXISTS is safe).
+
+-- ----------------------------------------
 -- Habit definitions
 -- ----------------------------------------
 -- What habits the user wants to track.
@@ -78,7 +105,8 @@ CREATE TABLE IF NOT EXISTS life_engine_briefings (
   briefing_type TEXT NOT NULL
     CHECK (briefing_type IN ('morning', 'pre_meeting', 'checkin', 'evening', 'habit_reminder', 'weekly_review', 'custom')),
   content TEXT NOT NULL,
-  delivered_via TEXT DEFAULT 'telegram',
+  delivered_via TEXT DEFAULT 'telegram'
+    CHECK (delivered_via IN ('telegram', 'discord')),
   user_responded BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -111,6 +139,8 @@ COMMENT ON TABLE life_engine_evolution IS 'Self-improvement history — tracks s
 -- ----------------------------------------
 -- System state that doesn't belong in user-facing tables.
 -- Examples: cron_job_id, cron_interval, wake_time, sleep_time, latitude, longitude.
+-- Note: No user_id column — this table assumes a single Life Engine instance
+-- per Supabase project. For multi-user setups, prefix keys with user ID.
 
 CREATE TABLE IF NOT EXISTS life_engine_state (
   key TEXT PRIMARY KEY,
