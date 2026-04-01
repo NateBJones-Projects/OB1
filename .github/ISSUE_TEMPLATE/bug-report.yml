@@ -11,7 +11,7 @@ body:
     id: contribution
     attributes:
       label: Which contribution?
-      description: The name and category (e.g., "recipes/email-history-import")
+      description: The name and category (e.g., "recipes/email-history-import" or "skills/panning-for-gold")
       placeholder: recipes/email-history-import
     validations:
       required: true

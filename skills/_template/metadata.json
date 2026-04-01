@@ -1,0 +1,20 @@
+{
+  "name": "Skill Name",
+  "description": "Brief description of what this skill does.",
+  "category": "skills",
+  "author": {
+    "name": "Your Name",
+    "github": "your-github-username"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["skill", "prompt", "workflow"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-03-27",
+  "updated": "2026-03-27"
+}

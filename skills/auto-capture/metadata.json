@@ -1,0 +1,20 @@
+{
+  "name": "Auto-Capture",
+  "description": "Reusable skill pack that captures ACT NOW items and a session summary to Open Brain when a session ends.",
+  "category": "skills",
+  "author": {
+    "name": "Jared Irish",
+    "github": "jaredirish"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["AI client with reusable skills, rules, or custom instructions"]
+  },
+  "tags": ["skill", "capture", "session-close", "workflow", "open-brain"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}

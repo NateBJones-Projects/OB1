@@ -1,0 +1,21 @@
+{
+  "name": "Auto-Capture Protocol",
+  "description": "Workflow guidance for using the reusable Auto-Capture skill to store ACT NOW items and session summaries in Open Brain at session close.",
+  "category": "recipes",
+  "author": {
+    "name": "Jared Irish",
+    "github": "jaredirish"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+  },
+  "requires_skills": ["auto-capture"],
+  "tags": ["capture", "auto-save", "session-close", "workflow", "skill"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-03-15",
+  "updated": "2026-03-31"
+}

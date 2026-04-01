@@ -1,0 +1,27 @@
+{
+  "name": "Research-to-Decision Workflow",
+  "description": "Workflow recipe for composing canonical OB1 skills into operator and investor decision pipelines, from competitive work and model review through synthesis, meeting outputs, and memo drafting.",
+  "category": "recipes",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+  },
+  "requires_skills": [
+    "competitive-analysis",
+    "financial-model-review",
+    "deal-memo-drafting",
+    "research-synthesis",
+    "meeting-synthesis"
+  ],
+  "tags": ["workflow", "decision-support", "diligence", "memo", "skill-composition"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}

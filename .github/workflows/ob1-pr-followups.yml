@@ -1,0 +1,256 @@
+name: OB1 PR Follow-Ups
+
+on:
+  workflow_run:
+    workflows:
+      - "OB1 PR Gate"
+      - ".github/workflows/ob1-gate.yml"
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  issues: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  followups:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    concurrency:
+      group: ob1-pr-followups-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.id }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout base repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 1
+
+      - name: Download gate artifact
+        id: artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          artifact_id=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/artifacts" \
+            --jq '.artifacts[] | select(.name == "ob1-pr-gate-context" and .expired == false) | .id' \
+            | head -n 1)
+
+          if [ -z "$artifact_id" ]; then
+            echo "Gate artifact not found for run $RUN_ID"
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > gate-artifact.zip
+          unzip -o gate-artifact.zip -d gate-artifact
+
+      - name: Load gate context
+        if: steps.artifact.outputs.found == 'true'
+        id: context
+        run: |
+          set -euo pipefail
+
+          context_file="gate-artifact/ob1-review-context.json"
+          summary_file="gate-artifact/ob1-review-summary.md"
+
+          echo "context_file=$context_file" >> "$GITHUB_OUTPUT"
+          echo "summary_file=$summary_file" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$(jq -r '.pr_number' "$context_file")" >> "$GITHUB_OUTPUT"
+          echo "author_login=$(jq -r '.author_login' "$context_file")" >> "$GITHUB_OUTPUT"
+          echo "author_association=$(jq -r '.author_association' "$context_file")" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$(jq -r '.head_sha' "$context_file")" >> "$GITHUB_OUTPUT"
+          echo "gate_failed=$(jq -r '.failed' "$context_file")" >> "$GITHUB_OUTPUT"
+          echo "secret_blocked=$(jq -r '.secret_blocked' "$context_file")" >> "$GITHUB_OUTPUT"
+          echo "is_draft=$(jq -r '.is_draft' "$context_file")" >> "$GITHUB_OUTPUT"
+
+      - name: Post gate summary and sync security label
+        if: steps.artifact.outputs.found == 'true'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          SUMMARY_FILE: ${{ steps.context.outputs.summary_file }}
+          SECRET_BLOCKED: ${{ steps.context.outputs.secret_blocked }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- ob1-automated-review -->';
+            const prNumber = Number(process.env.PR_NUMBER);
+            const summary = fs.readFileSync(process.env.SUMMARY_FILE, 'utf8').trim();
+            const body = `${marker}\n${summary}`;
+            const secretBlocked = process.env.SECRET_BLOCKED === 'true';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user.type === 'Bot' && comment.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body,
+              });
+            }
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number: prNumber,
+            });
+            const hasSecurityLabel = labels.some((label) => label.name === 'security-blocked');
+
+            if (secretBlocked && !hasSecurityLabel) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: ['security-blocked'],
+              });
+            }
+
+            if (!secretBlocked && hasSecurityLabel) {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: prNumber,
+                name: 'security-blocked',
+              });
+            }
+
+      - name: Evaluate trust and PR quota
+        if: steps.artifact.outputs.found == 'true'
+        id: policy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHOR_ASSOCIATION: ${{ steps.context.outputs.author_association }}
+          AUTHOR_LOGIN: ${{ steps.context.outputs.author_login }}
+        run: |
+          set -euo pipefail
+
+          trusted=false
+          case "$AUTHOR_ASSOCIATION" in
+            OWNER|MEMBER|COLLABORATOR|CONTRIBUTOR)
+              trusted=true
+              ;;
+          esac
+
+          open_pr_count=$(gh api "search/issues" \
+            -f q="repo:$GITHUB_REPOSITORY is:pr is:open author:$AUTHOR_LOGIN" \
+            --jq '.total_count')
+
+          over_quota=false
+          if [ "$open_pr_count" -gt 3 ]; then
+            over_quota=true
+          fi
+
+          echo "trusted=$trusted" >> "$GITHUB_OUTPUT"
+          echo "open_pr_count=$open_pr_count" >> "$GITHUB_OUTPUT"
+          echo "over_quota=$over_quota" >> "$GITHUB_OUTPUT"
+
+      - name: Sync maintainer triage label
+        if: steps.artifact.outputs.found == 'true'
+        uses: actions/github-script@v7
+        env:
+          PR_NUMBER: ${{ steps.context.outputs.pr_number }}
+          OVER_QUOTA: ${{ steps.policy.outputs.over_quota }}
+        with:
+          script: |
+            const prNumber = Number(process.env.PR_NUMBER);
+            const overQuota = process.env.OVER_QUOTA === 'true';
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner,
+              repo,
+              issue_number: prNumber,
+            });
+            const hasLabel = labels.some((label) => label.name === 'needs-maintainer-triage');
+
+            if (overQuota && !hasLabel) {
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: ['needs-maintainer-triage'],
+              });
+            }
+
+            if (!overQuota && hasLabel) {
+              await github.rest.issues.removeLabel({
+                owner,
+                repo,
+                issue_number: prNumber,
+                name: 'needs-maintainer-triage',
+              });
+            }
+
+      - name: Run Claude auto review for trusted contributors
+        if: |
+          steps.artifact.outputs.found == 'true' &&
+          github.event.workflow_run.conclusion == 'success' &&
+          steps.context.outputs.gate_failed != 'true' &&
+          steps.context.outputs.secret_blocked != 'true' &&
+          steps.context.outputs.is_draft != 'true' &&
+          steps.policy.outputs.trusted == 'true' &&
+          steps.policy.outputs.over_quota != 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ steps.context.outputs.pr_number }}
+            GATE SUMMARY FILE: gate-artifact/ob1-review-summary.md
+            GATE CONTEXT FILE: gate-artifact/ob1-review-context.json
+
+            You are reviewing a contribution to Open Brain (OB1).
+
+            Read these files first:
+            - gate-artifact/ob1-review-summary.md
+            - gate-artifact/ob1-review-context.json
+            - CLAUDE.md
+            - CONTRIBUTING.md
+
+            This auto review only runs after the deterministic OB1 gate passed.
+            Do not repeat the mechanical gate checks unless the diff still shows
+            a clear issue. Focus on high-signal human review:
+
+            1. Mission and category fit
+            2. Clarity of the README and setup instructions
+            3. Actual usefulness of the contribution
+            4. Design-pattern fit for OB1
+            5. Scope creep or standalone-project drift
+
+            Review behavior:
+            - Use `gh pr view` and `gh pr diff` for PR context.
+            - Use inline comments only for precise, actionable findings.
+            - Submit exactly one final GitHub PR review with `gh pr review`.
+            - Approve only when there are no substantive concerns.
+            - If unsure, prefer a comment review over an approval.
+            - Do not post extra top-level issue comments.
+          claude_args: |
+            --model haiku --allowedTools "Bash(cat:CLAUDE.md),Bash(cat:CONTRIBUTING.md),Bash(cat:gate-artifact/ob1-review-summary.md),Bash(cat:gate-artifact/ob1-review-context.json),Bash(gh pr diff:*),Bash(gh pr review:*),Bash(gh pr view:*),mcp__github_inline_comment__create_inline_comment"
