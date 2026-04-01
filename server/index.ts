@@ -370,7 +370,7 @@ server.registerTool(
   {
     title: "Delete Thought",
     description:
-      "Delete a thought from the Open Brain by its ID. Use search_thoughts or list_thoughts first to find the ID of the thought to delete.",
+      "Delete a thought from the Open Brain by its ID. Irreversible — use search_thoughts or list_thoughts to confirm the correct ID before deleting. Operates across the full database regardless of user context (single-user deployments only).",
     inputSchema: {
       id: z.string().describe("The UUID of the thought to delete (from search_thoughts or list_thoughts output)"),
     },
