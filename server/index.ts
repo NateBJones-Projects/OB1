@@ -1002,7 +1002,17 @@ app.options("*", (c) => {
   return c.text("ok", 200, corsHeaders);
 });
 
-app.all("*", async (c) => {
+// Handle DELETE for session termination (Claude sends this)
+app.delete("*", (c) => {
+  return c.text("ok", 200, corsHeaders);
+});
+
+// Handle GET for SSE (some clients use this)
+app.get("*", (c) => {
+  return c.json({ status: "ok", service: "amicus-superbrain", version: "2.0.0" }, 200, corsHeaders);
+});
+
+app.post("*", async (c) => {
   const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
     return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
