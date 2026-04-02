@@ -991,12 +991,22 @@ function shouldProcessAttachment(att: { name: string; contentType: string; size:
 }
 
 async function fetchGraphAttachments(accessToken: string, messageId: string): Promise<GraphAttachment[]> {
-  const data = (await graphFetch(accessToken, `/me/messages/${messageId}/attachments`)) as {
-    value: Array<Record<string, unknown>>;
-  };
-  return (data.value || []).filter(
-    a => a["@odata.type"] === "#microsoft.graph.fileAttachment" && a.contentBytes,
-  ) as unknown as GraphAttachment[];
+  const attachments: GraphAttachment[] = [];
+  let url: string | null = `/me/messages/${messageId}/attachments`;
+
+  while (url) {
+    const data = (await graphFetch(accessToken, url)) as {
+      value: Array<Record<string, unknown>>;
+      "@odata.nextLink"?: string;
+    };
+    const fileAttachments = (data.value || []).filter(
+      a => a["@odata.type"] === "#microsoft.graph.fileAttachment" && a.contentBytes,
+    ) as unknown as GraphAttachment[];
+    attachments.push(...fileAttachments);
+    url = data["@odata.nextLink"]?.replace(GRAPH_API, "") || null;
+  }
+
+  return attachments;
 }
 
 async function extractAttachmentText(
@@ -1374,10 +1384,21 @@ async function main() {
       continue;
     }
 
-    // CRM filtering: skip emails not from/to a CRM contact
+    // CRM filtering: skip emails not from/to a CRM contact (applies to all emails, including attachment-only)
     let matchedContact: CrmContact | null = null;
-    if (args.crmOnly && email) {
-      const addresses = extractAllEmailAddresses(email);
+    if (args.crmOnly) {
+      // Build address list from raw message when body was filtered out
+      const addresses: string[] = [];
+      if (email) {
+        addresses.push(...extractAllEmailAddresses(email));
+      } else {
+        const fa = msg.from?.emailAddress?.address;
+        if (fa) addresses.push(fa.toLowerCase().trim());
+        for (const r of msg.toRecipients || []) {
+          const a = r.emailAddress?.address;
+          if (a) addresses.push(a.toLowerCase().trim());
+        }
+      }
       matchedContact = matchContactByEmail(addresses, crmContacts);
       if (!matchedContact) {
         skippedNoCrm++;
@@ -1475,8 +1496,11 @@ async function main() {
       }
     }
 
-    // Only mark as ingested if both email and attachments succeeded
-    if (emailIngested || !email) {
+    // Only mark as ingested if everything that could run succeeded.
+    // In endpoint mode with attachments present, don't mark — allows a later
+    // direct-mode rerun to pick up and process the attachments.
+    const hasUnprocessedAttachments = msg.hasAttachments && !canProcessAttachments;
+    if ((emailIngested || !email) && !hasUnprocessedAttachments) {
       if (attachmentsOk || !msg.hasAttachments) {
         syncLog.ingested_ids[msg.id] = new Date().toISOString();
       }

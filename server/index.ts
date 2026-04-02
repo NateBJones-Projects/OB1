@@ -1007,8 +1007,11 @@ app.delete("*", (c) => {
   return c.text("ok", 200, corsHeaders);
 });
 
-// Handle GET for SSE (some clients use this)
-app.get("*", (c) => {
+// Handle GET — route SSE requests through MCP transport, serve health check otherwise
+app.get("*", async (c) => {
+  if (c.req.header("accept")?.includes("text/event-stream")) {
+    return transport.handleRequest(c);
+  }
   return c.json({ status: "ok", service: "amicus-superbrain", version: "2.0.0" }, 200, corsHeaders);
 });
 
