@@ -26,6 +26,7 @@
  *   --list-folders                  List all mail folders and exit
  *   --ingest-endpoint               Use INGEST_URL/INGEST_KEY instead of Supabase direct
  *   --crm-only                      Only import emails from/to contacts in your CRM
+ *   --skip-attachments              Skip attachment processing (email bodies only)
  */
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ interface CliArgs {
   ingestEndpoint: boolean;
   importance: string | null;
   crmOnly: boolean;
+  skipAttachments: boolean;
 }
 
 function parseArgs(): CliArgs {
@@ -108,6 +110,7 @@ function parseArgs(): CliArgs {
     ingestEndpoint: false,
     importance: null,
     crmOnly: false,
+    skipAttachments: false,
   };
 
   for (const arg of Deno.args) {
@@ -127,6 +130,8 @@ function parseArgs(): CliArgs {
       args.importance = arg.split("=")[1].toLowerCase();
     } else if (arg === "--crm-only") {
       args.crmOnly = true;
+    } else if (arg === "--skip-attachments") {
+      args.skipAttachments = true;
     }
   }
 
@@ -416,6 +421,7 @@ interface GraphMessage {
   body: { contentType: string; content: string };
   importance: string;
   parentFolderId: string;
+  hasAttachments: boolean;
 }
 
 async function listMessagesForFolder(
@@ -426,7 +432,7 @@ async function listMessagesForFolder(
   limit: number,
 ): Promise<GraphMessage[]> {
   const messages: GraphMessage[] = [];
-  const select = "id,subject,from,toRecipients,receivedDateTime,body,importance,conversationId,parentFolderId";
+  const select = "id,subject,from,toRecipients,receivedDateTime,body,importance,conversationId,parentFolderId,hasAttachments";
 
   // Build OData filter
   const filters: string[] = [];
@@ -944,6 +950,297 @@ async function logCrmInteraction(
   }
 }
 
+// ─── Attachment Processing ───────────────────────────────────────────────────
+
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set(["pdf", "docx", "xlsx", "pptx", "md", "txt"]);
+const SKIP_ATTACHMENT_CONTENT_TYPES = new Set([
+  "image/png", "image/jpeg", "image/gif", "image/bmp", "image/svg+xml",
+  "image/webp", "image/tiff", "image/x-icon",
+]);
+const SIGNATURE_FILE_PATTERNS = [
+  /^image\d{3}\.\w+$/i, /^logo[._-]/i, /^banner[._-]/i,
+  /^signature[._-]/i, /^icon[._-]/i, /^spacer\.\w+$/i, /^pixel\.\w+$/i,
+];
+const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024;
+
+interface GraphAttachment {
+  id: string;
+  name: string;
+  contentType: string;
+  size: number;
+  contentBytes: string;
+}
+
+interface AttachmentProcessResult {
+  processed: Array<{ filename: string; fileType: string; wordCount: number; documentId: string }>;
+  skipped: number;
+  errors: string[];
+}
+
+function getAttachmentFileType(filename: string): string {
+  return (filename.split(".").pop() || "").toLowerCase();
+}
+
+function shouldProcessAttachment(att: { name: string; contentType: string; size: number }): boolean {
+  const ext = getAttachmentFileType(att.name);
+  if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(ext)) return false;
+  if (SKIP_ATTACHMENT_CONTENT_TYPES.has(att.contentType.toLowerCase())) return false;
+  if (att.size > MAX_ATTACHMENT_SIZE) return false;
+  if (SIGNATURE_FILE_PATTERNS.some(p => p.test(att.name))) return false;
+  return true;
+}
+
+async function fetchGraphAttachments(accessToken: string, messageId: string): Promise<GraphAttachment[]> {
+  const data = (await graphFetch(accessToken, `/me/messages/${messageId}/attachments`)) as {
+    value: Array<Record<string, unknown>>;
+  };
+  return (data.value || []).filter(
+    a => a["@odata.type"] === "#microsoft.graph.fileAttachment" && a.contentBytes,
+  ) as unknown as GraphAttachment[];
+}
+
+async function extractAttachmentText(
+  bytes: Uint8Array,
+  fileType: string,
+): Promise<{ text: string; pages: number }> {
+  if (fileType === "pdf") {
+    try {
+      const { extractText: pdfExtract } = await import("npm:unpdf@0.12.1");
+      const result = await pdfExtract(bytes);
+      return { text: result.text || "", pages: result.totalPages || 1 };
+    } catch {
+      const str = new TextDecoder("latin1").decode(bytes);
+      const textParts: string[] = [];
+      const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
+      let match;
+      while ((match = streamRegex.exec(str)) !== null) {
+        for (const tj of match[1].matchAll(/\(([^)]*)\)\s*Tj/g)) textParts.push(tj[1]);
+        for (const td of match[1].matchAll(/\[([^\]]*)\]\s*TJ/g)) {
+          for (const it of td[1].matchAll(/\(([^)]*)\)/g)) textParts.push(it[1]);
+        }
+      }
+      const pageMatches = str.match(/\/Type\s*\/Page[^s]/g);
+      return { text: textParts.join(" "), pages: pageMatches?.length || 1 };
+    }
+  }
+
+  const { unzipSync } = await import("npm:fflate@0.8.2");
+
+  if (fileType === "docx") {
+    const files = unzipSync(bytes);
+    const docXml = files["word/document.xml"];
+    if (!docXml) throw new Error("Invalid DOCX");
+    const xml = new TextDecoder().decode(docXml);
+    const parts: string[] = [];
+    let current = "";
+    for (const m of xml.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>|<\/w:p>/g)) {
+      if (m[0] === "</w:p>") { if (current.trim()) parts.push(current.trim()); current = ""; }
+      else current += m[1];
+    }
+    if (current.trim()) parts.push(current.trim());
+    return { text: parts.join("\n"), pages: 1 };
+  }
+
+  if (fileType === "xlsx") {
+    const files = unzipSync(bytes);
+    const sharedData = files["xl/sharedStrings.xml"];
+    const strings: string[] = [];
+    if (sharedData) {
+      for (const m of new TextDecoder().decode(sharedData).matchAll(/<t[^>]*>([^<]*)<\/t>/g)) strings.push(m[1]);
+    }
+    const values: string[] = [];
+    for (const [path, data] of Object.entries(files)) {
+      if (path.startsWith("xl/worksheets/sheet") && path.endsWith(".xml")) {
+        for (const m of new TextDecoder().decode(data as Uint8Array).matchAll(/<v>([^<]*)<\/v>/g)) values.push(m[1]);
+      }
+    }
+    return { text: [...strings, ...values].join(" "), pages: 1 };
+  }
+
+  if (fileType === "pptx") {
+    const files = unzipSync(bytes);
+    const texts: string[] = [];
+    for (const [path, data] of Object.entries(files)) {
+      if (/^ppt\/slides\/slide\d+\.xml$/.test(path)) {
+        for (const m of new TextDecoder().decode(data as Uint8Array).matchAll(/<a:t>([^<]*)<\/a:t>/g)) texts.push(m[1]);
+      }
+    }
+    return { text: texts.join("\n"), pages: 1 };
+  }
+
+  // md, txt
+  return { text: new TextDecoder().decode(bytes), pages: 1 };
+}
+
+function chunkAttachmentText(text: string, maxWords = 4000, overlap = 200): string[] {
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return [text];
+  const chunks: string[] = [];
+  let start = 0;
+  while (start < words.length) {
+    const end = Math.min(start + maxWords, words.length);
+    chunks.push(words.slice(start, end).join(" "));
+    start = end - overlap;
+    if (start >= words.length - overlap) break;
+  }
+  return chunks;
+}
+
+function slugifyStr(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+}
+
+async function processEmailAttachments(
+  accessToken: string,
+  messageId: string,
+  emailSubject: string,
+  emailFrom: string,
+  emailDate: string,
+  contactMatch: CrmContact | null,
+): Promise<AttachmentProcessResult> {
+  const result: AttachmentProcessResult = { processed: [], skipped: 0, errors: [] };
+
+  let attachments: GraphAttachment[];
+  try {
+    attachments = await fetchGraphAttachments(accessToken, messageId);
+  } catch (err) {
+    result.errors.push(`Fetch: ${(err as Error).message}`);
+    return result;
+  }
+
+  for (const att of attachments) {
+    if (!shouldProcessAttachment(att)) { result.skipped++; continue; }
+
+    try {
+      const fileType = getAttachmentFileType(att.name);
+
+      // Check for existing document
+      const checkRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/documents?email_message_id=eq.${encodeURIComponent(messageId)}&filename=eq.${encodeURIComponent(att.name)}&select=id&limit=1`,
+        { headers: { apikey: SUPABASE_SERVICE_ROLE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}` } },
+      );
+      if (checkRes.ok) {
+        const existing = await checkRes.json();
+        if (existing?.length) { result.skipped++; continue; }
+      }
+
+      // Decode base64 to Uint8Array (copy to fresh buffer to avoid detached ArrayBuffer issues)
+      const binaryStr = atob(att.contentBytes);
+      const buffer = new ArrayBuffer(binaryStr.length);
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+      // Create a copy so the buffer isn't shared/detached during extraction
+      const bytesCopy = bytes.slice();
+
+      // Extract text (use copy to avoid detached buffer)
+      const extracted = await extractAttachmentText(bytesCopy, fileType);
+      const fullText = (extracted.text || "").toString();
+      const pages = extracted.pages || 1;
+      if (!fullText || fullText.trim().length < 10) { result.skipped++; continue; }
+      const wc = wordCount(fullText);
+
+      // Upload to Supabase Storage (use original bytes)
+      const storagePath = `email-attachments/${slugifyStr(emailSubject || "untitled")}/${Date.now()}_${att.name}`;
+      const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/documents/${storagePath}`, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          "Content-Type": att.contentType,
+          "x-upsert": "false",
+        },
+        body: bytes,
+      });
+      if (!uploadRes.ok) {
+        const uploadBody = await uploadRes.text();
+        throw new Error(`Storage upload: ${uploadRes.status} ${uploadBody}`);
+      }
+
+      // Chunk, embed, insert as thoughts
+      const chunks = chunkAttachmentText(fullText);
+      const thoughtIds: string[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkContent = i === 0
+          ? `[Attachment: ${att.name} | From email: ${emailFrom} | Subject: ${emailSubject} | Date: ${emailDate}]\n\n${chunks[i]}`
+          : chunks[i];
+
+        const [embedding, metadata] = await Promise.all([
+          getEmbedding(chunkContent),
+          i === 0 ? extractMetadata(chunkContent) : Promise.resolve({ topics: ["document", "email-attachment"], type: "reference" }),
+        ]);
+
+        const thoughtRow: Record<string, unknown> = {
+          content: chunkContent,
+          embedding,
+          metadata: {
+            ...metadata,
+            source: "email-attachment",
+            email_message_id: messageId,
+            document_filename: att.name,
+            ...(contactMatch ? { crm_contact_id: contactMatch.id, crm_contact_name: contactMatch.name } : {}),
+          },
+        };
+
+        const thoughtRes = await fetch(`${SUPABASE_URL}/rest/v1/thoughts`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: SUPABASE_SERVICE_ROLE_KEY,
+            Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            Prefer: "return=representation",
+          },
+          body: JSON.stringify(thoughtRow),
+        });
+        if (!thoughtRes.ok) throw new Error(`Thought insert: ${thoughtRes.status}`);
+        const thoughtData = await thoughtRes.json();
+        thoughtIds.push(Array.isArray(thoughtData) ? thoughtData[0].id : thoughtData.id);
+
+        if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 200));
+      }
+
+      // Insert documents record
+      const docRow: Record<string, unknown> = {
+        filename: att.name,
+        file_type: fileType,
+        file_size_bytes: bytes.length,
+        storage_path: storagePath,
+        full_text: fullText,
+        page_count: pages,
+        word_count: wc,
+        thought_id: thoughtIds[0],
+        chunk_thought_ids: thoughtIds.slice(1),
+        email_message_id: messageId,
+        description: `Email attachment from: ${emailFrom} | Subject: ${emailSubject}`,
+        tags: ["email-attachment"],
+        ...(contactMatch ? { contact_id: contactMatch.id } : {}),
+      };
+
+      const docRes = await fetch(`${SUPABASE_URL}/rest/v1/documents`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          Prefer: "return=representation",
+        },
+        body: JSON.stringify(docRow),
+      });
+      if (!docRes.ok) throw new Error(`Document insert: ${docRes.status}`);
+      const docData = await docRes.json();
+      const docId = Array.isArray(docData) ? docData[0].id : docData.id;
+
+      result.processed.push({ filename: att.name, fileType, wordCount: wc, documentId: docId });
+    } catch (err) {
+      result.errors.push(`${att.name}: ${(err as Error).message}`);
+    }
+
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  return result;
+}
+
 // ─── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -1054,6 +1351,9 @@ async function main() {
   let interactions = 0;
   let errors = 0;
   let totalWords = 0;
+  let attachmentsProcessed = 0;
+  let attachmentsSkipped = 0;
+  let attachmentErrors = 0;
 
   for (const msg of messages) {
     if (syncLog.ingested_ids[msg.id]) {
@@ -1128,6 +1428,24 @@ async function main() {
         interactions++;
         console.log(`   -> CRM: Logged interaction with ${matchedContact.name}`);
       }
+
+      // Process attachments
+      if (msg.hasAttachments && !args.skipAttachments && !result.duplicate) {
+        const attResult = await processEmailAttachments(
+          accessToken, msg.id, email.subject, email.from, email.date, matchedContact,
+        );
+        if (attResult.processed.length) {
+          for (const a of attResult.processed) {
+            console.log(`   -> Attachment: ${a.filename} (${a.fileType}, ${a.wordCount} words)`);
+          }
+          attachmentsProcessed += attResult.processed.length;
+        }
+        attachmentsSkipped += attResult.skipped;
+        if (attResult.errors.length) {
+          for (const e of attResult.errors) console.error(`   -> Attachment error: ${e}`);
+          attachmentErrors += attResult.errors.length;
+        }
+      }
     } else {
       errors++;
       console.error(`   -> ERROR: ${result.error}`);
@@ -1160,6 +1478,10 @@ async function main() {
     console.log(`  Ingested:         ${ingested}`);
     if (args.crmOnly) {
       console.log(`  CRM interactions: ${interactions}`);
+    }
+    if (!args.skipAttachments) {
+      console.log(`  Attachments:      ${attachmentsProcessed} processed, ${attachmentsSkipped} skipped`);
+      if (attachmentErrors > 0) console.log(`  Attach errors:    ${attachmentErrors}`);
     }
     console.log(`  Errors:           ${errors}`);
   }

@@ -1,0 +1,7 @@
+{
+  "name": "email-attachments",
+  "description": "Schema extension for email attachment ingestion — adds email_message_id to documents and relaxes file_type constraint",
+  "category": "schemas",
+  "tags": ["email", "attachments", "documents"],
+  "requires": ["documents"]
+}
