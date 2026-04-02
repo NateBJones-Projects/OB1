@@ -1006,8 +1006,9 @@ async function extractAttachmentText(
   if (fileType === "pdf") {
     try {
       const { extractText: pdfExtract } = await import("npm:unpdf@0.12.1");
-      const result = await pdfExtract(bytes);
-      return { text: result.text || "", pages: result.totalPages || 1 };
+      const result = await pdfExtract(bytes, { mergePages: true });
+      const text = Array.isArray(result.text) ? result.text.join("\n\n") : (result.text || "");
+      return { text, pages: result.totalPages || 1 };
     } catch {
       const str = new TextDecoder("latin1").decode(bytes);
       const textParts: string[] = [];
@@ -1355,6 +1356,10 @@ async function main() {
   let attachmentsSkipped = 0;
   let attachmentErrors = 0;
 
+  // Attachment processing requires Supabase direct mode (not endpoint mode)
+  const canProcessAttachments = !useEndpoint && !args.skipAttachments &&
+    SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && OPENROUTER_API_KEY;
+
   for (const msg of messages) {
     if (syncLog.ingested_ids[msg.id]) {
       alreadyIngested++;
@@ -1363,14 +1368,15 @@ async function main() {
 
     const email = processEmail(msg, folderMap);
 
-    if (!email) {
+    // Even if the email body is noise/empty, attachments may be valuable
+    if (!email && !(msg.hasAttachments && canProcessAttachments)) {
       skipped++;
       continue;
     }
 
     // CRM filtering: skip emails not from/to a CRM contact
     let matchedContact: CrmContact | null = null;
-    if (args.crmOnly) {
+    if (args.crmOnly && email) {
       const addresses = extractAllEmailAddresses(email);
       matchedContact = matchContactByEmail(addresses, crmContacts);
       if (!matchedContact) {
@@ -1379,76 +1385,101 @@ async function main() {
       }
     }
 
-    processed++;
-    totalWords += email.wordCount;
+    // Extract basic info for display/attachment metadata even when body is skipped
+    const fromName = msg.from?.emailAddress?.name || "";
+    const fromAddr = msg.from?.emailAddress?.address || "";
+    const msgFrom = fromName ? `${fromName} <${fromAddr}>` : fromAddr;
+    const msgSubject = msg.subject || "(no subject)";
+    const msgDate = msg.receivedDateTime;
 
-    console.log(`${processed}. ${email.subject}`);
+    processed++;
+    if (email) totalWords += email.wordCount;
+
+    console.log(`${processed}. ${msgSubject}`);
     console.log(
-      `   From: ${email.from} | ${email.wordCount} words | ${new Date(email.date).toLocaleDateString()}`,
+      `   From: ${msgFrom} | ${email ? email.wordCount : 0} words | ${new Date(msgDate).toLocaleDateString()}`,
     );
-    console.log(`   Folder: ${email.folders.join(", ")} | Importance: ${email.importance}`);
+    if (email) {
+      const folderName = folderMap.get(msg.parentFolderId) || msg.parentFolderId;
+      console.log(`   Folder: ${folderName} | Importance: ${msg.importance || "normal"}`);
+    } else {
+      console.log(`   Body: skipped (noise/empty) — processing attachments only`);
+    }
     if (matchedContact) {
       console.log(`   CRM Match: ${matchedContact.name}${matchedContact.company ? ` (${matchedContact.company})` : ""}`);
     }
 
     if (args.dryRun) {
-      console.log(`   "${email.body.slice(0, 120)}..."`);
+      if (email) console.log(`   "${email.body.slice(0, 120)}..."`);
+      if (msg.hasAttachments) console.log(`   Has attachments: yes`);
       console.log();
       continue;
     }
 
-    const outlookMeta: Record<string, unknown> = {
-      outlook_folders: email.folders,
-      outlook_id: email.outlookId,
-      outlook_conversation_id: email.conversationId,
-      outlook_importance: email.importance,
-    };
+    let emailIngested = false;
 
-    // Add CRM contact info to metadata if matched
-    if (matchedContact) {
-      outlookMeta.crm_contact_id = matchedContact.id;
-      outlookMeta.crm_contact_name = matchedContact.name;
-      if (matchedContact.company) outlookMeta.crm_contact_company = matchedContact.company;
+    // Ingest email body if it passed filters
+    if (email) {
+      const outlookMeta: Record<string, unknown> = {
+        outlook_folders: email.folders,
+        outlook_id: email.outlookId,
+        outlook_conversation_id: email.conversationId,
+        outlook_importance: email.importance,
+      };
+
+      if (matchedContact) {
+        outlookMeta.crm_contact_id = matchedContact.id;
+        outlookMeta.crm_contact_name = matchedContact.name;
+        if (matchedContact.company) outlookMeta.crm_contact_company = matchedContact.company;
+      }
+
+      const content = buildEmailContent(email.body, email.from, email.subject, email.date);
+      const result = useEndpoint
+        ? await ingestThoughtEndpoint(content, "outlook", outlookMeta)
+        : await ingestThoughtDirect(content, "outlook", outlookMeta);
+
+      if (result.ok) {
+        ingested++;
+        emailIngested = true;
+        const dupTag = result.duplicate ? " (duplicate — skipped)" : "";
+        console.log(`   -> Ingested: ${result.type} — ${(result.topics || []).join(", ")}${dupTag}`);
+
+        if (matchedContact && !result.duplicate) {
+          await logCrmInteraction(matchedContact, email);
+          interactions++;
+          console.log(`   -> CRM: Logged interaction with ${matchedContact.name}`);
+        }
+      } else {
+        errors++;
+        console.error(`   -> ERROR: ${result.error}`);
+      }
     }
 
-    const content = buildEmailContent(email.body, email.from, email.subject, email.date);
-    const result = useEndpoint
-      ? await ingestThoughtEndpoint(content, "outlook", outlookMeta)
-      : await ingestThoughtDirect(content, "outlook", outlookMeta);
-
-    if (result.ok) {
-      ingested++;
-      syncLog.ingested_ids[msg.id] = new Date().toISOString();
-      const dupTag = result.duplicate ? " (duplicate — skipped)" : "";
-      console.log(`   -> Ingested: ${result.type} — ${(result.topics || []).join(", ")}${dupTag}`);
-
-      // Log interaction in CRM
-      if (matchedContact && !result.duplicate) {
-        await logCrmInteraction(matchedContact, email);
-        interactions++;
-        console.log(`   -> CRM: Logged interaction with ${matchedContact.name}`);
-      }
-
-      // Process attachments
-      if (msg.hasAttachments && !args.skipAttachments && !result.duplicate) {
-        const attResult = await processEmailAttachments(
-          accessToken, msg.id, email.subject, email.from, email.date, matchedContact,
-        );
-        if (attResult.processed.length) {
-          for (const a of attResult.processed) {
-            console.log(`   -> Attachment: ${a.filename} (${a.fileType}, ${a.wordCount} words)`);
-          }
-          attachmentsProcessed += attResult.processed.length;
+    // Process attachments (independent of email body ingestion)
+    let attachmentsOk = true;
+    if (msg.hasAttachments && canProcessAttachments) {
+      const attResult = await processEmailAttachments(
+        accessToken, msg.id, msgSubject, msgFrom, msgDate, matchedContact,
+      );
+      if (attResult.processed.length) {
+        for (const a of attResult.processed) {
+          console.log(`   -> Attachment: ${a.filename} (${a.fileType}, ${a.wordCount} words)`);
         }
-        attachmentsSkipped += attResult.skipped;
-        if (attResult.errors.length) {
-          for (const e of attResult.errors) console.error(`   -> Attachment error: ${e}`);
-          attachmentErrors += attResult.errors.length;
-        }
+        attachmentsProcessed += attResult.processed.length;
       }
-    } else {
-      errors++;
-      console.error(`   -> ERROR: ${result.error}`);
+      attachmentsSkipped += attResult.skipped;
+      if (attResult.errors.length) {
+        for (const e of attResult.errors) console.error(`   -> Attachment error: ${e}`);
+        attachmentErrors += attResult.errors.length;
+        attachmentsOk = false;
+      }
+    }
+
+    // Only mark as ingested if both email and attachments succeeded
+    if (emailIngested || !email) {
+      if (attachmentsOk || !msg.hasAttachments) {
+        syncLog.ingested_ids[msg.id] = new Date().toISOString();
+      }
     }
 
     console.log();
