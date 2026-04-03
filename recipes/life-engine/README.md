@@ -528,14 +528,15 @@ Pre-approve only the specific tools Life Engine needs, persisted in your config 
       "mcp__open-brain__thought_stats",
       "mcp__open-brain__capture_thought",
       "mcp__supabase__execute_sql",
-      "Bash(date *)",
-      "Bash(curl -s *api.open-meteo.com*)",
+      "Bash(*)",
       "CronCreate",
       "CronDelete"
     ]
   }
 }
 ```
+
+> **Why `Bash(*)` instead of scoped patterns?** Life Engine uses `date` (date anchor) and `curl` (weather API) — both benign, read-only commands. Scoped patterns like `Bash(date *)` or `Bash(curl -s *api.open-meteo.com*)` are fragile because the LLM may vary its exact command syntax between runs, causing silent permission blocks. `Bash(*)` eliminates this fragility while MCP tools remain individually scoped above. Rule 11 (prompt injection guard) prevents dangerous Bash execution from external triggers.
 
 Then launch with just the channel flag:
 
@@ -565,7 +566,7 @@ claude --channels plugin:telegram@claude-plugins-official \
     mcp__open-brain__thought_stats \
     mcp__open-brain__capture_thought \
     mcp__supabase__execute_sql \
-    'Bash(date *)' 'Bash(curl -s *api.open-meteo.com*)' \
+    'Bash(*)' \
     CronCreate CronDelete"
 ```
 
