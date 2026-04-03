@@ -14,3 +14,5 @@ sync-log.json
 
 # Build artifacts
 deno.lock
+
+/docs/openbrain-credentials.txt
