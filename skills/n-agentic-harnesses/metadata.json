@@ -1,0 +1,20 @@
+{
+  "name": "N Agentic Harnesses",
+  "description": "Reusable skill pack for designing, auditing, and improving the harness layer around agentic products, including tool-use architecture, permissions, workflow state, memory, evaluation, and operator visibility.",
+  "category": "skills",
+  "author": {
+    "name": "Jonathan Edwards",
+    "github": "jonathanedwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["AI client with reusable skills/prompts", "Ability to install the bundled references directory"]
+  },
+  "tags": ["agentic-harness", "agents", "workflow", "architecture", "evaluation", "memory"],
+  "difficulty": "advanced",
+  "estimated_time": "10 minutes",
+  "created": "2026-04-02",
+  "updated": "2026-04-02"
+}

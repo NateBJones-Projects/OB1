@@ -1,0 +1,6 @@
+interface:
+  display_name: "N Agentic Harnesses"
+  short_description: "Design, audit, and improve agentic harnesses"
+  default_prompt: "Use $n-agentic-harnesses to design, audit, or upgrade an agentic harness for my product."
+policy:
+  allow_implicit_invocation: true
