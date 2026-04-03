@@ -133,12 +133,13 @@ server.registerTool(
       const client = await pool.connect();
       try {
         const result = await client.queryObject<{
+          id: string;
           content: string;
           metadata: Record<string, unknown>;
           similarity: number;
           created_at: string;
         }>(
-          `SELECT content, metadata, created_at,
+          `SELECT id, content, metadata, created_at,
                   1 - (embedding <=> $1::vector) AS similarity
            FROM thoughts
            WHERE 1 - (embedding <=> $1::vector) >= $2
@@ -157,6 +158,7 @@ server.registerTool(
           const m = t.metadata || {};
           const parts = [
             `--- Result ${i + 1} (${(t.similarity * 100).toFixed(1)}% match) ---`,
+            `ID: ${t.id}`,
             `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
             `Type: ${m.type || "unknown"}`,
           ];
@@ -235,11 +237,12 @@ server.registerTool(
       const client = await pool.connect();
       try {
         const result = await client.queryObject<{
+          id: string;
           content: string;
           metadata: Record<string, unknown>;
           created_at: string;
         }>(
-          `SELECT content, metadata, created_at
+          `SELECT id, content, metadata, created_at
            FROM thoughts
            ${whereClause}
            ORDER BY created_at DESC
@@ -254,7 +257,7 @@ server.registerTool(
         const results = result.rows.map((t, i) => {
           const m = t.metadata || {};
           const tags = Array.isArray(m.topics) ? (m.topics as string[]).join(", ") : "";
-          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
+          return `${i + 1}. [${t.id}] [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
         });
 
         return {
@@ -401,6 +404,62 @@ server.registerTool(
       return {
         content: [{ type: "text" as const, text: confirmation }],
       };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Tool 5: Delete Thought
+server.registerTool(
+  "delete_thought",
+  {
+    title: "Delete Thought",
+    description:
+      "Delete a thought from the Open Brain by its ID. Irreversible — use search_thoughts or list_thoughts to confirm the correct ID before deleting. Operates across the full database regardless of user context (single-user deployments only).",
+    inputSchema: {
+      id: z.string().describe("The ID of the thought to delete (from search_thoughts or list_thoughts output)"),
+    },
+  },
+  async ({ id }) => {
+    try {
+      const client = await pool.connect();
+      try {
+        // First fetch the thought so we can confirm what was deleted
+        const existing = await client.queryObject<{ id: string; content: string; metadata: Record<string, unknown> }>(
+          `SELECT id, content, metadata FROM thoughts WHERE id = $1`,
+          [id]
+        );
+
+        if (!existing.rows.length) {
+          return {
+            content: [{ type: "text" as const, text: `No thought found with ID: ${id}` }],
+            isError: true,
+          };
+        }
+
+        await client.queryObject(`DELETE FROM thoughts WHERE id = $1`, [id]);
+
+        const t = existing.rows[0];
+        const m = (t.metadata || {}) as Record<string, unknown>;
+        const preview = t.content.length > 100
+          ? t.content.substring(0, 100) + "..."
+          : t.content;
+
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `Deleted thought ${id} (${m.type || "unknown"}):\n${preview}`,
+            },
+          ],
+        };
+      } finally {
+        client.release();
+      }
     } catch (err: unknown) {
       return {
         content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
