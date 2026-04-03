@@ -2,7 +2,7 @@
 
 > One loop. One skill. Claude figures out what matters right now.
 
-A self-improving, time-aware personal assistant that runs in the background via Claude Code's `/loop` command. It checks your calendar, surfaces relevant knowledge from your Open Brain, tracks habits and health check-ins, and delivers proactive briefings via Telegram — adapting to your life over time.
+A self-improving, time-aware personal assistant that runs in the background via Claude Code's `/loop` command. It checks your calendar, surfaces relevant knowledge from your Open Brain, tracks habits and health check-ins, and delivers proactive briefings via Telegram or Discord — adapting to your life over time.
 
 **This isn't a calendar tool. It's not a reminder app. It's a personal AI engine that runs your day and gets better at it every week.**
 
@@ -40,14 +40,14 @@ This guide contains everything Claude Code needs to set up your entire Life Engi
 5. Pause for you to complete Telegram pairing (requires your phone)
 6. Run a test cycle to confirm everything works
 
-After setup, exit and relaunch with your channel:
+After setup, exit and relaunch with your channel (permissions are handled by `settings.json` — see Step 6):
 
 ```bash
 # Telegram
-claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:telegram@claude-plugins-official
 
 # Discord
-claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:discord@claude-plugins-official
 ```
 
 Then start your loop: `/loop 30m /life-engine`
@@ -474,7 +474,7 @@ The Life Engine needs its own tables to track habits, moods, check-ins, and skil
 
 Run the included [`schema.sql`](schema.sql) file in your Supabase SQL Editor. It contains the full schema with CHECK constraints, table comments, GRANT statements for `service_role`, performance indexes, and an auto-update trigger.
 
-✅ **Checkpoint:** Run the verification query at the bottom of `schema.sql` — you should see 5 tables (`life_engine_habits`, `life_engine_habit_log`, `life_engine_checkins`, `life_engine_briefings`, `life_engine_evolution`).
+✅ **Checkpoint:** Run the verification query at the bottom of `schema.sql` — you should see 6 tables (`life_engine_habits`, `life_engine_habit_log`, `life_engine_checkins`, `life_engine_briefings`, `life_engine_evolution`, `life_engine_state`).
 
 ---
 
@@ -484,143 +484,11 @@ This is the core — a Claude Code skill that runs on every loop iteration.
 
 ### 5.1 Create the Skill File
 
-Create `.claude/skills/life-engine/SKILL.md` in your home directory (or project directory):
+Create `.claude/skills/life-engine/SKILL.md` in your home directory (or project directory) and paste the full contents of [`life-engine-skill.md`](life-engine-skill.md) into it.
 
-```markdown
-# /life-engine — Proactive Personal Assistant
+This file contains the complete Life Engine behavior: the 7-step core loop, time windows, message formats, self-improvement protocol, dynamic loop timing with automatic rescheduling, and all operational rules. It is the single source of truth for how Life Engine behaves — any customizations you make should be made there.
 
-You are a time-aware personal assistant running on a recurring loop.
-Every time this skill fires, determine what the user needs RIGHT NOW
-based on the current time, their calendar, and their Open Brain.
-
-## Core Behavior
-
-1. **Time check** — What time is it? What time window am I in?
-2. **Duplicate check** — Did I already send something this cycle/today?
-3. **Decide** — Based on the time window, what should I be doing?
-4. **External pull** — Grab live data from integrations (calendar, etc.)
-5. **Internal enrich** — Search Open Brain for context on what you found.
-   You can't enrich what you haven't seen yet — always external before internal.
-6. **Deliver via Telegram** — only if worth it. Silence > noise.
-7. **Log what you did** so the next cycle knows what's been covered
-
-## Time Windows
-
-### Early Morning (6 AM - 8 AM)
-- Pull today's calendar events
-- Count meetings, identify first event
-- Check for active habits (morning jog, meditation, etc.)
-- Send a **morning briefing** via Telegram:
-  - "Good morning! Here's your day..."
-  - List key events with times
-  - Habit reminders
-  - Weather note if relevant
-
-### Pre-Meeting (15-45 min before any calendar event)
-- Identify the upcoming meeting
-- Extract attendee names, meeting title, description
-- Search Open Brain for relevant context on attendees/topics
-- Send a **meeting prep briefing** via Telegram:
-  - Who you're meeting with
-  - What Open Brain knows about them
-  - Any recent interactions or notes
-  - Suggested talking points
-
-### Midday (11 AM - 1 PM)
-- If no imminent meetings, send a **check-in prompt**:
-  - "Quick check-in: How are you feeling? Reply with a quick update"
-  - Log responses to life_engine_checkins table
-- Review afternoon calendar
-
-### Afternoon (2 PM - 5 PM)
-- Pre-meeting prep (same as above) for afternoon events
-- If calendar is clear, review pending tasks or follow-ups
-- Surface any Open Brain thoughts tagged as action items
-
-### Evening (5 PM - 7 PM)
-- Send a **day summary** via Telegram:
-  - Meetings attended
-  - Habits completed today
-  - Any check-in data logged
-  - Preview of tomorrow's calendar
-
-### Off Hours (7 PM - 6 AM)
-- Do nothing. Respect quiet hours.
-- Exception: urgent calendar events in the next hour
-
-## Rules
-
-- **Never send the same briefing twice** — check life_engine_briefings
-  before sending. If you already sent a morning briefing today, skip it.
-- **Be concise** — the user reads on their phone. Use bullet points.
-- **When in doubt, do nothing** — silence is better than noise.
-- **Respect check-in responses** — if the user replies on Telegram,
-  log it to the appropriate table.
-- **Suggest improvements** — every 7 days, review your briefing log
-  and suggest one addition or removal to make the skill more useful.
-  Send the suggestion via Telegram and wait for approval before changing.
-
-## Available Tools
-
-Use these MCP tools:
-- `gcal_list_events` — Get calendar events for a date range
-- `gcal_get_event` — Get details on a specific event
-- Open Brain semantic search — Find relevant knowledge
-- `reply` — Send text or files via Telegram channel
-- `react` — Acknowledge messages with emoji reactions
-- `edit_message` — Update a previously sent message
-- Supabase execute_sql — Query/insert Life Engine tables
-
-## Self-Improvement Protocol
-
-Every 7 days (check life_engine_evolution for last suggestion date):
-
-1. Review the past week's briefing log
-2. Identify patterns:
-   - Which briefings did the user respond to? (high value)
-   - Which briefings got no response? (low value / noise)
-   - Did the user manually ask Claude for something repeatedly?
-     (candidate for automation)
-3. Propose ONE change via Telegram:
-   - "I noticed you always check your OB1 before client calls.
-     Want me to add automatic client prep briefings?"
-   - "You haven't responded to the midday check-ins in 2 weeks.
-     Should I drop those?"
-4. Wait for user approval
-5. Log the change to life_engine_evolution (approved: true/false)
-6. If approved, update your behavior accordingly
-
-## Message Format
-
-Use this format for Telegram messages:
-
-Morning briefing:
-☀️ **Good morning!**
-📅 You have [N] events today
-• [Time] — [Event name]
-• [Time] — [Event name]
-🏃 Habit reminder: [habit name]
-
-Pre-meeting:
-📋 **Prep: [Meeting name] in [N] min**
-👥 With: [attendees]
-🧠 From your brain: [relevant OB1 context]
-💡 Suggested: [talking points]
-
-Check-in:
-💬 **Quick check-in**
-How are you feeling? Reply with a quick update
-and I'll log it.
-
-Evening summary:
-🌙 **Day wrap-up**
-📅 [N] meetings today
-✅ Habits: [completed] / [total]
-📊 Mood: [if logged]
-📅 Tomorrow: [first event]
-```
-
-✅ **Checkpoint:** The skill file exists in `.claude/skills/`.
+✅ **Checkpoint:** The skill file exists at `.claude/skills/life-engine/SKILL.md` and matches the contents of `life-engine-skill.md`.
 
 > **Note:** In the previous version of this recipe, a separate `/check-telegram` polling skill was required to read incoming messages. With Channels, that's no longer needed — Telegram messages are pushed directly into your Claude Code session in real time. Claude reads and responds to them inline.
 
@@ -637,51 +505,14 @@ Life Engine runs autonomously via `/loop`. If Claude encounters a tool it doesn'
 
 | Approach | Best For | Risk Level |
 |----------|----------|------------|
-| **`--dangerously-skip-permissions`** | Always-on setups on a dedicated, trusted machine | High — bypasses ALL checks |
+| **`settings.json` allowlist** *(recommended)* | Scoped permissions that persist across sessions | Low — scoped + persistent |
+| **`--allowedTools` (CLI flag)** | Same scoping, but must be re-typed each launch | Low — scoped |
 | **`--permission-mode auto`** | A middle ground — automatic but with some guardrails | Medium |
-| **`--allowedTools` (CLI flag)** | Fine-grained — approve only the tools Life Engine needs | Low — scoped |
-| **`settings.json` allowlist** | Same as above, but persisted in config instead of CLI | Low — scoped + persistent |
+| **`--dangerously-skip-permissions`** | Quick testing on a dedicated, trusted machine | High — bypasses ALL checks |
 
-### 6.2 Option A: Skip Permissions (Simplest for Dedicated Machines)
+### 6.2 Option A: settings.json Allowlist (Recommended)
 
-For a machine you fully trust (e.g., a Mac Mini running Life Engine in a persistent terminal):
-
-```bash
-# Use whichever channel you set up in Step 1
-claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
-claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
-```
-
-> [!CAUTION]
-> This means Claude can run any tool, any bash command, write any file — without asking. Only use this on a machine and in an environment you fully trust.
-
-### 6.3 Option B: Auto Permission Mode
-
-A less extreme alternative. Claude can take actions automatically but still respects certain guardrails:
-
-```bash
-claude --channels plugin:telegram@claude-plugins-official --permission-mode auto
-```
-
-(Swap `telegram` for `discord` if using Discord.)
-
-### 6.4 Option C: Allowlisted Tools (Most Precise)
-
-Pre-approve only the specific tools Life Engine uses. You can pass them on the CLI:
-
-```bash
-claude --channels plugin:telegram@claude-plugins-official \
-  --allowedTools "Bash Read Write Edit \
-    mcp__plugin_telegram_telegram__reply \
-    mcp__plugin_telegram_telegram__react \
-    mcp__plugin_telegram_telegram__edit_message \
-    mcp__google-calendar__gcal_list_events \
-    mcp__google-calendar__gcal_get_event \
-    mcp__open-brain__* \
-    mcp__supabase__*"
-```
-
-Or persist them in `.claude/settings.json`:
+Pre-approve only the specific tools Life Engine needs, persisted in your config so you don't have to re-type them every session. Create or update `.claude/settings.json`:
 
 ```json
 {
@@ -692,18 +523,75 @@ Or persist them in `.claude/settings.json`:
       "mcp__plugin_telegram_telegram__edit_message",
       "mcp__google-calendar__gcal_list_events",
       "mcp__google-calendar__gcal_get_event",
-      "mcp__open-brain__*",
-      "mcp__supabase__*"
+      "mcp__open-brain__search_thoughts",
+      "mcp__open-brain__list_thoughts",
+      "mcp__open-brain__thought_stats",
+      "mcp__open-brain__capture_thought",
+      "mcp__supabase__execute_sql",
+      "Bash(*)",
+      "CronCreate",
+      "CronDelete"
     ]
   }
 }
 ```
 
-> **Note:** The exact tool names depend on how you named your MCP servers. Run `/mcp` in Claude Code to see your server names, then match them here. The `__*` wildcard approves all tools from that server.
+> **Why `Bash(*)` instead of scoped patterns?** Life Engine uses `date` (date anchor) and `curl` (weather API) — both benign, read-only commands. Scoped patterns like `Bash(date *)` or `Bash(curl -s *api.open-meteo.com*)` are fragile because the LLM may vary its exact command syntax between runs, causing silent permission blocks. `Bash(*)` eliminates this fragility while MCP tools remain individually scoped above. Rule 11 (prompt injection guard) prevents dangerous Bash execution from external triggers.
 
-If you're using the [Dynamic Loop Timing](#dynamic-loop-timing) feature from the skill, also add `CronCreate` and `CronDelete`.
+Then launch with just the channel flag:
 
-### 6.5 Test Before You Walk Away
+```bash
+# Telegram
+claude --channels plugin:telegram@claude-plugins-official
+
+# Discord
+claude --channels plugin:discord@claude-plugins-official
+```
+
+> **Note:** The exact tool names depend on how you named your MCP servers. Run `/mcp` in Claude Code to see your server names, then match them here. If you use Discord instead of Telegram, replace the `mcp__plugin_telegram_telegram__` entries with the corresponding Discord tool names.
+
+### 6.3 Option B: --allowedTools (CLI Flag)
+
+Same scoping as Option A, but passed on the command line instead of persisted in config. Useful if you want different permission sets for different sessions:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official \
+  --allowedTools "mcp__plugin_telegram_telegram__reply \
+    mcp__plugin_telegram_telegram__react \
+    mcp__plugin_telegram_telegram__edit_message \
+    mcp__google-calendar__gcal_list_events \
+    mcp__google-calendar__gcal_get_event \
+    mcp__open-brain__search_thoughts \
+    mcp__open-brain__list_thoughts \
+    mcp__open-brain__thought_stats \
+    mcp__open-brain__capture_thought \
+    mcp__supabase__execute_sql \
+    'Bash(*)' \
+    CronCreate CronDelete"
+```
+
+### 6.4 Option C: Auto Permission Mode
+
+A middle ground. Claude can take actions automatically but still respects certain guardrails:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official --permission-mode auto
+```
+
+(Swap `telegram` for `discord` if using Discord.)
+
+### 6.5 Option D: Skip Permissions (Testing Only)
+
+For initial setup and testing on a machine you fully trust:
+
+```bash
+claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+```
+
+> [!CAUTION]
+> This means Claude can run any tool, any bash command, write any file — without asking. Use this for initial testing, then switch to Option A for daily operation.
+
+### 6.6 Test Before You Walk Away
 
 1. Start Claude Code with your chosen permission strategy
 2. Run `/life-engine` manually
@@ -721,15 +609,17 @@ If you're using the [Dynamic Loop Timing](#dynamic-loop-timing) feature from the
 
 ### 7.1 Start Claude Code with Channels and Permissions
 
+If you configured `settings.json` in Step 6 (recommended), just launch with the channel flag:
+
 ```bash
 # Telegram
-claude --channels plugin:telegram@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:telegram@claude-plugins-official
 
 # Discord
-claude --channels plugin:discord@claude-plugins-official --dangerously-skip-permissions
+claude --channels plugin:discord@claude-plugins-official
 ```
 
-Or swap `--dangerously-skip-permissions` for your preferred permission strategy from Step 6.
+Or append your preferred permission flag from Step 6 if you didn't use `settings.json`.
 
 ### 7.2 Test the Skill Manually
 
@@ -749,7 +639,7 @@ Once you've confirmed it works:
 /loop 30m /life-engine
 ```
 
-That's it. Claude will now check in every 30 minutes and decide if you need anything. When you reply on Telegram, the channel pushes your message directly into the session — Claude reads and responds inline, no separate polling loop needed.
+That's it. Claude will now check in every 30 minutes and decide if you need anything. When you reply on Telegram or Discord, the channel pushes your message directly into the session — Claude reads and responds inline, no separate polling loop needed.
 
 > **Note:** Loop jobs and channels are session-only — they stop when Claude Code exits. For persistent operation, keep a Claude Code session running on a dedicated machine or persistent terminal, or restart when you begin your day.
 
@@ -790,7 +680,7 @@ After 7 days of data, Claude reviews its own performance:
 - Which ones did you ignore?
 - What did you ask for manually that could be automated?
 
-It sends you a suggestion via Telegram. You approve or reject. The skill evolves.
+It sends you a suggestion via your messaging channel. You approve or reject. The skill evolves.
 
 ### Beyond: It's Yours
 Over weeks and months, your Life Engine accumulates:
