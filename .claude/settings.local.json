@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \"import sys,json; d=json.loads\\(sys.stdin.read\\(\\).split\\(''''warning''''\\)[0].rstrip\\(\\).rstrip\\('''',''''\\)\\); [print\\(f''''  {r[\"\"table_name\"\"]}''''\\) for r in d.get\\(''''rows'''',[]\\)]\")"
+    ]
+  }
+}
