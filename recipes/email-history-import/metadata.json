@@ -12,9 +12,10 @@
     "services": ["Gmail API"],
     "tools": ["Deno"]
   },
+  "requires_primitives": ["sensitive-data-redaction"],
   "tags": ["email", "gmail", "import", "history"],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
   "created": "2026-03-10",
-  "updated": "2026-03-10"
+  "updated": "2026-04-01"
 }

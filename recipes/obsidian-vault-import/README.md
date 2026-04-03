@@ -37,6 +37,7 @@ No special configuration is needed for any of these — the script handles them 
 - Python 3.10+
 - Your Supabase project URL and API key
 - OpenRouter API key (for embeddings and optional LLM chunking)
+- [Sensitive Data Redaction](../../primitives/sensitive-data-redaction/) primitive (required for the default pre-ingest masking pass)
 - Recommended: add a `content_fingerprint` column and unique index for database-level dedup (see [Re-running and Deduplication](#re-running-and-deduplication))
 
 ## Credential Tracker
@@ -107,7 +108,7 @@ FILE LOCATION
 | `--after DATE` | Only import notes modified after this date (YYYY-MM-DD) |
 | `--no-llm` | Disable LLM chunking — heading splits only, zero API cost beyond embeddings |
 | `--no-embed` | Skip embedding generation (insert thoughts without vectors) |
-| `--no-secret-scan` | Disable secret detection (not recommended) |
+| `--no-redact` | Disable sensitive-data redaction and skip pass (not recommended) |
 | `--verbose` | Show detailed progress for each note |
 | `--report` | Generate an `import-report.md` summary file |
 
@@ -137,18 +138,17 @@ The script automatically skips notes that wouldn't make useful thoughts. Run wit
 python import-obsidian.py /path/to/vault --skip-folders "Archive,Files,patterns"
 ```
 
-## Secret Detection
+## Sensitive Data Redaction
 
-The script scans each thought for potential secrets before embedding or inserting. Thoughts containing API keys, tokens, passwords, or connection strings are skipped and logged — they never reach your database.
+This importer now uses the [Sensitive Data Redaction](../../primitives/sensitive-data-redaction/) primitive before embedding or inserting anything.
 
-Detected patterns include:
-- API keys (OpenAI, OpenRouter, AWS, GitHub, Supabase)
-- JWT tokens
-- Private key blocks
-- Connection strings with embedded credentials
-- Generic secret assignments (`password=`, `token=`, `api_key=`, etc.)
+The policy has two actions:
+- **Redact in place** for API keys, bearer tokens, connection strings with embedded credentials, SSNs, and similar exact strings that should not be stored raw
+- **Skip entirely** for high-risk payloads like private key blocks
 
-The dry run (`--dry-run`) also runs the scanner, so you can review what would be flagged before a live import. If the scanner flags a false positive, use `--no-secret-scan` to disable it.
+That means useful notes keep their meaning, but the dangerous exact value is replaced with a placeholder such as `[REDACTED_API_KEY]`.
+
+The dry run (`--dry-run`) also runs this pass, so you can review what would be redacted or skipped before a live import. If the scanner flags a false positive or you intentionally want raw import behavior, use `--no-redact` to disable it.
 
 ## How Chunking Works
 
@@ -217,6 +217,8 @@ After a successful import, searching your Open Brain for topics from your vault 
 }
 ```
 
+If redaction was applied, the thought metadata also includes redaction counts, labels, and the policy version used for that insert.
+
 You can filter by source to find only Obsidian-imported thoughts: search with `{"source": "obsidian"}` as a metadata filter.
 
 ## Troubleshooting
@@ -239,5 +241,8 @@ Solution: The sync log prevents duplicates on re-runs. For stronger protection, 
 **Issue: Import aborts after "10 consecutive insert failures"**
 Solution: The script stops early if 10 inserts fail in a row to avoid wasting embedding credits. Check your Supabase connection, verify the `thoughts` table exists, and confirm your API key is correct. The preflight check catches most of these, but a connection drop mid-import can also trigger this.
 
-**Issue: Notes flagged as containing secrets (false positive)**
-Solution: Review the flagged content. If it's a false positive (e.g., a note discussing API key formats without containing real keys), re-run with `--no-secret-scan`. The scanner is intentionally conservative — it's better to flag and skip than to store a real secret in your database.
+**Issue: Notes flagged by the redaction pass (false positive)**
+Solution: Review the flagged content. If it's a false positive (for example, a note discussing API key formats without containing a real secret), re-run with `--no-redact`. The policy is intentionally conservative by default.
+
+**Issue: Redaction policy file missing**
+Solution: Keep the repo structure intact, or copy `primitives/sensitive-data-redaction/` alongside this recipe folder. The importer reads that primitive's `patterns.json` at runtime.

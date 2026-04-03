@@ -62,33 +62,102 @@ LLM_MODEL = "openai/gpt-4o-mini"
 MAX_RETRIES = 3
 RETRY_BACKOFF = 2  # seconds, doubles each retry
 
-# Secret detection patterns — (label, compiled regex)
-SECRET_PATTERNS = [
-    ("OpenAI/OpenRouter API key", re.compile(r'sk-(?:or-v1-|proj-|live-)?[a-zA-Z0-9]{20,}')),
-    ("JWT token", re.compile(r'eyJ[a-zA-Z0-9_-]{20,}\.[a-zA-Z0-9_-]{20,}')),
-    ("GitHub token", re.compile(r'gh[ps]_[a-zA-Z0-9]{36,}')),
-    ("GitHub OAuth token", re.compile(r'gho_[a-zA-Z0-9]{36,}')),
-    ("AWS access key", re.compile(r'AKIA[0-9A-Z]{16}')),
-    ("Supabase key", re.compile(r'sbp_[a-zA-Z0-9]{20,}')),
-    ("Private key block", re.compile(r'-----BEGIN [A-Z ]+ PRIVATE KEY-----')),
-    ("Generic secret assignment", re.compile(
-        r'(?:password|secret|token|api_key|apikey|api_secret|access_token|auth_token)'
-        r'\s*[=:]\s*["\']?[a-zA-Z0-9_\-/.]{16,}',
-        re.IGNORECASE,
-    )),
-    ("Connection string with credentials", re.compile(
-        r'(?:postgres|mysql|mongodb|redis)://[^:]+:[^@]+@',
-        re.IGNORECASE,
-    )),
-]
+REDACTION_POLICY_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "primitives"
+    / "sensitive-data-redaction"
+    / "patterns.json"
+)
+SENSITIVE_DATA_POLICY = None
 
 
-def scan_for_secrets(text: str) -> str | None:
-    """Return the label of the first secret pattern found, or None if clean."""
-    for label, pattern in SECRET_PATTERNS:
-        if pattern.search(text):
-            return label
-    return None
+def _regex_flags(flags: str) -> int:
+    mask = 0
+    if "i" in flags:
+        mask |= re.IGNORECASE
+    if "m" in flags:
+        mask |= re.MULTILINE
+    if "s" in flags:
+        mask |= re.DOTALL
+    return mask
+
+
+def load_sensitive_data_policy() -> dict:
+    global SENSITIVE_DATA_POLICY
+    if SENSITIVE_DATA_POLICY is None:
+        try:
+            SENSITIVE_DATA_POLICY = json.loads(REDACTION_POLICY_FILE.read_text())
+        except Exception as exc:
+            raise RuntimeError(
+                "Sensitive-data redaction requires "
+                f"{REDACTION_POLICY_FILE}. Keep the repo structure intact or pass "
+                "--no-redact to opt out."
+            ) from exc
+
+        rules = SENSITIVE_DATA_POLICY.get("rules")
+        if not isinstance(rules, list):
+            raise RuntimeError(
+                f"Invalid sensitive-data redaction policy file: {REDACTION_POLICY_FILE}"
+            )
+
+    return SENSITIVE_DATA_POLICY
+
+
+def apply_sensitive_data_policy(text: str) -> dict:
+    policy = load_sensitive_data_policy()
+    current = text
+    findings = []
+    total_redactions = 0
+
+    for rule in policy["rules"]:
+        label = rule["label"]
+        action = rule["action"]
+        pattern = re.compile(rule["pattern"], _regex_flags(rule.get("flags", "")))
+
+        if action == "skip":
+            if pattern.search(current):
+                return {
+                    "text": current,
+                    "skipped": True,
+                    "skip_label": label,
+                    "findings": [{"label": label, "action": "skip", "count": 1}],
+                    "total_redactions": 0,
+                    "policy_version": policy.get("version", "unknown"),
+                }
+            continue
+
+        matches = list(pattern.finditer(current))
+        if not matches:
+            continue
+
+        current = pattern.sub(rule.get("placeholder", "[REDACTED]"), current)
+        findings.append({"label": label, "action": "redact", "count": len(matches)})
+        total_redactions += len(matches)
+
+    return {
+        "text": current,
+        "skipped": False,
+        "skip_label": None,
+        "findings": findings,
+        "total_redactions": total_redactions,
+        "policy_version": policy.get("version", "unknown"),
+    }
+
+
+def format_redaction_findings(findings: list[dict]) -> str:
+    counts = {}
+    for finding in findings:
+        if finding["action"] != "redact":
+            continue
+        counts[finding["label"]] = counts.get(finding["label"], 0) + finding["count"]
+
+    parts = []
+    for label, count in counts.items():
+        if count > 1:
+            parts.append(f"{label} x{count}")
+        else:
+            parts.append(label)
+    return ", ".join(parts)
 
 # Summarization prompt for long sections
 SUMMARIZATION_PROMPT = """You are extracting atomic thoughts from an Obsidian note section.
@@ -478,8 +547,9 @@ def main():
                         help="Disable LLM chunking (heading splits only, no API cost)")
     parser.add_argument("--no-embed", action="store_true",
                         help="Skip embedding generation (insert thoughts without vectors)")
-    parser.add_argument("--no-secret-scan", action="store_true",
-                        help="Disable secret detection (not recommended)")
+    parser.add_argument("--no-redact", "--no-secret-scan", dest="no_redact",
+                        action="store_true",
+                        help="Disable sensitive-data redaction and skip pass (not recommended)")
     parser.add_argument("--verbose", action="store_true",
                         help="Show detailed progress")
     parser.add_argument("--report", action="store_true",
@@ -493,6 +563,14 @@ def main():
     if not (vault_root / ".obsidian").is_dir():
         print(f"Warning: {vault_root} doesn't have a .obsidian/ folder — "
               "are you sure this is an Obsidian vault?", file=sys.stderr)
+
+    redaction_policy_version = None
+    if not args.no_redact:
+        try:
+            redaction_policy_version = load_sensitive_data_policy().get("version", "unknown")
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
 
     # Load env vars
     env_file = Path(__file__).parent / ".env"
@@ -585,6 +663,10 @@ def main():
         print(f"Chunking: hybrid (headings + LLM fallback)")
     else:
         print(f"Chunking: headings only (--no-llm)")
+    if args.no_redact:
+        print("Redaction: disabled (--no-redact)")
+    else:
+        print(f"Redaction: Sensitive Data Redaction {redaction_policy_version}")
     print()
 
     # ── Stage 1+2: Walk + Parse ──────────────────────────────────────────────
@@ -719,27 +801,43 @@ def main():
     # ── Dry run summary ──────────────────────────────────────────────────────
 
     if args.dry_run:
-        # Scan for secrets even in dry run so users know before committing
-        dry_secrets = 0
-        if not args.no_secret_scan:
+        dry_sensitive_skips = 0
+        dry_redacted = 0
+        dry_redaction_hits = 0
+        if not args.no_redact:
             for t in all_thoughts:
-                secret_match = scan_for_secrets(t['content'])
-                if secret_match:
-                    dry_secrets += 1
-                    title = t['metadata'].get('title', '?')
-                    section = t['metadata'].get('section', '')
-                    location = f"{title} > {section}" if section else title
-                    print(f"  SECRET DETECTED: {location} — {secret_match}")
+                result = apply_sensitive_data_policy(t['content'])
+                title = t['metadata'].get('title', '?')
+                section = t['metadata'].get('section', '')
+                location = f"{title} > {section}" if section else title
+
+                if result['skipped']:
+                    dry_sensitive_skips += 1
+                    print(f"  WOULD SKIP: {location} — {result['skip_label']}")
+                    continue
+
+                if result['total_redactions']:
+                    dry_redacted += 1
+                    dry_redaction_hits += result['total_redactions']
+                    print(f"  WOULD REDACT: {location} — {format_redaction_findings(result['findings'])}")
 
         print()
         print("=== DRY RUN COMPLETE ===")
         print(f"Would import {len(all_thoughts)} thoughts from {len(filtered)} notes")
-        if dry_secrets:
-            print(f"Would skip {dry_secrets} thoughts containing potential secrets")
+        if dry_sensitive_skips:
+            print(f"Would skip {dry_sensitive_skips} thoughts containing high-risk sensitive data")
+        if dry_redacted:
+            print(f"Would redact {dry_redacted} thoughts ({dry_redaction_hits} replacements)")
         if args.verbose:
             print("\nSample thoughts:")
             for t in all_thoughts[:5]:
-                preview = t['content'][:120] + "..." if len(t['content']) > 120 else t['content']
+                preview_content = t['content']
+                if not args.no_redact:
+                    preview_result = apply_sensitive_data_policy(t['content'])
+                    if preview_result['skipped']:
+                        continue
+                    preview_content = preview_result['text']
+                preview = preview_content[:120] + "..." if len(preview_content) > 120 else preview_content
                 print(f"  [{t['metadata']['folder']}] {preview}")
         if args.report:
             _write_report(all_thoughts, filtered, vault_root, args, skip_reasons, dry_run=True)
@@ -756,20 +854,40 @@ def main():
     embed_failures = 0
     insert_failures = 0
     consecutive_failures = 0
-    secrets_skipped = 0
+    sensitive_skipped = 0
+    redacted_thoughts = 0
+    redaction_hits = 0
     successful_paths = {}  # note_path → first insert timestamp
 
     for i, thought in enumerate(all_thoughts):
-        # Scan for secrets before embedding or inserting
-        if not args.no_secret_scan:
-            secret_match = scan_for_secrets(thought['content'])
-            if secret_match:
-                secrets_skipped += 1
+        if not args.no_redact:
+            result = apply_sensitive_data_policy(thought['content'])
+            if result['skipped']:
+                sensitive_skipped += 1
                 title = thought['metadata'].get('title', '?')
                 section = thought['metadata'].get('section', '')
                 location = f"{title} > {section}" if section else title
-                print(f"  SKIPPED (secret detected): {location} — {secret_match}", flush=True)
+                print(f"  SKIPPED (sensitive-data-redaction): {location} — {result['skip_label']}",
+                      flush=True)
                 continue
+            if result['total_redactions']:
+                redacted_thoughts += 1
+                redaction_hits += result['total_redactions']
+                thought = {
+                    **thought,
+                    'content': result['text'],
+                    'fingerprint': content_fingerprint(result['text']),
+                    'metadata': {
+                        **thought['metadata'],
+                        'redaction_applied': True,
+                        'redaction_count': result['total_redactions'],
+                        'redaction_labels': list(dict.fromkeys(
+                            finding['label'] for finding in result['findings']
+                            if finding['action'] == 'redact'
+                        )),
+                        'redaction_version': result['policy_version'],
+                    },
+                }
 
         # Generate embedding (skip if --no-embed)
         embedding = None
@@ -829,8 +947,10 @@ def main():
     print(f"  Thoughts inserted:  {inserted}")
     if duplicates:
         print(f"  Duplicates skipped: {duplicates}")
-    if secrets_skipped:
-        print(f"  Secrets skipped:    {secrets_skipped}")
+    if sensitive_skipped:
+        print(f"  Sensitive skipped:  {sensitive_skipped}")
+    if redacted_thoughts:
+        print(f"  Thoughts redacted:  {redacted_thoughts} ({redaction_hits} replacements)")
     if embed_failures:
         print(f"  Embed failures:     {embed_failures}")
     if insert_failures:

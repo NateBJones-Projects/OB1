@@ -1,0 +1,20 @@
+{
+  "name": "Sensitive Data Redaction",
+  "description": "A standard pre-ingest redaction pass for secrets and high-risk identifiers before external text is embedded or stored in Open Brain.",
+  "category": "primitives",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["security", "privacy", "redaction", "ingestion", "sensitive-data"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-04-01",
+  "updated": "2026-04-01"
+}
