@@ -1,0 +1,20 @@
+{
+  "name": "Perplexity Pro MCP",
+  "description": "Connect Perplexity Pro as an MCP client to search and capture thoughts in Open Brain.",
+  "category": "integrations",
+  "author": {
+    "name": "Antonio De Marinis",
+    "github": "demarant"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Perplexity Pro"],
+    "tools": []
+  },
+  "tags": ["perplexity", "mcp", "client", "search"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-04-04",
+  "updated": "2026-04-04"
+}

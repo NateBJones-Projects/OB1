@@ -378,8 +378,11 @@ app.options("*", (c) => {
 });
 
 app.all("*", async (c) => {
-  // Accept access key via header OR URL query parameter
-  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
+  // Accept access key via Authorization: Bearer header, x-brain-key header, or URL query parameter
+  const authHeader = c.req.header("Authorization");
+  const provided = (authHeader?.startsWith("Bearer ") && authHeader.split(" ")[1])
+    || c.req.header("x-brain-key")
+    || new URL(c.req.url).searchParams.get("key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
     return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
   }
