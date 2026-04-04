@@ -1,0 +1,20 @@
+{
+  "name": "Life Engine",
+  "description": "Personal habit tracking, daily check-ins, briefing logs, and weekly self-improvement evolution. Powers morning habit reminders, mood/energy check-ins, and autonomous self-optimisation proposals.",
+  "category": "schemas",
+  "author": {
+    "name": "John Macrae",
+    "github": "jramacrae"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["habits", "check-ins", "wellbeing", "productivity", "autonomous-agent"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-04-04",
+  "updated": "2026-04-04"
+}

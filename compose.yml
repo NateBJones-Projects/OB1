@@ -1,0 +1,20 @@
+services:
+
+  ob1:
+    build: ./server
+    container_name: ob1
+    restart: unless-stopped
+    ports:
+      - "8100:8000"
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - MCP_ACCESS_KEY=${MCP_ACCESS_KEY}
+      - PROPERTY_AGENT_URL=http://property-agent:3001
+    networks:
+      - agent-net
+
+networks:
+  agent-net:
+    external: true
