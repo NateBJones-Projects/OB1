@@ -19,11 +19,13 @@ const app = new Hono();
 
 // POST /mcp - Main MCP endpoint
 app.post("*", async (c) => {
-  // Fix: Claude Desktop connectors don't send the Accept header that
-  // StreamableHTTPTransport requires. Build a patched request if missing.
-  if (!c.req.header("accept")?.includes("text/event-stream")) {
+  // Force JSON-only responses. SSE causes a reconnect loop on stateless edge functions:
+  // the client sends Accept: text/event-stream (per MCP spec), the transport opens an SSE
+  // stream, the function terminates, client reconnects in ~1-2s -- ~43k idle invocations/day.
+  // Stripping text/event-stream forces plain JSON responses and breaks the loop.
+  {
     const headers = new Headers(c.req.raw.headers);
-    headers.set("Accept", "application/json, text/event-stream");
+    headers.set("Accept", "application/json");
     const patched = new Request(c.req.raw.url, {
       method: c.req.raw.method,
       headers,
