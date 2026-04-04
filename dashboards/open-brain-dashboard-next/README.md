@@ -29,7 +29,7 @@ Provides 8 pages for managing your thoughts:
 
 ## Prerequisites
 
-- A working Open Brain setup with the **REST API gateway** (`open-brain-rest`) deployed
+- A working Open Brain setup with the **REST API gateway** ([`open-brain-rest`](../../integrations/open-brain-rest/README.md)) deployed — follow the integration guide to set up the backend
 - **Node.js 18+** installed
 - A **Vercel account** (free tier works) or any Node.js hosting
 
@@ -47,7 +47,7 @@ Provides 8 pages for managing your thoughts:
 
 ```bash
 # From the OB1 repo
-cd dashboards/open-brain-dashboard
+cd dashboards/open-brain-dashboard-next
 ```
 
 Or copy the folder to your own project directory.
