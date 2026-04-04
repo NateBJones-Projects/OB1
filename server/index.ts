@@ -362,6 +362,52 @@ server.registerTool(
   }
 );
 
+// Tool 5: Trigger Property Agent
+const PROPERTY_AGENT_URL = Deno.env.get("PROPERTY_AGENT_URL"); // http://property-agent:3001 on shared Docker network
+
+server.registerTool(
+  "trigger_property_agent",
+  {
+    title: "Trigger Property Agent",
+    description:
+      "Trigger a property management agent session. Use when property matters need attention — maintenance issues, urgent tenant emails, lease renewals, or a manual check is needed. Returns immediately; session runs asynchronously.",
+    inputSchema: {
+      type: z.enum(["morning", "checkin", "evening", "property-check", "manual"]).describe("Session type to trigger"),
+      reason: z.string().optional().describe("Why this session is being triggered"),
+    },
+  },
+  async ({ type, reason }) => {
+    if (!PROPERTY_AGENT_URL) {
+      return {
+        content: [{ type: "text" as const, text: "PROPERTY_AGENT_URL not set in environment." }],
+        isError: true,
+      };
+    }
+    try {
+      const r = await fetch(`${PROPERTY_AGENT_URL}/trigger`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, reason }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        return {
+          content: [{ type: "text" as const, text: `Property agent session "${type}" accepted${reason ? ` (${reason})` : ""}. Running asynchronously.` }],
+        };
+      }
+      return {
+        content: [{ type: "text" as const, text: `Agent rejected trigger: ${d.error || JSON.stringify(d)}` }],
+        isError: true,
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Failed to reach property agent: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
 // --- Hono App with Auth + CORS ---
 
 const corsHeaders = {

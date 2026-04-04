@@ -48,6 +48,8 @@ A multi-person family scheduling system. Track activities, important dates, and 
 - Extensions 1-2 recommended but not required
 - Supabase CLI installed and linked to your project
 
+> **No CLI?** Use `index.dashboard.ts` instead of `index.ts` and follow the [Dashboard Deploy Guide](../../docs/dashboard-deploy.md) — no local tooling required.
+
 ## Credential Tracker
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
@@ -115,6 +117,8 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 |---------|-------|
 | Function name | `family-calendar-mcp` |
 | Download path | `extensions/family-calendar` |
+
+> **No CLI?** Paste `index.dashboard.ts` directly into the Supabase dashboard editor. See the [Dashboard Deploy Guide](../../docs/dashboard-deploy.md).
 
 ### 4. Connect to Your AI
 

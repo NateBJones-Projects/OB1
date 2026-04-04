@@ -1,0 +1,18 @@
+{
+  "name": "Embedding Utils",
+  "description": "Canonical getEmbedding and extractMetadata functions for Supabase Edge Functions. Copy into any capture integration (Slack, Telegram, Discord, etc.) to avoid drift between implementations.",
+  "category": "primitives",
+  "author": {
+    "name": "John Macrae",
+    "github": "jramacrae"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": []
+  },
+  "tags": ["embeddings", "metadata", "openrouter", "edge-functions", "capture"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes"
+}

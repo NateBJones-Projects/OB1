@@ -34,6 +34,8 @@ A database and MCP server for storing and retrieving household facts — paint c
 - Supabase project configured
 - Supabase CLI installed and linked to your project
 
+> **No CLI?** Use `index.dashboard.ts` instead of `index.ts` and follow the [Dashboard Deploy Guide](../../docs/dashboard-deploy.md) — no local tooling required.
+
 ## Credential Tracker
 
 You'll reference these values during setup. Copy this block into a text editor and fill it in as you go.
@@ -96,6 +98,8 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 |---------|-------|
 | Function name | `household-knowledge-mcp` |
 | Download path | `extensions/household-knowledge` |
+
+> **No CLI?** Paste `index.dashboard.ts` directly into the Supabase dashboard editor. See the [Dashboard Deploy Guide](../../docs/dashboard-deploy.md).
 
 ### 4. Connect to Your AI
 
