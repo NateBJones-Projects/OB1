@@ -93,14 +93,14 @@ function buildFingerprint(text) {
 
 // ── REST helpers ────────────────────────────────────────────────────────────
 
-async function fetchBatch(cursorId, batchSize) {
+async function fetchBatch(cursorCreatedAt, batchSize) {
   const url =
     `${REST_BASE}/thoughts` +
     `?content_fingerprint=is.null` +
-    `&id=gt.${cursorId}` +
-    `&select=id,content` +
+    `&created_at=gt.${encodeURIComponent(cursorCreatedAt)}` +
+    `&select=id,content,created_at` +
     `&limit=${batchSize}` +
-    `&order=id.asc`;
+    `&order=created_at.asc`;
   const res = await fetch(url, { headers: HEADERS });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -173,7 +173,7 @@ function loadState() {
     return JSON.parse(fs.readFileSync(STATE_FILE, "utf8"));
   } catch {
     return {
-      cursorId: 0,
+      cursorCreatedAt: "1970-01-01T00:00:00Z",
       totalDeleted: 0,
       totalPatched: 0,
       totalWouldDelete: 0,
@@ -205,19 +205,19 @@ async function main() {
   }
 
   console.log(
-    `Resuming from cursor id=${state.cursorId} (deleted: ${state.totalDeleted}, patched: ${state.totalPatched})`
+    `Resuming from cursor created_at=${state.cursorCreatedAt} (deleted: ${state.totalDeleted}, patched: ${state.totalPatched})`
   );
   console.log(`Batch size: ${BATCH_SIZE}\n`);
 
   while (true) {
     state.batches++;
     process.stdout.write(
-      `Batch ${state.batches}: fetching from id>${state.cursorId}… `
+      `Batch ${state.batches}: fetching from created_at>${state.cursorCreatedAt}… `
     );
 
     let rows;
     try {
-      rows = await fetchBatch(state.cursorId, BATCH_SIZE);
+      rows = await fetchBatch(state.cursorCreatedAt, BATCH_SIZE);
     } catch (err) {
       console.error("\n  Fetch error:", err.message, "— retrying in 5s…");
       await new Promise((r) => setTimeout(r, 5000));
@@ -303,14 +303,14 @@ async function main() {
     }
 
     // Advance cursor
-    const maxId = rows[rows.length - 1].id;
-    state.cursorId = maxId;
+    const lastCreatedAt = rows[rows.length - 1].created_at;
+    state.cursorCreatedAt = lastCreatedAt;
     saveState(state);
 
     console.log(
       `  Totals: deleted=${state.totalDeleted}, patched=${state.totalPatched}, ` +
         `would-delete=${state.totalWouldDelete}, errors=${state.totalErrors}. ` +
-        `Cursor: ${state.cursorId}`
+        `Cursor: ${state.cursorCreatedAt}`
     );
 
     await new Promise((r) => setTimeout(r, 200));
