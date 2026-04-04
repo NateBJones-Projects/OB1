@@ -51,6 +51,8 @@ A complete meal planning system with recipes, weekly meal plans, and auto-genera
 - Working Open Brain setup
 - Extensions 1-3 recommended (Extension 3's family_members table is referenced for cross-extension integration)
 - Supabase CLI installed and linked to your project
+
+> **No CLI?** Use `index.dashboard.ts` instead of `index.ts` and follow the [Dashboard Deploy Guide](../../docs/dashboard-deploy.md) — no local tooling required.
 - **Required reading:** [Row Level Security](../../primitives/rls/) primitive
 - **Required reading:** [Shared MCP Server](../../primitives/shared-mcp/) primitive
 
@@ -132,6 +134,8 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 |---------|-------|
 | Function name | `meal-planning-mcp` |
 | Download path | `extensions/meal-planning` |
+
+> **No CLI?** Paste `index.dashboard.ts` directly into the Supabase dashboard editor. See the [Dashboard Deploy Guide](../../docs/dashboard-deploy.md).
 
 ### 4. Connect to Your AI
 
