@@ -6,7 +6,7 @@
  * thoughts with embeddings into your Open Brain Supabase instance.
  *
  * Usage:
- *   node import-limitless.mjs /path/to/lifelogs [--dry-run] [--skip N] [--limit N] [--concurrency N]
+ *   node import-limitless.mjs /path/to/lifelogs [--dry-run] [--skip N] [--limit N]
  */
 
 import { createClient } from "@supabase/supabase-js";
@@ -36,12 +36,13 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const args = process.argv.slice(2);
 const dirPath = args.find((a) => !a.startsWith("--"));
 const dryRun = args.includes("--dry-run");
-const skip = parseInt(args[args.indexOf("--skip") + 1]) || 0;
-const limit = parseInt(args[args.indexOf("--limit") + 1]) || Infinity;
-const concurrency = parseInt(args[args.indexOf("--concurrency") + 1]) || 1;
+const skipIdx = args.indexOf("--skip");
+const skip = skipIdx !== -1 ? parseInt(args[skipIdx + 1]) || 0 : 0;
+const limitIdx = args.indexOf("--limit");
+const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1]) || Infinity : Infinity;
 
 if (!dirPath) {
-  console.error("Usage: node import-limitless.mjs /path/to/lifelogs [--dry-run] [--skip N] [--limit N]");
+  console.error("Usage: node import-limitless.mjs /path/to/lifelogs [--dry-run] [--skip N] [--limit N]\n\nNote: Timestamps are parsed from filenames as UTC. If your Limitless recordings\nuse local time, timestamps will be offset by your timezone difference.");
   process.exit(1);
 }
 

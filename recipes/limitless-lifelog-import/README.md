@@ -103,3 +103,6 @@ The script processes files sequentially by default. If you hit rate limits, wait
 
 **Issue: Duplicate thoughts after re-running**
 This shouldn't happen — content fingerprints prevent duplicates. If you see duplicates, check that the `content_fingerprint` column and unique index exist on your `thoughts` table.
+
+**Issue: Timestamps are offset by several hours**
+Limitless filenames use your local timezone, but the script parses them as UTC. If your timezone is UTC-5, timestamps will appear 5 hours early. This is a known limitation — a `--timezone` flag is not yet implemented.
