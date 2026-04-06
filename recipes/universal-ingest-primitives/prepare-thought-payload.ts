@@ -19,10 +19,7 @@
  *   - Detecting sensitivity tiers (if applicable)
  */
 
-import {
-  parseStructuredCapture,
-  normalizeTypeHint,
-} from "./parse-structured-capture.ts";
+import { parseStructuredCapture } from "./parse-structured-capture.ts";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

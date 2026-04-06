@@ -5,6 +5,7 @@
  * inline with their thought content.
  *
  * Format: [type] [topic] thought content + optional next step
+ *         [type] thought content + optional next step
  *
  * Examples:
  *   "[decision] [architecture] Use PostgreSQL for analytics + Evaluate pgvector by Friday"
@@ -87,6 +88,28 @@ export function parseStructuredCapture(content: string): StructuredCapture {
   );
 
   if (!match) {
+    // Try single-bracket: [type] body + optional next step
+    const singleMatch = /^\s*\[([^\]]+)\]\s+(.+?)(?:\s*\+\s*(.+))?$/i.exec(
+      trimmed
+    );
+
+    if (singleMatch) {
+      const typeHint = normalizeTypeHint(singleMatch[1] ?? "");
+      const thoughtBody = (singleMatch[2] ?? "").trim();
+      const nextStep = (singleMatch[3] ?? "").trim().slice(0, 180) || null;
+      const normalizedText = nextStep
+        ? `${thoughtBody} Next step: ${nextStep}`
+        : thoughtBody;
+
+      return {
+        matched: true,
+        normalizedText,
+        typeHint,
+        topicHint: null,
+        nextStep,
+      };
+    }
+
     return {
       matched: false,
       normalizedText: trimmed,

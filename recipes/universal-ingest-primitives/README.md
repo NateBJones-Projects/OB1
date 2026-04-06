@@ -25,11 +25,13 @@ Accepts an optional bracket syntax for inline type and topic hints:
 
 ```
 [type] [topic] thought body + optional next step
+[type] thought body + optional next step
 ```
 
 Examples:
 - `[decision] [architecture] Use PostgreSQL for the analytics service + Evaluate pgvector by Friday`
-- `[lesson] [devops] Never run database migrations during peak traffic`
+- `[lesson] Never run database migrations during peak traffic`
+- `[idea] [devops] Automate staging deploys with a webhook`
 - `Plain text without brackets passes through unchanged`
 
 The parser recognizes all 8 Open Brain thought types plus common aliases (`ref` → `reference`, `person` → `person_note`, `event` → `meeting`).
@@ -151,7 +153,7 @@ Verify by capturing the same thought through two different paths and confirming 
 ## Troubleshooting
 
 **Issue: Structured capture not being parsed**
-Solution: The bracket syntax requires both type and topic brackets: `[type] [topic] content`. A single bracket like `[idea] My thought` will not match. Both brackets are required.
+Solution: At minimum, the type bracket is required: `[type] content`. You can optionally add a topic bracket: `[type] [topic] content`. If neither format matches, the input is treated as plain text. Check that the type is one of the 8 canonical types or a recognized alias.
 
 **Issue: Type resolves to "idea" when I expected something else**
 Solution: Check the precedence order. If your caller override is empty and there's no structured hint, the default is "idea". Pass the type explicitly in `opts.metadata.type` or `opts.extracted.type`.
