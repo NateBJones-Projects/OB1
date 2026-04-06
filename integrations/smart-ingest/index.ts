@@ -786,7 +786,17 @@ async function handleExecuteJob(req: Request): Promise<Response> {
     .from("ingestion_items").select("*").eq("job_id", jobId).order("id");
   const items = itemRows ?? [];
 
-  await updateJobById(jobId, { status: "executing" });
+  // CAS: only transition dry_run_complete -> executing; concurrent requests get 409
+  const { data: casRow, error: casErr } = await supabase
+    .from("ingestion_jobs")
+    .update({ status: "executing" })
+    .eq("id", jobId)
+    .eq("status", "dry_run_complete")
+    .select("id, status")
+    .maybeSingle();
+  if (casErr || !casRow || casRow.status !== "executing") {
+    return json({ error: "Job execution conflict — another request may have claimed this job" }, 409);
+  }
 
   let addedCount = 0, skippedCount = 0, appendedCount = 0, revisedCount = 0;
   const sourceLabel = job.source_label ?? null;
@@ -1001,7 +1011,12 @@ Deno.serve(async (req) => {
 
     try {
       const fingerprint = await computeContentFingerprint(thought.content);
-      const embedding = await embedText(thought.content);
+      let embedding: number[] = [];
+      try {
+        embedding = await embedText(thought.content);
+      } catch (embedErr) {
+        console.warn(`embedText failed for thought (fingerprint=${fingerprint}), proceeding with null embedding:`, embedErr instanceof Error ? embedErr.message : String(embedErr));
+      }
       const reconciled = await reconcileThought(thought, embedding, fingerprint, jobFingerprints);
       jobFingerprints.add(fingerprint);
       items.push({ ...reconciled, status: "pending", error_message: null });
