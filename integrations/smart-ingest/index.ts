@@ -53,11 +53,11 @@ const CORS_HEADERS: Record<string, string> = {
 
 const EXTRACTION_SYSTEM_PROMPT = [
   "You extract atomic, self-contained thoughts from documents.",
-  'Return a JSON array of objects: [{"content": "...", "type": "idea|task|decision|lesson|reference|meeting|journal|person_note"}]',
+  'Return a JSON object with a "thoughts" array: {"thoughts": [{"content": "...", "type": "idea|task|decision|lesson|reference|meeting|journal|person_note"}]}',
   "Each thought should be a single, standalone insight that makes sense without the original document.",
   "Extract 1-20 thoughts depending on document length. Quality over quantity.",
   "Do NOT extract generic facts or filler. Focus on personal decisions, lessons, insights, and action items.",
-  "Return ONLY the JSON array — no markdown fences, no commentary.",
+  'Return ONLY the JSON object {"thoughts": [...]} — no markdown fences, no commentary.',
 ].join("\n");
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -248,12 +248,7 @@ async function callOpenAI(text: string): Promise<ExtractedThought[]> {
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
-        {
-          role: "system",
-          content:
-            EXTRACTION_SYSTEM_PROMPT +
-            '\nWrap the array in {"thoughts": [...]}',
-        },
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
         { role: "user", content: text },
       ],
     }),
@@ -282,11 +277,7 @@ async function callOpenRouter(text: string): Promise<ExtractedThought[]> {
       model: "anthropic/claude-3.5-haiku",
       temperature: 0.2,
       messages: [
-        {
-          role: "system",
-          content:
-            EXTRACTION_SYSTEM_PROMPT + "\nReturn a JSON array directly.",
-        },
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
         { role: "user", content: text },
       ],
     }),

@@ -33,10 +33,22 @@ Below 0.85, the thought is treated as entirely new (`add`).
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
-- Ingestion Jobs schema (see `schemas/ingestion-jobs` contribution) applied to your database
+- **Ingestion Jobs schema** (PR #98 / `schemas/ingestion-jobs`) applied to your database — this PR must be merged first
 - At least one LLM API key for extraction: Anthropic, OpenAI, or OpenRouter
 - An embedding API key: OpenAI or OpenRouter (Anthropic does not provide embeddings)
 - Supabase CLI installed
+
+### Required RPCs
+
+This Edge Function depends on these database functions:
+
+| RPC | Source | Purpose |
+|-----|--------|---------|
+| `append_thought_evidence(uuid, jsonb)` | `schemas/ingestion-jobs` (PR #98) | Appends corroborating evidence to an existing thought's metadata |
+| `match_thoughts(vector, int, float, jsonb)` | Core OB1 schema | Semantic similarity search for deduplication |
+| `upsert_thought(text, jsonb)` | Core OB1 schema | Creates or updates a thought with content and payload |
+
+If any of these RPCs are missing, the Edge Function will return errors at runtime.
 
 ## Cost
 
