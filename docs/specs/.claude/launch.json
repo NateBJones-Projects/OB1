@@ -4,31 +4,31 @@
     {
       "name": "Brain App",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "apps/brain", "run", "dev", "--", "--port", "3000"],
+      "runtimeArgs": ["--prefix", "../../apps/brain", "run", "dev", "--", "--port", "3000"],
       "port": 3000
     },
     {
       "name": "Home Maintenance Dashboard",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "dashboards/home-maintenance", "run", "dev", "--", "--port", "3002"],
+      "runtimeArgs": ["--prefix", "../../dashboards/home-maintenance", "run", "dev", "--", "--port", "3002"],
       "port": 3002
     },
     {
       "name": "Data Browser Dashboard",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "dashboards/data-browser", "run", "dev", "--", "--port", "3001"],
+      "runtimeArgs": ["--prefix", "../../dashboards/data-browser", "run", "dev", "--", "--port", "3001"],
       "port": 3001
     },
     {
       "name": "Thought Explorer",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "dashboards/thought-explorer", "run", "dev", "--", "--port", "3003"],
+      "runtimeArgs": ["--prefix", "../../dashboards/thought-explorer", "run", "dev", "--", "--port", "3003"],
       "port": 3003
     },
     {
       "name": "Command Center",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "dashboards/command-center", "run", "dev", "--", "--port", "3004"],
+      "runtimeArgs": ["--prefix", "../../dashboards/command-center", "run", "dev", "--", "--port", "3004"],
       "port": 3004
     }
   ]
