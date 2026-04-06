@@ -15,3 +15,5 @@
 .DS_Store
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel

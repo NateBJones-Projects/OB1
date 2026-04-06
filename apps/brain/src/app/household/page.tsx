@@ -237,7 +237,8 @@ export default function HouseholdPage() {
     setTasksError(null)
     try {
       setTasks(await getTasks())
-    } catch {
+    } catch (error) {
+      console.error('[HouseholdPage] failed to load maintenance tasks', error)
       setTasksError('Failed to load maintenance tasks.')
     } finally {
       setTasksLoading(false)
@@ -249,7 +250,8 @@ export default function HouseholdPage() {
     setItemsError(null)
     try {
       setItems(await getItems())
-    } catch {
+    } catch (error) {
+      console.error('[HouseholdPage] failed to load household items', error)
       setItemsError('Failed to load household items.')
     } finally {
       setItemsLoading(false)
@@ -263,7 +265,8 @@ export default function HouseholdPage() {
       const [data, types] = await Promise.all([getVendors(), getServiceTypes()])
       setVendors(data)
       setServiceTypes(types)
-    } catch {
+    } catch (error) {
+      console.error('[HouseholdPage] failed to load vendors', error)
       setVendorsError('Failed to load vendors.')
     } finally {
       setVendorsLoading(false)

@@ -10,3 +10,4 @@ credentials.json
 token.json
 gmail-sync-log.json
 sync-log.json
+.vercel

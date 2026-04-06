@@ -50,16 +50,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const supabase = getSupabase(supabaseRef)
 
-    async function fetchHouseholdInfo(userId: string) {
-      const { data } = await supabase
-        .from('household_members')
-        .select('household_id, role')
-        .eq('user_id', userId)
-        .single()
+    async function fetchHouseholdInfo() {
+      const { data, error } = await supabase.rpc('get_my_household_membership')
 
-      if (data) {
-        setRole(data.role as 'owner' | 'member')
-        setHouseholdId(data.household_id)
+      if (error) {
+        console.error('[AuthProvider] failed to load household membership', error)
+        setRole(null)
+        setHouseholdId(null)
+        return
+      }
+
+      const membership = Array.isArray(data) ? data[0] : data
+
+      if (membership?.household_id) {
+        setRole((membership.role as 'owner' | 'member') ?? null)
+        setHouseholdId(membership.household_id)
+      } else {
+        setRole(null)
+        setHouseholdId(null)
       }
     }
 
@@ -67,8 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       if (currentUser) {
-        fetchHouseholdInfo(currentUser.id).then(() => setLoading(false))
+        fetchHouseholdInfo().then(() => setLoading(false))
       } else {
+        setRole(null)
+        setHouseholdId(null)
         setLoading(false)
       }
     })
@@ -79,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       if (currentUser) {
-        fetchHouseholdInfo(currentUser.id).then(() => setLoading(false))
+        fetchHouseholdInfo().then(() => setLoading(false))
       } else {
         setRole(null)
         setHouseholdId(null)
