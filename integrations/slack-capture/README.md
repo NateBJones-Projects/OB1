@@ -2,7 +2,7 @@
 
 ## What It Does
 
-Adds Slack as a quick-capture interface for your Open Brain. Type a thought in a Slack channel, it gets automatically embedded, classified, and stored — with a threaded confirmation reply showing how your message was categorized.
+Adds Slack as a quick-capture interface for your Open Brain. Type a thought in a Slack channel, it gets automatically embedded, classified, and stored as a thought in your database. Processing is silent — capture is confirmed via console logs rather than Slack thread replies, keeping the channel clean.
 
 ## Prerequisites
 
@@ -130,7 +130,15 @@ CREATE TABLE IF NOT EXISTS slack_events (
   event_id TEXT PRIMARY KEY,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE slack_events ENABLE ROW LEVEL SECURITY;
+-- No policies needed: service_role bypasses RLS, and anon/authenticated should not access this table.
 ```
+
+> **Maintenance:** The `slack_events` table grows with every Slack event. For active workspaces, periodically clean up old dedup records:
+> ```sql
+> DELETE FROM slack_events WHERE created_at < NOW() - INTERVAL '7 days';
+> ```
 
 ### Set Your Secrets
 
@@ -207,6 +215,25 @@ You can now search for these thoughts using any MCP-connected AI (Claude Desktop
 
 ---
 
+## Upgrading from a Previous Version
+
+If you had an earlier version of this integration, note the following changes:
+
+- **Removed:** `SLACK_BOT_TOKEN` — the function no longer replies in Slack threads, so no bot token is needed
+- **Renamed:** `SLACK_CAPTURE_CHANNEL` → `SLACK_CAPTURE_CHANNEL_ID` — update your secrets accordingly
+- **New:** `SLACK_SIGNING_SECRET` — required for HMAC-SHA256 request verification (App Settings → Basic Information → Signing Secret)
+- **New table:** `slack_events` — required for event-level dedup (see "Create the Dedup Table" above)
+- **Behavior change:** Capture is now silent (no threaded reply in Slack). Confirmations are logged to the Edge Function console.
+
+Update your secrets:
+```bash
+supabase secrets unset SLACK_BOT_TOKEN SLACK_CAPTURE_CHANNEL
+supabase secrets set SLACK_SIGNING_SECRET=your-signing-secret
+supabase secrets set SLACK_CAPTURE_CHANNEL_ID=your-channel-id
+```
+
+---
+
 ## Troubleshooting
 
 ### Slack says "Request URL not verified"
@@ -235,7 +262,7 @@ supabase secrets list
 
 ### No confirmation reply in Slack
 
-The bot token might be wrong, or `chat:write` scope wasn't added. Go to your Slack app → OAuth & Permissions and verify. If you added the scope after installing, you need to reinstall the app.
+This is expected. The current implementation captures silently and logs to the Edge Function console. It does not reply in Slack threads. Check the Edge Function logs (Supabase dashboard → Edge Functions → Logs) to confirm captures are working.
 
 ### Metadata extraction seems off
 
