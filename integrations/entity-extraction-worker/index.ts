@@ -362,6 +362,20 @@ async function upsertEdge(
 
 // ── Queue Management ────────────────────────────────────────────────────────
 
+/** Peek at pending items without changing their status (for dry-run mode). */
+async function peekQueueItems(limit: number): Promise<Array<{ thought_id: number }>> {
+  const { data, error } = await supabase
+    .from("entity_extraction_queue")
+    .select("thought_id")
+    .eq("status", "pending")
+    .order("queued_at", { ascending: true })
+    .limit(limit);
+
+  if (error || !data) return [];
+  return data;
+}
+
+/** Atomically claim pending items — returns only items this worker actually acquired. */
 async function claimQueueItems(limit: number): Promise<Array<{ thought_id: number }>> {
   const { data: pending, error: fetchError } = await supabase
     .from("entity_extraction_queue")
@@ -374,7 +388,10 @@ async function claimQueueItems(limit: number): Promise<Array<{ thought_id: numbe
 
   const ids = pending.map((p) => p.thought_id);
 
-  const { error: updateError } = await supabase
+  // Atomic claim: the .eq("status", "pending") guard ensures only items still
+  // pending are updated. .select() returns the rows actually claimed, so
+  // concurrent workers don't see each other's items.
+  const { data: claimed, error: updateError } = await supabase
     .from("entity_extraction_queue")
     .update({
       status: "processing",
@@ -382,14 +399,15 @@ async function claimQueueItems(limit: number): Promise<Array<{ thought_id: numbe
       worker_version: WORKER_VERSION,
     })
     .in("thought_id", ids)
-    .eq("status", "pending");
+    .eq("status", "pending")
+    .select("thought_id");
 
   if (updateError) {
     console.error("Failed to claim queue items:", updateError);
     return [];
   }
 
-  return pending;
+  return claimed ?? [];
 }
 
 async function markComplete(thoughtId: number): Promise<void> {
@@ -401,6 +419,7 @@ async function markComplete(thoughtId: number): Promise<void> {
 
 async function markError(thoughtId: number, error: string, attemptCount: number): Promise<void> {
   const newStatus = attemptCount + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
+  const isRetry = newStatus === "pending";
   await supabase
     .from("entity_extraction_queue")
     .update({
@@ -408,6 +427,9 @@ async function markError(thoughtId: number, error: string, attemptCount: number)
       attempt_count: attemptCount + 1,
       last_error: error.slice(0, 500),
       processed_at: newStatus === "failed" ? new Date().toISOString() : null,
+      // Clear claim state on retry so the item doesn't look stale in monitoring
+      started_at: isRetry ? null : undefined,
+      worker_version: isRetry ? null : undefined,
     })
     .eq("thought_id", thoughtId);
 }
@@ -435,8 +457,10 @@ Deno.serve(async (req) => {
   const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") ?? "10", 10) || 10, 1), 50);
   const dryRun = url.searchParams.get("dry_run") === "true";
 
-  // Step 1: Claim queue items
-  const claimed = await claimQueueItems(limit);
+  // Step 1: Fetch queue items — peek only for dry-run, claim for real processing
+  const claimed = dryRun
+    ? await peekQueueItems(limit)
+    : await claimQueueItems(limit);
 
   if (claimed.length === 0) {
     return json({ processed: 0, succeeded: 0, failed: 0, entities_created: 0, edges_created: 0, dry_run: dryRun });
