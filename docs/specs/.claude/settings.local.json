@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(npx next:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(done)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(gh pr:*)",
+      "Read(//c/Users/tinkl/Documents/GitHub/BigOleBrain/**)",
+      "Bash(supabase functions:*)"
     ]
   }
 }

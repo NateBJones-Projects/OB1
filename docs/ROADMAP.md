@@ -45,13 +45,14 @@ See `CLAUDE.md` for the full list. Key rules:
 | 2.2 Liv's dashboard | 🚫 Superseded by Phase 3 | `docs/specs/2.2-livs-dashboard.md` |
 | 2.3 Instacart export | 🔲 Standalone | `docs/specs/2.3-instacart-export.md` |
 | **Phase 3: Unified app** | | |
-| 3.0-s1 App shell + auth | 🔲 Ready | `docs/specs/3.0-s1-app-shell-auth.md` |
-| 3.0-s2 Shared components | 🔲 Blocked on 3.0-s1 | `docs/specs/3.0-s2-shared-components.md` |
-| 3.0-s3 Actions screen | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s3-actions-screen.md` |
-| 3.0-s4 Household screen | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s4-household-screen.md` |
-| 3.0-s5 Meals screen | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s5-meals-screen.md` |
-| 3.0-s6 Morning briefing | 🔲 Blocked on 3.0-s3, s4, s5 | `docs/specs/3.0-s6-morning-briefing.md` |
-| 3.0-s7 Agent feed | 🔲 Blocked on 3.0-s2 | `docs/specs/3.0-s7-agent-feed.md` |
+| 3.0-s1 App shell + auth | ✅ Complete| `docs/specs/3.0-s1-app-shell-auth.md` |
+| 3.0-s2 Shared components | ✅ Complete | `docs/specs/3.0-s2-shared-components.md` |
+| 3.0-s3 Actions screen | ✅ Complete | `docs/specs/3.0-s3-actions-screen.md` |
+| 3.0-s3 Thoughts screen | ✅ Complete | `docs/specs/3.0-s3b-thoughts-screen.md` |
+| 3.0-s4 Household screen | ✅ Complete | `docs/specs/3.0-s4-household-screen.md` |
+| 3.0-s5 Meals screen | ✅ Complete | `docs/specs/3.0-s5-meals-screen.md` |
+| 3.0-s6 Morning briefing | ✅ Complete | `docs/specs/3.0-s6-morning-briefing.md` |
+| 3.0-s7 Agent feed | ✅ Complete | `docs/specs/3.0-s7-agent-feed.md` |
 | 3.0-s8 Polish + Vercel deploy | 🔲 Blocked on 3.0-s7 | `docs/specs/3.0-s8-polish-deploy.md` |
 | 4.1 Thought graph | 🔲 Phase 4 | `docs/specs/4.1-thought-graph.md` |
 | 4.3 Capture sources | 🔲 Modular | `docs/specs/4.3-capture-sources.md` |
