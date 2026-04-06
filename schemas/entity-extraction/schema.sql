@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS public.edges (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.thought_entities (
-  thought_id BIGINT NOT NULL REFERENCES public.thoughts(id) ON DELETE CASCADE,
+  thought_id UUID NOT NULL REFERENCES public.thoughts(id) ON DELETE CASCADE,
   entity_id BIGINT NOT NULL REFERENCES public.entities(id) ON DELETE CASCADE,
   mention_role TEXT NOT NULL DEFAULT 'mentioned',
   confidence NUMERIC(3,2),
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS public.thought_entities (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.entity_extraction_queue (
-  thought_id BIGINT PRIMARY KEY REFERENCES public.thoughts(id) ON DELETE CASCADE,
+  thought_id UUID PRIMARY KEY REFERENCES public.thoughts(id) ON DELETE CASCADE,
   status TEXT NOT NULL DEFAULT 'pending',  -- pending, processing, complete, failed, skipped
   attempt_count INT NOT NULL DEFAULT 0,
   last_error TEXT,
@@ -90,8 +90,8 @@ CREATE TABLE IF NOT EXISTS public.entity_extraction_queue (
 CREATE TABLE IF NOT EXISTS public.consolidation_log (
   id BIGSERIAL PRIMARY KEY,
   operation TEXT NOT NULL,           -- dedup_merge, metadata_fix, bio_synthesis, etc.
-  survivor_id BIGINT,
-  loser_id BIGINT,
+  survivor_id UUID,
+  loser_id UUID,
   details JSONB NOT NULL DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
