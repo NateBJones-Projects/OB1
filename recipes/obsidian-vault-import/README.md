@@ -63,30 +63,38 @@ FILE LOCATION
 1. **Clone or copy this recipe folder** to your local machine.
 
 2. **Install Python dependencies:**
+
    ```bash
    cd recipes/obsidian-vault-import
    pip install -r requirements.txt
    ```
 
 3. **Create your `.env` file** from the example:
+
    ```bash
    cp .env.example .env
    ```
+
    Edit `.env` and fill in your Supabase URL, API key, and OpenRouter API key. Find your Supabase credentials in the dashboard under Settings → API.
 
 4. **Run a dry run first** to see what would be imported:
+
    ```bash
    python import-obsidian.py /path/to/your/vault --dry-run --verbose
    ```
+
    This scans your vault, shows how many notes pass filters, how many thoughts would be generated, and flags any notes containing potential secrets — without inserting anything.
 
 5. **Start with a small batch** to verify everything works:
+
    ```bash
    python import-obsidian.py /path/to/your/vault --limit 20 --verbose
    ```
+
    The script runs a preflight check before any import — it verifies your Supabase connection and OpenRouter API key before spending time on chunking or embeddings.
 
 6. **Run the full import** once you're satisfied:
+
    ```bash
    python import-obsidian.py /path/to/your/vault --verbose
    ```
@@ -132,6 +140,7 @@ The script automatically skips notes that wouldn't make useful thoughts. Run wit
 **Date-filtered notes** — when using `--after YYYY-MM-DD`, notes not modified after that date are skipped.
 
 **Additional folder exclusions** — use `--skip-folders` for vault-specific directories you don't want imported:
+
 ```bash
 # Skip framework reference materials, archive, and attachments
 python import-obsidian.py /path/to/vault --skip-folders "Archive,Files,patterns"
@@ -155,7 +164,7 @@ The dry run (`--dry-run`) also runs the scanner, so you can review what would be
 The script uses a hybrid chunking strategy to turn notes into atomic thoughts:
 
 1. **Short notes** (under 500 words) become a single thought.
-2. **Notes with headings** are split at `## ` boundaries — each section becomes one thought.
+2. **Notes with headings** are split at `##` boundaries — each section becomes one thought.
 3. **Long sections** (over 1000 words) are sent to an LLM (gpt-4o-mini via OpenRouter) which distills them into 1-3 standalone thoughts.
 
 Use `--no-llm` to skip step 3 if you want to avoid LLM costs. Heading-based splitting still works.

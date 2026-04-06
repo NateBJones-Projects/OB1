@@ -53,12 +53,14 @@ FROM OPENROUTER
    - Look for the `your_instagram_activity/` folder
 
 2. **Copy this recipe folder** and install dependencies:
+
    ```bash
    cd instagram-import
    npm install
    ```
 
 3. **Create `.env`** with your credentials (see `.env.example`):
+
    ```env
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -66,17 +68,20 @@ FROM OPENROUTER
    ```
 
 4. **Preview what will be imported** (dry run):
+
    ```bash
    node import-instagram.mjs /path/to/instagram-export --dry-run
    ```
 
 5. **Import specific types only** (optional):
+
    ```bash
    node import-instagram.mjs /path/to/instagram-export --types messages
    node import-instagram.mjs /path/to/instagram-export --types comments,posts
    ```
 
 6. **Run the full import:**
+
    ```bash
    node import-instagram.mjs /path/to/instagram-export
    ```

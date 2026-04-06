@@ -51,12 +51,14 @@ FROM OPENROUTER
    - You should see a `data/` folder containing `tweets.js`, `direct-messages.js`, etc.
 
 2. **Copy this recipe folder** and install dependencies:
+
    ```bash
    cd x-twitter-import
    npm install
    ```
 
 3. **Create `.env`** with your credentials (see `.env.example`):
+
    ```env
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -64,17 +66,20 @@ FROM OPENROUTER
    ```
 
 4. **Preview what will be imported** (dry run):
+
    ```bash
    node import-x-twitter.mjs /path/to/twitter-export --dry-run
    ```
 
 5. **Import specific types only** (optional):
+
    ```bash
    node import-x-twitter.mjs /path/to/twitter-export --types tweets
    node import-x-twitter.mjs /path/to/twitter-export --types dms,grok
    ```
 
 6. **Run the full import:**
+
    ```bash
    node import-x-twitter.mjs /path/to/twitter-export
    ```

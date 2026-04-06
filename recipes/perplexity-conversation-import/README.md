@@ -222,6 +222,7 @@ For a typical export with 100 conversations and 50 memory entries, total cost is
 ## Troubleshooting
 
 **"No module named 'openpyxl'"**
+
 ```bash
 pip install openpyxl>=3.1
 ```
@@ -230,9 +231,11 @@ pip install openpyxl>=3.1
 Your export may use different sheet names. Open the file in a spreadsheet app and check the sheet tabs. The script looks for exact names "Conversations" and "Memory".
 
 **"OPENROUTER_API_KEY environment variable required"**
+
 ```bash
 export OPENROUTER_API_KEY="sk-or-v1-your-key"
 ```
+
 Or use `--model ollama` for local summarization (embeddings still need OpenRouter).
 
 **Summarization returns empty thoughts**
@@ -240,6 +243,7 @@ Some Q&A pairs are too simple (e.g., "what time is it?"). This is expected — t
 
 **"Failed to generate embedding"**
 Check your OpenRouter API key has credits and access to `text-embedding-3-small`. Test with:
+
 ```bash
 curl https://openrouter.ai/api/v1/embeddings \
   -H "Authorization: Bearer $OPENROUTER_API_KEY" \
