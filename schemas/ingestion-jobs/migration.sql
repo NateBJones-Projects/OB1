@@ -83,7 +83,8 @@ begin
   select coalesce(metadata->'evidence', '[]'::jsonb)
     into v_current_evidence
     from public.thoughts
-   where id = p_thought_id;
+   where id = p_thought_id
+   for update;
 
   if not found then
     raise exception 'thought % not found', p_thought_id;
@@ -130,6 +131,7 @@ $$;
 grant select, insert, update, delete on table public.ingestion_jobs to service_role;
 grant select, insert, update, delete on table public.ingestion_items to service_role;
 grant execute on function public.append_thought_evidence to service_role;
+revoke execute on function public.append_thought_evidence(uuid, jsonb) from public;
 
 -- RLS: enable row-level security (no policies = service-role only by default)
 alter table public.ingestion_jobs enable row level security;
