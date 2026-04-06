@@ -85,7 +85,7 @@ ALTER TABLE thoughts ALTER COLUMN embedding TYPE vector(1024);
 You will also need to recreate the `match_thoughts` function with the matching dimension. See the [getting started guide](../../docs/01-getting-started.md) for the function definition and replace `vector(1536)` with your model's dimension.
 
 > **Note:** `rjmalagon/gte-qwen2-1.5b-instruct-embed-f16` is a community-published model (a quantized version of Alibaba's GTE-Qwen2-1.5B-instruct). It is not published by an official organization on Ollama. If you prefer an officially published model, use nomic-embed-text or mxbai-embed-large and adjust your schema accordingly.
-
+>
 > **Important:** Do **not** mix embeddings from different models in the same similarity search. Embeddings from different models occupy different semantic spaces — cosine similarity between them is meaningless, even if the dimensions happen to match. If you switch models, re-embed your entire corpus.
 
 ### 3. Clone and install
@@ -106,26 +106,31 @@ export $(cat .env | xargs)
 ### 5. Embed a thought
 
 **From a string argument:**
+
 ```bash
 python embed-local.py "The key insight from today's meeting was that we need to ship the MVP before expanding the feature set."
 ```
 
 **From stdin (pipe from another tool):**
+
 ```bash
 echo "My important thought" | python embed-local.py
 ```
 
 **From a text file (one thought per line):**
+
 ```bash
 python embed-local.py --file my-thoughts.txt
 ```
 
 **From a JSONL file (structured input):**
+
 ```bash
 python embed-local.py --file thoughts.jsonl
 ```
 
 JSONL format:
+
 ```json
 {"content": "The thought text", "source": "journal", "metadata": {"project": "acme"}}
 {"content": "Another thought", "source": "meeting-notes"}
