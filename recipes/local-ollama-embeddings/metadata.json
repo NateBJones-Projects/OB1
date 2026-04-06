@@ -1,0 +1,20 @@
+{
+  "name": "Local Embeddings via Ollama",
+  "description": "Generate embeddings locally using Ollama and insert thoughts into Supabase — no cloud API key needed for the embedding step.",
+  "category": "recipes",
+  "author": {
+    "name": "Sam Rogers",
+    "github": "snapsynapse"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Python 3.10+", "Ollama"]
+  },
+  "tags": ["ollama", "embeddings", "local", "offline", "privacy"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-03-14",
+  "updated": "2026-04-05"
+}
