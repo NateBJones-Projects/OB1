@@ -91,7 +91,8 @@ BEGIN
   SELECT coalesce(metadata->'evidence', '[]'::jsonb)
     INTO v_current_evidence
     FROM public.thoughts
-   WHERE id = p_thought_id;
+   WHERE id = p_thought_id
+   FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'thought % not found', p_thought_id;
@@ -142,8 +143,9 @@ GRANT ALL ON TABLE public.ingestion_jobs TO service_role;
 GRANT ALL ON TABLE public.ingestion_items TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.ingestion_jobs_id_seq TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.ingestion_items_id_seq TO service_role;
+REVOKE EXECUTE ON FUNCTION public.append_thought_evidence(bigint, jsonb) FROM public;
 GRANT EXECUTE ON FUNCTION public.append_thought_evidence(bigint, jsonb)
-  TO authenticated, anon, service_role;
+  TO service_role;
 
 -- Notify PostgREST to reload schema cache
 NOTIFY pgrst, 'reload schema';
