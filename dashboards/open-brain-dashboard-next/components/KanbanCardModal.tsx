@@ -113,7 +113,7 @@ export function KanbanCardModal({
   });
   const currentPriority = getPriorityLevel(importance);
 
-  return createPortal(
+  return <>{createPortal(
     <div
       ref={backdropRef}
       onClick={handleBackdropClick}
@@ -126,32 +126,6 @@ export function KanbanCardModal({
         onClick={(e) => e.stopPropagation()}
         className="bg-bg-surface border border-border rounded-xl w-full max-h-full max-w-lg flex flex-col shadow-2xl overflow-hidden mx-auto"
       >
-        {/* Delete confirmation banner */}
-        {showDeleteConfirm && (
-          <div className="flex items-center justify-between px-5 py-2.5 bg-danger/10 border-b border-danger/20 shrink-0">
-            <span className="text-sm text-danger">Delete permanently?</span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-3 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onDelete(thought.id);
-                  onClose();
-                }}
-                className="px-3 py-1 text-xs text-danger hover:text-red-300 transition-colors font-medium"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Discard confirmation banner */}
         {showDiscardConfirm && (
           <div className="flex items-center justify-between px-5 py-2.5 bg-warning/10 border-b border-warning/20 shrink-0">
@@ -319,5 +293,43 @@ export function KanbanCardModal({
       </div>
     </div>,
     document.body
-  );
+  )}
+
+  {showDeleteConfirm && createPortal(
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
+      onClick={() => setShowDeleteConfirm(false)}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-bg-surface border border-border rounded-xl p-6 w-full max-w-sm shadow-2xl mx-4"
+      >
+        <h3 className="text-base font-semibold text-text-primary mb-2">Delete thought?</h3>
+        <p className="text-sm text-text-secondary mb-5">
+          This will permanently delete this thought. This action cannot be undone.
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(false)}
+            className="px-4 py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onDelete(thought.id);
+              onClose();
+            }}
+            className="px-4 py-1.5 text-sm rounded-lg bg-danger text-white hover:bg-danger/80 transition-colors"
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )}</>;
+
 }
