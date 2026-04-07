@@ -12,6 +12,7 @@ interface KanbanCardModalProps {
     updates: { content?: string; status?: string; importance?: number; type?: string }
   ) => void;
   onArchive: (thoughtId: number) => void;
+  onDelete: (thoughtId: number) => void;
   onClose: () => void;
 }
 
@@ -19,6 +20,7 @@ export function KanbanCardModal({
   thought,
   onSave,
   onArchive,
+  onDelete,
   onClose,
 }: KanbanCardModalProps) {
   const [content, setContent] = useState(thought.content);
@@ -27,6 +29,7 @@ export function KanbanCardModal({
   const [type, setType] = useState(thought.type);
   const [hasChanges, setHasChanges] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -123,6 +126,32 @@ export function KanbanCardModal({
         onClick={(e) => e.stopPropagation()}
         className="bg-bg-surface border border-border rounded-xl w-full max-h-full max-w-lg flex flex-col shadow-2xl overflow-hidden mx-auto"
       >
+        {/* Delete confirmation banner */}
+        {showDeleteConfirm && (
+          <div className="flex items-center justify-between px-5 py-2.5 bg-danger/10 border-b border-danger/20 shrink-0">
+            <span className="text-sm text-danger">Delete permanently?</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                className="px-3 py-1 text-xs text-text-secondary hover:text-text-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onDelete(thought.id);
+                  onClose();
+                }}
+                className="px-3 py-1 text-xs text-danger hover:text-red-300 transition-colors font-medium"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Discard confirmation banner */}
         {showDiscardConfirm && (
           <div className="flex items-center justify-between px-5 py-2.5 bg-warning/10 border-b border-warning/20 shrink-0">
@@ -241,7 +270,7 @@ export function KanbanCardModal({
 
         {/* Actions — always visible */}
         <div className="flex items-center justify-between px-5 py-3 border-t border-border shrink-0">
-          <div>
+          <div className="flex items-center gap-3">
             {thought.status === "done" && (
               <button
                 type="button"
@@ -254,6 +283,16 @@ export function KanbanCardModal({
                 Archive
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => {
+                setShowDiscardConfirm(false);
+                setShowDeleteConfirm(true);
+              }}
+              className="text-sm text-text-muted hover:text-danger transition-colors"
+            >
+              Delete
+            </button>
           </div>
           <div className="flex items-center gap-2">
             <button

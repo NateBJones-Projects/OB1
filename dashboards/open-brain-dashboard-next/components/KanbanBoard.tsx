@@ -174,6 +174,24 @@ export function KanbanBoard() {
     }
   }
 
+  async function handleDelete(thoughtId: number) {
+    previousThoughts.current = [...thoughts];
+    setThoughts((prev) => prev.filter((t) => t.id !== thoughtId));
+
+    try {
+      const res = await fetch("/api/kanban/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thoughtId }),
+      });
+      if (!res.ok) throw new Error("Delete failed");
+    } catch {
+      setThoughts(previousThoughts.current);
+      setError("Failed to delete. Reverted.");
+      setTimeout(() => setError(null), 5000);
+    }
+  }
+
   async function handleModalSave(
     thoughtId: number,
     updates: Record<string, unknown>
@@ -304,6 +322,7 @@ export function KanbanBoard() {
           thought={selectedThought}
           onSave={handleModalSave}
           onArchive={handleArchive}
+          onDelete={handleDelete}
           onClose={() => setSelectedThought(null)}
         />
       )}
