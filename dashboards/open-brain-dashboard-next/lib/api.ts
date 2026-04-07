@@ -138,7 +138,15 @@ export async function deleteThought(
   apiKey: string,
   id: number
 ): Promise<void> {
-  await apiFetch<unknown>(apiKey, `/thought/${id}`, { method: "DELETE" });
+  const url = `${API_URL}/thought/${id}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: headers(apiKey),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ApiError(`API ${res.status}: ${text || res.statusText}`, res.status);
+  }
 }
 
 export interface SearchResponse {
