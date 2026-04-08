@@ -13,8 +13,8 @@
     "tools": ["Node.js 18+", "wrangler CLI"]
   },
   "tags": ["cloudflare", "d1", "vectorize", "workers-ai", "serverless", "deployment", "alternative"],
-  "difficulty": "intermediate",
-  "estimated_time": "45 minutes",
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
   "created": "2026-04-08",
   "updated": "2026-04-08"
 }

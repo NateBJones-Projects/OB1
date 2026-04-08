@@ -30,7 +30,7 @@ This integration rebuilds the full Open Brain stack on Cloudflare's edge platfor
 
 - A free [Cloudflare account](https://dash.cloudflare.com/sign-up)
 - Node.js 18+ installed
-- About 45 minutes
+- About 15 minutes (automated setup) or 45 minutes (manual)
 
 > [!NOTE]
 > You do **not** need a working Supabase-based Open Brain to use this integration. This is a standalone alternative deployment that replaces the entire backend.
