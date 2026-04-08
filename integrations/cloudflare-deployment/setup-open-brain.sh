@@ -205,7 +205,7 @@ mkdir -p "$PROJECT_DIR/src"
 cd "$PROJECT_DIR"
 
 # ─── package.json ────────────────────────────────────────────────────────
-cat > package.json << 'EOF'
+cat > package.json << EOF
 {
   "name": "${BRAIN_NAME}",
   "version": "1.0.0",
@@ -807,9 +807,14 @@ curl -X POST ${WORKER_URL}/search \\
   -H "Content-Type: application/json" \\
   -d '{"query": "first thought"}'
 
-── Claude Desktop MCP Config ──────────────────────
+── Claude Desktop (Custom Connector — Preferred) ──
 
-Add to ~/Library/Application Support/Claude/claude_desktop_config.json:
+Open Claude Desktop → Settings → Connectors → Add custom connector
+Paste this URL:  ${WORKER_URL}/mcp?key=${MCP_ACCESS_KEY}
+
+── Claude Desktop (mcp-remote fallback) ────────────
+
+If custom connectors don't work, add to MCP config:
 
 {
   "mcpServers": {

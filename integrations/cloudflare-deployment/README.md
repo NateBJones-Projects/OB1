@@ -280,16 +280,25 @@ curl -X POST https://open-brain.YOUR_SUBDOMAIN.workers.dev/search \
 
 ![Step 7](https://img.shields.io/badge/Step_7-Connect_Your_MCP_Client-1565C0?style=for-the-badge)
 
-Your Worker is a remote MCP server accessible by URL. Connect it using `mcp-remote`:
+Your Worker is a remote MCP server accessible by URL.
 
-### Claude Desktop
+> [!IMPORTANT]
+> The MCP server runs **remotely on Cloudflare Workers**, not locally. The connection methods below all point to your deployed Worker URL — no local stdio server is involved.
 
-Open your Claude Desktop config file:
+### Claude Desktop (Custom Connector)
 
-- **Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+The preferred method — uses Claude Desktop's built-in remote MCP support:
 
-Add this MCP server configuration:
+1. Open Claude Desktop → **Settings** → **Connectors** → **Add custom connector**
+2. Paste your Worker MCP endpoint URL:
+   ```
+   https://open-brain.YOUR_SUBDOMAIN.workers.dev/mcp?key=YOUR_ACCESS_KEY
+   ```
+3. Click **Save**. The Open Brain tools should appear immediately.
+
+### Claude Desktop (via mcp-remote)
+
+If the custom connector method doesn't work for your setup, you can use `mcp-remote` as a bridge. Add this to your Claude Desktop MCP config:
 
 ```json
 {
@@ -304,9 +313,6 @@ Add this MCP server configuration:
   }
 }
 ```
-
-> [!NOTE]
-> This uses `mcp-remote` to connect to a **remote URL** — the MCP server runs on Cloudflare, not locally. This is not a local stdio server.
 
 Restart Claude Desktop. You should see the Open Brain tools available.
 
