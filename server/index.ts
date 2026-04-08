@@ -5,7 +5,14 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { unzipSync } from "fflate";
+import {
+  extractText as docExtractText,
+  getFileType,
+  MIME_TYPES,
+  chunkText,
+  countWords,
+  slugify,
+} from "./document-extraction.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -77,116 +84,8 @@ Only extract what's explicitly there. Topics must be lowercase. People must be f
   }
 }
 
-// ─── Document Text Extraction ───────────────────────────────────────────────
-
-async function extractPdfText(buffer: Uint8Array): Promise<{ text: string; pages: number }> {
-  try {
-    const { extractText: pdfExtract } = await import("unpdf");
-    const result = await pdfExtract(buffer);
-    return { text: result.text || "", pages: result.totalPages || 1 };
-  } catch {
-    const str = new TextDecoder("latin1").decode(buffer);
-    const textParts: string[] = [];
-    const streamRegex = /stream\r?\n([\s\S]*?)endstream/g;
-    let match;
-    while ((match = streamRegex.exec(str)) !== null) {
-      const content = match[1];
-      const tjMatches = content.matchAll(/\(([^)]*)\)\s*Tj/g);
-      for (const tj of tjMatches) textParts.push(tj[1]);
-      const tdMatches = content.matchAll(/\[([^\]]*)\]\s*TJ/g);
-      for (const td of tdMatches) {
-        const innerText = td[1].matchAll(/\(([^)]*)\)/g);
-        for (const it of innerText) textParts.push(it[1]);
-      }
-    }
-    const pageMatches = str.match(/\/Type\s*\/Page[^s]/g);
-    return { text: textParts.join(" "), pages: pageMatches?.length || 1 };
-  }
-}
-
-function extractDocxText(buffer: Uint8Array): string {
-  const files = unzipSync(buffer);
-  const documentXml = files["word/document.xml"];
-  if (!documentXml) throw new Error("Invalid DOCX: no word/document.xml");
-  const xmlStr = new TextDecoder().decode(documentXml);
-  const textParts: string[] = [];
-  let current = "";
-  for (const match of xmlStr.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>|<\/w:p>/g)) {
-    if (match[0] === "</w:p>") {
-      if (current.trim()) textParts.push(current.trim());
-      current = "";
-    } else {
-      current += match[1];
-    }
-  }
-  if (current.trim()) textParts.push(current.trim());
-  return textParts.join("\n");
-}
-
-function extractXlsxText(buffer: Uint8Array): string {
-  const files = unzipSync(buffer);
-  const sharedStringsData = files["xl/sharedStrings.xml"];
-  const strings: string[] = [];
-  if (sharedStringsData) {
-    const xml = new TextDecoder().decode(sharedStringsData);
-    for (const match of xml.matchAll(/<t[^>]*>([^<]*)<\/t>/g)) {
-      strings.push(match[1]);
-    }
-  }
-  const values: string[] = [];
-  for (const [path, data] of Object.entries(files)) {
-    if (path.startsWith("xl/worksheets/sheet") && path.endsWith(".xml")) {
-      const xml = new TextDecoder().decode(data as Uint8Array);
-      for (const match of xml.matchAll(/<v>([^<]*)<\/v>/g)) {
-        values.push(match[1]);
-      }
-    }
-  }
-  return [...strings, ...values].join(" ");
-}
-
-function docExtractText(buffer: Uint8Array, fileType: string): Promise<{ text: string; pages: number }> {
-  switch (fileType) {
-    case "pdf": return extractPdfText(buffer);
-    case "docx": return Promise.resolve({ text: extractDocxText(buffer), pages: 1 });
-    case "xlsx": return Promise.resolve({ text: extractXlsxText(buffer), pages: 1 });
-    case "md":
-    case "txt": return Promise.resolve({ text: new TextDecoder().decode(buffer), pages: 1 });
-    default: throw new Error(`Unsupported file type: ${fileType}`);
-  }
-}
-
-function chunkText(text: string, maxWords = 4000, overlap = 200): string[] {
-  const words = text.split(/\s+/);
-  if (words.length <= maxWords) return [text];
-  const chunks: string[] = [];
-  let start = 0;
-  while (start < words.length) {
-    const end = Math.min(start + maxWords, words.length);
-    chunks.push(words.slice(start, end).join(" "));
-    start = end - overlap;
-    if (start >= words.length - overlap) break;
-  }
-  return chunks;
-}
-
-function countWords(text: string): number {
-  return text.split(/\s+/).filter(w => w.length > 0).length;
-}
-
-function getFileType(filename: string): string {
-  const ext = filename.split(".").pop()?.toLowerCase() || "";
-  if (ext === "pdf") return "pdf";
-  if (ext === "docx") return "docx";
-  if (ext === "xlsx") return "xlsx";
-  if (ext === "md") return "md";
-  if (ext === "txt") return "txt";
-  throw new Error(`Unsupported file type: .${ext}. Supported: pdf, docx, xlsx, md, txt`);
-}
-
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
-}
+// ─── Document extraction, chunking, file type detection, slugify ────────────
+// All imported from ../supabase/functions/_shared/document-extraction.ts
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MCP SERVER — Amicus Superbrain (unified)
@@ -354,7 +253,7 @@ server.registerTool(
   "upload_document",
   {
     title: "Upload Document",
-    description: "Upload a PDF, DOCX, or XLSX document. Extracts text, creates searchable thoughts with embeddings, and stores the file. Optionally links to a matter and/or contact.",
+    description: "Upload a PDF, DOCX, XLSX, or PPTX document. Extracts text with structure-aware parsing (headings, tables, slides), creates searchable thoughts with embeddings, and stores the file. Optionally links to a matter and/or contact.",
     inputSchema: {
       file_base64: z.string().describe("Base64-encoded file content"),
       filename: z.string().describe("Original filename with extension (e.g., 'plea.pdf')"),
@@ -371,7 +270,8 @@ server.registerTool(
       for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
       const fileType = getFileType(filename);
 
-      const { text: fullText, pages } = await docExtractText(bytes, fileType);
+      const extraction = await docExtractText(bytes, fileType, filename);
+      const { text: fullText, pages, quality: extractionQuality } = extraction;
       if (!fullText || fullText.trim().length < 10) {
         return { content: [{ type: "text" as const, text: `Warning: Very little text extracted from ${filename}. File may be scanned/image-based. Stored but not searchable.` }] };
       }
@@ -391,14 +291,7 @@ server.registerTool(
 
       const folder = matter_name ? `matters/${slugify(matter_name)}` : "unsorted";
       const storagePath = `${folder}/${Date.now()}_${filename}`;
-      const mimeTypes: Record<string, string> = {
-        pdf: "application/pdf",
-        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        md: "text/markdown",
-        txt: "text/plain",
-      };
-      const mimeType = mimeTypes[fileType] || "application/octet-stream";
+      const mimeType = MIME_TYPES[fileType] || "application/octet-stream";
       const { error: uploadError } = await supabase.storage.from("documents").upload(storagePath, bytes, { contentType: mimeType });
       if (uploadError) throw new Error(`Storage upload failed: ${uploadError.message}`);
 
@@ -425,12 +318,16 @@ server.registerTool(
         matter_id: matterId, matter_name: matter_name || null, contact_id: contactId,
         thought_id: thoughtIds[0], chunk_thought_ids: thoughtIds.slice(1),
         description: description || null, tags: tags || [],
+        extraction_quality: extractionQuality,
       });
       if (docError) throw new Error(`Document record failed: ${docError.message}`);
 
-      const parts = [`Uploaded: ${filename}`, `Type: ${fileType.toUpperCase()} | ${pages} page(s) | ${wc.toLocaleString()} words`, `Thoughts: ${thoughtIds.length}${chunks.length > 1 ? ` (${chunks.length} chunks)` : ""}`];
+      const parts = [`Uploaded: ${filename}`, `Type: ${fileType.toUpperCase()} | ${pages} page(s) | ${wc.toLocaleString()} words | Converter: ${extractionQuality.converter}`, `Thoughts: ${thoughtIds.length}${chunks.length > 1 ? ` (${chunks.length} chunks)` : ""}`];
       if (matter_name) parts.push(`Matter: ${matter_name}${matterId ? " (linked)" : " (name stored)"}`);
       if (contact_name) parts.push(`Contact: ${contact_name}${contactId ? " (linked)" : " (no match)"}`);
+      if (extractionQuality.quality_flags.length > 0) {
+        parts.push(`Quality warnings: ${extractionQuality.quality_flags.join(", ")} — ${extractionQuality.recommended_next_step}`);
+      }
       parts.push("Searchable via search_thoughts.");
       return { content: [{ type: "text" as const, text: parts.join("\n") }] };
     } catch (err: unknown) {
@@ -448,13 +345,13 @@ server.registerTool(
       matter_name: z.string().optional().describe("Filter by matter name (partial match)"),
       contact_name: z.string().optional().describe("Filter by linked contact"),
       filename: z.string().optional().describe("Filter by filename (partial match)"),
-      file_type: z.enum(["pdf", "docx", "xlsx", "md", "txt"]).optional().describe("Filter by file type"),
+      file_type: z.enum(["pdf", "docx", "xlsx", "pptx", "md", "txt"]).optional().describe("Filter by file type"),
       limit: z.number().optional().default(20),
     },
   },
   async ({ matter_name, contact_name, filename, file_type, limit }) => {
     try {
-      let q = supabase.from("documents").select("id, filename, file_type, page_count, word_count, matter_name, description, created_at, contact_id").order("created_at", { ascending: false }).limit(limit);
+      let q = supabase.from("documents").select("id, filename, file_type, page_count, word_count, matter_name, description, created_at, contact_id, extraction_quality").order("created_at", { ascending: false }).limit(limit);
       if (matter_name) q = q.ilike("matter_name", `%${matter_name}%`);
       if (filename) q = q.ilike("filename", `%${filename}%`);
       if (file_type) q = q.eq("file_type", file_type);
@@ -466,9 +363,11 @@ server.registerTool(
       if (error) return { content: [{ type: "text" as const, text: `Error: ${error.message}` }], isError: true };
       if (!data?.length) return { content: [{ type: "text" as const, text: "No documents found." }] };
 
-      const results = data.map((d: { filename: string; file_type: string; page_count: number; word_count: number; matter_name: string; description: string; created_at: string }, i: number) =>
-        `${i + 1}. ${d.filename} (${d.file_type.toUpperCase()}, ${d.page_count || "?"} pg, ${(d.word_count || 0).toLocaleString()} words)\n   Matter: ${d.matter_name || "—"} | ${new Date(d.created_at).toLocaleDateString()}${d.description ? "\n   " + d.description : ""}`
-      );
+      const results = data.map((d: { filename: string; file_type: string; page_count: number; word_count: number; matter_name: string; description: string; created_at: string; extraction_quality?: { quality_flags?: string[]; converter?: string } }, i: number) => {
+        const eq = d.extraction_quality;
+        const qualityNote = eq?.quality_flags?.length ? ` ⚠ ${eq.quality_flags.join(", ")}` : "";
+        return `${i + 1}. ${d.filename} (${d.file_type.toUpperCase()}, ${d.page_count || "?"} pg, ${(d.word_count || 0).toLocaleString()} words${eq?.converter ? ", " + eq.converter : ""}${qualityNote})\n   Matter: ${d.matter_name || "—"} | ${new Date(d.created_at).toLocaleDateString()}${d.description ? "\n   " + d.description : ""}`;
+      });
       return { content: [{ type: "text" as const, text: `${data.length} document(s):\n\n${results.join("\n\n")}` }] };
     } catch (err: unknown) {
       return { content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }], isError: true };

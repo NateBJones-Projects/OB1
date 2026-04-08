@@ -1,0 +1,7 @@
+{
+  "name": "extraction-quality",
+  "description": "Schema extension for document extraction quality metadata — adds extraction_quality JSONB column to documents table for tracking converter, quality flags, and stats",
+  "category": "schemas",
+  "tags": ["documents", "extraction", "quality", "heavy-file-ingestion"],
+  "requires": ["documents"]
+}
