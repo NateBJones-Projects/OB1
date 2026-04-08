@@ -2,6 +2,7 @@ node_modules/
 .DS_Store
 .planning/
 supabase/
+.vscode/
 
 # Credentials & runtime state
 .env
@@ -11,6 +12,7 @@ credentials.json
 token.json
 gmail-sync-log.json
 sync-log.json
+run-local-open-brain-mcp.sh
 
 # Build artifacts
 deno.lock

@@ -8,62 +8,71 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
+const OLLAMA_BASE_URL = Deno.env.get("OLLAMA_BASE_URL") ?? "http://host.docker.internal:11434";
+const OLLAMA_EMBED_MODEL = Deno.env.get("OLLAMA_EMBED_MODEL") ?? "nomic-embed-text";
+const OLLAMA_CHAT_MODEL = Deno.env.get("OLLAMA_CHAT_MODEL") ?? "qwen3.5:2b-q4_K_M";
 
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 async function getEmbedding(text: string): Promise<number[]> {
-  const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
+  const r = await fetch(`${OLLAMA_BASE_URL}/api/embeddings`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/text-embedding-3-small",
-      input: text,
+      model: OLLAMA_EMBED_MODEL,
+      prompt: text,
     }),
   });
   if (!r.ok) {
     const msg = await r.text().catch(() => "");
-    throw new Error(`OpenRouter embeddings failed: ${r.status} ${msg}`);
+    throw new Error(`Ollama embeddings failed: ${r.status} ${msg}`);
   }
   const d = await r.json();
-  return d.data[0].embedding;
+  if (!Array.isArray(d.embedding)) throw new Error("Ollama embeddings response missing embedding array");
+  return d.embedding;
 }
 
 async function extractMetadata(text: string): Promise<Record<string, unknown>> {
-  const r = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: `Extract metadata from the user's captured thought. Return JSON with:
-- "people": array of people mentioned (empty if none)
-- "action_items": array of implied to-dos (empty if none)
-- "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
-- "topics": array of 1-3 short topic tags (always at least one)
-- "type": one of "observation", "task", "idea", "reference", "person_note"
-Only extract what's explicitly there.`,
-        },
-        { role: "user", content: text },
-      ],
-    }),
-  });
-  const d = await r.json();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12000);
   try {
-    return JSON.parse(d.choices[0].message.content);
+    const r = await fetch(`${OLLAMA_BASE_URL}/api/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: OLLAMA_CHAT_MODEL,
+        format: "json",
+        stream: false,
+        options: { num_predict: 120, temperature: 0 },
+        messages: [
+          {
+            role: "system",
+            content: `Return valid JSON only with keys people, action_items, dates_mentioned, topics, type. Keep it minimal and only use explicitly present information.`,
+          },
+          { role: "user", content: text },
+        ],
+      }),
+    });
+    if (!r.ok) {
+      const msg = await r.text().catch(() => "");
+      throw new Error(`Ollama metadata extraction failed: ${r.status} ${msg}`);
+    }
+    const d = await r.json();
+    try {
+      return JSON.parse(d.message.content);
+    } catch {
+      return { topics: ["uncategorized"], type: "observation" };
+    }
   } catch {
     return { topics: ["uncategorized"], type: "observation" };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

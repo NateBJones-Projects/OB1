@@ -1,0 +1,20 @@
+#!/bin/zsh
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+if [[ -f .env.local ]]; then
+  set -a
+  source ./.env.local
+  set +a
+fi
+
+: "${SUPABASE_URL:?Set SUPABASE_URL in .env.local or your shell}"
+: "${SUPABASE_SERVICE_ROLE_KEY:?Set SUPABASE_SERVICE_ROLE_KEY in .env.local or your shell}"
+: "${MCP_ACCESS_KEY:?Set MCP_ACCESS_KEY in .env.local or your shell}"
+
+export OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434}"
+export OLLAMA_EMBED_MODEL="${OLLAMA_EMBED_MODEL:-nomic-embed-text}"
+export OLLAMA_CHAT_MODEL="${OLLAMA_CHAT_MODEL:-qwen3.5:2b-q4_K_M}"
+
+exec deno run --allow-net --allow-env local-open-brain-mcp.ts

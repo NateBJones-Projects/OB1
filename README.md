@@ -14,6 +14,69 @@ https://github.com/user-attachments/assets/80a79b09-f323-42c6-b11b-de10bb6fa36f
 
 ## Getting Started
 
+## Local Ollama MCP setup
+
+This repo now supports a fully local MCP path for capture and search, with Supabase as storage and Ollama for embeddings plus lightweight metadata extraction.
+
+### What this gives you
+
+- Supabase stores thoughts and vectors
+- a local MCP server exposes `capture_thought`, `search_thoughts`, `list_thoughts`, and `thought_stats`
+- Ollama runs locally for embeddings and metadata extraction
+- OpenClaw, Claude Desktop, or any MCP client can point at the same local endpoint
+
+### Quick start
+
+1. Install and run Ollama.
+2. Pull the recommended local models:
+   - `ollama pull nomic-embed-text`
+   - `ollama pull qwen3.5:2b-q4_K_M`
+3. Create your local env file:
+   - `cp .env.local.example .env.local`
+4. Fill in these values in `.env.local`:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `MCP_ACCESS_KEY`
+5. Start the local MCP server:
+   - `cp run-local-open-brain-mcp.sh.example run-local-open-brain-mcp.sh`
+   - `chmod +x run-local-open-brain-mcp.sh`
+   - `./run-local-open-brain-mcp.sh`
+6. Point your MCP client to:
+   - `http://127.0.0.1:8000/?key=YOUR_MCP_ACCESS_KEY`
+
+### Recommended local defaults
+
+These defaults are used unless you override them in `.env.local`:
+
+- `OLLAMA_BASE_URL=http://127.0.0.1:11434`
+- `OLLAMA_EMBED_MODEL=nomic-embed-text`
+- `OLLAMA_CHAT_MODEL=qwen3.5:2b-q4_K_M`
+
+### Database note
+
+If you use `nomic-embed-text`, your `thoughts.embedding` column must be `vector(768)`.
+If your database was originally built for OpenAI or OpenRouter embeddings, it may still be `vector(1536)` and must be migrated before local capture works.
+
+The included `setup-complete.sql` is now aligned to the local Ollama path in this repo and creates a `vector(768)` schema by default.
+If you choose a different embedding model, update both the database schema and the MCP server configuration together.
+
+### Files added for local setup
+
+- `local-open-brain-mcp.ts` — local Deno MCP server for Ollama-backed capture and search
+- `.env.local.example` — example local environment variables
+- `run-local-open-brain-mcp.sh.example` — safe launcher template with no secrets committed
+- `setup-complete.sql` and `setup-sql/` — SQL helpers for creating the core schema
+
+### Notes for agent users
+
+If you are wiring this into OpenClaw, Claude Desktop, Codex, or another agent client:
+
+- never commit real values in `.env.local` or `run-local-open-brain-mcp.sh`
+- prefer a local MCP URL for Ollama-backed capture, because hosted Supabase Edge functions cannot reliably reach your local Ollama instance
+- keep the MCP access key separate from your Supabase service role key
+- use the service role key only on trusted local machines or private servers
+
+
 https://github.com/user-attachments/assets/85208d73-112b-4204-82fd-d03b6c397a8b
 
 Never built an Open Brain? Start here:
