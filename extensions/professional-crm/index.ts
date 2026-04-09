@@ -112,8 +112,61 @@ app.post("*", async (c) => {
       };
     },
   );
+  
+  // Tool 2: update_professional_contact
+  server.tool(
+    "update_professional_contact",
+    "Update a new professional contact to your network",
+    {
+      id: z.string().describe("Contact ID (UUID)"),
+      name: z.string().describe("Contact's full name"),
+      company: z.string().optional().describe("Company name"),
+      title: z.string().optional().describe("Job title"),
+      email: z.string().optional().describe("Email address"),
+      phone: z.string().optional().describe("Phone number"),
+      linkedin_url: z.string().optional().describe("LinkedIn profile URL"),
+      how_we_met: z.string().optional().describe("How you met this person"),
+      tags: z.array(z.string()).optional().describe("Tags for categorization (e.g., ['ai', 'consulting', 'conference'])"),
+      notes: z.string().optional().describe("Additional notes about this contact"),
+    },
+    async ({ id, name, company, title, email, phone, linkedin_url, how_we_met, tags, notes }) => {
+      const { data, error } = await supabase
+        .from("professional_contacts")
+        .update({
+          name,
+          company: company || null,
+          title: title || null,
+          email: email || null,
+          phone: phone || null,
+          linkedin_url: linkedin_url || null,
+          how_we_met: how_we_met || null,
+          tags: tags || [],
+          notes: notes || null,
+        })
+        .eq('id', id)
+        .select()
+        .single();
 
-  // Tool 2: search_contacts
+      if (error) {
+        throw new Error(`Failed to add professional contact: ${error.message}`);
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              message: `Added professional contact: ${name}`,
+              contact: data,
+            }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+  
+  // Tool 3: search_contacts
   server.tool(
     "search_contacts",
     "Search professional contacts by name, company, or tags",
@@ -158,7 +211,7 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 3: log_interaction
+  // Tool 4: log_interaction
   server.tool(
     "log_interaction",
     "Log an interaction with a contact (automatically updates last_contacted)",
@@ -206,7 +259,7 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 4: get_contact_history
+  // Tool 5: get_contact_history
   server.tool(
     "get_contact_history",
     "Get a contact's full profile and all interactions, ordered by date",
@@ -267,7 +320,7 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 5: create_opportunity
+  // Tool 6: create_opportunity
   server.tool(
     "create_opportunity",
     "Create a new opportunity/deal, optionally linked to a contact",
@@ -315,7 +368,7 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 6: get_follow_ups_due
+  // Tool 7: get_follow_ups_due
   server.tool(
     "get_follow_ups_due",
     "List contacts with follow-ups due in the past or next N days",
@@ -363,7 +416,7 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 7: link_thought_to_contact (CROSS-EXTENSION BRIDGE)
+  // Tool 8: link_thought_to_contact (CROSS-EXTENSION BRIDGE)
   server.tool(
     "link_thought_to_contact",
     "CROSS-EXTENSION: Link a thought from your core Open Brain to a professional contact",
