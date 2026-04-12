@@ -239,9 +239,12 @@ wrangler deploy
 
 wrangler secret put MCP_ACCESS_KEY
 # Paste your access key from the credential tracker when prompted
+
+# Redeploy so the secret is live immediately
+wrangler deploy
 ```
 
-Wrangler will output your Worker URL (e.g., `https://open-brain.YOUR_SUBDOMAIN.workers.dev`).
+The second deploy picks up your secret. Wrangler will output your Worker URL (e.g., `https://open-brain.YOUR_SUBDOMAIN.workers.dev`).
 
 **Test it:**
 

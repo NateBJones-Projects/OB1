@@ -747,10 +747,10 @@ echo -e "${YELLOW}▸ Applying D1 schema...${NC}"
 wrangler d1 execute "$BRAIN_NAME" --remote --file=schema.sql
 echo -e "${GREEN}✔ Schema applied${NC}"
 
-# ─── Deploy Worker ───────────────────────────────────────────────────────
+# ─── Initial Deploy (needed before secrets can be set) ───────────────────
 echo ""
-echo -e "${YELLOW}▸ Deploying Worker...${NC}"
-wrangler deploy
+echo -e "${YELLOW}▸ Deploying Worker (initial)...${NC}"
+wrangler deploy > /dev/null 2>&1
 echo -e "${GREEN}✔ Worker deployed${NC}"
 
 # ─── Set Secret ──────────────────────────────────────────────────────────
@@ -759,11 +759,16 @@ echo -e "${YELLOW}▸ Setting MCP access key secret...${NC}"
 echo "$MCP_ACCESS_KEY" | wrangler secret put MCP_ACCESS_KEY
 echo -e "${GREEN}✔ Secret set${NC}"
 
-# ─── Get Worker URL ──────────────────────────────────────────────────────
-WORKER_URL=$(wrangler deploy 2>&1 | grep -oE 'https://[^ ]+workers\.dev' | head -1)
+# ─── Redeploy (picks up secret, captures Worker URL) ─────────────────────
+echo ""
+echo -e "${YELLOW}▸ Redeploying Worker with secret...${NC}"
+DEPLOY_OUTPUT=$(wrangler deploy 2>&1)
+echo "$DEPLOY_OUTPUT"
+WORKER_URL=$(echo "$DEPLOY_OUTPUT" | grep -oE 'https://[^ ]+workers\.dev' | head -1)
 if [ -z "$WORKER_URL" ]; then
   WORKER_URL="https://${BRAIN_NAME}.<your-subdomain>.workers.dev"
 fi
+echo -e "${GREEN}✔ Worker redeployed${NC}"
 
 # ─── Output Summary ─────────────────────────────────────────────────────
 echo ""
