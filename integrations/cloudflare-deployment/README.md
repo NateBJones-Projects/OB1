@@ -1,15 +1,5 @@
 # Cloudflare Deployment
 
-<div align="center">
-
-![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
-
-**Created by [@aspitz](https://github.com/aspitz)**
-
-*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
-
-</div>
-
 > Deploy Open Brain entirely on Cloudflare — D1 database, Vectorize semantic search, Workers AI embeddings, and a Worker-based MCP server. No Supabase or OpenRouter required.
 
 ## What It Does
