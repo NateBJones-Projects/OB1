@@ -1,0 +1,26 @@
+{
+  "name": "Repo Learning Coach",
+  "description": "Run a local learning app backed by Supabase tables inside your Open Brain project, with file-based curriculum content and durable captures into thoughts.",
+  "category": "recipes",
+  "author": {
+    "name": "Jonathan Edwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Node.js 18+"]
+  },
+  "tags": [
+    "learning",
+    "onboarding",
+    "curriculum",
+    "repo",
+    "supabase",
+    "thoughts"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-04-12",
+  "updated": "2026-04-12"
+}
