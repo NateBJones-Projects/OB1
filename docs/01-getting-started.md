@@ -288,7 +288,7 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 
 > [!WARNING]
 > Copy and paste the command for **your operating system only**. The Mac command won't work on Windows and vice versa.
-
+>
 > [!IMPORTANT]
 > This is your **one access key for all of Open Brain** — core setup and every extension you add later. Save it somewhere permanent. Never generate a new one unless you want to replace it for ALL deployed functions.
 
@@ -631,7 +631,6 @@ Get-Content supabase\functions\open-brain-mcp\index.ts -Head 1
 
 > [!CAUTION]
 > ❌ If you see `console.log("Hello from Functions!")` — the download didn't overwrite the starter file. Delete the folder, re-create it, and retry the download commands.
->
 > ✅ If you see `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — you're good.
 
 ![6.7](https://img.shields.io/badge/6.7-Deploy-555?style=for-the-badge&labelColor=1E88E5)
