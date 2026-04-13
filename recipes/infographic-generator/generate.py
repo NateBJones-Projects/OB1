@@ -136,7 +136,8 @@ def main():
     results = []
     for i, p in enumerate(prompts):
         num = args.redo if args.redo else i + 1
-        print(f"\n[{num}/{len(prompts)}] Generating: {p['title']}")
+        progress_num = i + 1
+        print(f"\n[{progress_num}/{len(prompts)}] Generating: {p['title']}")
         print(f"  Aspect ratio: {p['aspect_ratio']}")
 
         try:
