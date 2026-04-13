@@ -21,6 +21,8 @@ Intermediate
 - A capture interface you control — CLI script, Telegram bot, n8n workflow, or similar
   (this recipe is interface-agnostic; the gating logic sits between your interface and the
   OB1 `capture` MCP call)
+- A trusted server-side environment for the reference implementation below
+  (`capture-with-gating.ts` uses `SUPABASE_SERVICE_ROLE_KEY`, not a browser-safe anon key)
 
 ## What You'll Learn
 
@@ -42,7 +44,9 @@ existing OB1 schema — nothing existing is modified.
 
 **Supabase CLI:**
 ```bash
-supabase db push --file schema.sql
+supabase migration new adaptive_capture_classification
+# paste the contents of schema.sql into the generated migration file
+supabase db push
 ```
 
 ✅ **Done when:** the four tables appear in your Supabase Studio table list:

@@ -6,7 +6,7 @@
  *
  * Prerequisites:
  *   - schema.sql applied to your Supabase project
- *   - SUPABASE_URL, SUPABASE_ANON_KEY, OPENROUTER_API_KEY set in environment
+ *   - SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, OPENROUTER_API_KEY set in environment
  *   - `npm install @supabase/supabase-js`
  *
  * Adapt callLLM() to point at your preferred AI gateway (OpenRouter shown here).
@@ -20,7 +20,7 @@ import { createClient } from "@supabase/supabase-js";
 // ---------------------------------------------------------------------------
 
 const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY!;
 
 const DEFAULT_MODEL = "openai/gpt-4o-mini"; // swap for any OpenRouter model
@@ -64,7 +64,7 @@ interface PipelineResult {
 // Supabase client
 // ---------------------------------------------------------------------------
 
-const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const db = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // ---------------------------------------------------------------------------
 // LLM classification
@@ -144,19 +144,24 @@ async function getThreshold(itemType: string): Promise<number> {
     .from("capture_thresholds")
     .select("threshold")
     .eq("item_type", itemType)
-    .single();
+    .maybeSingle();
   return data ? Number(data.threshold) : DEFAULT_THRESHOLD;
 }
 
 async function adjustThreshold(itemType: string, accepted: boolean): Promise<void> {
   const current = await getThreshold(itemType);
+  const { data: thresholdRow } = await db
+    .from("capture_thresholds")
+    .select("sample_count")
+    .eq("item_type", itemType)
+    .maybeSingle();
   const delta = accepted ? -THRESHOLD_NUDGE : +THRESHOLD_NUDGE;
   const newVal = Math.max(THRESHOLD_MIN, Math.min(THRESHOLD_MAX, current + delta));
 
   await db.from("capture_thresholds").upsert({
     item_type: itemType,
     threshold: newVal,
-    sample_count: 1, // incremented by Supabase upsert merge — use a raw increment in prod
+    sample_count: (thresholdRow?.sample_count ?? 0) + 1,
     updated_at: new Date().toISOString(),
   }, { onConflict: "item_type" });
 }
