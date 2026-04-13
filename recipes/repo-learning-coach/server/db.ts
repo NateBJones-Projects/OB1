@@ -67,6 +67,8 @@ type ProjectRow = {
 }
 
 type ResearchDocumentDetailRow = {
+  id: string
+  project_id: string
   slug: string
   title: string
   summary: string
@@ -74,6 +76,17 @@ type ResearchDocumentDetailRow = {
   content: string
   source_path: string
   source_url: string | null
+}
+
+type ResearchIdentityRow = {
+  id: string
+  slug: string
+  source_path: string
+}
+
+type LessonIdentityRow = {
+  id: string
+  slug: string
 }
 
 type QueryResult<T> = PromiseLike<{
@@ -142,17 +155,21 @@ const getProject = async () =>
     `Project ${REPO_LEARNING_CONFIG.slug} was not found. Run npm run sync first.`,
   )
 
-const getLessonRowBySlug = async (slug: string) =>
-  unwrapSingle<LessonRow>(
+const getLessonRowBySlug = async (slug: string) => {
+  const project = await getProject()
+
+  return unwrapSingle<LessonRow>(
     supabase
       .from('repo_learning_lessons')
       .select(
         'id, slug, title, stage, difficulty, order_index, estimated_minutes, summary, goals_json, content, related_research_json',
       )
+      .eq('project_id', project.id)
       .eq('slug', slug)
       .single(),
     `Lesson ${slug} was not found.`,
   ) as Promise<LessonRow>
+}
 
 const getProgressByLessonId = async (lessonId: string) =>
   maybeSingle(
@@ -221,7 +238,7 @@ const getBrainBridgeForLesson = async (
 export const syncContentToSupabase = async () => {
   const timestamp = now()
   const researchDocuments = loadResearchDocuments()
-  const lessons = loadLessons()
+  const lessons = loadLessons(new Set(researchDocuments.map((document) => document.slug)))
 
   const project = await unwrapSingle<{ id: string }>(
     supabase
@@ -258,13 +275,35 @@ export const syncContentToSupabase = async () => {
     'Failed to create or update the learning track.',
   )
 
+  const { data: existingResearchRows, error: existingResearchError } = await supabase
+    .from('repo_learning_research_documents')
+    .select('id, slug, source_path')
+    .eq('project_id', project.id)
+
+  if (existingResearchError) {
+    throw new Error(existingResearchError.message)
+  }
+
+  const researchBySlug = new Map(
+    ((existingResearchRows ?? []) as ResearchIdentityRow[]).map((row) => [row.slug, row]),
+  )
+  const researchBySourcePath = new Map(
+    ((existingResearchRows ?? []) as ResearchIdentityRow[]).map((row) => [
+      row.source_path,
+      row,
+    ]),
+  )
+  const keptResearchIds = new Set<string>()
+
   for (const document of researchDocuments) {
-    await unwrapSingle<{ id: string }>(
-      supabase
-        .from('repo_learning_research_documents')
-        .upsert(
-          {
-            project_id: project.id,
+    const existing =
+      researchBySlug.get(document.slug) ?? researchBySourcePath.get(document.sourcePath)
+
+    if (existing) {
+      await ensureNoError(
+        supabase
+          .from('repo_learning_research_documents')
+          .update({
             slug: document.slug,
             title: document.title,
             summary: document.summary,
@@ -274,21 +313,73 @@ export const syncContentToSupabase = async () => {
             source_url: document.sourceUrl,
             content_hash: document.contentHash,
             updated_at: timestamp,
-          },
-          { onConflict: 'slug' },
-        )
+          })
+          .eq('id', existing.id),
+      )
+      keptResearchIds.add(existing.id)
+      continue
+    }
+
+    const inserted = await unwrapSingle<{ id: string }>(
+      supabase
+        .from('repo_learning_research_documents')
+        .insert({
+          project_id: project.id,
+          slug: document.slug,
+          title: document.title,
+          summary: document.summary,
+          category: document.category,
+          content: document.content,
+          source_path: document.sourcePath,
+          source_url: document.sourceUrl,
+          content_hash: document.contentHash,
+          updated_at: timestamp,
+        })
         .select('id')
         .single(),
       `Failed to sync research document ${document.slug}.`,
     )
+
+    keptResearchIds.add(inserted.id)
   }
 
-  for (const lesson of lessons) {
-    const lessonRow = await unwrapSingle<{ id: string }>(
+  const staleResearchIds = ((existingResearchRows ?? []) as ResearchIdentityRow[])
+    .map((row) => row.id)
+    .filter((id) => !keptResearchIds.has(id))
+
+  if (staleResearchIds.length > 0) {
+    await ensureNoError(
       supabase
-        .from('repo_learning_lessons')
-        .upsert(
-          {
+        .from('repo_learning_research_documents')
+        .delete()
+        .in('id', staleResearchIds),
+    )
+  }
+
+  const { data: existingLessonRows, error: existingLessonError } = await supabase
+    .from('repo_learning_lessons')
+    .select('id, slug')
+    .eq('project_id', project.id)
+
+  if (existingLessonError) {
+    throw new Error(existingLessonError.message)
+  }
+
+  const lessonBySlug = new Map(
+    ((existingLessonRows ?? []) as LessonIdentityRow[]).map((row) => [row.slug, row]),
+  )
+  const keptLessonIds = new Set<string>()
+
+  for (const lesson of lessons) {
+    const existingLesson = lessonBySlug.get(lesson.slug)
+    let lessonId: string
+
+    if (existingLesson) {
+      lessonId = existingLesson.id
+      await ensureNoError(
+        supabase
+          .from('repo_learning_lessons')
+          .update({
             project_id: project.id,
             track_id: track.id,
             slug: lesson.slug,
@@ -302,20 +393,44 @@ export const syncContentToSupabase = async () => {
             content: lesson.content,
             related_research_json: lesson.relatedResearchSlugs,
             updated_at: timestamp,
-          },
-          { onConflict: 'slug' },
-        )
-        .select('id')
-        .single(),
-      `Failed to sync lesson ${lesson.slug}.`,
-    )
+          })
+          .eq('id', lessonId),
+      )
+    } else {
+      const insertedLesson = await unwrapSingle<{ id: string }>(
+        supabase
+          .from('repo_learning_lessons')
+          .insert({
+            project_id: project.id,
+            track_id: track.id,
+            slug: lesson.slug,
+            title: lesson.title,
+            stage: lesson.stage,
+            difficulty: lesson.difficulty,
+            order_index: lesson.orderIndex,
+            estimated_minutes: lesson.estimatedMinutes,
+            summary: lesson.summary,
+            goals_json: lesson.goals,
+            content: lesson.content,
+            related_research_json: lesson.relatedResearchSlugs,
+            updated_at: timestamp,
+          })
+          .select('id')
+          .single(),
+        `Failed to sync lesson ${lesson.slug}.`,
+      )
+
+      lessonId = insertedLesson.id
+    }
+
+    keptLessonIds.add(lessonId)
 
     const quizRow = await unwrapSingle<{ id: string }>(
       supabase
         .from('repo_learning_quizzes')
         .upsert(
           {
-            lesson_id: lessonRow.id,
+            lesson_id: lessonId,
             title: lesson.quiz.title,
             passing_score: lesson.quiz.passingScore,
             question_count: lesson.quiz.questions.length,
@@ -353,7 +468,7 @@ export const syncContentToSupabase = async () => {
     await ensureNoError(
       supabase.from('repo_learning_lesson_progress').upsert(
         {
-          lesson_id: lessonRow.id,
+          lesson_id: lessonId,
           status: 'not_started',
           confidence: 1,
           quiz_average: 0,
@@ -366,6 +481,24 @@ export const syncContentToSupabase = async () => {
         },
       ),
     )
+
+    await ensureNoError(
+      supabase
+        .from('repo_learning_quiz_questions')
+        .delete()
+        .eq('quiz_id', quizRow.id)
+        .gt('order_index', lesson.quiz.questions.length),
+    )
+  }
+
+  const staleLessonIds = ((existingLessonRows ?? []) as LessonIdentityRow[])
+    .map((row) => row.id)
+    .filter((id) => !keptLessonIds.has(id))
+
+  if (staleLessonIds.length > 0) {
+    await ensureNoError(
+      supabase.from('repo_learning_lessons').delete().in('id', staleLessonIds),
+    )
   }
 
   return {
@@ -376,40 +509,61 @@ export const syncContentToSupabase = async () => {
 
 export const getBootstrapData = async () => {
   const project = await getProject()
-
-  const [
-    { data: lessonRows, error: lessonError },
-    { data: progressRows, error: progressError },
-    { data: commentRows, error: commentError },
-    { data: researchRows, error: researchError },
-    { data: attemptRows, error: attemptError },
-  ] = await Promise.all([
-    supabase
-      .from('repo_learning_lessons')
-      .select(
-        'id, slug, title, stage, difficulty, order_index, estimated_minutes, summary',
-      )
-      .order('order_index'),
-    supabase
-      .from('repo_learning_lesson_progress')
-      .select(
-        'lesson_id, status, confidence, quiz_average, quiz_best, last_viewed_at, completed_at',
-      ),
-    supabase
-      .from('repo_learning_lesson_comments')
-      .select('lesson_id, understanding_state'),
-    supabase
-      .from('repo_learning_research_documents')
-      .select('slug, title, summary, category')
-      .order('title'),
-    supabase.from('repo_learning_quiz_attempts').select('score'),
-  ])
+  const { data: lessonRows, error: lessonError } = await supabase
+    .from('repo_learning_lessons')
+    .select('id, slug, title, stage, difficulty, order_index, estimated_minutes, summary')
+    .eq('project_id', project.id)
+    .order('order_index')
 
   if (lessonError) throw new Error(lessonError.message)
+
+  const lessonIds = (lessonRows ?? []).map((lesson) => lesson.id)
+  const { data: progressRows, error: progressError } =
+    lessonIds.length > 0
+      ? await supabase
+          .from('repo_learning_lesson_progress')
+          .select(
+            'lesson_id, status, confidence, quiz_average, quiz_best, last_viewed_at, completed_at',
+          )
+          .in('lesson_id', lessonIds)
+      : { data: [], error: null }
+
+  const { data: commentRows, error: commentError } =
+    lessonIds.length > 0
+      ? await supabase
+          .from('repo_learning_lesson_comments')
+          .select('lesson_id, understanding_state')
+          .in('lesson_id', lessonIds)
+      : { data: [], error: null }
+
+  const { data: quizRows, error: quizError } =
+    lessonIds.length > 0
+      ? await supabase
+          .from('repo_learning_quizzes')
+          .select('id, lesson_id')
+          .in('lesson_id', lessonIds)
+      : { data: [], error: null }
+
+  const quizIds = (quizRows ?? []).map((quiz) => quiz.id)
+  const { data: attemptRows, error: attemptError } =
+    quizIds.length > 0
+      ? await supabase
+          .from('repo_learning_quiz_attempts')
+          .select('score')
+          .in('quiz_id', quizIds)
+      : { data: [], error: null }
+
+  const { data: researchRows, error: researchError } = await supabase
+    .from('repo_learning_research_documents')
+    .select('slug, title, summary, category')
+    .eq('project_id', project.id)
+    .order('title')
+
   if (progressError) throw new Error(progressError.message)
   if (commentError) throw new Error(commentError.message)
-  if (researchError) throw new Error(researchError.message)
+  if (quizError) throw new Error(quizError.message)
   if (attemptError) throw new Error(attemptError.message)
+  if (researchError) throw new Error(researchError.message)
 
   const progressByLessonId = new Map(
     (progressRows ?? []).map((row) => [row.lesson_id, row as ProgressRow]),
@@ -487,6 +641,7 @@ export const getBootstrapData = async () => {
 }
 
 export const getLessonDetail = async (slug: string) => {
+  const project = await getProject()
   const lesson = await getLessonRowBySlug(slug)
   const [progress, quiz, commentResponse] = await Promise.all([
     getProgressByLessonId(lesson.id),
@@ -527,6 +682,7 @@ export const getLessonDetail = async (slug: string) => {
       return supabase
         .from('repo_learning_research_documents')
         .select('slug, title, summary, category')
+        .eq('project_id', project.id)
         .in('slug', relatedResearchSlugs)
     })(),
   ])
@@ -615,22 +771,27 @@ export const getLessonDetail = async (slug: string) => {
 }
 
 export const getResearchDocumentDetail = async (slug: string) =>
-  unwrapSingle<ResearchDocumentDetailRow>(
-    supabase
-      .from('repo_learning_research_documents')
-      .select('slug, title, summary, category, content, source_path, source_url')
-      .eq('slug', slug)
-      .single(),
-    `Research document ${slug} was not found.`,
-  ).then((document) => ({
-    slug: document.slug,
-    title: document.title,
-    summary: document.summary,
-    category: document.category,
-    content: document.content,
-    sourcePath: document.source_path,
-    sourceUrl: document.source_url,
-  }))
+  getProject().then((project) =>
+    unwrapSingle<ResearchDocumentDetailRow>(
+      supabase
+        .from('repo_learning_research_documents')
+        .select(
+          'id, project_id, slug, title, summary, category, content, source_path, source_url',
+        )
+        .eq('project_id', project.id)
+        .eq('slug', slug)
+        .single(),
+      `Research document ${slug} was not found.`,
+    ).then((document) => ({
+      slug: document.slug,
+      title: document.title,
+      summary: document.summary,
+      category: document.category,
+      content: document.content,
+      sourcePath: document.source_path,
+      sourceUrl: document.source_url,
+    })),
+  )
 
 export const updateLessonProgress = async (
   slug: string,
@@ -751,53 +912,60 @@ export const submitQuizAnswers = async (
     `Failed to save quiz attempt for ${quizId}.`,
   )
 
-  await ensureNoError(
-    supabase.from('repo_learning_quiz_responses').insert(
-      results.map((result) => ({
-        attempt_id: attempt.id,
-        question_id: result.questionId,
-        selected_option: result.selectedOption,
-        is_correct: result.isCorrect,
-      })),
-    ),
-  )
+  try {
+    await ensureNoError(
+      supabase.from('repo_learning_quiz_responses').insert(
+        results.map((result) => ({
+          attempt_id: attempt.id,
+          question_id: result.questionId,
+          selected_option: result.selectedOption,
+          is_correct: result.isCorrect,
+        })),
+      ),
+    )
 
-  const { data: attemptRows, error: attemptError } = await supabase
-    .from('repo_learning_quiz_attempts')
-    .select('score')
-    .eq('quiz_id', quizId)
+    const { data: attemptRows, error: attemptError } = await supabase
+      .from('repo_learning_quiz_attempts')
+      .select('score')
+      .eq('quiz_id', quizId)
 
-  if (attemptError) {
-    throw new Error(attemptError.message)
+    if (attemptError) {
+      throw new Error(attemptError.message)
+    }
+
+    const existingProgress = await getProgressByLessonId(quiz.lesson_id)
+    const allScores = (attemptRows ?? []).map((row) => row.score)
+    const timestamp = now()
+
+    await ensureNoError(
+      supabase.from('repo_learning_lesson_progress').upsert(
+        {
+          lesson_id: quiz.lesson_id,
+          status:
+            existingProgress?.status === 'not_started'
+              ? 'in_progress'
+              : existingProgress?.status ?? 'in_progress',
+          confidence: existingProgress?.confidence ?? 1,
+          quiz_average:
+            allScores.length > 0
+              ? Math.round(
+                  allScores.reduce((sum, value) => sum + value, 0) / allScores.length,
+                )
+              : 0,
+          quiz_best: allScores.length > 0 ? Math.max(...allScores) : 0,
+          last_viewed_at: timestamp,
+          completed_at: existingProgress?.completed_at,
+          updated_at: timestamp,
+        },
+        { onConflict: 'lesson_id' },
+      ),
+    )
+  } catch (error) {
+    await ensureNoError(
+      supabase.from('repo_learning_quiz_attempts').delete().eq('id', attempt.id),
+    )
+    throw error
   }
-
-  const existingProgress = await getProgressByLessonId(quiz.lesson_id)
-  const allScores = (attemptRows ?? []).map((row) => row.score)
-  const timestamp = now()
-
-  await ensureNoError(
-    supabase.from('repo_learning_lesson_progress').upsert(
-      {
-        lesson_id: quiz.lesson_id,
-        status:
-          existingProgress?.status === 'not_started'
-            ? 'in_progress'
-            : existingProgress?.status ?? 'in_progress',
-        confidence: existingProgress?.confidence ?? 1,
-        quiz_average:
-          allScores.length > 0
-            ? Math.round(
-                allScores.reduce((sum, value) => sum + value, 0) / allScores.length,
-              )
-            : 0,
-        quiz_best: allScores.length > 0 ? Math.max(...allScores) : 0,
-        last_viewed_at: timestamp,
-        completed_at: existingProgress?.completed_at,
-        updated_at: timestamp,
-      },
-      { onConflict: 'lesson_id' },
-    ),
-  )
 
   return {
     score,

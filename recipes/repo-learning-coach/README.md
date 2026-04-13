@@ -117,7 +117,7 @@ npm run sync
 - Lessons: [curriculum/lessons/](./curriculum/lessons/)
 
 > [!NOTE]
-> Re-running `npm run sync` updates research and lesson content without wiping learner-generated progress, comments, or quiz history.
+> Re-running `npm run sync` updates content in place for surviving lesson and research slugs. If you delete or rename source content, the importer prunes the stale database rows so markdown remains the source of truth.
 
 ✅ **Done when:** The sync command reports lesson and research counts, and you can see rows in the new `repo_learning_*` tables.
 

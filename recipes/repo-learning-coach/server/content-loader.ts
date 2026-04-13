@@ -85,8 +85,32 @@ const markdownFilesIn = (directory: string) =>
     .filter((fileName) => extname(fileName) === '.md')
     .sort()
 
-export const loadResearchDocuments = (): LoadedResearchDocument[] =>
-  markdownFilesIn(RESEARCH_DIR).map((fileName) => {
+const ensureUniqueSlugs = <
+  T extends {
+    slug: string
+    sourcePath: string
+  },
+>(
+  items: T[],
+  itemType: string,
+) => {
+  const seen = new Map<string, string>()
+
+  for (const item of items) {
+    const existing = seen.get(item.slug)
+
+    if (existing) {
+      throw new Error(
+        `Duplicate ${itemType} slug "${item.slug}" found in ${existing} and ${item.sourcePath}.`,
+      )
+    }
+
+    seen.set(item.slug, item.sourcePath)
+  }
+}
+
+export const loadResearchDocuments = (): LoadedResearchDocument[] => {
+  const documents = markdownFilesIn(RESEARCH_DIR).map((fileName) => {
     const absolutePath = resolve(RESEARCH_DIR, fileName)
     const file = matter(readFileSync(absolutePath, 'utf8'))
     const frontmatter = researchFrontmatterSchema.parse(file.data)
@@ -103,13 +127,32 @@ export const loadResearchDocuments = (): LoadedResearchDocument[] =>
       contentHash: createHash('sha1').update(content).digest('hex'),
     }
   })
+  ensureUniqueSlugs(documents, 'research')
+  return documents
+}
 
-export const loadLessons = (): LoadedLesson[] =>
-  markdownFilesIn(LESSON_DIR)
+export const loadLessons = (knownResearchSlugs: Set<string> = new Set()): LoadedLesson[] => {
+  const lessons = markdownFilesIn(LESSON_DIR)
     .map((fileName) => {
       const absolutePath = resolve(LESSON_DIR, fileName)
       const file = matter(readFileSync(absolutePath, 'utf8'))
       const frontmatter = lessonFrontmatterSchema.parse(file.data)
+
+      for (const question of frontmatter.quiz.questions) {
+        if (!question.options.includes(question.correctOption)) {
+          throw new Error(
+            `Lesson ${fileName} has a quiz question whose correctOption is not in options.`,
+          )
+        }
+      }
+
+      for (const relatedSlug of frontmatter.relatedResearch) {
+        if (knownResearchSlugs.size > 0 && !knownResearchSlugs.has(relatedSlug)) {
+          throw new Error(
+            `Lesson ${fileName} references unknown research slug "${relatedSlug}".`,
+          )
+        }
+      }
 
       return {
         slug: frontmatter.slug ?? slugFromFileName(fileName),
@@ -127,3 +170,6 @@ export const loadLessons = (): LoadedLesson[] =>
       }
     })
     .sort((a, b) => a.orderIndex - b.orderIndex)
+  ensureUniqueSlugs(lessons, 'lesson')
+  return lessons
+}
