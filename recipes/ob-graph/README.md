@@ -80,6 +80,19 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 | Function name | `ob-graph-mcp` |
 | Download path | `recipes/ob-graph` |
 
+Before you deploy, generate an MCP access key and decide which Open Brain user this graph belongs to. Then set the function secrets from `.env.example`:
+
+```bash
+openssl rand -hex 32
+supabase secrets set \
+  MCP_ACCESS_KEY=your-generated-key \
+  DEFAULT_USER_ID=your-user-uuid
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided automatically by Supabase for Edge Functions. You only need to set `MCP_ACCESS_KEY` and `DEFAULT_USER_ID` manually.
+
+Done when: The `ob-graph-mcp` function is deployed successfully and its secrets include `MCP_ACCESS_KEY` and `DEFAULT_USER_ID`.
+
 ---
 
 ![Step 3](https://img.shields.io/badge/Step_3-Connect_to_Your_AI-2E86AB?style=for-the-badge)
@@ -90,6 +103,8 @@ Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connec
 |---------|-------|
 | Connector name | `OB-Graph` |
 | URL | Your **MCP Connection URL** from the credential tracker |
+
+Done when: Your AI client can connect to the OB-Graph MCP server without authentication errors and the tools appear in its MCP tool list.
 
 ---
 

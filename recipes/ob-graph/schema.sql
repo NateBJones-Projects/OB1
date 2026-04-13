@@ -202,7 +202,7 @@ BEGIN
         LIMIT 1
     )
     SELECT
-        row_number() OVER ()::INT AS step,
+        row_number() OVER (ORDER BY u.ordinality)::INT AS step,
         gn.id AS node_id,
         gn.label AS node_label,
         s.relationships[ordinality] AS via_relationship
