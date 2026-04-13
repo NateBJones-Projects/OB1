@@ -160,7 +160,8 @@ If you build Extension 6, the `link_contact_to_professional_crm` tool works in r
 4. **`get_contact_history`** — Get a contact's full profile + all interactions ordered by date
 5. **`create_opportunity`** — Create an opportunity/deal linked to a contact (title, description, stage, value, expected_close_date)
 6. **`get_follow_ups_due`** — List contacts with follow_up_date in the past or next N days
-7. **`link_thought_to_contact`** — **CROSS-EXTENSION BRIDGE** — Takes a thought_id and contact_id, retrieves the thought from your core Open Brain, and links it to the contact record
+7. **`update_professional_contact`** — Update only the fields you provide on an existing contact, including setting or clearing `follow_up_date`
+8. **`link_thought_to_contact`** — **CROSS-EXTENSION BRIDGE** — Takes a thought_id and contact_id, retrieves the thought from your core Open Brain, and links it to the contact record
 
 ## Expected Outcome
 
