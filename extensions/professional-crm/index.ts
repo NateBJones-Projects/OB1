@@ -2,7 +2,7 @@
  * Extension 5: Professional CRM MCP Server (Remote Edge Function)
  *
  * Provides tools for managing professional contacts, interactions, and opportunities:
- * - Contact management with rich metadata
+ * - Contact management with rich metadata (add, update, search)
  * - Interaction logging with auto-updating last_contacted
  * - Opportunity/pipeline tracking
  * - Follow-up reminders
@@ -365,7 +365,65 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 7: link_thought_to_contact (CROSS-EXTENSION BRIDGE)
+  // Tool 7: update_professional_contact
+  server.tool(
+    "update_professional_contact",
+    "Update an existing professional contact's details (name, title, company, email, etc.)",
+    {
+      contact_id: z.string().describe("Contact ID (UUID)"),
+      name: z.string().optional().describe("Updated full name"),
+      company: z.string().optional().describe("Updated company name"),
+      title: z.string().optional().describe("Updated job title"),
+      email: z.string().optional().describe("Updated email address"),
+      phone: z.string().optional().describe("Updated phone number"),
+      linkedin_url: z.string().optional().describe("Updated LinkedIn profile URL"),
+      how_we_met: z.string().optional().describe("Updated context for how you met"),
+      tags: z.array(z.string()).optional().describe("Replace tags (e.g., ['ai', 'consulting'])"),
+      notes: z.string().optional().describe("Replace notes with new content"),
+      follow_up_date: z.string().nullable().optional().describe("Set or update follow-up date (YYYY-MM-DD), or null/empty string to clear"),
+    },
+    async ({ contact_id, ...fields }) => {
+      const updates: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(fields)) {
+        if (key === "follow_up_date" && (value === null || value === "")) {
+          updates[key] = null;
+        } else if (value !== undefined) {
+          updates[key] = value;
+        }
+      }
+
+      if (Object.keys(updates).length === 0) {
+        throw new Error("No fields provided to update");
+      }
+
+      const { data, error } = await supabase
+        .from("professional_contacts")
+        .update(updates)
+        .eq("id", contact_id)
+        .eq("user_id", userId)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(`Failed to update contact: ${error.message}`);
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              message: `Updated contact: ${data.name}`,
+              contact: data,
+            }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  // Tool 8: link_thought_to_contact (CROSS-EXTENSION BRIDGE)
   server.tool(
     "link_thought_to_contact",
     "CROSS-EXTENSION: Link a thought from your core Open Brain to a professional contact",
