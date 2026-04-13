@@ -48,6 +48,7 @@ FROM OPENROUTER
    - If you have multiple blogs, export each one
 
 2. **Place all `.atom` files in a folder:**
+
    ```
    blogger-exports/
    ├── my-tech-blog.atom
@@ -56,12 +57,14 @@ FROM OPENROUTER
    ```
 
 3. **Copy this recipe folder** and install dependencies:
+
    ```bash
    cd journals-blogger-import
    npm install
    ```
 
 4. **Create `.env`** with your credentials (see `.env.example`):
+
    ```env
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -69,11 +72,13 @@ FROM OPENROUTER
    ```
 
 5. **Preview what will be imported** (dry run):
+
    ```bash
    node import-blogger.mjs /path/to/blogger-exports --dry-run
    ```
 
 6. **Run the import:**
+
    ```bash
    node import-blogger.mjs /path/to/blogger-exports
    ```

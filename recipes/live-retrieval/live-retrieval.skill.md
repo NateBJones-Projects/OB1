@@ -61,6 +61,7 @@ Do NOT fire on:
 Append a brief note to your response. Maximum 3 lines. Do not interrupt flow.
 
 Format:
+
 ```
 [OB1: Found 2 related thoughts]
 - "ACT NOW: [summary]" (captured March 14)

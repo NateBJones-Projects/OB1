@@ -37,12 +37,14 @@ FROM OPENROUTER
    - Find the Grok JSON file in the export
 
 2. **Copy this recipe folder** and install dependencies:
+
    ```bash
    cd grok-export-import
    npm install
    ```
 
 3. **Create `.env`** with your credentials (see `.env.example`):
+
    ```env
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -50,11 +52,13 @@ FROM OPENROUTER
    ```
 
 4. **Preview what will be imported** (dry run):
+
    ```bash
    node import-grok.mjs /path/to/grok-export.json --dry-run
    ```
 
 5. **Run the import:**
+
    ```bash
    node import-grok.mjs /path/to/grok-export.json
    ```
