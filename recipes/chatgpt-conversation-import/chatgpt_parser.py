@@ -434,7 +434,7 @@ def should_skip(conv, dialogue_text, message_count, sync_log, args):
     word_count = len(dialogue_text.split())
 
     # CLI override for min words
-    min_words = getattr(args, "min_score", MIN_WORDS_BORDERLINE) or MIN_WORDS_BORDERLINE
+    min_words = getattr(args, "min_words", MIN_WORDS_BORDERLINE) or MIN_WORDS_BORDERLINE
 
     # Untitled with few messages: likely throwaway
     if not title and message_count <= 5:

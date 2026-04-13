@@ -226,7 +226,7 @@ The pyramid summaries are generated in the same LLM call as the thought extracti
 | `--after YYYY-MM-DD` | Only process conversations created after this date | None |
 | `--before YYYY-MM-DD` | Only process conversations created before this date | None |
 | `--limit N` | Max conversations to process (0 = unlimited) | 0 |
-| `--min-messages N` | Minimum messages for a conversation to be processed | 5 |
+| `--min-messages N` | Minimum messages for a conversation to be processed | 2 |
 | `--min-words N` | Minimum word count for borderline conversations | 50 |
 | `--focus TOPICS` | Focus extraction on specific topics (preset or custom text — see below) | All topics |
 | `--store-conversations` | Also store conversation summaries with pyramid detail levels (requires `schema.sql`) | Off |
