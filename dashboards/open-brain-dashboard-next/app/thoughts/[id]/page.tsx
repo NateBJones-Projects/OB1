@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import {
   fetchThought,
   updateThought,
@@ -77,6 +77,7 @@ export default async function ThoughtDetailPage({
     "use server";
     const { apiKey } = await requireSessionOrRedirect();
     await deleteThought(apiKey, thoughtId);
+    redirect("/thoughts");
   }
 
   return (
@@ -86,6 +87,11 @@ export default async function ThoughtDetailPage({
         <div>
           <div className="flex items-center gap-3 mb-2 flex-wrap">
             <TypeBadge type={thought.type} />
+            {thought.status && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border bg-violet/15 text-violet border-violet/20">
+                {thought.status}
+              </span>
+            )}
             <span className="text-xs text-text-muted font-mono">
               ID: {thought.id}
             </span>

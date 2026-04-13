@@ -14,11 +14,12 @@ A full-featured web dashboard for your Open Brain second brain. Browse, search, 
 
 ## What It Does
 
-Provides 8 pages for managing your thoughts:
+Provides 9 pages for managing your thoughts:
 
 | Page | Description |
 |------|-------------|
-| **Dashboard** | Stats overview (total thoughts, type distribution, top topics), recent activity, quick capture |
+| **Dashboard** | Stats overview (total thoughts, type distribution, top topics), recent activity, quick capture, workflow summary widget |
+| **Workflow** | Kanban board for tasks and ideas with drag-and-drop status management (New → Planning → Active → Review → Done → Archived) |
 | **Browse** | Paginated thought table with filters for type, source, and importance |
 | **Detail** | Full thought view with inline editing, delete, linked reflections, and related connections |
 | **Search** | Semantic (vector similarity) and full-text search with match scores and pagination |
@@ -103,6 +104,43 @@ When working correctly:
 - **Add to Brain** auto-routes short text (< 500 chars, single paragraph) to single capture, and long/structured text to extraction with dry-run preview
 - **Detail page** shows full thought content with metadata, inline edit for content/type/importance, and linked reflections
 
+## Workflow Board
+
+The Workflow page adds a visual kanban board for managing `task` and `idea` thoughts through status stages.
+
+### Features
+
+- **Drag-and-drop** between status columns using @dnd-kit (touch-friendly with 200ms hold delay)
+- **Collapsible columns** — click the arrow to collapse any column to a slim vertical bar (persisted in localStorage)
+- **Auto-adjusting widths** — expanded columns share available space equally, no horizontal scrollbar
+- **Inline editing** — tap a card to open the edit modal (status, priority, type, content)
+- **Priority dots** — click to change priority (Critical/High/Medium/Low mapped from importance 0-100)
+- **Dashboard widget** — summary of active workflow items on the main dashboard
+- **Mobile-first** — responsive layout, pinch-to-zoom enabled, full-screen edit modal on small screens
+
+### Status Flow
+
+```
+New → Planning → Active → Review → Done → (Archived)
+```
+
+Cards auto-archive from Done after 30 days. Archived cards are hidden by default (toggle with "Show archived").
+
+### Database Requirements
+
+The Workflow board requires two additional columns on the `thoughts` table. See the [workflow-status schema](../../schemas/workflow-status/) for the migration SQL.
+
+### MCP Integration
+
+The `progress_task` tool in the Open Brain MCP server allows AI assistants to update task status and priority conversationally:
+
+```
+"Move the API redesign task to active"
+"Set priority on thought 42 to high"
+```
+
+When a new task or idea is captured, the MCP server auto-assigns `status: "new"`.
+
 ## REST API Endpoints Required
 
 The dashboard calls these endpoints on your Open Brain REST API:
@@ -121,6 +159,8 @@ The dashboard calls these endpoints on your Open Brain REST API:
 | `/ingest` | POST | Smart ingest (extraction) |
 | `/ingestion-jobs` | GET | Ingest page (job history) |
 | `/duplicates` | GET | Duplicates page |
+| `/thoughts?type=task` | GET | Workflow board (filtered by type) |
+| `/thought/:id` | PUT | Workflow board (status/priority updates) |
 
 > [!NOTE]
 > If your Open Brain instance doesn't have all these endpoints (e.g., no smart-ingest or duplicates), those pages will show errors but the core pages (dashboard, browse, search, detail) will still work.
@@ -154,6 +194,7 @@ No API key is stored in environment variables or exposed to the browser.
 - **React 19** with TypeScript
 - **Tailwind CSS 4** (dark theme)
 - **iron-session 8** (encrypted cookies)
+- **@dnd-kit** (drag-and-drop for workflow board)
 - Zero external runtime dependencies beyond these
 
 ## Troubleshooting

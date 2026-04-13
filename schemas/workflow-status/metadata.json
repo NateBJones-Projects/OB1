@@ -1,0 +1,20 @@
+{
+  "name": "Workflow Status Tracking",
+  "description": "Adds status and status_updated_at columns to the thoughts table, enabling kanban-style workflow management for tasks and ideas.",
+  "category": "schemas",
+  "author": {
+    "name": "Ivan",
+    "github": "csakzozo"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["workflow", "kanban", "status", "tasks"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}
