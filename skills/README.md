@@ -13,6 +13,7 @@ Reusable AI client skills and prompt packs for Open Brain workflows. These are t
 | [Heavy File Ingestion Skill Pack](heavy-file-ingestion/) | Converts PDFs, decks, spreadsheets, and other bulky files into markdown, CSV, and a cheap structural index before analysis | [@NateBJones](https://github.com/NateBJones) |
 | [Panning for Gold Skill Pack](panning-for-gold/) | Turns brain dumps and transcripts into evaluated idea inventories | [@jaredirish](https://github.com/jaredirish) |
 | [Claudeception Skill Pack](claudeception/) | Extracts reusable lessons from work sessions into new skills | [@jaredirish](https://github.com/jaredirish) |
+| [Work Operating Model Skill Pack](work-operating-model/) | Runs a five-layer work elicitation interview and turns the approved result into structured Open Brain records plus exports | [@jonathanedwards](https://github.com/jonathanedwards) |
 
 ## How Skills Differ From Recipes
 
