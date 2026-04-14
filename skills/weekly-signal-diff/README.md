@@ -47,6 +47,30 @@ companies for any fast-moving market and keep the same structural-diff process.
    use the Perplexity Sonar family for the retrieval pass and keep the final
    digest structure consistent every week.
 
+If you want an agent to do the installation for you, copy and paste this:
+
+```text
+Install the Weekly Signal Diff skill for me from this repository.
+
+Source files:
+- skills/weekly-signal-diff/SKILL.md
+- skills/weekly-signal-diff/references/starter-universe.md
+- skills/weekly-signal-diff/references/live-search-upgrade.md
+
+What I want you to do:
+1. Detect which AI client or agent environment we are in.
+2. Create the correct reusable-skill folder for that client.
+3. Copy the skill file and the full references folder into that location.
+4. Preserve the folder name as `weekly-signal-diff`.
+5. Tell me exactly where you installed it.
+6. Give me the shortest possible reload step if this client needs one.
+7. Give me one test prompt I can run immediately.
+
+If the client has no native skill folder, put the contents somewhere easy to
+reuse and tell me exactly how to paste or load it into that client's reusable
+instructions feature.
+```
+
 For Claude Code, a common install path is:
 
 ```bash
