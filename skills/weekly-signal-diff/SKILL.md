@@ -55,7 +55,7 @@ the strongest search mode the environment supports.
      personal awareness, operator strategy, investor tracking, or content prep.
    - If the user says nothing, default to a 7-day operator-style review.
 
-2. Pull Open Brain context first.
+1. Pull Open Brain context first.
    - Search for active projects, current priorities, recurring entities, recent
      captures, and the last 2-4 weekly digests.
    - Tool names vary by client. Use the available Open Brain search, list, and
@@ -64,7 +64,7 @@ the strongest search mode the environment supports.
      keep revisiting, what they are worried about, and what they are trying to
      learn.
 
-3. Build the watchlist.
+1. Build the watchlist.
    - Start from the suggested 10-category / 30-company starter universe if the
      user has not defined a watchlist.
    - Treat the starter list as a scaffold, not a contract.
@@ -75,7 +75,7 @@ the strongest search mode the environment supports.
    - Preserve some baseline discovery. Personalization should shape the scan,
      not collapse it into only known favorites.
 
-4. Gather the week's evidence.
+1. Gather the week's evidence.
    - Prefer fresh, source-backed information with links or citations.
    - If live search is available, perform a broad sweep first, then targeted
      follow-ups on the top candidate shifts.
@@ -84,7 +84,7 @@ the strongest search mode the environment supports.
    - Ignore pure announcement theater unless it changes economics,
      distribution, regulation, dependency, geography, or buyer behavior.
 
-5. Ask the structural questions on every candidate signal.
+1. Ask the structural questions on every candidate signal.
    - What constraint shifted?
    - Who gained or lost leverage?
    - What got cheaper, harder, faster, or more defensible?
@@ -94,13 +94,13 @@ the strongest search mode the environment supports.
    - Why does this matter for the user's actual projects, workflows, or market
      view?
 
-6. Score before writing.
+1. Score before writing.
    - Keep only the few signals that represent real change.
    - A good weekly diff usually has 3-7 structural shifts.
    - Merge duplicates, drop weak stories, and explicitly label speculation as
      speculation.
 
-7. Produce the weekly diff.
+1. Produce the weekly diff.
 
 Use this default structure:
 
@@ -115,7 +115,7 @@ Use this default structure:
 - `Watch next` — entities, constraints, or questions to monitor
 - `Actions` — optional follow-ups, only if the evidence supports them
 
-8. Capture the durable output.
+1. Capture the durable output.
    - Save the final digest back into Open Brain when capture tools are
      available.
    - Prefer one durable weekly summary plus separate captures only for truly
