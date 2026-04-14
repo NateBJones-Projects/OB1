@@ -2,6 +2,9 @@
 
 > A conversation-first workflow that interviews you about how your work actually runs, stores the answers as structured Open Brain data, and generates agent-ready operating files.
 
+> [!NOTE]
+> If you are coming from the Bring Your Own Context post or want the article-friendly entrypoint, start with [Bring Your Own Context](../bring-your-own-context/). This recipe is the structured profiling engine that BYOC uses under the hood.
+
 ## What It Does
 
 This recipe adds a dedicated MCP server plus schema for a 45-minute elicitation workflow. The interview runs in five fixed layers:
@@ -14,7 +17,7 @@ This recipe adds a dedicated MCP server plus schema for a 45-minute elicitation 
 
 Each approved layer is saved into structured tables, summarized into one durable Open Brain thought through your existing core connector, and made available for later querying and export generation.
 
-This recipe depends on the canonical [Work Operating Model skill](../../skills/work-operating-model/), which owns the interview behavior. The recipe owns the data model, remote MCP server, and export snapshots.
+This recipe depends on the canonical [Work Operating Model skill](../../skills/work-operating-model/), which owns the interview behavior. The recipe owns the data model, remote MCP server, and export snapshots. The higher-level [Bring Your Own Context](../bring-your-own-context/) recipe packages this workflow together with context extraction prompts and the portable bundle contract.
 
 ## Prerequisites
 
