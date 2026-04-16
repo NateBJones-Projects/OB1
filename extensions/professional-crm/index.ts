@@ -19,13 +19,11 @@ const app = new Hono();
 
 // POST /mcp - Main MCP endpoint
 app.post("*", async (c) => {
-  // Force JSON-only responses. SSE causes a reconnect loop on stateless edge functions:
-  // the client sends Accept: text/event-stream (per MCP spec), the transport opens an SSE
-  // stream, the function terminates, client reconnects in ~1-2s -- ~43k idle invocations/day.
-  // Stripping text/event-stream forces plain JSON responses and breaks the loop.
-  {
+  // Keep the transport compatible with MCP content negotiation. Some connectors omit
+  // text/event-stream, but @hono/mcp expects POST requests to accept both response types.
+  if (!c.req.header("accept")?.includes("text/event-stream")) {
     const headers = new Headers(c.req.raw.headers);
-    headers.set("Accept", "application/json");
+    headers.set("Accept", "application/json, text/event-stream");
     const patched = new Request(c.req.raw.url, {
       method: c.req.raw.method,
       headers,
@@ -491,7 +489,11 @@ app.post("*", async (c) => {
     },
   );
 
-  const transport = new StreamableHTTPTransport();
+  // Use the SDK's JSON response mode to avoid SSE reconnect churn on stateless edge functions.
+  const transport = new StreamableHTTPTransport({
+    sessionIdGenerator: undefined,
+    enableJsonResponse: true,
+  });
   await server.connect(transport);
   return transport.handleRequest(c);
 });

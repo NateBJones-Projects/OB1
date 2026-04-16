@@ -356,15 +356,16 @@ Follow the prompts — it may ask for your Mac password. Once it finishes, close
 
 **Without Homebrew:**
 
-```bash
-npm install -g supabase
-```
+`npm install -g supabase` is not supported. If you want a global `supabase` command, install the standalone CLI from the [official Supabase CLI guide](https://supabase.com/docs/guides/local-development/cli/getting-started). Otherwise, run every command below with `npx supabase ...`.
 
 Verify it worked:
 
 ```bash
 supabase --version
 ```
+
+> [!NOTE]
+> If you're using `npx` instead of a global `supabase` binary, run `npx supabase --version` here and prefix the rest of the commands in this section the same way.
 
 ![6.3](https://img.shields.io/badge/6.3-Log_In-555?style=for-the-badge&labelColor=1E88E5)
 
@@ -418,10 +419,11 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
-
+>
 > **If you ever rotate your OpenRouter key:** you must re-run the `supabase secrets set` command above with the new key, AND update any local `.env` files that reference it. The edge function reads from Supabase secrets at runtime — updating the key on openrouter.ai alone won't propagate here. See the [FAQ on key rotation](03-faq.md#api-key-rotation) for the full checklist.
 
 ### Create the Function
+
 ![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
 Three commands, run them one at a time in order:
@@ -680,7 +682,7 @@ Pick your AI client below:
 <summary>🤖 <strong>7.1 — Claude Desktop</strong></summary>
 
 > [!NOTE]
-> No JSON config files. No Node.js. No terminal. This is the simplest connection method.
+> These steps are for Anthropic's official Claude Desktop app on macOS and Windows. Linux/community ports vary and aren't officially covered by this Connectors UI flow. No JSON config files. No Node.js. No terminal. This is the simplest connection method.
 
 1. Open Claude Desktop → **Settings** → **Connectors**
 2. Click **Add custom connector**
@@ -689,27 +691,6 @@ Pick your AI client below:
 5. Click **Add**
 
 That's it. Start a new conversation, and Claude will have access to your Open Brain tools. You can enable or disable it per conversation via the "+" button → Connectors.
-
-> [!TIP]
-> **Prefer JSON config?** If you'd rather use `claude_desktop_config.json` instead of the Connectors UI, use `supergateway` (not `mcp-remote` — see note below):
->
-> ```json
-> {
->   "mcpServers": {
->     "open-brain": {
->       "command": "npx",
->       "args": [
->         "-y",
->         "supergateway",
->         "--streamableHttp",
->         "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
->       ]
->     }
->   }
-> }
-> ```
->
-> ⚠️ **Do not use `mcp-remote` for Claude Desktop.** It performs OAuth discovery against the Supabase domain, which returns a 404 that causes the connection to fail before Claude Desktop's short startup timeout. `supergateway --streamableHttp` connects directly with no OAuth handshake. (`mcp-remote` works fine in Codex because its `startup_timeout_sec = 30` gives enough time for the OAuth fallback.)
 
 </details>
 
@@ -880,7 +861,7 @@ Your AI should retrieve the thought you just saved.
 
 **❌ Claude Desktop tools don't appear**
 
-Make sure you added the connector in Settings → Connectors (not by editing the JSON config file). Verify the connector is enabled for your conversation — click the "+" button at the bottom of the chat, then Connectors, and check that Open Brain is toggled on. If the connector was added but tools still don't show, try removing and re-adding it with the same URL.
+On the official macOS/Windows Claude Desktop app, make sure you added the connector in Settings → Connectors. Verify the connector is enabled for your conversation — click the "+" button at the bottom of the chat, then Connectors, and check that Open Brain is toggled on. If the connector was added but tools still don't show, try removing and re-adding it with the same URL. If you're using a Linux/community port, its connector behavior can differ and isn't covered by this guide.
 
 **❌ ChatGPT doesn't use the Open Brain tools**
 
@@ -889,10 +870,6 @@ First, confirm Developer Mode is enabled (Settings → Apps & Connectors → Adv
 **❌ "Permission denied for table thoughts"**
 
 Your `service_role` doesn't have table-level permissions. This happens on newer Supabase projects where CRUD grants are no longer automatic. Go back to Step 2.5 and run the `GRANT` SQL, then retry.
-
-**❌ Claude Desktop JSON config: "Couldn't reach the MCP server"**
-
-If you're using `claude_desktop_config.json` with `mcp-remote`, switch to `supergateway --streamableHttp` instead. `mcp-remote` performs OAuth discovery against the Supabase domain (`/.well-known/oauth-authorization-server`), which returns a 404 that stalls the connection past Claude Desktop's startup timeout. `supergateway` connects directly with no OAuth handshake. See Step 7.1 for the config. (This does not affect Codex, which has a configurable `startup_timeout_sec` that gives `mcp-remote` enough time to fall back.)
 
 **❌ Getting 401 errors**
 

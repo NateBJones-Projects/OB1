@@ -79,6 +79,27 @@ const getUpcomingInterviewsSchema = z.object({
   days_ahead: z.number().optional().describe("Number of days to look ahead (default: 14)"),
 });
 
+const jobContactRoleSchema = z.enum(["recruiter", "hiring_manager", "referral", "interviewer", "other"]);
+
+const addJobContactSchema = z.object({
+  company_id: z.string().optional().describe("Company ID (UUID)"),
+  name: z.string().describe("Contact's full name"),
+  title: z.string().optional().describe("Job title"),
+  email: z.string().optional().describe("Email address"),
+  phone: z.string().optional().describe("Phone number"),
+  linkedin_url: z.string().optional().describe("LinkedIn profile URL"),
+  role_in_process: jobContactRoleSchema.optional().describe("Role in your hiring process"),
+  notes: z.string().optional().describe("Additional notes about this contact"),
+  last_contacted: z.string().optional().describe("Last contact timestamp (ISO 8601)"),
+});
+
+const searchJobContactsSchema = z.object({
+  query: z.string().optional().describe("Search term across contact name, title, email, notes, or company name"),
+  company_id: z.string().optional().describe("Filter to a specific company ID (UUID)"),
+  role_in_process: jobContactRoleSchema.optional().describe("Filter by role in your hiring process"),
+  only_unlinked: z.boolean().optional().describe("If true, only return contacts not yet linked to Professional CRM"),
+});
+
 const linkContactToProfessionalCRMSchema = z.object({
   job_contact_id: z.string().describe("Job contact ID (UUID)"),
 });
@@ -147,6 +168,43 @@ async function handleAddJobPosting(supabase: any, args: z.infer<typeof addJobPos
     success: true,
     message: `Added job posting: ${title}`,
     job_posting: data,
+  }, null, 2);
+}
+
+async function handleAddJobContact(supabase: any, args: z.infer<typeof addJobContactSchema>, userId: string): Promise<string> {
+  const { company_id, name, title, email, phone, linkedin_url, role_in_process, notes, last_contacted } = args;
+
+  const { data, error } = await supabase
+    .from("job_contacts")
+    .insert({
+      user_id: userId,
+      company_id: company_id || null,
+      name,
+      title: title || null,
+      email: email || null,
+      phone: phone || null,
+      linkedin_url: linkedin_url || null,
+      role_in_process: role_in_process || null,
+      notes: notes || null,
+      last_contacted: last_contacted || null,
+    })
+    .select(`
+      *,
+      companies (
+        id,
+        name
+      )
+    `)
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to add job contact: ${error.message}`);
+  }
+
+  return JSON.stringify({
+    success: true,
+    message: `Added job contact: ${name}`,
+    job_contact: data,
   }, null, 2);
 }
 
@@ -331,6 +389,77 @@ async function handleGetUpcomingInterviews(supabase: any, args: z.infer<typeof g
   }, null, 2);
 }
 
+async function handleSearchJobContacts(supabase: any, args: z.infer<typeof searchJobContactsSchema>, userId: string): Promise<string> {
+  const { query, company_id, role_in_process, only_unlinked } = args;
+  const normalizedQuery = query?.trim();
+  let matchingCompanyIds: string[] = [];
+
+  if (normalizedQuery) {
+    const { data: companies, error: companyError } = await supabase
+      .from("companies")
+      .select("id")
+      .eq("user_id", userId)
+      .ilike("name", `%${normalizedQuery}%`);
+
+    if (companyError) {
+      throw new Error(`Failed to search companies for matching contacts: ${companyError.message}`);
+    }
+
+    matchingCompanyIds = companies.map((company: { id: string }) => company.id);
+  }
+
+  let queryBuilder = supabase
+    .from("job_contacts")
+    .select(`
+      *,
+      companies (
+        id,
+        name
+      )
+    `)
+    .eq("user_id", userId);
+
+  if (normalizedQuery) {
+    const filters = [
+      `name.ilike.%${normalizedQuery}%`,
+      `title.ilike.%${normalizedQuery}%`,
+      `email.ilike.%${normalizedQuery}%`,
+      `notes.ilike.%${normalizedQuery}%`,
+      `role_in_process.ilike.%${normalizedQuery}%`,
+    ];
+
+    if (matchingCompanyIds.length > 0) {
+      filters.push(`company_id.in.(${matchingCompanyIds.join(",")})`);
+    }
+
+    queryBuilder = queryBuilder.or(filters.join(","));
+  }
+
+  if (company_id) {
+    queryBuilder = queryBuilder.eq("company_id", company_id);
+  }
+
+  if (role_in_process) {
+    queryBuilder = queryBuilder.eq("role_in_process", role_in_process);
+  }
+
+  if (only_unlinked) {
+    queryBuilder = queryBuilder.is("professional_crm_contact_id", null);
+  }
+
+  const { data, error } = await queryBuilder.order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(`Failed to search job contacts: ${error.message}`);
+  }
+
+  return JSON.stringify({
+    success: true,
+    count: data.length,
+    contacts: data,
+  }, null, 2);
+}
+
 async function handleLinkContactToProfessionalCRM(supabase: any, args: z.infer<typeof linkContactToProfessionalCRMSchema>, userId: string): Promise<string> {
   const { job_contact_id } = args;
 
@@ -486,6 +615,13 @@ app.post("*", async (c) => {
   );
 
   server.tool(
+    "add_job_contact",
+    "Add a recruiter, hiring manager, referral, or interviewer to your job search contacts",
+    addJobContactSchema.shape,
+    async (args) => wrap(() => handleAddJobContact(supabase, args, userId))
+  );
+
+  server.tool(
     "submit_application",
     "Record a submitted application",
     submitApplicationSchema.shape,
@@ -518,6 +654,13 @@ app.post("*", async (c) => {
     "List interviews in the next N days with full company/role context",
     getUpcomingInterviewsSchema.shape,
     async (args) => wrap(() => handleGetUpcomingInterviews(supabase, args, userId))
+  );
+
+  server.tool(
+    "search_job_contacts",
+    "Search or list job contacts so you can find the right recruiter/interviewer and their ID",
+    searchJobContactsSchema.shape,
+    async (args) => wrap(() => handleSearchJobContacts(supabase, args, userId))
   );
 
   server.tool(

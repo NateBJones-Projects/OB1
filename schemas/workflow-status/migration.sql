@@ -14,4 +14,4 @@ CREATE INDEX IF NOT EXISTS idx_thoughts_status ON thoughts (status) WHERE status
 -- Backfill: set existing task and idea thoughts to 'new' status
 UPDATE thoughts
 SET status = 'new', status_updated_at = now()
-WHERE type IN ('task', 'idea') AND status IS NULL;
+WHERE metadata->>'type' IN ('task', 'idea') AND status IS NULL;

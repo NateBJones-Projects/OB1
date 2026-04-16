@@ -64,7 +64,8 @@ from chatgpt_parser import (
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 
-SYNC_LOG_PATH = Path("chatgpt-sync-log.json")
+SCRIPT_DIR = Path(__file__).resolve().parent
+SYNC_LOG_PATH = SCRIPT_DIR / "chatgpt-sync-log.json"
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 OLLAMA_BASE = "http://localhost:11434"
@@ -247,7 +248,7 @@ Conversation:
 def load_sync_log():
     """Load sync log from disk. Returns dict with ingested_ids and last_sync."""
     try:
-        with open(SYNC_LOG_PATH) as f:
+        with SYNC_LOG_PATH.open(encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {"ingested_ids": {}, "last_sync": ""}
@@ -255,7 +256,7 @@ def load_sync_log():
 
 def save_sync_log(log):
     """Save sync log to disk."""
-    with open(SYNC_LOG_PATH, "w") as f:
+    with SYNC_LOG_PATH.open("w", encoding="utf-8", newline="\n") as f:
         json.dump(log, f, indent=2)
 
 
@@ -1153,7 +1154,7 @@ def main():
 
 def _write_report(filepath, entries, stats):
     """Write a markdown report of imported conversations."""
-    with open(filepath, "w") as f:
+    with Path(filepath).open("w", encoding="utf-8", newline="\n") as f:
         mode = "DRY RUN" if stats["dry_run"] else "LIVE"
         f.write(f"# ChatGPT Import Report ({mode})\n\n")
         f.write(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n\n")

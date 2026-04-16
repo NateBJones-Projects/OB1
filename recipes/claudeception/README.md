@@ -1,4 +1,4 @@
-# Claudeception
+# Aiception (Formerly Claudeception)
 
 <div align="center">
 
@@ -12,13 +12,18 @@
 
 *Skills that create other skills.*
 
-A continuous learning system that extracts reusable knowledge from work sessions and codifies it into new AI coding tool skills. When you discover something non-obvious (a debugging technique, a workaround, an error resolution), Claudeception evaluates whether it's worth preserving and creates a structured skill file automatically.
+The repo keeps the historical `claudeception` folder and recipe name for continuity, but the
+actual installable Claude Code skill should now be named `aiception`. Anthropic reserves
+skill names containing `claude` or `anthropic` in frontmatter, so the old installed name
+is no longer compatible.
+
+A continuous learning system that extracts reusable knowledge from work sessions and codifies it into new AI coding tool skills. When you discover something non-obvious (a debugging technique, a workaround, an error resolution), Aiception evaluates whether it's worth preserving and creates a structured skill file automatically.
 
 **This is the meta-skill.** Every other recipe in OB1 does a specific thing. This one creates new things from the act of working.
 
 ## What It Does
 
-During normal work, Claudeception watches for extractable knowledge:
+During normal work, Aiception watches for extractable knowledge:
 
 | Discovery Type | Example | What Gets Created |
 |----------------|---------|-------------------|
@@ -50,24 +55,24 @@ No additional credentials needed for this recipe.
 ### 1. Create the skill directory
 
 ```bash
-mkdir -p ~/.claude/skills/claudeception
+mkdir -p ~/.claude/skills/aiception
 ```
 
 ### 2. Copy the skill file
 
 ```bash
-cp claudeception.skill.md ~/.claude/skills/claudeception/SKILL.md
+cp claudeception.skill.md ~/.claude/skills/aiception/SKILL.md
 ```
 
 ### 3. Verify Claude Code picks up the skill
 
-Restart Claude Code. To verify, say "what did we learn?" or run `/claudeception` at the end of a work session. Claude should reference the Claudeception methodology.
+Restart Claude Code. To verify, say "what did we learn?" or run `/aiception` at the end of a work session. Claude should reference the Aiception methodology.
 
 ### 4. Work normally
 
-Claudeception fires automatically after tasks involving non-obvious investigation. You can also trigger it manually:
+Aiception fires automatically after tasks involving non-obvious investigation. You can also trigger it manually:
 
-- `/claudeception` at end of session (retrospective mode)
+- `/aiception` at end of session (retrospective mode)
 - "save this as a skill" after a discovery
 - "what did we learn?" to review the session
 
@@ -94,7 +99,7 @@ A typical week of active development produces 1-3 new skills. Not every session 
 
 ## Open Brain Integration
 
-Claudeception connects to Open Brain at two points:
+Aiception connects to Open Brain at two points:
 
 **Before creating (search):** Queries `search_thoughts` with keywords from the discovery. If related knowledge already exists in Open Brain, it updates the existing skill instead of creating a duplicate.
 
@@ -124,14 +129,14 @@ The skill file format may differ, but the extraction process and quality criteri
 
 ## Troubleshooting
 
-**Issue:** Claudeception fires too often, creating low-value skills.
+**Issue:** Aiception fires too often, creating low-value skills.
 **Solution:** Check the quality criteria in the skill file. A skill must be reusable, non-trivial, specific, and verified. If it only helps with one instance and won't recur, it's not a skill.
 
 **Issue:** Skills aren't being discovered in future sessions.
 **Solution:** Check the `description` field in the skill's frontmatter. It needs specific trigger conditions (error messages, symptoms, tool names) for Claude Code's semantic matching to surface it. Vague descriptions like "helps with React" won't match.
 
 **Issue:** Open Brain search returns nothing but a similar skill exists locally.
-**Solution:** The skill may have been created before Open Brain integration was added. Run `/claudeception` in retrospective mode to capture existing skills to Open Brain.
+**Solution:** The skill may have been created before Open Brain integration was added. Run `/aiception` in retrospective mode to capture existing skills to Open Brain.
 
 **Issue:** Too many skills accumulating (30+).
 **Solution:** Review the 5 least-recently-modified skills. If they haven't fired in 30+ days, either the trigger conditions are too narrow (update them) or the knowledge is no longer relevant (deprecate). Add a `deprecated: true` note to the frontmatter rather than deleting.
