@@ -1,0 +1,22 @@
+{
+  "name": "Bring Your Own Context",
+  "description": "Portable context workflow that packages extraction prompts, the Work Operating Model profile flow, and remote MCP deployment into one reusable Open Brain recipe.",
+  "category": "recipes",
+  "author": {
+    "name": "Jonathan Edwards",
+    "github": "jonathanedwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Supabase CLI", "AI client with MCP support and reusable skills/prompts"]
+  },
+  "requires_skills": ["work-operating-model"],
+  "requires_primitives": ["deploy-edge-function", "remote-mcp"],
+  "tags": ["byoc", "portable-context", "operating-model", "mcp", "prompts"],
+  "difficulty": "intermediate",
+  "estimated_time": "1 hour",
+  "created": "2026-04-14",
+  "updated": "2026-04-14"
+}

@@ -1,0 +1,670 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bring Your Own Context Export Bundle",
+  "description": "Schema for the payload returned by generate_operating_model_exports. The tool returns artifact contents as strings. Parsed JSON artifact contracts are documented in $defs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["session_id", "profile_version", "exports"],
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "profile_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "exports": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operating-model.json",
+        "USER.md",
+        "SOUL.md",
+        "HEARTBEAT.md",
+        "schedule-recommendations.json"
+      ],
+      "properties": {
+        "operating-model.json": {
+          "type": "string",
+          "contentMediaType": "application/json",
+          "description": "JSONString containing an object that matches #/$defs/operatingModelJson."
+        },
+        "USER.md": {
+          "type": "string",
+          "contentMediaType": "text/markdown"
+        },
+        "SOUL.md": {
+          "type": "string",
+          "contentMediaType": "text/markdown"
+        },
+        "HEARTBEAT.md": {
+          "type": "string",
+          "contentMediaType": "text/markdown"
+        },
+        "schedule-recommendations.json": {
+          "type": "string",
+          "contentMediaType": "application/json",
+          "description": "JSONString containing an object that matches #/$defs/scheduleRecommendations."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "profileStatus": {
+      "type": "string",
+      "enum": ["draft", "active", "archived"]
+    },
+    "sessionStatus": {
+      "type": "string",
+      "enum": ["in_progress", "review_ready", "completed", "abandoned"]
+    },
+    "layerName": {
+      "type": "string",
+      "enum": [
+        "operating_rhythms",
+        "recurring_decisions",
+        "dependencies",
+        "institutional_knowledge",
+        "friction"
+      ]
+    },
+    "sourceConfidence": {
+      "type": "string",
+      "enum": ["confirmed", "synthesized"]
+    },
+    "entryStatus": {
+      "type": "string",
+      "enum": ["active", "unresolved", "superseded"]
+    },
+    "timeWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "start": {
+          "type": "string"
+        },
+        "end": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "baseEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "summary",
+        "cadence",
+        "trigger",
+        "inputs",
+        "stakeholders",
+        "constraints",
+        "details",
+        "source_confidence",
+        "status",
+        "last_validated_at"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "cadence": {
+          "type": ["string", "null"]
+        },
+        "trigger": {
+          "type": ["string", "null"]
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stakeholders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "details": {
+          "type": "object"
+        },
+        "source_confidence": {
+          "$ref": "#/$defs/sourceConfidence"
+        },
+        "status": {
+          "$ref": "#/$defs/entryStatus"
+        },
+        "last_validated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "operatingRhythmsDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time_windows",
+        "energy_pattern",
+        "interruptions",
+        "non_calendar_reality"
+      ],
+      "properties": {
+        "time_windows": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/timeWindow"
+              }
+            ]
+          }
+        },
+        "energy_pattern": {
+          "type": "string"
+        },
+        "interruptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "non_calendar_reality": {
+          "type": "string"
+        }
+      }
+    },
+    "recurringDecisionsDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_name",
+        "decision_inputs",
+        "thresholds",
+        "escalation_rule",
+        "reversible"
+      ],
+      "properties": {
+        "decision_name": {
+          "type": "string"
+        },
+        "decision_inputs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "thresholds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "escalation_rule": {
+          "type": "string"
+        },
+        "reversible": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    "dependenciesDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dependency_owner",
+        "deliverable",
+        "needed_by",
+        "failure_impact",
+        "fallback"
+      ],
+      "properties": {
+        "dependency_owner": {
+          "type": "string"
+        },
+        "deliverable": {
+          "type": "string"
+        },
+        "needed_by": {
+          "type": "string"
+        },
+        "failure_impact": {
+          "type": "string"
+        },
+        "fallback": {
+          "type": "string"
+        }
+      }
+    },
+    "institutionalKnowledgeDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "knowledge_area",
+        "why_it_matters",
+        "where_it_lives",
+        "who_else_knows",
+        "risk_if_missing"
+      ],
+      "properties": {
+        "knowledge_area": {
+          "type": "string"
+        },
+        "why_it_matters": {
+          "type": "string"
+        },
+        "where_it_lives": {
+          "type": "string"
+        },
+        "who_else_knows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "risk_if_missing": {
+          "type": "string"
+        }
+      }
+    },
+    "frictionDetails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frequency",
+        "time_cost",
+        "current_workaround",
+        "systems_involved",
+        "automation_candidate"
+      ],
+      "properties": {
+        "frequency": {
+          "type": "string"
+        },
+        "time_cost": {
+          "type": "string"
+        },
+        "current_workaround": {
+          "type": "string"
+        },
+        "systems_involved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "automation_candidate": {
+          "oneOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        }
+      }
+    },
+    "operatingRhythmsEntry": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "details": {
+              "$ref": "#/$defs/operatingRhythmsDetails"
+            }
+          }
+        }
+      ]
+    },
+    "recurringDecisionsEntry": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "details": {
+              "$ref": "#/$defs/recurringDecisionsDetails"
+            }
+          }
+        }
+      ]
+    },
+    "dependenciesEntry": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "details": {
+              "$ref": "#/$defs/dependenciesDetails"
+            }
+          }
+        }
+      ]
+    },
+    "institutionalKnowledgeEntry": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "details": {
+              "$ref": "#/$defs/institutionalKnowledgeDetails"
+            }
+          }
+        }
+      ]
+    },
+    "frictionEntry": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/baseEntry"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "details": {
+              "$ref": "#/$defs/frictionDetails"
+            }
+          }
+        }
+      ]
+    },
+    "operatingRhythmsLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpoint_summary", "entries"],
+      "properties": {
+        "checkpoint_summary": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/operatingRhythmsEntry"
+          }
+        }
+      }
+    },
+    "recurringDecisionsLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpoint_summary", "entries"],
+      "properties": {
+        "checkpoint_summary": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recurringDecisionsEntry"
+          }
+        }
+      }
+    },
+    "dependenciesLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpoint_summary", "entries"],
+      "properties": {
+        "checkpoint_summary": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dependenciesEntry"
+          }
+        }
+      }
+    },
+    "institutionalKnowledgeLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpoint_summary", "entries"],
+      "properties": {
+        "checkpoint_summary": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/institutionalKnowledgeEntry"
+          }
+        }
+      }
+    },
+    "frictionLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checkpoint_summary", "entries"],
+      "properties": {
+        "checkpoint_summary": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frictionEntry"
+          }
+        }
+      }
+    },
+    "operatingModelJson": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generated_at",
+        "profile_id",
+        "profile_status",
+        "profile_version",
+        "session_id",
+        "session_status",
+        "layers"
+      ],
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "profile_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "profile_status": {
+          "$ref": "#/$defs/profileStatus"
+        },
+        "profile_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "session_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "session_status": {
+          "$ref": "#/$defs/sessionStatus"
+        },
+        "layers": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "operating_rhythms",
+            "recurring_decisions",
+            "dependencies",
+            "institutional_knowledge",
+            "friction"
+          ],
+          "properties": {
+            "operating_rhythms": {
+              "$ref": "#/$defs/operatingRhythmsLayer"
+            },
+            "recurring_decisions": {
+              "$ref": "#/$defs/recurringDecisionsLayer"
+            },
+            "dependencies": {
+              "$ref": "#/$defs/dependenciesLayer"
+            },
+            "institutional_knowledge": {
+              "$ref": "#/$defs/institutionalKnowledgeLayer"
+            },
+            "friction": {
+              "$ref": "#/$defs/frictionLayer"
+            }
+          }
+        }
+      }
+    },
+    "scheduleRecommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "cadence", "trigger", "rationale", "source_layers"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "cadence": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "source_layers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/layerName"
+          }
+        }
+      }
+    },
+    "scheduleRecommendations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generated_at",
+        "profile_version",
+        "session_id",
+        "daily",
+        "weekly",
+        "monthly",
+        "event_driven"
+      ],
+      "properties": {
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "profile_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "session_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "daily": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scheduleRecommendation"
+          }
+        },
+        "weekly": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scheduleRecommendation"
+          }
+        },
+        "monthly": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scheduleRecommendation"
+          }
+        },
+        "event_driven": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scheduleRecommendation"
+          }
+        }
+      }
+    },
+    "portableBundleParsed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operating-model.json",
+        "USER.md",
+        "SOUL.md",
+        "HEARTBEAT.md",
+        "schedule-recommendations.json"
+      ],
+      "properties": {
+        "operating-model.json": {
+          "$ref": "#/$defs/operatingModelJson"
+        },
+        "USER.md": {
+          "type": "string"
+        },
+        "SOUL.md": {
+          "type": "string"
+        },
+        "HEARTBEAT.md": {
+          "type": "string"
+        },
+        "schedule-recommendations.json": {
+          "$ref": "#/$defs/scheduleRecommendations"
+        }
+      }
+    }
+  }
+}
