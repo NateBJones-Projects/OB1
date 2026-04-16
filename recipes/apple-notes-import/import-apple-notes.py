@@ -56,6 +56,79 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
 
 
+# ─── API helpers ──────────────────────────────────────────────────────────────
+
+def _with_retry(fn, max_retries: int = 3, base_delay: float = 2.0):
+    """Exponential backoff for transient API errors (429, 5xx)."""
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except requests.HTTPError as e:
+            if attempt == max_retries - 1:
+                raise
+            if e.response.status_code in (429, 500, 502, 503, 504):
+                time.sleep(base_delay * (2 ** attempt))
+            else:
+                raise
+
+
+def get_embedding(text: str) -> list[float]:
+    def _call():
+        r = requests.post(
+            f'{OPENROUTER_BASE}/embeddings',
+            headers={'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                     'Content-Type': 'application/json'},
+            json={'model': EMBED_MODEL, 'input': text},
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()['data'][0]['embedding']
+    return _with_retry(_call)
+
+
+def classify_type(content: str) -> str:
+    def _call():
+        r = requests.post(
+            f'{OPENROUTER_BASE}/chat/completions',
+            headers={'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                     'Content-Type': 'application/json'},
+            json={
+                'model': LLM_MODEL,
+                'response_format': {'type': 'json_object'},
+                'messages': [
+                    {'role': 'system', 'content': (
+                        'Classify the thought type. Return JSON with one key "type" '
+                        'set to exactly one of: observation, task, idea, reference, person_note'
+                    )},
+                    {'role': 'user', 'content': content[:500]},
+                ],
+            },
+            timeout=20,
+        )
+        r.raise_for_status()
+        return json.loads(r.json()['choices'][0]['message']['content']).get('type', 'observation')
+    try:
+        return _with_retry(_call)
+    except Exception:
+        return 'observation'
+
+
+def insert_thought(supabase_client, content: str, embedding: list[float], metadata: dict) -> str | None:
+    fingerprint = compute_fingerprint(content)
+    try:
+        result = (
+            supabase_client.table('thoughts')
+            .insert({'content': content, 'embedding': embedding,
+                     'metadata': {**metadata, 'content_fingerprint': fingerprint}})
+            .execute()
+        )
+        return result.data[0]['id'] if result.data else None
+    except Exception as e:
+        if any(x in str(e).lower() for x in ('23505', 'duplicate', 'unique')):
+            return None  # Already imported
+        raise
+
+
 # ─── Sync log ─────────────────────────────────────────────────────────────────
 
 def load_sync_log() -> dict[str, str]:
@@ -161,6 +234,148 @@ def dry_run_preview(notes: list[dict], args: argparse.Namespace) -> None:
     print(f"  Chunks skipped (secrets):       {secret_hits}")
 
 
+# ─── Live import ──────────────────────────────────────────────────────────────
+
+def live_import(notes: list[dict], args: argparse.Namespace, sync_log: dict[str, str]) -> None:
+    supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    imported = skipped_secrets = skipped_dupes = errors = 0
+    report_lines: list[str] = []
+
+    for i, note in enumerate(notes, 1):
+        note_id = note['id']
+        title = note.get('title', 'Untitled')
+        folder = note.get('folder', '')
+        account = note.get('account', '')
+
+        if args.verbose:
+            print(f"[{i}/{len(notes)}] {account} / {folder} / {title}")
+
+        web_urls, note_links = extract_links(note['body'])
+        markdown = html_to_markdown(note['body'])
+        chunks = chunk_note(markdown, title, folder)
+
+        if not args.no_llm:
+            chunks = _maybe_distil_with_llm(chunks)
+
+        for chunk in chunks:
+            if scan_for_secrets(chunk):
+                skipped_secrets += 1
+                if args.verbose:
+                    print("  WARNING: secret detected — skipping chunk")
+                continue
+
+            thought_type = classify_type(chunk)
+            metadata = {
+                'source': 'apple-notes',
+                'note_id': note_id,
+                'title': title,
+                'folder': folder,
+                'account': account,
+                'created': note.get('created', '')[:10],
+                'modified': note.get('modified', '')[:10],
+                'urls': web_urls,
+                'note_links': note_links,
+                'type': thought_type,
+            }
+
+            try:
+                embedding = get_embedding(chunk)
+                time.sleep(EMBED_DELAY_SECONDS)
+            except Exception as e:
+                errors += 1
+                if args.verbose:
+                    print(f"  ERROR embed: {e}")
+                continue
+
+            try:
+                thought_id = insert_thought(supabase, chunk, embedding, metadata)
+                if thought_id is None:
+                    skipped_dupes += 1
+                    if args.verbose:
+                        print("  -> duplicate, skipped")
+                else:
+                    imported += 1
+                    if args.verbose:
+                        print(f"  -> imported as {thought_type} ({thought_id[:8]}...)")
+            except Exception as e:
+                errors += 1
+                if args.verbose:
+                    print(f"  ERROR insert: {e}")
+                continue
+
+        sync_log[note_id] = note.get('modified', '')
+        save_sync_log(sync_log)
+
+        if args.report:
+            report_lines.append(
+                f"| {title[:40]} | {folder} | {len(chunks)} | "
+                f"{len(web_urls)} | {len(note_links)} |"
+            )
+
+    print(f"\nImport complete:")
+    print(f"  Thoughts imported:    {imported}")
+    print(f"  Duplicates skipped:   {skipped_dupes}")
+    print(f"  Secrets skipped:      {skipped_secrets}")
+    print(f"  Errors:               {errors}")
+
+    if args.report:
+        _write_report(report_lines, imported, skipped_dupes, skipped_secrets, errors)
+
+
+def _maybe_distil_with_llm(chunks: list[str]) -> list[str]:
+    """Distil chunks over 1000 words using gpt-4o-mini. Falls back on error."""
+    result = []
+    for chunk in chunks:
+        if len(chunk.split()) <= 1000:
+            result.append(chunk)
+            continue
+        try:
+            r = requests.post(
+                f'{OPENROUTER_BASE}/chat/completions',
+                headers={'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                         'Content-Type': 'application/json'},
+                json={
+                    'model': LLM_MODEL,
+                    'response_format': {'type': 'json_object'},
+                    'messages': [
+                        {'role': 'system', 'content': (
+                            'Extract 1-3 standalone knowledge thoughts from this note section. '
+                            'Each thought must make sense on its own. '
+                            'Return JSON: {"thoughts": ["thought 1", "thought 2"]}'
+                        )},
+                        {'role': 'user', 'content': chunk[:3000]},
+                    ],
+                },
+                timeout=30,
+            )
+            r.raise_for_status()
+            distilled = json.loads(r.json()['choices'][0]['message']['content']).get('thoughts', [])
+            if distilled:
+                result.extend(distilled)
+                continue
+        except Exception:
+            pass
+        result.append(chunk)
+    return result
+
+
+def _write_report(lines: list[str], imported: int, dupes: int, secrets: int, errors: int) -> None:
+    now = datetime.now().strftime('%Y-%m-%d %H:%M')
+    content = '\n'.join([
+        f"# Apple Notes Import Report — {now}", "",
+        "| Metric | Count |", "|--------|-------|",
+        f"| Imported | {imported} |",
+        f"| Duplicates skipped | {dupes} |",
+        f"| Secret-flagged skipped | {secrets} |",
+        f"| Errors | {errors} |", "",
+        "## Notes Processed", "",
+        "| Title | Folder | Chunks | URLs | Note Links |",
+        "|-------|--------|--------|------|------------|",
+    ] + lines)
+    Path('import-report.md').write_text(content)
+    print("\nReport written to import-report.md")
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main() -> None:
@@ -199,9 +414,7 @@ def main() -> None:
         dry_run_preview(to_process, args)
         return
 
-    # Live import — implemented in Task 6
-    print("Live import not yet implemented — run with --dry-run for now.")
-    sys.exit(0)
+    live_import(to_process, args, sync_log)
 
 
 if __name__ == '__main__':
