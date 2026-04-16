@@ -126,6 +126,13 @@ def preflight(args: argparse.Namespace) -> None:
             print("Copy .env.example to .env and fill in your credentials.")
             sys.exit(1)
 
+    if args.after:
+        try:
+            datetime.fromisoformat(args.after)
+        except ValueError:
+            print(f"ERROR: Invalid --after date '{args.after}' — expected YYYY-MM-DD")
+            sys.exit(1)
+
 
 # ─── Dry run ──────────────────────────────────────────────────────────────────
 
