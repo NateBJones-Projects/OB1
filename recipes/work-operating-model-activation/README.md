@@ -1,7 +1,6 @@
 # Work Operating Model Activation
 
 > A conversation-first workflow that interviews you about how your work actually runs, stores the answers as structured Open Brain data, and generates agent-ready operating files.
-
 > [!NOTE]
 > If you are coming from the Bring Your Own Context post or want the article-friendly entrypoint, start with [Bring Your Own Context](../bring-your-own-context/). This recipe is the structured profiling engine that BYOC uses under the hood.
 
