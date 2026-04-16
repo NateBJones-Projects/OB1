@@ -133,6 +133,14 @@ Show me my pipeline overview - how many applications, what stages, upcoming inte
 ```
 
 ```
+Add a job contact at TechCorp: Jessica Lee, recruiter, jessica@techcorp.com
+```
+
+```
+Show me my TechCorp job contacts
+```
+
+```
 Link the TechCorp recruiter to my professional CRM
 ```
 
@@ -146,15 +154,16 @@ A recruiter you're talking to during the job search is also a professional conta
 
 **Example workflow:**
 
-1. You add a job contact: "Jessica Lee, TechCorp recruiter, jessica@techcorp.com"
+1. You add a job contact with `add_job_contact`: "Jessica Lee, TechCorp recruiter, jessica@techcorp.com"
 2. You have multiple interactions: phone screen, interview coordination, offer negotiation
-3. Your agent uses `link_contact_to_professional_crm` to create a professional_contacts record in Extension 5
-4. The `professional_crm_contact_id` field is set, creating a bidirectional link
-5. After the job search ends, Jessica is already in your CRM with full context: company, role, all notes from the job search
+3. If you need to recover the contact later, your agent uses `search_job_contacts` to find the right `job_contact_id`
+4. Your agent uses `link_contact_to_professional_crm` to create a professional_contacts record in Extension 5
+5. The `professional_crm_contact_id` field is set, creating a bidirectional link
+6. After the job search ends, Jessica is already in your CRM with full context: company, role, all notes from the job search
 
 **How it works technically:**
 
-The tool takes a `job_contact_id` from the `job_contacts` table. It retrieves the contact details and creates a corresponding record in Extension 5's `professional_contacts` table. The `professional_crm_contact_id` field stores the link — this is application-managed rather than a database foreign key, because the two extensions live in separate table domains and you might install one without the other. This means:
+The bridge tool takes a `job_contact_id` from the `job_contacts` table. In normal use, your agent creates that row with `add_job_contact`, and if it needs to recover the UUID later it can call `search_job_contacts` first. Once it has the ID, it retrieves the contact details and creates a corresponding record in Extension 5's `professional_contacts` table. The `professional_crm_contact_id` field stores the link — this is application-managed rather than a database foreign key, because the two extensions live in separate table domains and you might install one without the other. This means:
 
 - Future interactions in the job hunt also appear in the CRM context
 - You can track the relationship long-term in Extension 5
@@ -175,12 +184,14 @@ This is the power of a fully interconnected Open Brain — context flows across 
 
 1. **`add_company`** — Add a company to track (name, industry, website, size, location, remote_policy, notes, glassdoor_rating)
 2. **`add_job_posting`** — Add a specific role at a company (company_id, title, url, salary_min, salary_max, requirements, nice_to_haves, source, posted_date)
-3. **`submit_application`** — Record a submitted application (job_posting_id, status, applied_date, resume_version, cover_letter_notes, referral_contact)
-4. **`schedule_interview`** — Schedule an interview for an application (application_id, interview_type, scheduled_at, duration_minutes, interviewer_name, interviewer_title, notes)
-5. **`log_interview_notes`** — Add feedback/notes after an interview, update status to completed (interview_id, feedback, rating 1-5)
-6. **`get_pipeline_overview`** — Dashboard summary: counts by application status, upcoming interviews in next N days, recent activity. This is your "how's it going?" tool.
-7. **`get_upcoming_interviews`** — List interviews in the next N days with full company/role context
-8. **`link_contact_to_professional_crm`** — **CROSS-EXTENSION BRIDGE** — Takes a job_contact_id, creates/links to a professional_contacts record in Extension 5, sets professional_crm_contact_id
+3. **`add_job_contact`** — Add a recruiter, hiring manager, referral, or interviewer to `job_contacts` (company_id, name, title, email, phone, linkedin_url, role_in_process, notes, last_contacted)
+4. **`submit_application`** — Record a submitted application (job_posting_id, status, applied_date, resume_version, cover_letter_notes, referral_contact)
+5. **`schedule_interview`** — Schedule an interview for an application (application_id, interview_type, scheduled_at, duration_minutes, interviewer_name, interviewer_title, notes)
+6. **`log_interview_notes`** — Add feedback/notes after an interview, update status to completed (interview_id, feedback, rating 1-5)
+7. **`get_pipeline_overview`** — Dashboard summary: counts by application status, upcoming interviews in next N days, recent activity. This is your "how's it going?" tool.
+8. **`get_upcoming_interviews`** — List interviews in the next N days with full company/role context
+9. **`search_job_contacts`** — Search or list job contacts to recover recruiter/interviewer records and IDs before linking or follow-up
+10. **`link_contact_to_professional_crm`** — **CROSS-EXTENSION BRIDGE** — Takes a job_contact_id, creates/links to a professional_contacts record in Extension 5, sets professional_crm_contact_id
 
 ## Expected Outcome
 

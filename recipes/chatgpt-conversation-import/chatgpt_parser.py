@@ -12,6 +12,7 @@ Used by import-chatgpt.py.
 """
 
 import hashlib
+import io
 import json
 import os
 import re
@@ -78,7 +79,7 @@ def extract_conversations(source_path):
 
         all_conversations = []
         for name in sorted(candidates):
-            with zf.open(name) as f:
+            with zf.open(name) as raw_file, io.TextIOWrapper(raw_file, encoding="utf-8-sig") as f:
                 convs = json.load(f)
                 if isinstance(convs, list):
                     all_conversations.extend(convs)
@@ -103,7 +104,7 @@ def _load_conversations_from_dir(directory):
     all_conversations = []
     for name in candidates:
         filepath = os.path.join(directory, name)
-        with open(filepath) as f:
+        with open(filepath, encoding="utf-8-sig") as f:
             convs = json.load(f)
             if isinstance(convs, list):
                 all_conversations.extend(convs)
