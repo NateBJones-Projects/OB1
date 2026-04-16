@@ -17,6 +17,7 @@ Pulls your Gmail history via the Gmail API and loads each email into Open Brain 
 - Google Cloud project with Gmail API enabled
 - Gmail API OAuth credentials (Client ID + Client Secret)
 - OpenRouter API key (same one from your Open Brain setup)
+- [Sensitive Data Redaction](../../primitives/sensitive-data-redaction/) primitive (required for the default pre-ingest masking pass)
 
 ## Credential Tracker
 
@@ -85,6 +86,7 @@ deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --list
 | `--dry-run` | off | Preview without ingesting |
 | `--list-labels` | off | List all Gmail labels and exit |
 | `--ingest-endpoint` | off | Use `INGEST_URL`/`INGEST_KEY` instead of Supabase direct insert |
+| `--no-redact` | off | Disable sensitive-data redaction before embedding/storage (not recommended) |
 
 ### Ingestion modes
 
@@ -96,11 +98,12 @@ deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --list
 
 1. **Fetch** emails from Gmail API by label and time window
 2. **Extract** body (base64 decode, HTML-to-text, strip quoted replies and signatures)
-3. **Filter** out noise (no-reply senders, receipts, auto-generated, <10 words)
-4. **Deduplicate** via sync-log (tracks Gmail message IDs already imported)
-5. **Embed** content via OpenRouter (`text-embedding-3-small`)
-6. **Classify** via LLM (topics, type, people, action items)
-7. **Upsert** into Supabase with SHA-256 [content fingerprint](../../primitives/content-fingerprint-dedup/README.md) — re-running produces zero duplicates
+3. **Redact** sensitive strings via the [Sensitive Data Redaction](../../primitives/sensitive-data-redaction/) primitive
+4. **Filter** out noise (no-reply senders, receipts, auto-generated, <10 words)
+5. **Deduplicate** via sync-log (tracks Gmail message IDs already imported)
+6. **Embed** content via OpenRouter (`text-embedding-3-small`)
+7. **Classify** via LLM (topics, type, people, action items)
+8. **Upsert** into Supabase with SHA-256 [content fingerprint dedup](../../recipes/content-fingerprint-dedup/) — re-running produces zero duplicates
 
 ### What gets filtered out
 
@@ -109,13 +112,21 @@ deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --list
 - Emails with <10 words after cleanup
 - Quoted replies and email signatures are stripped before ingestion
 
+### What gets redacted or skipped
+
+By default, the importer runs a pre-ingest redaction pass before embeddings and storage. It masks high-risk strings such as API keys, bearer tokens, connection strings with embedded credentials, SSNs, and similar values that create unnecessary blast radius if stored raw.
+
+Some payloads are too risky to keep even with partial masking. If the importer detects a private key block, it skips that email entirely instead of storing a redacted version.
+
+If you copied this recipe folder out of the repo, keep the [Sensitive Data Redaction](../../primitives/sensitive-data-redaction/) primitive folder with it. The script reads the canonical `patterns.json` from that primitive at runtime.
+
 ## Expected Outcome
 
 Each imported email becomes one row in the `thoughts` table:
 - `content`: Email body with context prefix (`[Email from X | Subject: Y | Date: Z]`)
 - `embedding`: 1536-dim vector for semantic search (truncated to 8K chars)
-- `metadata`: LLM-extracted topics, type, people, action items, plus `source: "gmail"`, `gmail_id`, `gmail_labels`, `gmail_thread_id`
-- `content_fingerprint`: Normalized SHA-256 hash for dedup (see [content fingerprint primitive](../../primitives/content-fingerprint-dedup/README.md))
+- `metadata`: LLM-extracted topics, type, people, action items, plus `source: "gmail"`, `gmail_id`, `gmail_labels`, `gmail_thread_id`, and redaction metadata when any replacements were applied
+- `content_fingerprint`: Normalized SHA-256 hash for dedup (see [content fingerprint dedup recipe](../../recipes/content-fingerprint-dedup/))
 
 ## Troubleshooting
 
@@ -126,3 +137,5 @@ Each imported email becomes one row in the `thoughts` table:
 **Re-running imports the same emails:** The `sync-log.json` file tracks imported Gmail IDs. Delete it to re-import everything. Content fingerprints provide a second layer of dedup at the database level.
 
 **Embedding/metadata errors:** Verify your `OPENROUTER_API_KEY` has credits. The script calls OpenRouter for both embedding generation and metadata extraction.
+
+**Redaction policy file missing:** Keep the repo structure intact, or copy `primitives/sensitive-data-redaction/` alongside this recipe folder. The importer reads that primitive's `patterns.json` at runtime.

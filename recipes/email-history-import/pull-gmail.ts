@@ -22,6 +22,7 @@
  *   --limit=N                       Max emails to process (default: 50)
  *   --list-labels                   List all Gmail labels and exit
  *   --ingest-endpoint               Use INGEST_URL/INGEST_KEY instead of Supabase direct
+ *   --no-redact                     Disable sensitive-data redaction before ingest
  */
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -30,6 +31,10 @@ const SCRIPT_DIR = new URL(".", import.meta.url).pathname;
 const CREDENTIALS_PATH = `${SCRIPT_DIR}credentials.json`;
 const TOKEN_PATH = `${SCRIPT_DIR}token.json`;
 const SYNC_LOG_PATH = `${SCRIPT_DIR}sync-log.json`;
+const REDACTION_POLICY_URL = new URL(
+  "../../primitives/sensitive-data-redaction/patterns.json",
+  import.meta.url,
+);
 
 const GMAIL_API = "https://gmail.googleapis.com/gmail/v1/users/me";
 const SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"];
@@ -75,6 +80,121 @@ async function sha256(text: string): Promise<string> {
     .join("");
 }
 
+// ─── Sensitive Data Redaction ───────────────────────────────────────────────
+
+interface SensitiveDataRule {
+  label: string;
+  action: "redact" | "skip";
+  pattern: string;
+  placeholder?: string;
+  flags?: string;
+}
+
+interface SensitiveDataPolicyFile {
+  version: string;
+  rules: SensitiveDataRule[];
+}
+
+interface RedactionFinding {
+  label: string;
+  action: "redact" | "skip";
+  count: number;
+}
+
+interface RedactionResult {
+  text: string;
+  skipped: boolean;
+  skipLabel?: string;
+  findings: RedactionFinding[];
+  totalRedactions: number;
+  policyVersion: string;
+}
+
+let sensitiveDataPolicyPromise: Promise<SensitiveDataPolicyFile> | null = null;
+
+async function loadSensitiveDataPolicy(): Promise<SensitiveDataPolicyFile> {
+  if (!sensitiveDataPolicyPromise) {
+    sensitiveDataPolicyPromise = (async () => {
+      try {
+        const text = await Deno.readTextFile(REDACTION_POLICY_URL);
+        const parsed = JSON.parse(text) as Partial<SensitiveDataPolicyFile>;
+        if (!parsed.rules || !Array.isArray(parsed.rules)) {
+          throw new Error("Invalid patterns.json format");
+        }
+        return {
+          version: parsed.version || "unknown",
+          rules: parsed.rules as SensitiveDataRule[],
+        };
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `Sensitive-data redaction requires ${REDACTION_POLICY_URL.pathname}. ` +
+            `Keep the repo structure intact or pass --no-redact to opt out. (${detail})`,
+        );
+      }
+    })();
+  }
+
+  return await sensitiveDataPolicyPromise;
+}
+
+function buildRuleRegex(rule: SensitiveDataRule, global = false): RegExp {
+  let flags = rule.flags || "";
+  if (global && !flags.includes("g")) flags += "g";
+  return new RegExp(rule.pattern, flags);
+}
+
+async function applySensitiveDataPolicy(text: string): Promise<RedactionResult> {
+  const policy = await loadSensitiveDataPolicy();
+  let current = text;
+  const findings: RedactionFinding[] = [];
+  let totalRedactions = 0;
+
+  for (const rule of policy.rules) {
+    if (rule.action === "skip") {
+      if (buildRuleRegex(rule).test(current)) {
+        return {
+          text: current,
+          skipped: true,
+          skipLabel: rule.label,
+          findings: [{ label: rule.label, action: "skip", count: 1 }],
+          totalRedactions: 0,
+          policyVersion: policy.version,
+        };
+      }
+      continue;
+    }
+
+    const regex = buildRuleRegex(rule, true);
+    const matches = current.match(regex);
+    if (!matches || matches.length === 0) continue;
+
+    current = current.replace(regex, rule.placeholder || "[REDACTED]");
+    findings.push({ label: rule.label, action: "redact", count: matches.length });
+    totalRedactions += matches.length;
+  }
+
+  return {
+    text: current,
+    skipped: false,
+    findings,
+    totalRedactions,
+    policyVersion: policy.version,
+  };
+}
+
+function formatRedactionFindings(findings: RedactionFinding[]): string {
+  const counts = new Map<string, number>();
+  for (const finding of findings) {
+    if (finding.action !== "redact") continue;
+    counts.set(finding.label, (counts.get(finding.label) || 0) + finding.count);
+  }
+
+  return [...counts.entries()]
+    .map(([label, count]) => (count > 1 ? `${label} x${count}` : label))
+    .join(", ");
+}
+
 // ─── CLI Argument Parsing ────────────────────────────────────────────────────
 
 interface CliArgs {
@@ -84,6 +204,7 @@ interface CliArgs {
   limit: number;
   listLabels: boolean;
   ingestEndpoint: boolean;
+  noRedact: boolean;
 }
 
 function parseArgs(): CliArgs {
@@ -94,6 +215,7 @@ function parseArgs(): CliArgs {
     limit: 50,
     listLabels: false,
     ingestEndpoint: false,
+    noRedact: false,
   };
 
   for (const arg of Deno.args) {
@@ -109,6 +231,8 @@ function parseArgs(): CliArgs {
       args.listLabels = true;
     } else if (arg === "--ingest-endpoint") {
       args.ingestEndpoint = true;
+    } else if (arg === "--no-redact") {
+      args.noRedact = true;
     }
   }
 
@@ -790,6 +914,7 @@ function buildEmailContent(
 
 async function main() {
   const args = parseArgs();
+  const redactionPolicyVersion = args.noRedact ? null : (await loadSensitiveDataPolicy()).version;
   const creds = await loadCredentials();
   const accessToken = await authorize(creds);
 
@@ -823,6 +948,11 @@ async function main() {
   console.log(`  Window: ${args.window}${query ? ` (${query})` : ""}`);
   console.log(`  Limit:  ${args.limit}`);
   console.log(`  Mode:   ${ingestMode}`);
+  console.log(
+    `  Redaction: ${
+      args.noRedact ? "disabled (--no-redact)" : `Sensitive Data Redaction ${redactionPolicyVersion}`
+    }`,
+  );
 
   if (!args.dryRun) {
     if (useEndpoint) {
@@ -856,6 +986,9 @@ async function main() {
   let ingested = 0;
   let errors = 0;
   let totalWords = 0;
+  let sensitiveSkipped = 0;
+  let redactedEmails = 0;
+  let totalRedactionHits = 0;
 
   for (const ref of messageRefs) {
     if (syncLog.ingested_ids[ref.id]) {
@@ -871,6 +1004,42 @@ async function main() {
       continue;
     }
 
+    let redactionCount = 0;
+    let redactionLabels: string[] = [];
+    let redactionVersion: string | undefined;
+    let redactionSummary = "";
+
+    if (!args.noRedact) {
+      const [subjectResult, bodyResult] = await Promise.all([
+        applySensitiveDataPolicy(email.subject),
+        applySensitiveDataPolicy(email.body),
+      ]);
+
+      if (subjectResult.skipped || bodyResult.skipped) {
+        sensitiveSkipped++;
+        const skipLabel = subjectResult.skipLabel || bodyResult.skipLabel || "sensitive content";
+        console.log(`SKIPPED (sensitive-data-redaction): ${email.subject || "(no subject)"}`);
+        console.log(`   Reason: ${skipLabel}`);
+        console.log();
+        continue;
+      }
+
+      const findings = [...subjectResult.findings, ...bodyResult.findings];
+      redactionCount = subjectResult.totalRedactions + bodyResult.totalRedactions;
+      redactionLabels = [...new Set(findings.map((finding) => finding.label))];
+      redactionVersion = subjectResult.policyVersion;
+      redactionSummary = formatRedactionFindings(findings);
+
+      email.subject = subjectResult.text;
+      email.body = bodyResult.text;
+      email.wordCount = wordCount(email.body);
+
+      if (redactionCount > 0) {
+        redactedEmails++;
+        totalRedactionHits += redactionCount;
+      }
+    }
+
     processed++;
     totalWords += email.wordCount;
 
@@ -883,6 +1052,9 @@ async function main() {
       `   From: ${email.from} | ${email.wordCount} words | ${new Date(email.date).toLocaleDateString()}`,
     );
     console.log(`   Labels: ${readableLabels.join(", ")}`);
+    if (redactionCount > 0) {
+      console.log(`   Redacted: ${redactionSummary}`);
+    }
 
     if (args.dryRun) {
       console.log(`   "${email.body.slice(0, 120)}..."`);
@@ -899,6 +1071,12 @@ async function main() {
       gmail_id: email.gmailId,
       gmail_thread_id: email.threadId,
     };
+    if (redactionCount > 0) {
+      emailMeta.redaction_applied = true;
+      emailMeta.redaction_count = redactionCount;
+      emailMeta.redaction_labels = redactionLabels;
+      emailMeta.redaction_version = redactionVersion;
+    }
 
     const content = buildEmailContent(email.body, email.from, email.subject, email.date);
     const result = useEndpoint
@@ -934,6 +1112,12 @@ async function main() {
   }
   console.log(`  Processed:        ${processed}`);
   console.log(`  Skipped (noise):  ${skipped}`);
+  if (sensitiveSkipped > 0) {
+    console.log(`  Skipped (sensitive): ${sensitiveSkipped}`);
+  }
+  if (redactedEmails > 0) {
+    console.log(`  Redacted emails:  ${redactedEmails} (${totalRedactionHits} replacements)`);
+  }
   console.log(`  Total words:      ${totalWords.toLocaleString()}`);
   if (!args.dryRun) {
     console.log(`  Ingested:         ${ingested}`);

@@ -1,0 +1,93 @@
+{
+  "version": "1.0.0",
+  "rules": [
+    {
+      "label": "Private key block",
+      "action": "skip",
+      "pattern": "-----BEGIN [A-Z ]+ PRIVATE KEY-----",
+      "flags": "i"
+    },
+    {
+      "label": "OpenAI or OpenRouter API key",
+      "action": "redact",
+      "placeholder": "[REDACTED_API_KEY]",
+      "pattern": "sk-(?:or-v1-|proj-|live-)?[A-Za-z0-9]{20,}"
+    },
+    {
+      "label": "Stripe secret key",
+      "action": "redact",
+      "placeholder": "[REDACTED_API_KEY]",
+      "pattern": "sk_(?:live|test)_[A-Za-z0-9]{16,}"
+    },
+    {
+      "label": "Google API key",
+      "action": "redact",
+      "placeholder": "[REDACTED_API_KEY]",
+      "pattern": "AIza[0-9A-Za-z\\-_]{35}"
+    },
+    {
+      "label": "JWT token",
+      "action": "redact",
+      "placeholder": "[REDACTED_JWT]",
+      "pattern": "eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9._-]{10,}\\.[A-Za-z0-9._-]{10,}"
+    },
+    {
+      "label": "GitHub token",
+      "action": "redact",
+      "placeholder": "[REDACTED_GITHUB_TOKEN]",
+      "pattern": "gh(?:p|s|o|u|r)_[A-Za-z0-9]{20,}"
+    },
+    {
+      "label": "Slack token",
+      "action": "redact",
+      "placeholder": "[REDACTED_SLACK_TOKEN]",
+      "pattern": "xox(?:b|p|a|o|r|s)-[A-Za-z0-9-]{10,}"
+    },
+    {
+      "label": "AWS access key",
+      "action": "redact",
+      "placeholder": "[REDACTED_AWS_ACCESS_KEY]",
+      "pattern": "AKIA[0-9A-Z]{16}"
+    },
+    {
+      "label": "Supabase secret key",
+      "action": "redact",
+      "placeholder": "[REDACTED_SUPABASE_SECRET]",
+      "pattern": "sb_secret_[A-Za-z0-9]+"
+    },
+    {
+      "label": "Bearer token",
+      "action": "redact",
+      "placeholder": "[REDACTED_BEARER_TOKEN]",
+      "pattern": "Bearer\\s+[A-Za-z0-9._~+\\/-]{20,}",
+      "flags": "i"
+    },
+    {
+      "label": "Database connection string with credentials",
+      "action": "redact",
+      "placeholder": "[REDACTED_DB_CREDENTIALS]",
+      "pattern": "(?:postgres|postgresql|mysql|mongodb|redis):\\/\\/[^\\s:@/]+:[^\\s@/]+@",
+      "flags": "i"
+    },
+    {
+      "label": "Generic secret assignment",
+      "action": "redact",
+      "placeholder": "[REDACTED_SECRET]",
+      "pattern": "(?:password|passwd|secret|token|api[_-]?key|apikey|api[_-]?secret|access[_-]?token|auth[_-]?token)\\s*[:=]\\s*[\"']?[A-Za-z0-9_\\-./]{12,}",
+      "flags": "i"
+    },
+    {
+      "label": "URL token parameter",
+      "action": "redact",
+      "placeholder": "[REDACTED_URL_SECRET]",
+      "pattern": "https?:\\/\\/[^\\s]+[?&](?:token|code|access_token|refresh_token|api_key|apikey|auth|sig|signature)=[^\\s&#]+",
+      "flags": "i"
+    },
+    {
+      "label": "US social security number",
+      "action": "redact",
+      "placeholder": "[REDACTED_SSN]",
+      "pattern": "\\b\\d{3}-\\d{2}-\\d{4}\\b"
+    }
+  ]
+}

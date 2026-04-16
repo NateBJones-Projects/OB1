@@ -11,6 +11,7 @@ Primitives are reusable concept guides that show up in multiple extensions. Lear
 | [Common Troubleshooting](troubleshooting/) | Solutions for connection, deployment, and database issues | All extensions |
 | [Row Level Security](rls/) | PostgreSQL policies for multi-user data isolation | Extensions 4, 5, 6 |
 | [Shared MCP Server](shared-mcp/) | Giving others scoped access to parts of your brain | Extension 4 |
+| [Sensitive Data Redaction](sensitive-data-redaction/) | Pre-ingest masking and skipping of secrets before storage or embeddings | Email History Import, Obsidian Vault Import |
 
 ## How Primitives Work
 
