@@ -128,14 +128,24 @@ type CorsHeaders = Record<string, string>;
 // (scheme downgraded, /functions/v1/ stripped). We rebuild the public URL
 // that clients actually used to reach us.
 function publicRoot(c: Context): string {
-  //   1. OAUTH_ISSUER_URL env var if explicitly configured
-  //   2. SUPABASE_URL + /functions/v1/<function-name>
-  //   3. X-Forwarded-* headers (self-hosting fallback)
-  const override = Deno.env.get("OAUTH_ISSUER_URL");
-  if (override) return override.replace(/\/$/, "");
+  //   1. OAUTH_ISSUER_URL_<FUNCTION_NAME> — per-function override. Needed when
+  //      an extension or recipe behind its own proxy shares a Supabase project
+  //      with the core server (Supabase secrets are project-wide).
+  //   2. OAUTH_ISSUER_URL — default for the core server.
+  //   3. SUPABASE_URL + /functions/v1/<function-name> — bare Supabase URL.
+  //   4. X-Forwarded-* headers — self-hosting fallback.
 
   // First path segment of the internal URL is the function name.
   const functionName = new URL(c.req.url).pathname.split("/").filter(Boolean)[0] ?? "";
+
+  if (functionName) {
+    const perFnKey = `OAUTH_ISSUER_URL_${functionName.toUpperCase().replace(/-/g, "_")}`;
+    const perFn = Deno.env.get(perFnKey);
+    if (perFn) return perFn.replace(/\/$/, "");
+  }
+
+  const override = Deno.env.get("OAUTH_ISSUER_URL");
+  if (override) return override.replace(/\/$/, "");
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   if (supabaseUrl && functionName) {
