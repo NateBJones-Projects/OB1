@@ -9,8 +9,12 @@
 import type { Context, Hono } from "hono";
 import { SignJWT, jwtVerify } from "jose";
 
-const OAUTH_PASSWORD = Deno.env.get("OAUTH_PASSWORD") ?? Deno.env.get("MCP_ACCESS_KEY") ?? "";
-const OAUTH_JWT_SECRET = Deno.env.get("OAUTH_JWT_SECRET") ?? "";
+function getPassword(): string {
+  return Deno.env.get("OAUTH_PASSWORD") ?? Deno.env.get("MCP_ACCESS_KEY") ?? "";
+}
+function getJwtSecret(): string {
+  return Deno.env.get("OAUTH_JWT_SECRET") ?? "";
+}
 
 const ACCESS_TTL = 60 * 60;              // 1 hour
 const REFRESH_TTL = 60 * 60 * 24 * 30;   // 30 days
@@ -22,11 +26,11 @@ const SUBJECT = "owner";
 type TokenType = "code" | "access" | "refresh";
 
 function jwtKey(): Uint8Array {
-  return new TextEncoder().encode(OAUTH_JWT_SECRET);
+  return new TextEncoder().encode(getJwtSecret());
 }
 
 function oauthReady(): boolean {
-  return OAUTH_PASSWORD.length > 0 && OAUTH_JWT_SECRET.length > 0;
+  return getPassword().length > 0 && getJwtSecret().length > 0;
 }
 
 function timingSafeEqual(a: string, b: string): boolean {
@@ -71,7 +75,7 @@ export async function verifyBearer(header: string | undefined): Promise<boolean>
   if (!header) return false;
   const m = header.match(/^Bearer\s+(.+)$/i);
   if (!m) return false;
-  if (!OAUTH_JWT_SECRET) return false;
+  if (!getJwtSecret()) return false;
   return (await verify(m[1], "access")) !== null;
 }
 
@@ -212,11 +216,12 @@ async function handleAuthorizePost(c: Context, corsHeaders: CorsHeaders) {
     if (!v) return c.text(`Missing parameter: ${k}`, 400, corsHeaders);
   }
 
-  if (!timingSafeEqual(password, OAUTH_PASSWORD)) {
+  if (!timingSafeEqual(password, getPassword())) {
     // Redirect back to GET /authorize?error=invalid_password&<original-params>.
     // The Worker re-renders the login form with the error message. We use a
     // relative path so the redirect resolves to the Worker origin that made
     // the POST (not the Supabase origin the Edge Function lives on).
+    console.warn("[oauth] /authorize wrong password", { client_id: params.client_id });
     const qs = new URLSearchParams({ ...params, error: "invalid_password" });
     return c.redirect(`/authorize?${qs.toString()}`, 302);
   }
