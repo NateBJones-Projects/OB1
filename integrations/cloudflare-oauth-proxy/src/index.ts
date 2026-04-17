@@ -81,8 +81,15 @@ function renderAuthorizeForm(q: URLSearchParams): Response {
     status: 200,
     headers: {
       "Content-Type": "text/html; charset=UTF-8",
+      // No form-action directive. CSP Level 3 doesn't fall form-action back
+      // to default-src, so omitting it leaves form submission unrestricted.
+      // The OAuth form must submit to /authorize on this origin AND follow a
+      // redirect to an arbitrary redirect_uri (the MCP client's callback URL,
+      // which can be localhost or any HTTPS host) — restricting form-action
+      // reliably enough to permit both has been fragile; the password itself
+      // is the real security control here.
       "Content-Security-Policy":
-        "default-src 'self'; style-src 'unsafe-inline'; form-action 'self'",
+        "default-src 'self'; style-src 'unsafe-inline'",
       "X-Content-Type-Options": "nosniff",
       "Cache-Control": "no-store",
     },
