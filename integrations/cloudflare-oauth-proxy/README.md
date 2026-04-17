@@ -77,13 +77,31 @@ tracker.
 ### Step 3 — Tell the Edge Functions about their new origin
 
 Each MCP server needs to know its public URL is now the Worker, not the
-Supabase function. Set `OAUTH_ISSUER_URL` on each function **separately**.
-Use the Supabase Dashboard (the CLI sets project-wide secrets, which would
-collide between the two functions):
+Supabase function. Supabase secrets are **project-wide** (CLI and Dashboard
+both — there's no per-function scoping), so the core server uses the plain
+secret name and each additional server (extensions, recipes) takes an
+override.
 
-1. Open the dashboard → Project → **Edge Functions** → `open-brain-mcp` → **Secrets**.
-2. Add a secret: `OAUTH_ISSUER_URL` = the `WORKER_URL_CORE` from Step 2.
-3. Repeat for `life-crm-mcp` with `WORKER_URL_LIFE_CRM`.
+Open the Supabase Dashboard → Project → **Edge Functions** → **Secrets**
+(or `Project Settings → Edge Functions → Manage Secrets`).
+
+**Always set, for the core Open Brain server:**
+
+| Name | Value |
+|------|-------|
+| `OAUTH_ISSUER_URL` | `WORKER_URL_CORE` from Step 2 |
+
+**Additional extensions/recipes** (add one override per extra MCP server
+sharing the project):
+
+| Name | Value |
+|------|-------|
+| `OAUTH_ISSUER_URL_LIFE_CRM_MCP` | `WORKER_URL_LIFE_CRM` from Step 2 |
+
+The override name is the function name, uppercased with dashes replaced by
+underscores, prefixed with `OAUTH_ISSUER_URL_`. So `life-crm-mcp` becomes
+`OAUTH_ISSUER_URL_LIFE_CRM_MCP`. The core server (`open-brain-mcp`) just
+uses the plain `OAUTH_ISSUER_URL` — no override needed.
 
 No redeploy needed — secrets take effect on the next function invocation.
 
