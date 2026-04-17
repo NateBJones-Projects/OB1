@@ -217,6 +217,20 @@ async function handleRegister(c: Context, corsHeaders: CorsHeaders) {
   );
 }
 
+// Supabase Edge Functions inject a restrictive default:
+//   content-security-policy: default-src 'none'; sandbox
+//   x-content-type-options: nosniff
+//   content-type: text/plain   (overrides Hono's text/html)
+// These block browsers from rendering our login form as HTML and from
+// submitting it. We override all three explicitly on the /authorize GET
+// response so the password form renders and the POST can fire.
+const htmlHeaders = {
+  "Content-Type": "text/html; charset=UTF-8",
+  "Content-Security-Policy":
+    "default-src 'self'; style-src 'unsafe-inline'; form-action 'self'",
+  "X-Content-Type-Options": "nosniff",
+};
+
 async function handleAuthorizeGet(c: Context, corsHeaders: CorsHeaders) {
   if (!oauthReady()) return c.text("OAuth not configured on this server.", 501, corsHeaders);
   const q = c.req.query();
@@ -230,7 +244,7 @@ async function handleAuthorizeGet(c: Context, corsHeaders: CorsHeaders) {
   if (q.code_challenge_method !== "S256") {
     return c.text("Only code_challenge_method=S256 is supported", 400, corsHeaders);
   }
-  return c.html(loginPage(q));
+  return c.body(loginPage(q), 200, htmlHeaders);
 }
 
 async function handleAuthorizePost(c: Context, corsHeaders: CorsHeaders) {
@@ -251,7 +265,7 @@ async function handleAuthorizePost(c: Context, corsHeaders: CorsHeaders) {
   }
 
   if (!timingSafeEqual(password, OAUTH_PASSWORD)) {
-    return c.html(loginPage(params, "Incorrect password."), 401);
+    return c.body(loginPage(params, "Incorrect password."), 401, htmlHeaders);
   }
 
   const code = await sign(
