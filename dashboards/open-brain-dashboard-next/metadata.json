@@ -8,9 +8,11 @@
   },
   "version": "1.1.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Node.js 18+"]
+    "tools": [
+      "Node.js 18+"
+    ]
   },
   "tags": [
     "dashboard",

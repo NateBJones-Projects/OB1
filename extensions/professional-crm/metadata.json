@@ -8,13 +8,25 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Supabase CLI"]
+    "tools": [
+      "Supabase CLI"
+    ]
   },
-  "requires_primitives": ["deploy-edge-function", "remote-mcp", "rls"],
+  "requires_primitives": [
+    "deploy-edge-function",
+    "remote-mcp",
+    "rls"
+  ],
   "learning_order": 5,
-  "tags": ["crm", "contacts", "networking", "professional", "rls"],
+  "tags": [
+    "crm",
+    "contacts",
+    "networking",
+    "professional",
+    "rls"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "45 minutes",
   "created": "2026-03-12",

@@ -8,11 +8,21 @@
   },
   "version": "2.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenRouter"],
-    "tools": ["Python 3.10+"]
+    "open_brain": "required",
+    "services": [
+      "OpenRouter"
+    ],
+    "tools": [
+      "Python 3.10+"
+    ]
   },
-  "tags": ["chatgpt", "import", "conversations", "migration", "knowledge-extraction"],
+  "tags": [
+    "chatgpt",
+    "import",
+    "conversations",
+    "migration",
+    "knowledge-extraction"
+  ],
   "difficulty": "beginner",
   "estimated_time": "20 minutes",
   "created": "2026-03-10",

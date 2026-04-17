@@ -8,9 +8,13 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenAI-compatible API (LLM + embeddings)"],
-    "tools": ["Node.js 18+ or Deno"]
+    "open_brain": "required",
+    "services": [
+      "OpenAI-compatible API (LLM + embeddings)"
+    ],
+    "tools": [
+      "Node.js 18+ or Deno"
+    ]
   },
   "tags": [
     "ingestion",

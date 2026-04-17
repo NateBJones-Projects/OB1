@@ -51,7 +51,7 @@ Must validate against `/.github/metadata.schema.json`. Required fields:
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": ["Supabase CLI"]
   },

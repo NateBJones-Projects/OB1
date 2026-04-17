@@ -8,11 +8,14 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": []
   },
-  "tags": ["tag1", "tag2"],
+  "tags": [
+    "tag1",
+    "tag2"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes"
 }

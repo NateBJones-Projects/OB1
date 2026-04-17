@@ -8,11 +8,20 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Slack"],
-    "tools": ["Supabase CLI"]
+    "open_brain": "required",
+    "services": [
+      "Slack"
+    ],
+    "tools": [
+      "Supabase CLI"
+    ]
   },
-  "tags": ["slack", "capture", "integration", "messaging"],
+  "tags": [
+    "slack",
+    "capture",
+    "integration",
+    "messaging"
+  ],
   "difficulty": "beginner",
   "estimated_time": "15 minutes",
   "created": "2026-03-12",

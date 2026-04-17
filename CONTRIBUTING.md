@@ -162,7 +162,7 @@ Every contribution needs a `metadata.json` file. Here's the template:
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": ["Gmail API"],
     "tools": ["Node.js 18+"]
   },
@@ -175,9 +175,15 @@ Every contribution needs a `metadata.json` file. Here's the template:
 }
 ```
 
-**Required fields:** `name`, `description`, `category`, `author` (with `name`), `version`, `requires.open_brain` (must be `true`), `tags` (at least 1), `difficulty` (one of: `beginner`, `intermediate`, `advanced`), `estimated_time`
+**Required fields:** `name`, `description`, `category`, `author` (with `name`), `version`, `requires.open_brain` (either `"required"` or `"optional"`), `tags` (at least 1), `difficulty` (one of: `beginner`, `intermediate`, `advanced`), `estimated_time`
 
 **Optional fields:** `author.github`, `requires.services`, `requires.tools`, `requires_skills`, `created`, `updated`
+
+**`requires.open_brain` values:**
+- `"required"` — contribution depends on the core Open Brain setup (Supabase + pgvector + MCP). Recipes, primitives, extensions, schemas, dashboards, and most integrations use this.
+- `"optional"` — contribution is useful on its own. Any Open Brain hooks are additive, not required. Most skills in `skills/` that are reusable outside OB1 should use this.
+
+If you are unsure, default to `"required"`. Use `"optional"` only if a user with no Open Brain setup could still get real value from the contribution.
 
 **Additional structured dependency fields:**
 - `requires_skills` — array of skill slugs this contribution depends on (e.g., `["auto-capture"]`). Use this when the reusable behavior lives in `skills/<slug>/`
@@ -199,7 +205,7 @@ Example for an extension:
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": ["Node.js 18+"]
   },
@@ -226,7 +232,7 @@ Example for a recipe that depends on a reusable skill:
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": ["Claude Code or similar AI coding tool"]
   },

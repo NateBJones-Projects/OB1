@@ -8,11 +8,23 @@
   },
   "version": "2.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenRouter"],
-    "tools": ["Claude Code or similar AI coding tool"]
+    "open_brain": "required",
+    "services": [
+      "OpenRouter"
+    ],
+    "tools": [
+      "Claude Code or similar AI coding tool"
+    ]
   },
-  "tags": ["brain-dump", "transcript", "extraction", "evaluation", "voice", "processing", "skill"],
+  "tags": [
+    "brain-dump",
+    "transcript",
+    "extraction",
+    "evaluation",
+    "voice",
+    "processing",
+    "skill"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes",
   "created": "2026-03-13",

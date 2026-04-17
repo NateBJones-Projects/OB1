@@ -8,13 +8,23 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Supabase CLI"]
+    "tools": [
+      "Supabase CLI"
+    ]
   },
-  "requires_primitives": ["deploy-edge-function", "remote-mcp"],
+  "requires_primitives": [
+    "deploy-edge-function",
+    "remote-mcp"
+  ],
   "learning_order": 2,
-  "tags": ["home", "maintenance", "scheduling", "tracking"],
+  "tags": [
+    "home",
+    "maintenance",
+    "scheduling",
+    "tracking"
+  ],
   "difficulty": "beginner",
   "estimated_time": "30 minutes",
   "created": "2026-03-12",

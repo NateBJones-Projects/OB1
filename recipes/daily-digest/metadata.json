@@ -8,11 +8,23 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Gmail MCP"],
-    "tools": ["Claude Code or Claude Desktop"]
+    "open_brain": "required",
+    "services": [
+      "Gmail MCP"
+    ],
+    "tools": [
+      "Claude Code or Claude Desktop"
+    ]
   },
-  "tags": ["digest", "summary", "email", "automation", "scheduled-task", "gmail", "claude-code"],
+  "tags": [
+    "digest",
+    "summary",
+    "email",
+    "automation",
+    "scheduled-task",
+    "gmail",
+    "claude-code"
+  ],
   "difficulty": "beginner",
   "estimated_time": "10 minutes",
   "created": "2026-03-25",

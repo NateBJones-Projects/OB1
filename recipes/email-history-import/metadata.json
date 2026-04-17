@@ -8,11 +8,20 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Gmail API"],
-    "tools": ["Deno"]
+    "open_brain": "required",
+    "services": [
+      "Gmail API"
+    ],
+    "tools": [
+      "Deno"
+    ]
   },
-  "tags": ["email", "gmail", "import", "history"],
+  "tags": [
+    "email",
+    "gmail",
+    "import",
+    "history"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
   "created": "2026-03-10",

@@ -8,11 +8,16 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": []
   },
-  "tags": ["workflow", "kanban", "status", "tasks"],
+  "tags": [
+    "workflow",
+    "kanban",
+    "status",
+    "tasks"
+  ],
   "difficulty": "beginner",
   "estimated_time": "5 minutes",
   "created": "2026-03-31",

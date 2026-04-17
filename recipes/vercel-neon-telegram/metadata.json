@@ -8,11 +8,26 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Neon Postgres", "Vercel", "OpenAI API", "Telegram"],
-    "tools": ["Node.js 18+"]
+    "open_brain": "required",
+    "services": [
+      "Neon Postgres",
+      "Vercel",
+      "OpenAI API",
+      "Telegram"
+    ],
+    "tools": [
+      "Node.js 18+"
+    ]
   },
-  "tags": ["vercel", "neon", "telegram", "alternative-architecture", "mcp", "next-js", "pgvector"],
+  "tags": [
+    "vercel",
+    "neon",
+    "telegram",
+    "alternative-architecture",
+    "mcp",
+    "next-js",
+    "pgvector"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "1 hour",
   "created": "2026-03-14",

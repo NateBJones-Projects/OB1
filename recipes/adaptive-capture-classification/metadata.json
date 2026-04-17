@@ -8,9 +8,13 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Any OpenAI-compatible LLM gateway (OpenRouter, Ollama, etc.)"],
-    "tools": ["Supabase CLI or Supabase Studio"]
+    "open_brain": "required",
+    "services": [
+      "Any OpenAI-compatible LLM gateway (OpenRouter, Ollama, etc.)"
+    ],
+    "tools": [
+      "Supabase CLI or Supabase Studio"
+    ]
   },
   "tags": [
     "classification",
@@ -23,7 +27,7 @@
     "feedback-loop"
   ],
   "difficulty": "intermediate",
-  "estimated_time": "60–90 minutes",
+  "estimated_time": "60\u201390 minutes",
   "created": "2026-03-31",
   "updated": "2026-03-31"
 }

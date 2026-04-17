@@ -8,9 +8,11 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+    "tools": [
+      "Claude Code or similar AI coding tool with reusable skills/system prompts"
+    ]
   },
   "requires_skills": [
     "competitive-analysis",
@@ -19,7 +21,13 @@
     "research-synthesis",
     "meeting-synthesis"
   ],
-  "tags": ["workflow", "decision-support", "diligence", "memo", "skill-composition"],
+  "tags": [
+    "workflow",
+    "decision-support",
+    "diligence",
+    "memo",
+    "skill-composition"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes",
   "created": "2026-03-31",

@@ -8,11 +8,23 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Gemini API (free tier)"],
-    "tools": ["Claude Code or similar AI coding tool", "Python 3.10+"]
+    "open_brain": "required",
+    "services": [
+      "Gemini API (free tier)"
+    ],
+    "tools": [
+      "Claude Code or similar AI coding tool",
+      "Python 3.10+"
+    ]
   },
-  "tags": ["infographic", "visualization", "image-generation", "gemini", "research", "content"],
+  "tags": [
+    "infographic",
+    "visualization",
+    "image-generation",
+    "gemini",
+    "research",
+    "content"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "15 minutes",
   "created": "2026-03-18",

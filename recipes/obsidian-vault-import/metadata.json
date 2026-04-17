@@ -8,11 +8,22 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenRouter"],
-    "tools": ["Python 3.10+"]
+    "open_brain": "required",
+    "services": [
+      "OpenRouter"
+    ],
+    "tools": [
+      "Python 3.10+"
+    ]
   },
-  "tags": ["obsidian", "import", "migration", "vault", "markdown", "pkm"],
+  "tags": [
+    "obsidian",
+    "import",
+    "migration",
+    "vault",
+    "markdown",
+    "pkm"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes setup + ~16 min per 1000 thoughts",
   "created": "2026-03-13",

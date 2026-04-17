@@ -1,6 +1,6 @@
 {
   "name": "Kid Logistics / Family Calendar",
-  "description": "Multi-person family scheduling — activities, important dates, and conflict detection across the whole household.",
+  "description": "Multi-person family scheduling \u2014 activities, important dates, and conflict detection across the whole household.",
   "category": "extensions",
   "author": {
     "name": "Nate B. Jones",
@@ -8,13 +8,24 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Supabase CLI"]
+    "tools": [
+      "Supabase CLI"
+    ]
   },
-  "requires_primitives": ["deploy-edge-function", "remote-mcp"],
+  "requires_primitives": [
+    "deploy-edge-function",
+    "remote-mcp"
+  ],
   "learning_order": 3,
-  "tags": ["family", "calendar", "scheduling", "kids", "logistics"],
+  "tags": [
+    "family",
+    "calendar",
+    "scheduling",
+    "kids",
+    "logistics"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "45 minutes",
   "created": "2026-03-12",

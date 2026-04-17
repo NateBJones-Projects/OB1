@@ -8,13 +8,26 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Supabase CLI"]
+    "tools": [
+      "Supabase CLI"
+    ]
   },
-  "requires_primitives": ["deploy-edge-function", "remote-mcp", "rls", "shared-mcp"],
+  "requires_primitives": [
+    "deploy-edge-function",
+    "remote-mcp",
+    "rls",
+    "shared-mcp"
+  ],
   "learning_order": 4,
-  "tags": ["meal-planning", "recipes", "shopping", "sharing", "rls"],
+  "tags": [
+    "meal-planning",
+    "recipes",
+    "shopping",
+    "sharing",
+    "rls"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "1 hour",
   "created": "2026-03-12",

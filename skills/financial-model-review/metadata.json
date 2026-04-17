@@ -8,11 +8,19 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "optional",
     "services": [],
-    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+    "tools": [
+      "Claude Code or similar AI coding tool with reusable skills/system prompts"
+    ]
   },
-  "tags": ["financial-model", "forecast-review", "diligence", "assumptions", "finance"],
+  "tags": [
+    "financial-model",
+    "forecast-review",
+    "diligence",
+    "assumptions",
+    "finance"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "10 minutes",
   "created": "2026-03-31",

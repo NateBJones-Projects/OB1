@@ -8,11 +8,18 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Node.js 18+"]
+    "tools": [
+      "Node.js 18+"
+    ]
   },
-  "tags": ["mcp", "sharing", "multi-user", "collaboration"],
+  "tags": [
+    "mcp",
+    "sharing",
+    "multi-user",
+    "collaboration"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes"
 }

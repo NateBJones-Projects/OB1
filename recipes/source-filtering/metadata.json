@@ -8,11 +8,21 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenRouter"],
-    "tools": ["Deno 1.40+"]
+    "open_brain": "required",
+    "services": [
+      "OpenRouter"
+    ],
+    "tools": [
+      "Deno 1.40+"
+    ]
   },
-  "tags": ["source", "filtering", "metadata", "backfill", "search"],
+  "tags": [
+    "source",
+    "filtering",
+    "metadata",
+    "backfill",
+    "search"
+  ],
   "difficulty": "beginner",
   "estimated_time": "15 minutes",
   "created": "2026-03-13",

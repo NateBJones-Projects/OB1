@@ -98,6 +98,8 @@ Standalone capabilities that make your Open Brain smarter.
 
 Plain-text skill packs you can drop into Claude Code, Codex, or other AI clients that support reusable prompts/rules. These are the canonical reusable building blocks that recipes and other contributions can depend on.
 
+Most skills are useful on their own — Open Brain integration is **optional** for them, not required. A few (like `auto-capture`, `autodream-brain-sync`, `weekly-signal-diff`, and `work-operating-model`) are tightly coupled to a running Open Brain. See each skill's `metadata.json` (`requires.open_brain: "required" | "optional"`) or the [`skills/` README](skills/) for the full compatibility table.
+
 | Skill | What It Does | Contributor |
 | ----- | ------------ | ----------- |
 | [Auto-Capture Skill Pack](skills/auto-capture/) | Captures ACT NOW items and session summaries to Open Brain when a session ends | [@jaredirish](https://github.com/jaredirish) |

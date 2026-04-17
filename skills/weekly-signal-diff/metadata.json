@@ -8,9 +8,13 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Optional: OpenRouter (Perplexity Sonar family) for live search"],
-    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+    "open_brain": "required",
+    "services": [
+      "Optional: OpenRouter (Perplexity Sonar family) for live search"
+    ],
+    "tools": [
+      "Claude Code or similar AI coding tool with reusable skills/system prompts"
+    ]
   },
   "tags": [
     "weekly-review",

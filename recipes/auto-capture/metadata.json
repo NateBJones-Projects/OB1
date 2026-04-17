@@ -8,12 +8,22 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+    "tools": [
+      "Claude Code or similar AI coding tool with reusable skills/system prompts"
+    ]
   },
-  "requires_skills": ["auto-capture"],
-  "tags": ["capture", "auto-save", "session-close", "workflow", "skill"],
+  "requires_skills": [
+    "auto-capture"
+  ],
+  "tags": [
+    "capture",
+    "auto-save",
+    "session-close",
+    "workflow",
+    "skill"
+  ],
   "difficulty": "beginner",
   "estimated_time": "10 minutes",
   "created": "2026-03-15",

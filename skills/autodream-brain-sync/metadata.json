@@ -8,11 +8,18 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["mcp__open-brain__capture_thought"]
+    "tools": [
+      "mcp__open-brain__capture_thought"
+    ]
   },
-  "tags": ["memory", "autodream", "sync", "multi-client"],
+  "tags": [
+    "memory",
+    "autodream",
+    "sync",
+    "multi-client"
+  ],
   "difficulty": "beginner",
   "estimated_time": "5 minutes",
   "created": "2026-03-31",

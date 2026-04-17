@@ -1,6 +1,6 @@
 {
   "name": "Deploy an Edge Function",
-  "description": "How to deploy any Open Brain extension as a Supabase Edge Function — create, configure, and deploy in 5 steps.",
+  "description": "How to deploy any Open Brain extension as a Supabase Edge Function \u2014 create, configure, and deploy in 5 steps.",
   "category": "primitives",
   "author": {
     "name": "Nate B. Jones",
@@ -8,11 +8,19 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Supabase CLI"],
+    "open_brain": "required",
+    "services": [
+      "Supabase CLI"
+    ],
     "tools": []
   },
-  "tags": ["deployment", "edge-function", "supabase", "mcp", "deno"],
+  "tags": [
+    "deployment",
+    "edge-function",
+    "supabase",
+    "mcp",
+    "deno"
+  ],
   "difficulty": "beginner",
   "estimated_time": "10 minutes",
   "created": "2026-03-13",

@@ -8,11 +8,22 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "optional",
     "services": [],
-    "tools": ["Python 3.10+", "uv or pip", "AI client with reusable skills/prompts"]
+    "tools": [
+      "Python 3.10+",
+      "uv or pip",
+      "AI client with reusable skills/prompts"
+    ]
   },
-  "tags": ["skill", "file-conversion", "markdown", "pdf", "spreadsheet", "token-efficiency"],
+  "tags": [
+    "skill",
+    "file-conversion",
+    "markdown",
+    "pdf",
+    "spreadsheet",
+    "token-efficiency"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "10 minutes",
   "created": "2026-03-31",

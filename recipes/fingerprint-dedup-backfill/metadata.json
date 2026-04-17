@@ -8,11 +8,19 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Node.js 18+"]
+    "tools": [
+      "Node.js 18+"
+    ]
   },
-  "tags": ["deduplication", "fingerprint", "backfill", "data-quality", "cleanup"],
+  "tags": [
+    "deduplication",
+    "fingerprint",
+    "backfill",
+    "data-quality",
+    "cleanup"
+  ],
   "difficulty": "beginner",
   "estimated_time": "15 minutes",
   "created": "2026-03-22",
