@@ -75,44 +75,6 @@ export async function verifyBearer(header: string | undefined): Promise<boolean>
   return (await verify(m[1], "access")) !== null;
 }
 
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function loginPage(params: Record<string, string>, error?: string): string {
-  const hidden = Object.entries(params)
-    .map(([k, v]) => `<input type="hidden" name="${escapeHtml(k)}" value="${escapeHtml(v)}">`)
-    .join("\n        ");
-  const errHtml = error ? `<p style="color:#b00">${escapeHtml(error)}</p>` : "";
-  return `<!doctype html>
-<html><head><meta charset="utf-8"><title>Open Brain — Sign in</title>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  body{font-family:system-ui,-apple-system,sans-serif;max-width:400px;margin:4rem auto;padding:0 1rem;color:#222}
-  h1{font-size:1.4rem;margin-bottom:0.5rem}
-  p.lede{color:#666;margin-top:0}
-  form{display:flex;flex-direction:column;gap:0.75rem;margin-top:1.5rem}
-  input[type=password]{padding:0.6rem;font-size:1rem;border:1px solid #ccc;border-radius:4px}
-  button{padding:0.6rem;font-size:1rem;background:#111;color:#fff;border:0;border-radius:4px;cursor:pointer}
-  button:hover{background:#333}
-</style></head>
-<body>
-  <h1>Open Brain</h1>
-  <p class="lede">Enter your password to authorize this client.</p>
-  ${errHtml}
-  <form method="post" action="">
-    ${hidden}
-    <input type="password" name="password" autofocus required placeholder="Password">
-    <button type="submit">Authorize</button>
-  </form>
-</body></html>`;
-}
-
 function corsJson(c: Context, body: unknown, status: number, corsHeaders: Record<string, string>) {
   return c.json(body as Record<string, unknown>, status as 200, corsHeaders);
 }
@@ -217,34 +179,20 @@ async function handleRegister(c: Context, corsHeaders: CorsHeaders) {
   );
 }
 
-// Supabase Edge Functions inject a restrictive default:
-//   content-security-policy: default-src 'none'; sandbox
-//   x-content-type-options: nosniff
-//   content-type: text/plain   (overrides Hono's text/html)
-// These block browsers from rendering our login form as HTML and from
-// submitting it. We override all three explicitly on the /authorize GET
-// response so the password form renders and the POST can fire.
-const htmlHeaders = {
-  "Content-Type": "text/html; charset=UTF-8",
-  "Content-Security-Policy":
-    "default-src 'self'; style-src 'unsafe-inline'; form-action 'self'",
-  "X-Content-Type-Options": "nosniff",
-};
-
+// Supabase Edge Functions force `content-type: text/plain` and a
+// sandbox CSP on all HTML responses (platform-level, not overridable),
+// which breaks the OAuth login form. The Cloudflare Worker proxy
+// serves GET /authorize itself from its own origin, so this handler
+// is only hit if someone bypasses the Worker and talks to the Supabase
+// URL directly. We return plain text pointing them at the Worker.
 async function handleAuthorizeGet(c: Context, corsHeaders: CorsHeaders) {
-  if (!oauthReady()) return c.text("OAuth not configured on this server.", 501, corsHeaders);
-  const q = c.req.query();
-  const required = ["client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state"];
-  for (const k of required) {
-    if (!q[k]) return c.text(`Missing query parameter: ${k}`, 400, corsHeaders);
-  }
-  if (q.response_type && q.response_type !== "code") {
-    return c.text("Only response_type=code is supported", 400, corsHeaders);
-  }
-  if (q.code_challenge_method !== "S256") {
-    return c.text("Only code_challenge_method=S256 is supported", 400, corsHeaders);
-  }
-  return c.body(loginPage(q), 200, htmlHeaders);
+  return c.text(
+    "OAuth login forms cannot be rendered directly from this Edge Function.\n" +
+      "Route /authorize through the Cloudflare Worker proxy — see\n" +
+      "integrations/cloudflare-oauth-proxy/README.md for setup.",
+    501,
+    corsHeaders,
+  );
 }
 
 async function handleAuthorizePost(c: Context, corsHeaders: CorsHeaders) {
@@ -265,7 +213,12 @@ async function handleAuthorizePost(c: Context, corsHeaders: CorsHeaders) {
   }
 
   if (!timingSafeEqual(password, OAUTH_PASSWORD)) {
-    return c.body(loginPage(params, "Incorrect password."), 401, htmlHeaders);
+    // Redirect back to GET /authorize?error=invalid_password&<original-params>.
+    // The Worker re-renders the login form with the error message. We use a
+    // relative path so the redirect resolves to the Worker origin that made
+    // the POST (not the Supabase origin the Edge Function lives on).
+    const qs = new URLSearchParams({ ...params, error: "invalid_password" });
+    return c.redirect(`/authorize?${qs.toString()}`, 302);
   }
 
   const code = await sign(
