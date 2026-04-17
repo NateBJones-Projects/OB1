@@ -883,7 +883,7 @@ Once the deploy finishes, OAuth endpoints are live:
 
 ### 7b.3 — Connect clients without `?key=`
 
-For Claude Desktop, Cursor, `mcp-remote`, or any MCP client that supports OAuth: use your **MCP Server URL** (the one **without** `?key=`):
+For path-aware MCP clients (Cursor with OAuth, custom curl-based tools, anything that respects the explicit `authorization_endpoint`/`token_endpoint` URLs from the discovery document): use your **MCP Server URL** (the one **without** `?key=`):
 
 ```
 https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
@@ -891,7 +891,18 @@ https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
 
 The client will trigger OAuth discovery → open your browser to the `/authorize` page → you type `OAUTH_PASSWORD` → client receives a bearer token. No URL param, no header pasted by hand.
 
-### 7b.4 — If something goes wrong: the panic button
+> [!IMPORTANT]
+> **Claude Desktop and `mcp-remote` require one more step** — they're built on the MCP TypeScript SDK, which strips the URL path during OAuth discovery. Since Supabase Edge Functions live under `/functions/v1/<name>/`, the SDK can't reach the OAuth endpoints directly and connection fails with "Couldn't reach the MCP server". See **Step 7b.5** below for the fix.
+
+### 7b.4 — OAuth proxy for Claude Desktop and `mcp-remote`
+
+The fix is a tiny Cloudflare Worker that gives each MCP server a clean, path-less origin URL. The Worker proxies every request to your Supabase Edge Function with `/functions/v1/<name>/` prepended; the MCP client sees no path and OAuth resolves correctly.
+
+Full setup (~15 min): [`integrations/cloudflare-oauth-proxy/`](../integrations/cloudflare-oauth-proxy/).
+
+After setup, your Claude Desktop connector URL becomes `https://ob-<name>.<your-cf-subdomain>.workers.dev` (no `?key=`, no `/functions/v1/` path). Your original Supabase URL still works unchanged for any path-aware client or legacy `?key=`/`x-brain-key` flows — the Worker is additive.
+
+### 7b.5 — If something goes wrong: the panic button
 
 If you suspect an access token has leaked or a client has gone rogue, rotate the JWT signing key:
 
