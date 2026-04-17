@@ -123,13 +123,34 @@ type CorsHeaders = Record<string, string>;
 // that full prefix. We match on path suffix instead of absolute routes so the
 // same module works for any function name without configuration.
 
+function publicRoot(c: Context, path: string): string {
+  // Supabase Edge Functions run behind a proxy: the Deno runtime sees URLs
+  // like `http://<ref>.supabase.co/<function-name>/...` (scheme downgraded,
+  // /functions/v1/ stripped). Rebuild the client-facing URL:
+  //   1. OAUTH_ISSUER_URL env var if explicitly configured
+  //   2. SUPABASE_URL + /functions/v1/<function-name>
+  //   3. X-Forwarded-* headers (self-hosting fallback)
+  const override = Deno.env.get("OAUTH_ISSUER_URL");
+  if (override) return override.replace(/\/$/, "");
+
+  const trimmed = path.replace(/\/\.well-known\/oauth-authorization-server$/, "");
+  const functionName = trimmed.split("/").filter(Boolean)[0] ?? "";
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  if (supabaseUrl && functionName) {
+    return `${supabaseUrl.replace(/\/$/, "")}/functions/v1/${functionName}`;
+  }
+
+  const proto = c.req.header("x-forwarded-proto") ?? "https";
+  const host = c.req.header("x-forwarded-host") ?? c.req.header("host") ?? "";
+  return `${proto}://${host}/functions/v1/${functionName}`;
+}
+
 async function handleDiscovery(c: Context, corsHeaders: CorsHeaders, path: string) {
-  const base = new URL(c.req.url);
-  base.pathname = path.replace(/\/\.well-known\/oauth-authorization-server$/, "");
-  const root = base.origin + base.pathname.replace(/\/$/, "");
+  const root = publicRoot(c, path);
   return c.json(
     {
-      issuer: ISSUER,
+      issuer: root,
       authorization_endpoint: `${root}/authorize`,
       token_endpoint: `${root}/token`,
       registration_endpoint: `${root}/register`,
