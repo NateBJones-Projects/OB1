@@ -119,154 +119,174 @@ function corsJson(c: Context, body: unknown, status: number, corsHeaders: Record
 
 type CorsHeaders = Record<string, string>;
 
-export function registerOAuthRoutes(app: Hono, corsHeaders: CorsHeaders): void {
-  // RFC 8414 — authorization server metadata.
-  app.get("/.well-known/oauth-authorization-server", (c) => {
-    const base = new URL(c.req.url);
-    base.pathname = base.pathname.replace(/\/\.well-known\/oauth-authorization-server$/, "");
-    const root = base.origin + base.pathname.replace(/\/$/, "");
-    return c.json(
-      {
-        issuer: ISSUER,
-        authorization_endpoint: `${root}/authorize`,
-        token_endpoint: `${root}/token`,
-        registration_endpoint: `${root}/register`,
-        response_types_supported: ["code"],
-        grant_types_supported: ["authorization_code", "refresh_token"],
-        code_challenge_methods_supported: ["S256"],
-        token_endpoint_auth_methods_supported: ["none"],
-      },
+// Supabase Edge Functions mount at `/functions/v1/<name>/...`, so Hono sees
+// that full prefix. We match on path suffix instead of absolute routes so the
+// same module works for any function name without configuration.
+
+async function handleDiscovery(c: Context, corsHeaders: CorsHeaders, path: string) {
+  const base = new URL(c.req.url);
+  base.pathname = path.replace(/\/\.well-known\/oauth-authorization-server$/, "");
+  const root = base.origin + base.pathname.replace(/\/$/, "");
+  return c.json(
+    {
+      issuer: ISSUER,
+      authorization_endpoint: `${root}/authorize`,
+      token_endpoint: `${root}/token`,
+      registration_endpoint: `${root}/register`,
+      response_types_supported: ["code"],
+      grant_types_supported: ["authorization_code", "refresh_token"],
+      code_challenge_methods_supported: ["S256"],
+      token_endpoint_auth_methods_supported: ["none"],
+    },
+    200,
+    corsHeaders,
+  );
+}
+
+async function handleRegister(c: Context, corsHeaders: CorsHeaders) {
+  if (!oauthReady()) return corsJson(c, { error: "oauth_not_configured" }, 501, corsHeaders);
+  const body = await c.req.json().catch(() => ({}));
+  const clientId = crypto.randomUUID();
+  return c.json(
+    {
+      client_id: clientId,
+      client_id_issued_at: Math.floor(Date.now() / 1000),
+      token_endpoint_auth_method: "none",
+      redirect_uris: body.redirect_uris ?? [],
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+    },
+    201,
+    corsHeaders,
+  );
+}
+
+async function handleAuthorizeGet(c: Context, corsHeaders: CorsHeaders) {
+  if (!oauthReady()) return c.text("OAuth not configured on this server.", 501, corsHeaders);
+  const q = c.req.query();
+  const required = ["client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state"];
+  for (const k of required) {
+    if (!q[k]) return c.text(`Missing query parameter: ${k}`, 400, corsHeaders);
+  }
+  if (q.response_type && q.response_type !== "code") {
+    return c.text("Only response_type=code is supported", 400, corsHeaders);
+  }
+  if (q.code_challenge_method !== "S256") {
+    return c.text("Only code_challenge_method=S256 is supported", 400, corsHeaders);
+  }
+  return c.html(loginPage(q));
+}
+
+async function handleAuthorizePost(c: Context, corsHeaders: CorsHeaders) {
+  if (!oauthReady()) return c.text("OAuth not configured on this server.", 501, corsHeaders);
+  const form = await c.req.parseBody();
+  const asStr = (v: unknown): string => (typeof v === "string" ? v : "");
+  const password = asStr(form.password);
+  const params = {
+    client_id: asStr(form.client_id),
+    redirect_uri: asStr(form.redirect_uri),
+    code_challenge: asStr(form.code_challenge),
+    code_challenge_method: asStr(form.code_challenge_method),
+    state: asStr(form.state),
+  };
+
+  for (const [k, v] of Object.entries(params)) {
+    if (!v) return c.text(`Missing parameter: ${k}`, 400, corsHeaders);
+  }
+
+  if (!timingSafeEqual(password, OAUTH_PASSWORD)) {
+    return c.html(loginPage(params, "Incorrect password."), 401);
+  }
+
+  const code = await sign(
+    {
+      client_id: params.client_id,
+      redirect_uri: params.redirect_uri,
+      code_challenge: params.code_challenge,
+    },
+    "code",
+    CODE_TTL,
+  );
+
+  const redirect = new URL(params.redirect_uri);
+  redirect.searchParams.set("code", code);
+  redirect.searchParams.set("state", params.state);
+  return c.redirect(redirect.toString(), 302);
+}
+
+async function handleToken(c: Context, corsHeaders: CorsHeaders) {
+  if (!oauthReady()) return corsJson(c, { error: "oauth_not_configured" }, 501, corsHeaders);
+  const form = await c.req.parseBody();
+  const asStr = (v: unknown): string => (typeof v === "string" ? v : "");
+  const grantType = asStr(form.grant_type);
+
+  if (grantType === "authorization_code") {
+    const code = asStr(form.code);
+    const clientId = asStr(form.client_id);
+    const codeVerifier = asStr(form.code_verifier);
+    const redirectUri = asStr(form.redirect_uri);
+
+    if (!code || !clientId || !codeVerifier || !redirectUri) {
+      return corsJson(c, { error: "invalid_request" }, 400, corsHeaders);
+    }
+
+    const payload = await verify(code, "code");
+    if (!payload) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
+    if (payload.client_id !== clientId) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
+    if (payload.redirect_uri !== redirectUri) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
+
+    const expected = await sha256b64url(codeVerifier);
+    if (expected !== payload.code_challenge) {
+      return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
+    }
+
+    const access = await sign({ aud: clientId }, "access", ACCESS_TTL);
+    const refresh = await sign({ aud: clientId }, "refresh", REFRESH_TTL);
+    return corsJson(
+      c,
+      { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh },
       200,
       corsHeaders,
     );
-  });
+  }
 
-  // RFC 7591 — dynamic client registration. Stateless: any client may register.
-  app.post("/register", async (c) => {
-    if (!oauthReady()) return corsJson(c, { error: "oauth_not_configured" }, 501, corsHeaders);
-    const body = await c.req.json().catch(() => ({}));
-    const clientId = crypto.randomUUID();
-    return c.json(
-      {
-        client_id: clientId,
-        client_id_issued_at: Math.floor(Date.now() / 1000),
-        token_endpoint_auth_method: "none",
-        redirect_uris: body.redirect_uris ?? [],
-        grant_types: ["authorization_code", "refresh_token"],
-        response_types: ["code"],
-      },
-      201,
+  if (grantType === "refresh_token") {
+    const refresh = asStr(form.refresh_token);
+    if (!refresh) return corsJson(c, { error: "invalid_request" }, 400, corsHeaders);
+    const payload = await verify(refresh, "refresh");
+    if (!payload) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
+    const aud = typeof payload.aud === "string" ? payload.aud : "";
+    const access = await sign({ aud }, "access", ACCESS_TTL);
+    return corsJson(
+      c,
+      { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL },
+      200,
       corsHeaders,
     );
-  });
+  }
 
-  // Render the password form.
-  app.get("/authorize", (c) => {
-    if (!oauthReady()) return c.text("OAuth not configured on this server.", 501, corsHeaders);
-    const q = c.req.query();
-    const required = ["client_id", "redirect_uri", "code_challenge", "code_challenge_method", "state"];
-    for (const k of required) {
-      if (!q[k]) return c.text(`Missing query parameter: ${k}`, 400, corsHeaders);
-    }
-    if (q.response_type && q.response_type !== "code") {
-      return c.text("Only response_type=code is supported", 400, corsHeaders);
-    }
-    if (q.code_challenge_method !== "S256") {
-      return c.text("Only code_challenge_method=S256 is supported", 400, corsHeaders);
-    }
-    return c.html(loginPage(q));
-  });
+  return corsJson(c, { error: "unsupported_grant_type" }, 400, corsHeaders);
+}
 
-  // Verify password, issue code.
-  app.post("/authorize", async (c) => {
-    if (!oauthReady()) return c.text("OAuth not configured on this server.", 501, corsHeaders);
-    const form = await c.req.parseBody();
-    const asStr = (v: unknown): string => (typeof v === "string" ? v : "");
-    const password = asStr(form.password);
-    const params = {
-      client_id: asStr(form.client_id),
-      redirect_uri: asStr(form.redirect_uri),
-      code_challenge: asStr(form.code_challenge),
-      code_challenge_method: asStr(form.code_challenge_method),
-      state: asStr(form.state),
-    };
+export function registerOAuthRoutes(app: Hono, corsHeaders: CorsHeaders): void {
+  app.use("*", async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    const method = c.req.method;
 
-    for (const [k, v] of Object.entries(params)) {
-      if (!v) return c.text(`Missing parameter: ${k}`, 400, corsHeaders);
+    if (method === "GET" && path.endsWith("/.well-known/oauth-authorization-server")) {
+      return await handleDiscovery(c, corsHeaders, path);
+    }
+    if (method === "POST" && path.endsWith("/register")) {
+      return await handleRegister(c, corsHeaders);
+    }
+    if (path.endsWith("/authorize")) {
+      if (method === "GET") return await handleAuthorizeGet(c, corsHeaders);
+      if (method === "POST") return await handleAuthorizePost(c, corsHeaders);
+    }
+    if (method === "POST" && path.endsWith("/token")) {
+      return await handleToken(c, corsHeaders);
     }
 
-    if (!timingSafeEqual(password, OAUTH_PASSWORD)) {
-      return c.html(loginPage(params, "Incorrect password."), 401);
-    }
-
-    const code = await sign(
-      {
-        client_id: params.client_id,
-        redirect_uri: params.redirect_uri,
-        code_challenge: params.code_challenge,
-      },
-      "code",
-      CODE_TTL,
-    );
-
-    const redirect = new URL(params.redirect_uri);
-    redirect.searchParams.set("code", code);
-    redirect.searchParams.set("state", params.state);
-    return c.redirect(redirect.toString(), 302);
-  });
-
-  // Token endpoint — authorization_code + refresh_token grants.
-  app.post("/token", async (c) => {
-    if (!oauthReady()) return corsJson(c, { error: "oauth_not_configured" }, 501, corsHeaders);
-    const form = await c.req.parseBody();
-    const asStr = (v: unknown): string => (typeof v === "string" ? v : "");
-    const grantType = asStr(form.grant_type);
-
-    if (grantType === "authorization_code") {
-      const code = asStr(form.code);
-      const clientId = asStr(form.client_id);
-      const codeVerifier = asStr(form.code_verifier);
-      const redirectUri = asStr(form.redirect_uri);
-
-      if (!code || !clientId || !codeVerifier || !redirectUri) {
-        return corsJson(c, { error: "invalid_request" }, 400, corsHeaders);
-      }
-
-      const payload = await verify(code, "code");
-      if (!payload) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
-      if (payload.client_id !== clientId) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
-      if (payload.redirect_uri !== redirectUri) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
-
-      const expected = await sha256b64url(codeVerifier);
-      if (expected !== payload.code_challenge) {
-        return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
-      }
-
-      const access = await sign({ aud: clientId }, "access", ACCESS_TTL);
-      const refresh = await sign({ aud: clientId }, "refresh", REFRESH_TTL);
-      return corsJson(
-        c,
-        { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL, refresh_token: refresh },
-        200,
-        corsHeaders,
-      );
-    }
-
-    if (grantType === "refresh_token") {
-      const refresh = asStr(form.refresh_token);
-      if (!refresh) return corsJson(c, { error: "invalid_request" }, 400, corsHeaders);
-      const payload = await verify(refresh, "refresh");
-      if (!payload) return corsJson(c, { error: "invalid_grant" }, 400, corsHeaders);
-      const aud = typeof payload.aud === "string" ? payload.aud : "";
-      const access = await sign({ aud }, "access", ACCESS_TTL);
-      return corsJson(
-        c,
-        { access_token: access, token_type: "Bearer", expires_in: ACCESS_TTL },
-        200,
-        corsHeaders,
-      );
-    }
-
-    return corsJson(c, { error: "unsupported_grant_type" }, 400, corsHeaders);
+    await next();
   });
 }
