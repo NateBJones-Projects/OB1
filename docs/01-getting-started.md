@@ -832,6 +832,9 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 ✅ **Done when:** You can start a conversation in your AI client and it has access to Open Brain tools (search_thoughts, list_thoughts, thought_stats, capture_thought).
 
+> [!TIP]
+> **Worried about the `?key=` in your URL?** The access key lands in proxy logs, browser history, and `Referer` headers — one leak is forever. For a token-based alternative that keeps Claude Desktop working, see [`integrations/cloudflare-oauth-proxy/`](../integrations/cloudflare-oauth-proxy/). Both paths stay supported; you can pick per client.
+
 ---
 
 ![Step 8](https://img.shields.io/badge/Step_8-Use_It-8E24AA?style=for-the-badge)
