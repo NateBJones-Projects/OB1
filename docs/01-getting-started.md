@@ -834,6 +834,80 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 ---
 
+![Step 7b](https://img.shields.io/badge/Step_7b-OAuth_(Optional)-5C6BC0?style=for-the-badge)
+
+> [!NOTE]
+> This step is **optional**. Your setup from Steps 1–7 already works. OAuth is for users who want to remove the `?key=` URL parameter (which leaks in proxy logs, browser history, and Referer headers) and use short-lived bearer tokens instead. Legacy `x-brain-key` header and `?key=` auth keep working when OAuth is enabled — this is strictly additive.
+
+<details>
+<summary>🔐 <strong>Why enable OAuth?</strong></summary>
+
+- **Kill the URL-param leak.** `?key=<your-brain-key>` shows up in server access logs, browser history, shell history, and every `Referer` header sent to sites you visit from Supabase dashboards. One leak = permanent credential compromise.
+- **Short-lived tokens.** Access tokens expire after 1 hour; you stay signed in via a refresh token (30 days). A stolen access token is only useful for an hour.
+- **Panic button.** Rotate `OAUTH_JWT_SECRET` and every outstanding token is invalidated instantly.
+- **Standard MCP auth.** Clients that speak OAuth (Claude Desktop, `mcp-remote`) will use it automatically — no `?key=` to paste.
+
+</details>
+
+### 7b.1 — Generate the secrets
+
+Run locally:
+
+```bash
+# Password you'll type in your browser during sign-in. Keep it in a password manager.
+export OAUTH_PASSWORD="$(openssl rand -base64 24)"
+
+# JWT signing secret — never type this anywhere, only server reads it.
+export OAUTH_JWT_SECRET="$(openssl rand -hex 32)"
+
+# Set both as Supabase secrets.
+supabase secrets set OAUTH_PASSWORD="$OAUTH_PASSWORD" OAUTH_JWT_SECRET="$OAUTH_JWT_SECRET" --project-ref YOUR_PROJECT_REF
+```
+
+Write `OAUTH_PASSWORD` down (or save it in your password manager) — you'll type it once per client during the OAuth sign-in. `OAUTH_JWT_SECRET` never leaves the server; you don't need to save it anywhere except Supabase secrets.
+
+### 7b.2 — Redeploy
+
+```bash
+supabase functions deploy open-brain-mcp --no-verify-jwt --project-ref YOUR_PROJECT_REF
+```
+
+Once the deploy finishes, OAuth endpoints are live:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /.well-known/oauth-authorization-server` | Discovery — clients fetch this automatically |
+| `POST /register` | Dynamic client registration |
+| `GET /authorize` | Password prompt (browser) |
+| `POST /token` | Code/refresh exchange |
+
+### 7b.3 — Connect clients without `?key=`
+
+For Claude Desktop, Cursor, `mcp-remote`, or any MCP client that supports OAuth: use your **MCP Server URL** (the one **without** `?key=`):
+
+```
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
+```
+
+The client will trigger OAuth discovery → open your browser to the `/authorize` page → you type `OAUTH_PASSWORD` → client receives a bearer token. No URL param, no header pasted by hand.
+
+### 7b.4 — If something goes wrong: the panic button
+
+If you suspect an access token has leaked or a client has gone rogue, rotate the JWT signing key:
+
+```bash
+supabase secrets set OAUTH_JWT_SECRET="$(openssl rand -hex 32)" --project-ref YOUR_PROJECT_REF
+```
+
+Every outstanding access and refresh token is invalidated. Every client will need to re-authorize (sign in again with the password). `OAUTH_PASSWORD` itself stays the same.
+
+> [!TIP]
+> **Rotating the password:** Changing `OAUTH_PASSWORD` prevents new sign-ins but does NOT invalidate existing refresh tokens until they expire (30 days). If you need an immediate cutover, rotate `OAUTH_JWT_SECRET` at the same time.
+
+✅ **Done when:** Your client connected with an OAuth URL (no `?key=`) and tools work. The old `?key=` URL and `x-brain-key` header still work too — you can migrate clients one at a time.
+
+---
+
 ![Step 8](https://img.shields.io/badge/Step_8-Use_It-8E24AA?style=for-the-badge)
 
 Ask your AI naturally. It picks the right tool automatically:
@@ -893,6 +967,9 @@ Your `service_role` doesn't have table-level permissions. This happens on newer 
 **❌ Claude Desktop JSON config: "Couldn't reach the MCP server"**
 
 If you're using `claude_desktop_config.json` with `mcp-remote`, switch to `supergateway --streamableHttp` instead. `mcp-remote` performs OAuth discovery against the Supabase domain (`/.well-known/oauth-authorization-server`), which returns a 404 that stalls the connection past Claude Desktop's startup timeout. `supergateway` connects directly with no OAuth handshake. See Step 7.1 for the config. (This does not affect Codex, which has a configurable `startup_timeout_sec` that gives `mcp-remote` enough time to fall back.)
+
+> [!TIP]
+> If you've completed **Step 7b (OAuth)**, discovery returns a real metadata document instead of a 404 and `mcp-remote` works fine — no need to switch to `supergateway`.
 
 **❌ Getting 401 errors**
 

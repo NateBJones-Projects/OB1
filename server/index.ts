@@ -5,6 +5,7 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
+import { registerOAuthRoutes, verifyBearer } from "./oauth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -377,11 +378,26 @@ app.options("*", (c) => {
   return c.text("ok", 200, corsHeaders);
 });
 
+// OAuth 2.1 endpoints (/.well-known/oauth-authorization-server, /register,
+// /authorize, /token). Additive — legacy x-brain-key / ?key= paths below still
+// work. Registered before the catch-all so these routes don't get swallowed.
+registerOAuthRoutes(app, corsHeaders);
+
 app.all("*", async (c) => {
-  // Accept access key via header OR URL query parameter
-  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
-  if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
+  // Auth — first match wins:
+  //   1. Authorization: Bearer <jwt>  (OAuth 2.1)
+  //   2. x-brain-key header           (legacy)
+  //   3. ?key= URL query param        (legacy, leaks in logs — discouraged)
+  const bearerOk = await verifyBearer(c.req.header("authorization"));
+  const legacyHeader = c.req.header("x-brain-key");
+  const legacyQuery = new URL(c.req.url).searchParams.get("key");
+  const legacyOk =
+    !!MCP_ACCESS_KEY &&
+    ((legacyHeader && legacyHeader === MCP_ACCESS_KEY) ||
+      (legacyQuery && legacyQuery === MCP_ACCESS_KEY));
+
+  if (!bearerOk && !legacyOk) {
+    return c.json({ error: "Invalid or missing credentials" }, 401, corsHeaders);
   }
 
   // Fix: Claude Desktop connectors don't send the Accept header that
