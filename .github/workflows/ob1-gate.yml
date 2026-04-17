@@ -31,6 +31,29 @@ jobs:
       - name: Install metadata schema validator
         run: python3 -m pip install check-jsonschema
 
+      - name: Check catalog is not stale
+        id: catalog_check
+        # Only run if any contribution content or metadata changed — a doc-only
+        # or workflow-only PR cannot invalidate the catalog.
+        run: |
+          set +e
+          changed=$(git diff --name-only origin/main...HEAD)
+          if echo "$changed" | grep -qE '^(recipes|schemas|dashboards|integrations|skills|primitives|extensions)/[^_].*/(README\.md|metadata\.json)$' \
+            || echo "$changed" | grep -qE '^scripts/build_catalog\.py$' \
+            || echo "$changed" | grep -qE '^resources/ob1-catalog\.json$'; then
+            python3 scripts/build_catalog.py --check
+            rc=$?
+            if [ "$rc" -ne 0 ]; then
+              echo "catalog_stale=true" >> $GITHUB_OUTPUT
+              echo "::error::resources/ob1-catalog.json is stale. Run \`python3 scripts/build_catalog.py\` and commit the result."
+              exit "$rc"
+            fi
+            echo "catalog_stale=false" >> $GITHUB_OUTPUT
+          else
+            echo "catalog check skipped (no contribution or generator changes)"
+            echo "catalog_stale=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Get changed files
         id: changed
         run: |
