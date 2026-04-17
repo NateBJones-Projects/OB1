@@ -7,9 +7,13 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenRouter"],
-    "tools": ["Node.js 18+"]
+    "open_brain": "required",
+    "services": [
+      "OpenRouter"
+    ],
+    "tools": [
+      "Node.js 18+"
+    ]
   },
   "tags": [
     "learning",

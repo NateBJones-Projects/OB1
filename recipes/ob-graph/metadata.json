@@ -8,9 +8,14 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Supabase"],
-    "tools": ["Supabase CLI", "Deno"]
+    "open_brain": "required",
+    "services": [
+      "Supabase"
+    ],
+    "tools": [
+      "Supabase CLI",
+      "Deno"
+    ]
   },
   "tags": [
     "graph",

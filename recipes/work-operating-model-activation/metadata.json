@@ -8,12 +8,26 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Supabase"],
-    "tools": ["Supabase CLI", "AI client with MCP support and reusable skills/prompts"]
+    "open_brain": "required",
+    "services": [
+      "Supabase"
+    ],
+    "tools": [
+      "Supabase CLI",
+      "AI client with MCP support and reusable skills/prompts"
+    ]
   },
-  "requires_skills": ["work-operating-model"],
-  "tags": ["workflow", "operating-model", "interview", "agent-config", "mcp", "activation"],
+  "requires_skills": [
+    "work-operating-model"
+  ],
+  "tags": [
+    "workflow",
+    "operating-model",
+    "interview",
+    "agent-config",
+    "mcp",
+    "activation"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "45 minutes",
   "created": "2026-04-14",

@@ -8,12 +8,15 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": []
   },
   "requires_skills": [],
-  "tags": ["tag1", "tag2"],
+  "tags": [
+    "tag1",
+    "tag2"
+  ],
   "difficulty": "beginner",
   "estimated_time": "15 minutes",
   "created": "2026-03-11",

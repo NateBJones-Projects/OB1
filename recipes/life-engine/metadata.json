@@ -1,6 +1,6 @@
 {
   "name": "Life Engine",
-  "description": "A self-improving, time-aware personal assistant that runs in the background via Claude Code's /loop command. Checks your calendar, surfaces relevant knowledge from Open Brain, tracks habits and health, and delivers proactive briefings via Telegram or Discord — adapting to your life over time.",
+  "description": "A self-improving, time-aware personal assistant that runs in the background via Claude Code's /loop command. Checks your calendar, surfaces relevant knowledge from Open Brain, tracks habits and health, and delivers proactive briefings via Telegram or Discord \u2014 adapting to your life over time.",
   "category": "recipes",
   "author": {
     "name": "Jonathan Edwards",
@@ -8,7 +8,7 @@
   },
   "version": "1.1.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [
       "supabase",
       "google-calendar",

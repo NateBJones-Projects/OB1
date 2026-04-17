@@ -8,11 +8,21 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "optional",
     "services": [],
-    "tools": ["AI client with reusable skills/prompts", "Ability to install the bundled references directory"]
+    "tools": [
+      "AI client with reusable skills/prompts",
+      "Ability to install the bundled references directory"
+    ]
   },
-  "tags": ["agentic-harness", "agents", "workflow", "architecture", "evaluation", "memory"],
+  "tags": [
+    "agentic-harness",
+    "agents",
+    "workflow",
+    "architecture",
+    "evaluation",
+    "memory"
+  ],
   "difficulty": "advanced",
   "estimated_time": "10 minutes",
   "created": "2026-04-02",

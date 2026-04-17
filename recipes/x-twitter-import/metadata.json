@@ -1,6 +1,6 @@
 {
   "name": "X/Twitter Import",
-  "description": "Import X (Twitter) data exports — tweets, DMs, and Grok chats — into Open Brain as searchable thoughts.",
+  "description": "Import X (Twitter) data exports \u2014 tweets, DMs, and Grok chats \u2014 into Open Brain as searchable thoughts.",
   "category": "recipes",
   "author": {
     "name": "Alan Shurafa",
@@ -8,11 +8,22 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenRouter API", "Supabase"],
-    "tools": ["Node.js 18+"]
+    "open_brain": "required",
+    "services": [
+      "OpenRouter API",
+      "Supabase"
+    ],
+    "tools": [
+      "Node.js 18+"
+    ]
   },
-  "tags": ["import", "twitter", "x", "tweets", "social-media"],
+  "tags": [
+    "import",
+    "twitter",
+    "x",
+    "tweets",
+    "social-media"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes",
   "created": "2026-03-15",

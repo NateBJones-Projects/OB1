@@ -57,9 +57,9 @@
       "required": ["open_brain"],
       "properties": {
         "open_brain": {
-          "type": "boolean",
-          "const": true,
-          "description": "Must be true. All contributions require an Open Brain setup."
+          "type": "string",
+          "enum": ["required", "optional"],
+          "description": "Open Brain compatibility. 'required' = contribution depends on the core Open Brain setup (Supabase + pgvector + MCP). 'optional' = contribution is useful on its own; Open Brain integration is additive."
         },
         "services": {
           "type": "array",

@@ -8,11 +8,26 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Kubernetes", "PostgreSQL", "pgvector"],
-    "tools": ["kubectl", "Docker"]
+    "open_brain": "required",
+    "services": [
+      "Kubernetes",
+      "PostgreSQL",
+      "pgvector"
+    ],
+    "tools": [
+      "kubectl",
+      "Docker"
+    ]
   },
-  "tags": ["kubernetes", "k8s", "self-hosted", "postgresql", "pgvector", "deployment", "infrastructure"],
+  "tags": [
+    "kubernetes",
+    "k8s",
+    "self-hosted",
+    "postgresql",
+    "pgvector",
+    "deployment",
+    "infrastructure"
+  ],
   "difficulty": "advanced",
   "estimated_time": "60 minutes",
   "created": "2026-03-22",

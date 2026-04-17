@@ -7,11 +7,21 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["Discord API", "OpenRouter"],
-    "tools": ["Supabase CLI"]
+    "open_brain": "required",
+    "services": [
+      "Discord API",
+      "OpenRouter"
+    ],
+    "tools": [
+      "Supabase CLI"
+    ]
   },
-  "tags": ["discord", "capture", "bot", "messaging"],
+  "tags": [
+    "discord",
+    "capture",
+    "bot",
+    "messaging"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
   "created": "2026-03-11",

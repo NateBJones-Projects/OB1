@@ -8,11 +8,21 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
-    "tools": ["Claude Code"]
+    "tools": [
+      "Claude Code"
+    ]
   },
-  "tags": ["skills", "learning", "extraction", "meta", "self-improving", "knowledge", "continuous-learning"],
+  "tags": [
+    "skills",
+    "learning",
+    "extraction",
+    "meta",
+    "self-improving",
+    "knowledge",
+    "continuous-learning"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "10 minutes",
   "created": "2026-03-19",

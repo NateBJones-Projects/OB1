@@ -1,6 +1,6 @@
 {
   "name": "Instagram Import",
-  "description": "Import Instagram data exports — DM conversations, comments, and post captions — into Open Brain as searchable thoughts.",
+  "description": "Import Instagram data exports \u2014 DM conversations, comments, and post captions \u2014 into Open Brain as searchable thoughts.",
   "category": "recipes",
   "author": {
     "name": "Alan Shurafa",
@@ -8,11 +8,22 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
-    "services": ["OpenRouter API", "Supabase"],
-    "tools": ["Node.js 18+"]
+    "open_brain": "required",
+    "services": [
+      "OpenRouter API",
+      "Supabase"
+    ],
+    "tools": [
+      "Node.js 18+"
+    ]
   },
-  "tags": ["import", "instagram", "meta", "social-media", "messages"],
+  "tags": [
+    "import",
+    "instagram",
+    "meta",
+    "social-media",
+    "messages"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes",
   "created": "2026-03-15",

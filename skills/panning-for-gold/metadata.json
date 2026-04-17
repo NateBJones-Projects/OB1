@@ -8,11 +8,19 @@
   },
   "version": "2.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "optional",
     "services": [],
-    "tools": ["Claude Code or similar AI client with reusable skills/prompts"]
+    "tools": [
+      "Claude Code or similar AI client with reusable skills/prompts"
+    ]
   },
-  "tags": ["skill", "brain-dump", "transcript", "evaluation", "workflow"],
+  "tags": [
+    "skill",
+    "brain-dump",
+    "transcript",
+    "evaluation",
+    "workflow"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "5 minutes",
   "created": "2026-03-27",

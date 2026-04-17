@@ -1,6 +1,6 @@
 {
   "name": "Row Level Security (RLS)",
-  "description": "Reusable guide to PostgreSQL Row Level Security — the foundation for multi-user and shared-access extensions.",
+  "description": "Reusable guide to PostgreSQL Row Level Security \u2014 the foundation for multi-user and shared-access extensions.",
   "category": "primitives",
   "author": {
     "name": "Nate B. Jones",
@@ -8,11 +8,16 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": []
   },
-  "tags": ["security", "postgresql", "multi-user", "rls"],
+  "tags": [
+    "security",
+    "postgresql",
+    "multi-user",
+    "rls"
+  ],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes"
 }

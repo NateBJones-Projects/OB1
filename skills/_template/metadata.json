@@ -8,11 +8,15 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": true,
+    "open_brain": "required",
     "services": [],
     "tools": []
   },
-  "tags": ["skill", "prompt", "workflow"],
+  "tags": [
+    "skill",
+    "prompt",
+    "workflow"
+  ],
   "difficulty": "beginner",
   "estimated_time": "10 minutes",
   "created": "2026-03-27",
