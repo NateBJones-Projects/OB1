@@ -5,7 +5,7 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
-import { registerOAuthRoutes, verifyBearer } from "./oauth.ts";
+import { buildWwwAuthenticate, registerOAuthRoutes, verifyBearer } from "./oauth.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -369,6 +369,7 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-brain-key, accept, mcp-session-id",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+  "Access-Control-Expose-Headers": "WWW-Authenticate",
 };
 
 const app = new Hono();
@@ -397,7 +398,11 @@ app.all("*", async (c) => {
       (legacyQuery && legacyQuery === MCP_ACCESS_KEY));
 
   if (!bearerOk && !legacyOk) {
-    return c.json({ error: "Invalid or missing credentials" }, 401, corsHeaders);
+    return c.json(
+      { error: "Invalid or missing credentials" },
+      401,
+      { ...corsHeaders, "WWW-Authenticate": buildWwwAuthenticate(c) },
+    );
   }
 
   // Fix: Claude Desktop connectors don't send the Accept header that

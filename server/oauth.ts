@@ -123,18 +123,19 @@ type CorsHeaders = Record<string, string>;
 // that full prefix. We match on path suffix instead of absolute routes so the
 // same module works for any function name without configuration.
 
-function publicRoot(c: Context, path: string): string {
-  // Supabase Edge Functions run behind a proxy: the Deno runtime sees URLs
-  // like `http://<ref>.supabase.co/<function-name>/...` (scheme downgraded,
-  // /functions/v1/ stripped). Rebuild the client-facing URL:
+// Derive the client-facing URL root for this Edge Function.
+// Supabase sees URLs like `http://<ref>.supabase.co/<function-name>/...`
+// (scheme downgraded, /functions/v1/ stripped). We rebuild the public URL
+// that clients actually used to reach us.
+function publicRoot(c: Context): string {
   //   1. OAUTH_ISSUER_URL env var if explicitly configured
   //   2. SUPABASE_URL + /functions/v1/<function-name>
   //   3. X-Forwarded-* headers (self-hosting fallback)
   const override = Deno.env.get("OAUTH_ISSUER_URL");
   if (override) return override.replace(/\/$/, "");
 
-  const trimmed = path.replace(/\/\.well-known\/oauth-authorization-server$/, "");
-  const functionName = trimmed.split("/").filter(Boolean)[0] ?? "";
+  // First path segment of the internal URL is the function name.
+  const functionName = new URL(c.req.url).pathname.split("/").filter(Boolean)[0] ?? "";
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   if (supabaseUrl && functionName) {
@@ -146,8 +147,8 @@ function publicRoot(c: Context, path: string): string {
   return `${proto}://${host}/functions/v1/${functionName}`;
 }
 
-async function handleDiscovery(c: Context, corsHeaders: CorsHeaders, path: string) {
-  const root = publicRoot(c, path);
+async function handleDiscovery(c: Context, corsHeaders: CorsHeaders) {
+  const root = publicRoot(c);
   return c.json(
     {
       issuer: root,
@@ -162,6 +163,30 @@ async function handleDiscovery(c: Context, corsHeaders: CorsHeaders, path: strin
     200,
     corsHeaders,
   );
+}
+
+// RFC 9728 — OAuth 2.0 Protected Resource Metadata. MCP clients use this to
+// discover which authorization server guards this MCP endpoint. Triggered by
+// the WWW-Authenticate challenge on 401 (see buildWwwAuthenticate).
+async function handleProtectedResource(c: Context, corsHeaders: CorsHeaders) {
+  const root = publicRoot(c);
+  return c.json(
+    {
+      resource: root,
+      authorization_servers: [root],
+      bearer_methods_supported: ["header"],
+      scopes_supported: [],
+    },
+    200,
+    corsHeaders,
+  );
+}
+
+// Build a WWW-Authenticate: Bearer challenge header pointing at the
+// protected-resource metadata URL, per RFC 9728 §5.2.
+export function buildWwwAuthenticate(c: Context): string {
+  const root = publicRoot(c);
+  return `Bearer realm="${root}", resource_metadata="${root}/.well-known/oauth-protected-resource"`;
 }
 
 async function handleRegister(c: Context, corsHeaders: CorsHeaders) {
@@ -295,7 +320,10 @@ export function registerOAuthRoutes(app: Hono, corsHeaders: CorsHeaders): void {
     const method = c.req.method;
 
     if (method === "GET" && path.endsWith("/.well-known/oauth-authorization-server")) {
-      return await handleDiscovery(c, corsHeaders, path);
+      return await handleDiscovery(c, corsHeaders);
+    }
+    if (method === "GET" && path.endsWith("/.well-known/oauth-protected-resource")) {
+      return await handleProtectedResource(c, corsHeaders);
     }
     if (method === "POST" && path.endsWith("/register")) {
       return await handleRegister(c, corsHeaders);
