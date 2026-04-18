@@ -181,12 +181,14 @@ async function exportTable(tableName, orderBy, backupDir, dateStr, required) {
     `${label}: ${rowCount}${total != null ? "/" + total : ""} rows\r`
   );
 
+  let lastPageSize = first.rows.length;
   offset = PAGE_SIZE;
-  while (first.rows.length === PAGE_SIZE && (total == null || offset < total)) {
+  while (lastPageSize === PAGE_SIZE && (total == null || offset < total)) {
     const page = await fetchPage(tableName, orderBy, offset, PAGE_SIZE);
-    if (page.rows.length === 0) break;
+    lastPageSize = page.rows.length;
+    if (lastPageSize === 0) break;
     writeRows(page.rows);
-    offset += page.rows.length;
+    offset += lastPageSize;
 
     process.stdout.write(
       `${label}: ${rowCount}${total != null ? "/" + total : ""} rows\r`
