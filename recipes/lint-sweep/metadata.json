@@ -10,7 +10,8 @@
   "requires": {
     "open_brain": true,
     "services": ["OpenRouter (Tier 3 only)"],
-    "tools": ["Node.js 18+"]
+    "tools": ["Node.js 18+"],
+    "env": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"]
   },
   "tags": ["quality", "audit", "maintenance", "contradictions", "orphans", "staleness"],
   "difficulty": "intermediate",

@@ -37,8 +37,9 @@ LINT SWEEP -- CREDENTIAL TRACKER
 --------------------------------------
 
 FROM YOUR OPEN BRAIN SETUP
-  Supabase project URL:       ____________   (OPEN_BRAIN_URL)
-  Supabase service role key:  ____________   (OPEN_BRAIN_SERVICE_KEY)
+  Supabase project URL:       ____________   (SUPABASE_URL)
+  Supabase service role key:  ____________   (SUPABASE_SERVICE_ROLE_KEY)
+  (Legacy OPEN_BRAIN_URL / OPEN_BRAIN_SERVICE_KEY are accepted as fallbacks.)
 
 OPTIONAL (TIER 3 ONLY)
   OpenRouter API key:         ____________   (OPENROUTER_API_KEY)
@@ -59,12 +60,15 @@ OPTIONAL (TIER 3 ONLY)
 
    ```bash
    cat > .env.local <<'EOF'
-   OPEN_BRAIN_URL=https://your-project.supabase.co
-   OPEN_BRAIN_SERVICE_KEY=your-service-role-key
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
    # Optional: OPENROUTER_API_KEY=sk-or-v1-...
    EOF
    chmod 600 .env.local
    ```
+
+   > [!NOTE]
+   > This recipe now uses the standard `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` variable names used by every other OB1 recipe, so a shared `.env.local` works across the whole repo. The legacy `OPEN_BRAIN_URL` / `OPEN_BRAIN_SERVICE_KEY` names are still accepted (with a deprecation warning) for backward compatibility.
 
    > [!WARNING]
    > The service role key bypasses Row Level Security. Keep `.env.local` out of version control and restrict its file permissions.
@@ -240,8 +244,8 @@ After each run, open the latest `lint-report-YYYY-MM-DD.md`, triage the findings
 
 ## Troubleshooting
 
-**Issue: `ERROR: OPEN_BRAIN_URL and OPEN_BRAIN_SERVICE_KEY must be set`**
-Solution: Create `.env.local` in the same directory as `lint-sweep.mjs` with both variables, or export them in your shell. Fall-through order is `process.env` → `.env.local` → `.env`.
+**Issue: `ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set`**
+Solution: Create `.env.local` in the same directory as `lint-sweep.mjs` with both variables, or export them in your shell. Fall-through order is `process.env` → `.env.local` → `.env`. The legacy `OPEN_BRAIN_URL` / `OPEN_BRAIN_SERVICE_KEY` names are still accepted (with a one-line deprecation warning).
 
 **Issue: Tier 1 shows `content_fingerprint column missing — see recipes/content-fingerprint-dedup`**
 Solution: Your brain predates the [content-fingerprint-dedup](../content-fingerprint-dedup/) primitive. Apply that recipe (and the [fingerprint-dedup-backfill](../fingerprint-dedup-backfill/) recipe) to get duplicate detection.

@@ -28,9 +28,13 @@
  *
  * Environment (loaded from .env or .env.local in the script directory or
  * from process.env):
- *   OPEN_BRAIN_URL            — Supabase project URL (e.g., https://xyz.supabase.co)
- *   OPEN_BRAIN_SERVICE_KEY    — Supabase service role key
- *   OPENROUTER_API_KEY        — OpenRouter key (Tier 3 only; omit to skip)
+ *   SUPABASE_URL               — Supabase project URL (e.g., https://xyz.supabase.co)
+ *   SUPABASE_SERVICE_ROLE_KEY  — Supabase service role key
+ *   OPENROUTER_API_KEY         — OpenRouter key (Tier 3 only; omit to skip)
+ *
+ * Legacy aliases (deprecated, accepted with a warning):
+ *   OPEN_BRAIN_URL         → use SUPABASE_URL
+ *   OPEN_BRAIN_SERVICE_KEY → use SUPABASE_SERVICE_ROLE_KEY
  *
  * Exit codes:
  *   0 — report generated successfully
@@ -67,6 +71,25 @@ const fileEnv = {
 
 function envVar(name) {
   return process.env[name] || fileEnv[name] || "";
+}
+
+// Resolve a variable that supports a legacy alias. Prefer `primary`; fall back
+// to `legacy`. If the legacy name is what actually resolved the value, log a
+// one-line deprecation warning (once per key) so consumers migrate to the
+// canonical SUPABASE_* names shared by every other OB1 recipe.
+const _deprecationWarned = new Set();
+function envVarWithLegacy(primary, legacy) {
+  const fromPrimary = envVar(primary);
+  if (fromPrimary) return fromPrimary;
+  const fromLegacy = envVar(legacy);
+  if (fromLegacy && !_deprecationWarned.has(legacy)) {
+    console.warn(
+      `[lint-sweep] WARNING: ${legacy} is deprecated; prefer ${primary} ` +
+        `(matches every other OB1 recipe and shared .env.local setups).`
+    );
+    _deprecationWarned.add(legacy);
+  }
+  return fromLegacy;
 }
 
 // ── args ────────────────────────────────────────────────────────────────────
@@ -147,9 +170,13 @@ Options:
   --help, -h              Show this help
 
 Env (from .env, .env.local, or process.env):
-  OPEN_BRAIN_URL          Supabase project URL
-  OPEN_BRAIN_SERVICE_KEY  Supabase service role key
-  OPENROUTER_API_KEY      OpenRouter key (Tier 3 only)
+  SUPABASE_URL               Supabase project URL
+  SUPABASE_SERVICE_ROLE_KEY  Supabase service role key
+  OPENROUTER_API_KEY         OpenRouter key (Tier 3 only)
+
+Legacy aliases (deprecated, accepted with warning):
+  OPEN_BRAIN_URL         → SUPABASE_URL
+  OPEN_BRAIN_SERVICE_KEY → SUPABASE_SERVICE_ROLE_KEY
 `.trim();
 
 // ── Supabase REST helpers ───────────────────────────────────────────────────
@@ -659,10 +686,13 @@ function renderReport({ args, tier1, tier2, tier3, startedAt, finishedAt }) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
-  const baseUrl = envVar("OPEN_BRAIN_URL");
-  const serviceKey = envVar("OPEN_BRAIN_SERVICE_KEY");
+  const baseUrl = envVarWithLegacy("SUPABASE_URL", "OPEN_BRAIN_URL");
+  const serviceKey = envVarWithLegacy("SUPABASE_SERVICE_ROLE_KEY", "OPEN_BRAIN_SERVICE_KEY");
   if (!baseUrl || !serviceKey) {
-    console.error("ERROR: OPEN_BRAIN_URL and OPEN_BRAIN_SERVICE_KEY must be set (env or .env.local).");
+    console.error(
+      "ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set (env or .env.local). " +
+        "Legacy OPEN_BRAIN_URL / OPEN_BRAIN_SERVICE_KEY are accepted as fallbacks with a deprecation warning."
+    );
     process.exit(1);
   }
   const db = makeRestClient(baseUrl, serviceKey);
