@@ -145,8 +145,9 @@ After a full non-dry run:
 --dry-run                Classify but do not INSERT
 --min-confidence N       Skip inserts below this confidence (default 0.75)
 --parallelism N          Concurrent API calls (default 3)
---mirror-supersedes      Also set thoughts.supersedes on the older thought
-                         when a supersedes edge is classified. OFF by default.
+--mirror-supersedes      Also set thoughts.supersedes on the newer thought
+                         (pointing at the older one) when a supersedes edge
+                         is classified. OFF by default.
 ```
 
 ## Design Tensions (unresolved)
@@ -162,11 +163,11 @@ This classifier writes to `thought_edges`. If the OB1 maintainer decision flips 
 When the classifier decides that thought A `supersedes` thought B, there are two places that fact could live:
 
 1. **As an edge in `thought_edges`** — source of truth, carries evidence and temporal bounds.
-2. **As `public.thoughts.supersedes` on the older thought** — denormalized pointer for fast lookup, added by the sibling `provenance-chains` PR.
+2. **As `public.thoughts.supersedes` on the newer thought** — denormalized pointer for fast lookup, added by the sibling `provenance-chains` PR. Per that contract, the pointer lives on the **newer** thought and references the prior thought it replaces (`newer.supersedes = older`).
 
 **Open question: should this classifier also update `public.thoughts.supersedes` when it inserts a supersedes edge?**
 
-This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default**. When on, after inserting a `supersedes` edge from A -> B, the classifier also issues `UPDATE thoughts SET supersedes = A WHERE id = B`. When off, only the edge table is written.
+This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default**. When on, after inserting a `supersedes` edge from A -> B (A is newer, B is older), the classifier also issues `UPDATE thoughts SET supersedes = B WHERE id = A` — i.e. the NEWER thought's `supersedes` column points at the prior (older) thought it replaces, per the `provenance-chains` contract. When off, only the edge table is written.
 
 **Atomicity caveat (NOT atomic in this version).** The edge INSERT and the `thoughts.supersedes` PATCH are two separate HTTP calls. There is no transaction across them.
 
@@ -174,11 +175,14 @@ This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default
 - **Failure mode:** if the PATCH fails mid-run (column missing, network, 5xx, RLS), the edge is written but `thoughts.supersedes` is NOT updated. The run logs the warning and continues. Downstream readers that hit the edge table will see the relation; readers that hit `thoughts.supersedes` directly will not.
 - **Reconciliation (NOT automatic):** reruns will NOT retry a failed mirror PATCH. Once the `supersedes` edge exists in `thought_edges`, `processPair` short-circuits via `skip_already_classified` before reaching the mirror write, so `thought_edges_upsert` is never called and the PATCH is never re-issued. If the PATCH fails once, `thoughts.supersedes` stays stale until an operator runs the manual repair below. A one-off query to find all drifted rows:
   ```sql
-  -- Supersedes edges whose mirror is missing
+  -- Supersedes edges whose mirror is missing or wrong.
+  -- Contract: newer.supersedes = older (provenance-chains).
+  -- Edge (from=newer, to=older, relation='supersedes') implies
+  -- thoughts(id=from).supersedes = to.
   SELECT te.from_thought_id AS newer, te.to_thought_id AS older
   FROM public.thought_edges te
-  LEFT JOIN public.thoughts t ON t.id = te.to_thought_id
-  WHERE te.relation = 'supersedes' AND (t.supersedes IS DISTINCT FROM te.from_thought_id);
+  LEFT JOIN public.thoughts t ON t.id = te.from_thought_id
+  WHERE te.relation = 'supersedes' AND (t.supersedes IS DISTINCT FROM te.to_thought_id);
   ```
 
 ### Manual mirror repair

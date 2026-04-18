@@ -229,9 +229,10 @@ function printHelp() {
       "  --parallelism N          Concurrent API calls (default 3)",
       "",
       "Provenance overlap:",
-      "  --mirror-supersedes      Also set thoughts.supersedes on the older thought",
-      "                           when a supersedes edge is classified. OFF by default",
-      "                           (requires the provenance-chains schema).",
+      "  --mirror-supersedes      Also set thoughts.supersedes on the newer thought",
+      "                           (pointing at the older one) when a supersedes edge",
+      "                           is classified. OFF by default (requires the",
+      "                           provenance-chains schema).",
       "",
     ].join("\n"),
   );
@@ -608,11 +609,22 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
     // Optional: mirror supersedes onto public.thoughts.supersedes (see
     // the README "Design Tensions" section). This is off by default and
     // requires the provenance-chains schema to be installed.
+    //
+    // Direction per provenance-chains contract: the NEWER thought
+    // carries the pointer to the PRIOR (older) thought it replaces.
+    // Edge (from=A, to=B, relation='supersedes') means "A supersedes B",
+    // so the mirror PATCH targets A (the FROM thought) with
+    // supersedes = B (the TO thought). See the PATCH below.
     if (args.mirrorSupersedes && cls.relation === "supersedes") {
       try {
-        // The newer thought (the `from`) supersedes the older thought (the `to`).
-        // Update thoughts.supersedes on the OLDER thought so "what replaced me?"
-        // queries have a direct pointer.
+        // Edge direction: (from=A, to=B, relation='supersedes') means
+        // "A supersedes B" — A is newer, B is older. Per the
+        // provenance-chains contract (see
+        // schemas/provenance-chains/schema.sql), thoughts.supersedes is
+        // a pointer from the NEWER thought to the PRIOR thought it
+        // replaces. So the mirror write is:
+        //   A supersedes B  →  A.supersedes = B
+        // i.e. PATCH the FROM thought with supersedes = TO.
         //
         // BEST-EFFORT, NOT ATOMIC: this PATCH is a second HTTP round-trip
         // after the edge INSERT. If the PATCH fails for any reason
@@ -627,8 +639,8 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
         // branch is unreachable on a second pass. See README "Manual
         // mirror repair" for the SQL reconciliation command.
         await sb.patch(
-          `thoughts?id=eq.${to}`,
-          { supersedes: from },
+          `thoughts?id=eq.${from}`,
+          { supersedes: to },
         );
       } catch (e) {
         // Mirror to thoughts.supersedes failed. The edge is written, but

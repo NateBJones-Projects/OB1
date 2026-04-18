@@ -102,8 +102,8 @@ The sibling `provenance-chains` PR (branch `contrib/alanshurafa/provenance-chain
 The intended resolution:
 
 - **`thought_edges` is the source of truth** for reasoning relations **between** thoughts. It holds evidence (`confidence`, `support_count`, `metadata.rationale`), temporal bounds (`valid_from`, `valid_until`), and classifier version, and it supports all six relations uniformly.
-- **`thoughts.supersedes`** (from `provenance-chains`) is a **denormalized pointer** for fast "what's the newest version of this decision?" lookup without joining to `thought_edges`.
-- Both should be **kept in sync by the classifier**. When the classifier inserts a `supersedes` edge, it also sets `thoughts.supersedes` on the older thought.
+- **`thoughts.supersedes`** (from `provenance-chains`) is a **denormalized pointer** for fast "what's the newest version of this decision?" lookup without joining to `thought_edges`. Per the `provenance-chains` contract, the pointer lives on the **newer** thought and references the prior thought it replaces (`newer.supersedes = older`).
+- Both should be **kept in sync by the classifier**. When the classifier inserts a `supersedes` edge `(from=newer, to=older)`, it also sets `thoughts.supersedes = older` on the **newer** thought (i.e. PATCHes the FROM-side row).
 
 Open question flagged for reviewers: **should the classifier actually do that mirroring, or only the edge?**
 
