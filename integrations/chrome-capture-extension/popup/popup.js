@@ -14,12 +14,10 @@
   const queuedCount = document.getElementById('queued-count');
   const skippedCount = document.getElementById('skipped-count');
   const failedCount = document.getElementById('failed-count');
-  const captureModeSummary = document.getElementById('capture-mode-summary');
   const platformSummary = document.getElementById('platform-summary');
   const minLengthSummary = document.getElementById('min-length-summary');
   const endpointSummary = document.getElementById('endpoint-summary');
   const captureLog = document.getElementById('capture-log');
-  const captureModeSelect = document.getElementById('capture-mode');
   const enabledChatgpt = document.getElementById('enabled-chatgpt');
   const enabledClaude = document.getElementById('enabled-claude');
   const enabledGemini = document.getElementById('enabled-gemini');
@@ -101,7 +99,6 @@
         claude: enabledClaude.checked,
         gemini: enabledGemini.checked
       },
-      captureMode: captureModeSelect.value,
       minResponseLength: Number(minLengthInput.value)
     });
 
@@ -110,14 +107,12 @@
   }
 
   function renderSettings(config) {
-    captureModeSelect.value = config.captureMode;
     enabledChatgpt.checked = Boolean(config.enabledPlatforms.chatgpt);
     enabledClaude.checked = Boolean(config.enabledPlatforms.claude);
     enabledGemini.checked = Boolean(config.enabledPlatforms.gemini);
     minLengthInput.value = config.minResponseLength;
     minLengthValue.textContent = String(config.minResponseLength);
 
-    captureModeSummary.textContent = config.captureMode;
     platformSummary.textContent = formatPlatformSummary(config.enabledPlatforms);
     minLengthSummary.textContent = `${config.minResponseLength} chars`;
     endpointSummary.textContent = config.apiEndpoint || '(not configured)';
@@ -215,7 +210,7 @@
     });
   });
 
-  [captureModeSelect, enabledChatgpt, enabledClaude, enabledGemini, minLengthInput].forEach((element) => {
+  [enabledChatgpt, enabledClaude, enabledGemini, minLengthInput].forEach((element) => {
     element.addEventListener('input', saveMutableSettings);
     element.addEventListener('change', saveMutableSettings);
   });

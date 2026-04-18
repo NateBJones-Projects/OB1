@@ -188,7 +188,10 @@ async function queueRetry(item, errorMessage) {
 function normalizeCaptureRequest(message) {
   const platform = String(message.platform || '').trim().toLowerCase();
   const text = String(message.text || message.content || '').trim();
-  const captureMode = String(message.captureMode || 'ambient').trim().toLowerCase();
+  // Capture mode is now either 'manual' (user click) or 'sync' (bulk import).
+  // Ambient capture was removed in the initial public release because it was
+  // never wired up; no producer in this extension emits 'ambient'.
+  const captureMode = String(message.captureMode || 'manual').trim().toLowerCase();
   const sourceType = String(message.sourceType || '').trim() || OBConfig.getSourceType(platform, captureMode);
   const sourceLabel = String(message.sourceLabel || `${platform || 'unknown'}:${captureMode}`);
   const sourceMetadata = message.sourceMetadata && typeof message.sourceMetadata === 'object'
@@ -225,15 +228,9 @@ async function processCaptureRequest(message) {
     return { ok: true, status: 'disabled_platform' };
   }
 
-  if (config.captureMode === 'manual' && capture.captureMode === 'ambient') {
-    sessionMetrics.skipped += 1;
-    return { ok: true, status: 'manual_mode' };
-  }
-
-  if (capture.assistantLength < config.minResponseLength && capture.captureMode === 'ambient') {
-    sessionMetrics.skipped += 1;
-    return { ok: true, status: 'too_short' };
-  }
+  // Ambient capture was removed — no passive observer ships yet. Manual
+  // clicks and bulk sync both bypass the minResponseLength gate on purpose:
+  // the user has explicitly asked for this turn to be captured.
 
   const sensitivity = await OBSensitivity.detectSensitivity(capture.text);
   if (sensitivity.tier === 'restricted') {
@@ -430,7 +427,6 @@ async function getStatus() {
       apiEndpoint: config.apiEndpoint,
       apiKeyConfigured: Boolean(config.apiKey),
       enabledPlatforms: config.enabledPlatforms,
-      captureMode: config.captureMode,
       minResponseLength: config.minResponseLength
     },
     sessionMetrics: {

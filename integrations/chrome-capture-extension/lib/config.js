@@ -39,7 +39,11 @@
       claude: true,
       gemini: true
     },
-    captureMode: 'auto',
+    // NOTE: the user-level "capture mode" setting (Auto/Manual toggle) was
+    // removed in the initial public release because ambient capture was
+    // never wired up. Per-message captureMode on ingest payloads remains
+    // ('manual' for user clicks, 'sync' for bulk import) — that's a
+    // source-provenance hint, not a user preference.
     minResponseLength: 100,
     autoSyncEnabled: false,
     autoSyncIntervalMinutes: 15
@@ -98,9 +102,9 @@
         ...incoming.enabledPlatforms
       };
     }
-    if (incoming.captureMode === 'manual' || incoming.captureMode === 'auto') {
-      merged.captureMode = incoming.captureMode;
-    }
+    // incoming.captureMode (auto/manual) is intentionally ignored — that
+    // user-preference toggle was removed. Legacy saved settings that still
+    // carry the field are harmless: they're simply dropped during merge.
     if (Number.isFinite(Number(incoming.minResponseLength))) {
       merged.minResponseLength = Math.max(0, Number(incoming.minResponseLength));
     }
@@ -159,8 +163,8 @@
    *     avoids leaking the endpoint to loaner Chromebooks / shared profiles
    *     and sidesteps chrome.storage.sync's 8KB-per-item / 100KB-total
    *     quota, which can reject silently for long URLs + settings.
-   *   - Non-secret preferences (platform toggles, captureMode,
-   *     minResponseLength) still live in chrome.storage.sync so they
+   *   - Non-secret preferences (platform toggles, minResponseLength) still
+   *     live in chrome.storage.sync so they
    *     follow the user. If sync is disabled or over quota we fall back
    *     to local-only transparently.
    */
