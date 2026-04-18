@@ -10,6 +10,7 @@ import {
   embedText,
   extractMetadata,
   detectSensitivity,
+  resolveSensitivityTier,
   computeContentFingerprint,
   prepareThoughtPayload,
   applyEvergreenTag,
@@ -481,6 +482,22 @@ server.registerTool(
           "unknown",
         );
 
+      // Detect sensitivity on the NEW content first so we can reject
+      // restricted updates before paying for embedding + classification.
+      const sensitivity = detectSensitivity(content);
+      if (sensitivity.tier === "restricted") {
+        const reasons =
+          sensitivity.reasons.length > 0
+            ? ` Reasons: ${sensitivity.reasons.join(", ")}.`
+            : "";
+        return toolFailure(
+          "Updated content contains restricted patterns (SSN, credit card, " +
+            "API key, etc). Restricted content is local-only and cannot be " +
+            "stored in cloud MCP." +
+            reasons,
+        );
+      }
+
       const [embedding, extracted] = await Promise.all([
         embedText(content),
         extractMetadata(content),
@@ -489,8 +506,18 @@ server.registerTool(
       const oldMetadata = isRecord(existing.metadata)
         ? existing.metadata
         : {};
-      const sensitivity = detectSensitivity(content);
       const fingerprint = await computeContentFingerprint(content);
+
+      // Escalation-only tier resolution — never downgrade the stored tier.
+      // If an existing `personal` thought is edited to remove the sensitive
+      // phrasing, the row stays `personal` rather than silently becoming
+      // `standard` and leaking into broad list/search responses. This
+      // matches the invariant enforced in capture_thought's pipeline via
+      // resolveSensitivityTier (existing tier acts as the floor).
+      const resolvedTier = resolveSensitivityTier(
+        sensitivity.tier,
+        existing.sensitivity_tier ?? undefined,
+      );
 
       const metadata = {
         ...oldMetadata,
@@ -513,7 +540,7 @@ server.registerTool(
           content_fingerprint: fingerprint,
           embedding,
           type: extracted.type,
-          sensitivity_tier: sensitivity.tier,
+          sensitivity_tier: resolvedTier,
           importance: existing.importance ?? 3,
           metadata: finalizedMetadata,
           updated_at: new Date().toISOString(),
