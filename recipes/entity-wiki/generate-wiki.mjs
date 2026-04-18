@@ -521,18 +521,25 @@ async function writeEntityMetadata(sb, entity, wiki, sourceCounts, provenance) {
   return Array.isArray(updated) ? updated[0] : updated;
 }
 
-async function writeDossierThought(sb, entity, wiki, sourceCounts, provenance) {
+async function writeDossierThought(sb, env, entity, wiki, sourceCounts, provenance) {
   // Trade-off: storing the wiki as a thought pollutes semantic search.
   // Mitigations applied here:
   //   - metadata.type = 'dossier' and metadata.generated_by tag so readers
-  //     (and the entity-extraction auto-queue trigger) can filter it out.
+  //     can filter it out.
   //   - source = 'wiki_generator' for easy exclusion at query time.
   // Users who want a clean thought store should prefer `file` or
   // `entity-metadata` modes. Documented in the README.
+  //
+  // Idempotency: look up an existing dossier for this entity by
+  // metadata.wiki_entity_id and PATCH it in place. Otherwise upsert by
+  // content fingerprint. A per-run timestamp inside the content would defeat
+  // upsert_thought's content-fingerprint dedup (new fingerprint every run =
+  // accumulating duplicate dossiers), so the timestamp lives in metadata.
   const slug = slugify(entity.canonical_name, entity.entity_type);
+  const generatedAt = new Date().toISOString();
   const content =
     `# Dossier: ${entity.canonical_name} (${entity.entity_type})\n\n` +
-    `Generated ${new Date().toISOString()} from ` +
+    `Synthesized from ` +
     `${sourceCounts.linked} linked thoughts + ${sourceCounts.semantic} semantic matches.\n\n` +
     wiki;
   const metadata = {
@@ -540,6 +547,7 @@ async function writeDossierThought(sb, entity, wiki, sourceCounts, provenance) {
     topics: ["entity-wiki", entity.entity_type],
     tags: ["wiki", "dossier", "generated"],
     generated_by: "recipes/entity-wiki/generate-wiki.mjs",
+    generated_at: generatedAt,
     wiki_entity_id: entity.id,
     wiki_entity_name: entity.canonical_name,
     wiki_entity_type: entity.entity_type,
@@ -551,21 +559,67 @@ async function writeDossierThought(sb, entity, wiki, sourceCounts, provenance) {
     exclude_from_default_search: true,
   };
 
-  // Prefer the OB1 upsert_thought RPC (idempotent by content fingerprint).
-  // If unavailable, fall back to a direct insert.
+  // Compute embedding so the dossier is retrievable via match_thoughts. The
+  // MCP capture flow in server/index.ts does the same (embed first, then
+  // upsert + patch embedding). Failure to embed is non-fatal — the dossier
+  // is still written as text, it just won't show up in semantic search.
+  let embedding = null;
+  try {
+    embedding = await embedQuery(env, content);
+  } catch (embErr) {
+    console.error(
+      `[wiki] dossier embedding failed for #${entity.id}: ${embErr.message}`,
+    );
+  }
+
+  // 1. Check for an existing dossier for this entity (idempotency by
+  //    entity_id, not by content fingerprint — lets us refresh the wiki
+  //    when the evidence changes, rather than accumulating rows).
+  try {
+    const existing =
+      (await sb.get(
+        "thoughts",
+        `select=id&metadata->>type=eq.dossier&metadata->>wiki_entity_id=eq.${entity.id}&limit=1`,
+      )) || [];
+    if (existing.length > 0) {
+      const existingId = existing[0].id;
+      const patchBody = { content, metadata };
+      if (embedding) patchBody.embedding = embedding;
+      await sb.patch(`thoughts?id=eq.${existingId}`, patchBody);
+      return existingId;
+    }
+  } catch (lookupErr) {
+    // Non-fatal — fall through to upsert path.
+    console.error(
+      `[wiki] dossier lookup failed for #${entity.id}: ${lookupErr.message}`,
+    );
+  }
+
+  // 2. No existing dossier — upsert via RPC (content-fingerprint dedup).
   try {
     const rpcRes = await sb.rpc("upsert_thought", {
       p_content: content,
       p_payload: { metadata },
     });
     const thoughtId = Array.isArray(rpcRes) ? rpcRes[0]?.id : rpcRes?.id;
+    if (thoughtId && embedding) {
+      try {
+        await sb.patch(`thoughts?id=eq.${thoughtId}`, { embedding });
+      } catch (patchErr) {
+        console.error(
+          `[wiki] embedding patch failed for dossier ${thoughtId}: ${patchErr.message}`,
+        );
+      }
+    }
     return thoughtId ?? null;
   } catch (rpcErr) {
-    // Fallback: direct insert into thoughts (embedding left null; an
-    // enrichment pass can backfill if the user wants).
+    // Fallback: direct insert into thoughts. Include embedding in the insert
+    // payload so the dossier is immediately searchable even without the RPC.
+    const insertBody = { content, metadata };
+    if (embedding) insertBody.embedding = embedding;
     const inserted = await sb.post(
       "thoughts",
-      { content, metadata },
+      insertBody,
       { prefer: "return=representation" },
     );
     const row = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -642,7 +696,7 @@ async function generateForEntity(sb, env, entity, args) {
     return { entity_metadata: true };
   }
   if (args.outputMode === "thought") {
-    const thoughtId = await writeDossierThought(sb, entity, wiki, sourceCounts, provenance);
+    const thoughtId = await writeDossierThought(sb, env, entity, wiki, sourceCounts, provenance);
     console.log(`[wiki] wrote dossier thought id=${thoughtId}`);
     return { thought_id: thoughtId };
   }
