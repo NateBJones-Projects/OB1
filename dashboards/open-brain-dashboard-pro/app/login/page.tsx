@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { checkHealth, ApiError } from "@/lib/api";
 import { LoginForm } from "./LoginForm";
 
 async function loginAction(formData: FormData) {
@@ -10,21 +11,21 @@ async function loginAction(formData: FormData) {
     return { error: "API key is required" };
   }
 
-  // Validate key against health endpoint
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  // CR-02: Route through lib/api.ts::checkHealth — this both enforces the
+  // NEXT_PUBLIC_API_URL module-load guard (throws at import if missing) and
+  // centralizes the health-check shape so the login path cannot drift from
+  // the rest of the app.
   try {
-    const res = await fetch(`${apiUrl}/health`, {
-      headers: { "x-brain-key": apiKey },
-    });
-    if (!res.ok) {
+    await checkHealth(apiKey.trim());
+  } catch (err) {
+    if (err instanceof ApiError) {
       return { error: "Invalid API key or service unavailable" };
     }
-  } catch {
     return { error: "Could not reach API. Check your connection." };
   }
 
   const session = await getSession();
-  session.apiKey = apiKey;
+  session.apiKey = apiKey.trim();
   session.loggedIn = true;
   await session.save();
 
