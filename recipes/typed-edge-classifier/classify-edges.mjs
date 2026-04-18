@@ -132,12 +132,30 @@ function assertPricingKnown(args) {
 }
 
 // Worst-case per-pair cost for hard-cap arithmetic in processInChunks.
-// Derived from the classify stage with the generous token budget the
-// prompt could actually hit (800 in / 512 out matches max_tokens=512
-// in classifyPair). Unknown models return 0 which correctly disables
-// the proactive parallelism clamp (see estimateCost + WARN-1 refusal).
-function worstCasePerPair(model) {
-  return estimateCost(model, 800, 512);
+//
+// In hybrid mode a single pair can spend on BOTH the Haiku filter AND
+// the Opus classify leg, so the worst case must include both. If we
+// only budget the classify leg (as earlier versions did), the chunk
+// clamp lets `parallelism` tasks launch whose combined Haiku spend
+// overshoots the cap before the post-filter cap check trips. See
+// REVIEW-CODEX-2 P2.
+//
+// Classify leg: 800 in / 512 out matches max_tokens=512 in classifyPair.
+// Haiku filter leg: 500 in / 128 out matches max_tokens=128 in filterCandidate
+// with generous headroom for the system + user prompt.
+//
+// Unknown models return 0 which correctly disables the proactive
+// parallelism clamp (see estimateCost + WARN-1 refusal at startup).
+function worstCasePerPair(args) {
+  const classifyModel = args.singleModel || args.classifyModel;
+  const classifyWorst = estimateCost(classifyModel, 800, 512);
+  if (!args.hybrid) return classifyWorst;
+  const haikuFilterWorst = estimateCost(args.filterModel, 500, 128);
+  // If either leg prices to 0 (unknown model), the whole worst case is
+  // 0 — which disables the proactive clamp. That matches the existing
+  // contract: we only clamp when we can price the run.
+  if (classifyWorst === 0 || haikuFilterWorst === 0) return 0;
+  return haikuFilterWorst + classifyWorst;
 }
 
 // ── args + env ─────────────────────────────────────────────────────────────
@@ -844,13 +862,13 @@ async function main() {
   );
 
   const costState = { spent: 0 };
-  // Worst-case per-pair cost for the hard cost cap. Uses the classify
-  // model because that's the expensive leg. Returns 0 for unknown
-  // models, which disables the proactive parallelism clamp — the
-  // pricing-unknown refusal in parseArgs/loadEnv is what protects
-  // users in that case.
-  const classifyModel = args.singleModel || args.classifyModel;
-  const worstCost = worstCasePerPair(classifyModel);
+  // Worst-case per-pair cost for the hard cost cap. In hybrid mode this
+  // includes BOTH the Haiku filter leg AND the Opus classify leg so the
+  // parallelism clamp reflects the true per-pair spend (see
+  // REVIEW-CODEX-2 P2). Returns 0 for unknown models, which disables the
+  // proactive parallelism clamp — the pricing-unknown refusal in
+  // assertPricingKnown is what protects users in that case.
+  const worstCost = worstCasePerPair(args);
   const results = await processInChunks(
     pairs,
     (p) => processPair(env, sb, args, p, costState),
