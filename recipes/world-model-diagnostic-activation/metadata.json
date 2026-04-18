@@ -1,0 +1,33 @@
+{
+  "name": "World Model Diagnostic Activation",
+  "description": "Lightweight activation path for running the World Model Readiness Diagnostic inside OB1 using the base search/capture connector, with a direct-paste fallback for Claude and ChatGPT.",
+  "category": "recipes",
+  "author": {
+    "name": "Jonathan Edwards",
+    "github": "jonathanedwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": "required",
+    "services": [
+      "Supabase"
+    ],
+    "tools": [
+      "AI client with reusable skills/prompts or plain chat"
+    ]
+  },
+  "requires_skills": [
+    "world-model-diagnostic"
+  ],
+  "tags": [
+    "workflow",
+    "world-model",
+    "diagnostic",
+    "boundary-layer",
+    "activation"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-18",
+  "updated": "2026-04-18"
+}
