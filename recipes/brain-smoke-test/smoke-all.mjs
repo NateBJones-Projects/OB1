@@ -9,7 +9,8 @@
  *
  * Stock Open Brain (docs/01-getting-started.md) needs only the canonical
  * thoughts table, open-brain-mcp Edge Function, and MCP_ACCESS_KEY. Optional
- * tables and endpoints (entities, edges, REST API, enhanced-thoughts RPCs)
+ * tables and endpoints (graph_nodes/graph_edges from ob-graph, REST API,
+ * enhanced-thoughts search_thoughts_text RPC, smart-ingest ingestion_jobs)
  * are detected and reported as SKIP when not present -- they do not fail
  * the run.
  *
@@ -427,30 +428,41 @@ const dbChecks = [
     },
   },
   {
-    name: "entities table (optional recipe: ob-graph)",
+    // Canonical tables created by recipes/ob-graph/schema.sql:12,28 are
+    // `graph_nodes` and `graph_edges` -- NOT `entities`/`edges`. A harness
+    // that probed `entities`/`edges` would report SKIP on every real OB1
+    // install (stock or fully-loaded), misleading users who have ob-graph.
+    name: "graph_nodes table (optional recipe: ob-graph)",
     fn: async (s) => {
       try {
-        const n = await tableCount("entities", s);
+        const n = await tableCount("graph_nodes", s);
         return `rows=${n ?? "?"}`;
-      } catch (err) { requireOptional(err, "entities table"); }
+      } catch (err) { requireOptional(err, "graph_nodes table"); }
     },
   },
   {
-    name: "edges table (optional recipe: ob-graph)",
+    name: "graph_edges table (optional recipe: ob-graph)",
     fn: async (s) => {
       try {
-        const n = await tableCount("edges", s);
+        const n = await tableCount("graph_edges", s);
         return `rows=${n ?? "?"}`;
-      } catch (err) { requireOptional(err, "edges table"); }
+      } catch (err) { requireOptional(err, "graph_edges table"); }
     },
   },
   {
+    // The smart-ingest integration (integrations/smart-ingest) references
+    // `ingestion_jobs` and its sibling `schemas/smart-ingest-tables` schema.
+    // The schema is not yet on main at the time of writing; this probe will
+    // resolve to PASS once that schema lands and is applied. Keep the probe
+    // so the harness lights up automatically post-merge, rather than going
+    // stale. If the integration is installed without the schema, this will
+    // (correctly) show SKIP with a clear reason.
     name: "ingestion_jobs table (optional integration: smart-ingest)",
     fn: async (s) => {
       try {
         const n = await tableCount("ingestion_jobs", s);
         return `rows=${n ?? "?"}`;
-      } catch (err) { requireOptional(err, "ingestion_jobs table"); }
+      } catch (err) { requireOptional(err, "ingestion_jobs table (requires schemas/smart-ingest-tables, not yet on main)"); }
     },
   },
   {
