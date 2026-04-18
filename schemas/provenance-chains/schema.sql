@@ -334,6 +334,8 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  rows_affected INT;
 BEGIN
   IF p_thought_id IS NULL THEN
     RETURN;
@@ -346,6 +348,15 @@ BEGIN
                    COALESCE(metadata->'provenance', '{}'::jsonb) || COALESCE(p_provenance, '{}'::jsonb)
                  )
   WHERE id = p_thought_id;
+
+  -- Raise if the target row does not exist. Silent zero-row updates used to
+  -- make stale score files / mistyped ids look "applied" to callers even
+  -- though nothing was written. Surface it as a 22023 no_data_found so
+  -- PostgREST returns a structured error the caller can classify.
+  GET DIAGNOSTICS rows_affected = ROW_COUNT;
+  IF rows_affected = 0 THEN
+    RAISE EXCEPTION 'Thought % not found', p_thought_id USING ERRCODE = 'no_data_found';
+  END IF;
 END;
 $$;
 
@@ -385,6 +396,8 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  rows_affected INT;
 BEGIN
   IF p_thought_id IS NULL THEN
     RETURN;
@@ -393,6 +406,15 @@ BEGIN
   UPDATE public.thoughts
   SET metadata = COALESCE(metadata, '{}'::jsonb) || COALESCE(p_eval, '{}'::jsonb)
   WHERE id = p_thought_id;
+
+  -- Raise if the target row does not exist. Silent zero-row updates used to
+  -- make stale score files / mistyped ids look "applied" to callers even
+  -- though nothing was written. Surface it as a 22023 no_data_found so
+  -- PostgREST returns a structured error the caller can classify.
+  GET DIAGNOSTICS rows_affected = ROW_COUNT;
+  IF rows_affected = 0 THEN
+    RAISE EXCEPTION 'Thought % not found', p_thought_id USING ERRCODE = 'no_data_found';
+  END IF;
 END;
 $$;
 
