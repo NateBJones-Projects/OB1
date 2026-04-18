@@ -221,6 +221,7 @@ async function main() {
     patchedWithParents: 0,
     patchedWithoutParents: 0,
     errors: 0,
+    halfMigrated: 0,
   };
 
   for (const row of rows) {
@@ -298,13 +299,32 @@ async function main() {
         // eval.mjs storing eval_score) either lands before and gets preserved
         // by the `||` concat, or lands after and overwrites only its own
         // keys. There is no stale JS snapshot in the loop body.
-        await sbRpc("merge_thought_provenance_metadata", {
-          p_thought_id: row.id,
-          p_provenance: provenancePatch,
-        });
-        summary.patched++;
-        if (derivedFrom) summary.patchedWithParents++;
-        else summary.patchedWithoutParents++;
+        //
+        // If this RPC fails (transient network, schema cache lag, permission
+        // mismatch), the row is already flipped to derivation_layer='derived'
+        // at the column level but the metadata mirror is missing. We do NOT
+        // roll back the column PATCH — the top-level columns are useful on
+        // their own and idempotent on re-apply. Instead we log a clear
+        // warning pointing the operator at `--force`, which re-processes
+        // all candidate rows regardless of current state. Both writes are
+        // idempotent so re-running is safe.
+        try {
+          await sbRpc("merge_thought_provenance_metadata", {
+            p_thought_id: row.id,
+            p_provenance: provenancePatch,
+          });
+          summary.patched++;
+          if (derivedFrom) summary.patchedWithParents++;
+          else summary.patchedWithoutParents++;
+        } catch (rpcErr) {
+          console.warn(
+            `  WARN id=${row.id}: column PATCH succeeded but metadata merge ` +
+            `RPC failed: ${rpcErr.message}. Row is half-migrated ` +
+            `(derivation_layer='derived' set, metadata.provenance missing). ` +
+            `Re-run with --force to repair; both writes are idempotent.`,
+          );
+          summary.halfMigrated++;
+        }
       } catch (err) {
         console.error(`  ERROR id=${row.id}: ${err.message}`);
         summary.errors++;

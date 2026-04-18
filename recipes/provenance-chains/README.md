@@ -152,6 +152,29 @@ node eval.mjs --grader openrouter --limit 50 --report ./reports/eval-$(date +%F)
 
 Drop it in cron or a systemd timer. For a weekly deep-dive on low scorers, add `--force` and filter by score in your dashboard.
 
+## Recovery from interrupted backfill
+
+Backfill performs two server writes per row: a column PATCH (top-level
+provenance fields like `derivation_layer`, `derivation_method`, and
+`derived_from`) followed by an RPC call (`merge_thought_provenance_metadata`,
+which merges into `metadata.provenance`). If the second call fails due to
+transient network, PostgREST schema cache lag, or a permission error, the row
+is left half-migrated — the top-level columns are set but the metadata mirror
+is missing. The script logs an explicit warning when this happens and keeps
+processing.
+
+Default reruns skip rows that already have `derivation_layer='derived'`, so
+these half-migrated rows will not self-heal. To repair, run:
+
+```bash
+node backfill.mjs --force
+```
+
+which re-processes all candidate rows regardless of current state. Safe
+because both writes are idempotent: the column PATCH writes the same values
+it wrote last time, and the RPC merge is a `COALESCE || ` server-side
+concat so running it twice produces the same blob.
+
 ## Troubleshooting
 
 **Issue: `[backfill] GET thoughts: 400 "column \"derivation_layer\" does not exist"`**
