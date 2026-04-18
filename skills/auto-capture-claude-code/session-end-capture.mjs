@@ -136,6 +136,15 @@ function parseTranscript(transcriptPath) {
   return { sessionId, createdAt, gitBranch, cwd, turns, userTurns };
 }
 
+// Neutralize literal occurrences of the delimiter tags inside user content
+// so a transcript can't break out of the wrapper and smuggle instructions
+// to downstream LLM processing of the ingest payload.
+function escapeThoughtContent(text) {
+  return text
+    .replace(/<thought_content>/gi, "<thought_content_escaped>")
+    .replace(/<\/thought_content>/gi, "</thought_content_escaped>");
+}
+
 function formatTranscript(parsed, projectName) {
   const header = [
     `Claude Code Session Transcript`,
@@ -148,10 +157,10 @@ function formatTranscript(parsed, projectName) {
 
   const body = parsed.turns
     .filter(t => t.content.trim())
-    .map(t => `[${t.role}]\n${t.content}`)
+    .map(t => `[${t.role}]\n${escapeThoughtContent(t.content)}`)
     .join("\n\n");
 
-  return `${header}\n\n${body}`;
+  return `${header}\n\n<thought_content>\n${body}\n</thought_content>`;
 }
 
 function buildSessionSummary(parsed, projectName) {
