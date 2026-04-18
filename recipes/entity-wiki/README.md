@@ -1,5 +1,7 @@
 # Entity Wiki Pages
 
+> ⚠️ **Requires the entity-extraction companion PRs — not yet merged into OB1 `main`.** This recipe reads `public.entities`, `public.thought_entities`, and `public.edges`. Those tables are introduced by the in-flight entity-extraction schema + worker PRs (tracking: [#197](https://github.com/open-brain/ob1/pull/197) schema, [#199](https://github.com/open-brain/ob1/pull/199) worker). On the current `main` branch those tables do not exist and every query in `generate-wiki.mjs` will fail with `relation "public.entities" does not exist`. Do not try to install this recipe until both companion PRs are merged. See [Prerequisites](#prerequisites) for details.
+
 > Auto-generate per-entity markdown wiki pages by aggregating every thought linked to a person, project, topic, organization, tool, or place — then synthesizing a structured narrative with an LLM.
 
 ## What It Does
@@ -43,13 +45,16 @@ The script groups typed edges by relation, truncates thought content to 300 char
 
 ## Prerequisites
 
+> [!WARNING]
+> **Schema prereq not yet in OB1 `main`.** The `schemas/entity-extraction/` schema and the `integrations/entity-extraction-worker/` edge function referenced below are in-flight PRs, not merged code. Paths like `../../schemas/entity-extraction/` will 404 on GitHub today. This recipe will not run until both companion PRs land. Track: schema PR [#197](https://github.com/open-brain/ob1/pull/197), worker PR [#199](https://github.com/open-brain/ob1/pull/199).
+
 - A working Open Brain setup ([guide](../../docs/01-getting-started.md)).
-- The [`schemas/entity-extraction/`](../../schemas/entity-extraction/) schema deployed, and the companion [`integrations/entity-extraction-worker/`](../../integrations/entity-extraction-worker/) edge function processing the queue. This recipe reads `public.entities`, `public.edges`, and `public.thought_entities` — if those tables are empty, there is nothing to synthesize. Let the worker ingest your thoughts for at least one run before you try this.
+- The `schemas/entity-extraction/` schema deployed, and the companion `integrations/entity-extraction-worker/` edge function processing the queue. This recipe reads `public.entities`, `public.edges`, and `public.thought_entities` — if those tables are empty, there is nothing to synthesize. Let the worker ingest your thoughts for at least one run before you try this.
 - An API key for any OpenAI-compatible Chat Completions provider (OpenRouter, OpenAI, Groq, Together, Anthropic via OpenRouter, a local Ollama/LM Studio server — anything that accepts `POST /chat/completions`).
 - Node.js 18+ (uses built-in `fetch`).
 
 > [!NOTE]
-> This recipe does **not** require the `recipes/ob-graph/` manual graph layer. It uses the automatic extraction tables from `schemas/entity-extraction/`. The two are independent.
+> This recipe does **not** require the `recipes/ob-graph/` manual graph layer. It uses the automatic extraction tables from the (pending) `schemas/entity-extraction/` PR. The two are independent.
 
 ## Credential Tracker
 
@@ -126,7 +131,7 @@ SELECT
 
 </details>
 
-If `entities` or `thought_links` is 0, wait for the entity-extraction worker to process your queue before running the recipe. See [`schemas/entity-extraction/README.md`](../../schemas/entity-extraction/README.md) for worker setup.
+If `entities` or `thought_links` is 0, wait for the entity-extraction worker to process your queue before running the recipe. See the pending `schemas/entity-extraction/` PR for worker setup (not yet on `main` — see warning at the top of this README).
 
 Done when: all three counts are non-zero and at least one entity has 3+ linked thoughts.
 
@@ -244,6 +249,10 @@ Then rerun with `--id <N>` against the exact id.
 The entity has few linked thoughts or all its edges are `co_occurs_with` (which this recipe filters out as noise). Give the entity-extraction worker more content to process, or lower the `--max-linked` cap to force the model to use what little it has.
 
 **Issue: Batch mode is slow on a large brain**
+
+> [!WARNING]
+> `listBatchCandidates` runs a serial `thought_entities` count per candidate entity (up to `max(batch_limit * 4, 100)` requests) before the first LLM call. On brains with a few thousand entities this adds tens of seconds of startup latency; on 10k+ brains it dominates the run and scales linearly with `--batch-limit`. A drop-in RPC workaround is below. A follow-up recipe PR will ship this RPC by default once the entity-extraction schema lands.
+
 `listBatchCandidates` does a best-effort per-entity count because PostgREST does not expose `GROUP BY` directly. For brains with 10k+ entities, add an RPC like the following and swap it in:
 
 <details>
