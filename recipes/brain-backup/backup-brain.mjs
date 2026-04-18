@@ -118,7 +118,18 @@ async function fetchPage(table, orderBy, offset, limit) {
   });
 
   if (res.status === 404) {
-    return { rows: [], total: null, missing: true };
+    // PostgREST returns 404 with `code: "PGRST205"` when the table is not in
+    // the schema cache. Any other 404 (typo in SUPABASE_URL, paused project,
+    // wrong schema, custom API gateway) should surface loudly, not be
+    // silently treated as "table missing" -- that's how backup tools lose
+    // data without anyone noticing.
+    const rawBody = await res.text();
+    let parsed = null;
+    try { parsed = JSON.parse(rawBody); } catch {}
+    if (parsed && parsed.code === "PGRST205") {
+      return { rows: [], total: null, missing: true };
+    }
+    throw new Error(`PostgREST error 404 on ${table}: ${rawBody}`);
   }
 
   if (!res.ok && res.status !== 206) {
