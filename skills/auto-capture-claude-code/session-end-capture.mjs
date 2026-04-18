@@ -36,6 +36,10 @@ const HARD_TIMEOUT_MS = 25000;
 const MIN_USER_TURNS = 3;
 const RETRY_MAX_ATTEMPTS = 5;
 const RETRY_BATCH_SIZE = 3;
+// Per-request fetch timeout. Must be less than HARD_TIMEOUT_MS so an
+// abandoned fetch surfaces as AbortError and gets enqueued, rather than
+// the process being killed mid-flight by the hard timeout.
+const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS) || 10000;
 
 // Paths — adapt these to your project layout
 const SCRIPT_DIR = path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1"));
@@ -168,6 +172,18 @@ function buildImportKey(sessionId, formattedText) {
   return `cc:${sessionId}:${hash}`;
 }
 
+// ── Fetch with timeout ──────────────────────────────────────────────────────
+
+async function fetchWithTimeout(url, opts = {}, timeoutMs = FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...opts, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Retry Queue ─────────────────────────────────────────────────────────────
 
 function ensureRetryDirs() {
@@ -217,7 +233,7 @@ async function processRetryQueue(ingestUrl, mcpKey) {
     }
 
     try {
-      const response = await fetch(ingestUrl, {
+      const response = await fetchWithTimeout(ingestUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-brain-key": mcpKey },
         body: JSON.stringify({
@@ -320,7 +336,7 @@ async function main() {
   };
 
   try {
-    const response = await fetch(ingestUrl, {
+    const response = await fetchWithTimeout(ingestUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-brain-key": mcpKey },
       body: JSON.stringify(payload),
@@ -337,8 +353,12 @@ async function main() {
       saveToRetryQueue(payload, `HTTP ${response.status}`, parsed.sessionId);
     }
   } catch (err) {
-    appendLog(parsed.sessionId, projectName, parsed.userTurns, `error:fetch:${err.message}`);
-    saveToRetryQueue(payload, err.message, parsed.sessionId);
+    const isAbort = err?.name === "AbortError";
+    const disposition = isAbort
+      ? `error:fetch:timeout_${FETCH_TIMEOUT_MS}ms`
+      : `error:fetch:${err.message}`;
+    appendLog(parsed.sessionId, projectName, parsed.userTurns, disposition);
+    saveToRetryQueue(payload, isAbort ? `timeout ${FETCH_TIMEOUT_MS}ms` : err.message, parsed.sessionId);
   }
 
   process.exit(0);
