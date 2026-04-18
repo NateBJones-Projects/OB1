@@ -594,10 +594,53 @@ function buildFrontmatter(entity, sourceCounts, provenance) {
   return lines.join("\n");
 }
 
+// Resolve an output path that doesn't silently overwrite another entity's
+// wiki. slugify() strips non-alphanumerics, so distinct entities like `C`,
+// `C#`, and `C++` all collapse to the same base slug (e.g. `tool-c`). To keep
+// re-runs idempotent for the same entity while preventing cross-entity
+// clobber, we:
+//   1. Try the base slug first. If the file doesn't exist, use it.
+//   2. If it exists, peek at its `entity_id:` frontmatter line. If it belongs
+//      to this entity, overwrite (idempotent re-run).
+//   3. Otherwise another entity owns the base path — append `-1`, `-2`, ...
+//      until we find a free path (or one that already belongs to us).
+// Logs a warning on every collision so users see when their entities are
+// colliding and can pick better canonical names.
+function resolveOutputPath(outDir, baseSlug, entity) {
+  const tryPath = (suffix) => path.join(outDir, `${baseSlug}${suffix}.md`);
+  const ownedBy = (p) => {
+    try {
+      const head = fs.readFileSync(p, "utf8").slice(0, 2048);
+      const match = head.match(/^entity_id:\s*(\S+)/m);
+      return match ? String(match[1]) === String(entity.id) : false;
+    } catch {
+      return false;
+    }
+  };
+  let candidate = tryPath("");
+  if (!fs.existsSync(candidate) || ownedBy(candidate)) return candidate;
+  // Collision with a different entity — warn and pick a numeric suffix.
+  for (let i = 1; i < 1000; i++) {
+    candidate = tryPath(`-${i}`);
+    if (!fs.existsSync(candidate) || ownedBy(candidate)) {
+      console.warn(
+        `[wiki] slug collision on "${baseSlug}.md" for entity #${entity.id} ` +
+          `${entity.canonical_name} (${entity.entity_type}); writing as ` +
+          `"${path.basename(candidate)}". Consider disambiguating canonical names.`,
+      );
+      return candidate;
+    }
+  }
+  throw new Error(
+    `[wiki] gave up finding a non-colliding path for "${baseSlug}.md" ` +
+      `(entity #${entity.id}); too many collisions in ${outDir}.`,
+  );
+}
+
 function writeFile(wiki, entity, sourceCounts, provenance, outDir) {
   fs.mkdirSync(outDir, { recursive: true });
-  const filename = `${slugify(entity.canonical_name, entity.entity_type)}.md`;
-  const filepath = path.join(outDir, filename);
+  const baseSlug = slugify(entity.canonical_name, entity.entity_type);
+  const filepath = resolveOutputPath(outDir, baseSlug, entity);
   fs.writeFileSync(filepath, buildFrontmatter(entity, sourceCounts, provenance) + wiki + "\n", "utf8");
   return filepath;
 }

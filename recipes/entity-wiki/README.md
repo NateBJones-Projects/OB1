@@ -204,7 +204,7 @@ Pick the mode that matches how you plan to consume the wikis. Each has its own c
 
 | Mode | Where it lives | Pros | Cons |
 |------|----------------|------|------|
-| `file` (default) | `./wikis/<slug>.md` | Human-readable, git-versionable, Obsidian-compatible, zero DB writes | Not queryable from SQL or MCP tools; lives outside the brain |
+| `file` (default) | `./wikis/<slug>.md` | Human-readable, git-versionable, Obsidian-compatible, zero DB writes | Not queryable from SQL or MCP tools; lives outside the brain. Slug is derived from `canonical_name` with non-alphanumerics stripped, so distinct entities like `C`, `C#`, and `C++` share a base slug — the writer appends `-1`, `-2`, ... to avoid overwrites (and logs a warning). Re-running for the same entity id still overwrites its own file. |
 | `entity-metadata` | `entities.metadata.wiki_page` JSONB | Queryable via SQL, travels with the entity, no new rows | Not searchable via embeddings, not picked up by `search_thoughts` |
 | `thought` | A new row in `public.thoughts` with `metadata.type = 'dossier'` | Retrievable via normal search / MCP tools, full provenance back to the atoms it summarizes | **Requires `EMBEDDING_API_KEY`** (the dossier is embedded at write time so match_thoughts can find it). **Can pollute semantic search** — a long dossier that restates 20 atoms will match many queries and rank above the atoms themselves |
 
