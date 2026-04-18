@@ -55,6 +55,38 @@ const ENTITY_EXTRACTION_MAX_CALLS = Math.max(
 );
 let llmCallCount = 0;
 
+/**
+ * Hard timeout on every outbound LLM fetch. Without this, a stalled upstream
+ * (OpenRouter regional capacity event, DNS hang, TCP keep-alive drift) can
+ * consume the Edge Function's 150s wall-clock and leave claimed rows in
+ * 'processing' with no status update.
+ *
+ * Default 60s — conservative enough to let a cold-start haiku-4-5 reply,
+ * tight enough to fit multiple retries inside the 150s platform budget.
+ */
+const FETCH_TIMEOUT_MS = Math.max(
+  1000,
+  Number.parseInt(Deno.env.get("FETCH_TIMEOUT_MS") ?? "60000", 10) || 60000,
+);
+
+/** Wrap fetch with an AbortController so stuck upstreams can't exceed the timeout. */
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(
+    () => ctrl.abort(new Error(`fetch timeout after ${timeoutMs}ms: ${url}`)),
+    timeoutMs,
+  );
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // ── CORS ────────────────────────────────────────────────────────────────────
@@ -221,7 +253,7 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
   // OpenRouter (primary)
   if (OPENROUTER_API_KEY) {
     try {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const response = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -240,7 +272,7 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
   // OpenAI (secondary)
   if (OPENAI_API_KEY) {
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -259,7 +291,7 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
 
   // Anthropic (tertiary)
   if (ANTHROPIC_API_KEY) {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "x-api-key": ANTHROPIC_API_KEY,
