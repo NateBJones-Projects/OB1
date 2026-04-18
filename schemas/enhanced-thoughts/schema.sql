@@ -49,7 +49,7 @@ RETURNS TABLE (
   total_count BIGINT
 )
 LANGUAGE plpgsql
-VOLATILE
+STABLE
 SET statement_timeout = '25s'
 AS $$
 BEGIN
@@ -222,6 +222,7 @@ RETURNS TABLE (
   overlap_count INT
 )
 LANGUAGE plpgsql
+STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
