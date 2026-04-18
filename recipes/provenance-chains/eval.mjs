@@ -247,11 +247,27 @@ async function fetchCandidates(args) {
   // ignored and tied created_at values resolve deterministically on id.
   //
   // PostgREST predicate shape for DESC keyset is:
-  //   or=(created_at.lt.X,and(created_at.eq.X,id.lt.Y))
+  //   or=(created_at.lt."X",and(created_at.eq."X",id.lt."Y"))
   // Built by hand (not via URLSearchParams) because URLSearchParams
   // re-encodes the structural commas and parens and breaks the or()
-  // syntax. We encodeURIComponent only the cursor values — ISO
-  // timestamps contain ':' and '+' that must be percent-encoded.
+  // syntax.
+  //
+  // Cursor VALUES are wrapped in double quotes (percent-encoded as %22)
+  // because PostgREST treats `.` as a reserved character inside logical
+  // operators like or=(…). encodeURIComponent() does NOT escape `.`, so a
+  // real timestamptz like `2023-10-18T12:37:59.611+00:00` would leak a raw
+  // `.` into the URL and PostgREST would parse it as an operator separator,
+  // not data. Per maintainer guidance
+  // (https://github.com/PostgREST/postgrest/discussions/1591) and the URL
+  // grammar docs, reserved-char values inside logical operators must be
+  // quoted. We emit literal %22 around the encoded value so browsers/curl
+  // treat it as payload bytes, not the query-string quote char.
+  //
+  // The value inside the quotes is still encodeURIComponent'd for `:` and
+  // `+` (common in ISO timestamps). ISO timestamps and UUID/bigint IDs do
+  // not contain `"` themselves, so no inner-quote escaping is needed; if
+  // that assumption ever changes, inner `"` must be doubled to `""` per
+  // PostgREST quoting rules.
   const PAGE_SIZE = 100;
   const MAX_PAGES = 10; // safety cap: 1000 rows scanned before bailing out
   const collected = [];
@@ -266,10 +282,13 @@ async function fetchCandidates(args) {
       `limit=${PAGE_SIZE}`,
     ];
     if (cursor) {
+      // %22 = literal double quote. PostgREST strips the quotes server-side
+      // and treats the enclosed value as a single literal (reserved chars
+      // like `.` inside are data, not operator separators).
       const encX = encodeURIComponent(cursor.createdAt);
       const encY = encodeURIComponent(cursor.id);
       parts.push(
-        `or=(created_at.lt.${encX},and(created_at.eq.${encX},id.lt.${encY}))`,
+        `or=(created_at.lt.%22${encX}%22,and(created_at.eq.%22${encX}%22,id.lt.%22${encY}%22))`,
       );
     }
     const query = `thoughts?${parts.join("&")}`;
