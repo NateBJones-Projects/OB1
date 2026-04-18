@@ -14,10 +14,13 @@ When your AI answers a complex question by combining multiple atomic thoughts, t
 ## Prerequisites
 
 - Working Open Brain setup ([Getting Started guide](../../docs/01-getting-started.md))
-- **The `provenance-chains` sibling recipe applied** — this recipe depends on two things that ship together in that recipe:
+- **The `provenance-chains` sibling recipe applied (recommended)** — this recipe depends on two things that ship together in that recipe:
   1. Three new columns on `public.thoughts`: `derivation_layer`, `derivation_method`, `derived_from`.
   2. An updated `upsert_thought` RPC that reads those three fields from the top level of `p_payload` (not just from `p_payload.metadata`).
-  Without **both** of those, this recipe's inserts will either fail (missing columns) or silently drop the provenance fields (stock RPC only reads `metadata`). Apply the `provenance-chains` migration and redeploy its RPC first. See [Step 1](#step-1-confirm-the-provenance-columns-exist) for a quick verification query.
+
+  **On the stock RPC (no `provenance-chains` yet):** inserts still succeed and provenance is preserved in `metadata.provenance.{source_type,derivation_layer,derivation_method,derived_from}` as a mirrored fallback. The top-level provenance columns populated by the patched RPC will be empty, but you can reconstruct the chain from metadata. The anti-loop safety guard (synthesis-of-synthesis rejection) reads the top-level column and is therefore best-effort on stock RPC — see [`DEPENDENCIES.md`](./DEPENDENCIES.md) for the full matrix.
+
+  See [Step 1](#step-1-confirm-the-provenance-columns-exist) for a quick verification query and [Known Limitations](#known-limitations) for the broader dependency graph.
 - An `open-brain-mcp` Edge Function deployed from [server/index.ts](../../server/index.ts) — this recipe adds a second tool alongside `capture_thought`.
 - An `open-brain-rest` Edge Function deployed (for the REST half). If you only want the MCP tool, skip `rest-endpoint.ts`.
 - Supabase CLI linked to your project (for redeploying after you add the handler code).
@@ -208,3 +211,16 @@ Your `upsert_thought` RPC is returning an unexpected shape. This recipe expects 
 ### MCP tool registered but Claude can't see it
 
 After redeploying, disconnect and reconnect the Open Brain connector in Claude Desktop (Settings → Connectors → disable → re-enable). MCP tool lists are cached on the client side and a reconnect forces a fresh `tools/list` roundtrip.
+
+---
+
+## Known Limitations
+
+See [`DEPENDENCIES.md`](./DEPENDENCIES.md) for full detail. Summary:
+
+1. **Stock `upsert_thought` RPC drops top-level provenance fields.** Until the sibling `provenance-chains` recipe lands with its patched RPC, this recipe mirrors provenance into `metadata.provenance.*` so the data is durable — but the top-level columns (`source_type`, `derivation_layer`, `derivation_method`, `derived_from`) will be unpopulated on stock installs. The anti-loop safety guard reads the top-level column and is therefore best-effort until `provenance-chains` lands.
+2. **Stock `search_thoughts` / `list_thoughts` don't expose row IDs.** An AI client following the "search then synthesize" flow in Example 1 cannot read the required `source_thought_ids` from the standard tools — they only return formatted text. Workaround: pass IDs manually from a dashboard or SQL query, or deploy a variant read tool that returns structured JSON. A base update that exposes IDs is tracked as a follow-up; no timeline yet.
+3. **Input caps.** `content` is capped at 50KB, `source_thought_ids` at 50 items, `question` at 2000 chars, `topics`/`tags` at 20 entries each. Adjust in both `mcp-tool-handler.ts` (Zod schema) and `rest-endpoint.ts` (imperative checks) together if your use case needs higher bounds.
+4. **Embedding soft-fail.** If the embedding patch write fails after the row is saved, both MCP and REST paths return success with a warning message (`embedding_error`). The thought is durable — callers can retry via a `reembed_thought` helper rather than re-capturing.
+
+Search the source files for `TODO(synthesis-capture):` to locate the exact lines where these limitations originate.
