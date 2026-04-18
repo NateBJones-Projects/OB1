@@ -1,6 +1,6 @@
 # Entity Wiki Pages
 
-> ⚠️ **Requires the entity-extraction companion PRs — not yet merged into OB1 `main`.** This recipe reads `public.entities`, `public.thought_entities`, and `public.edges`. Those tables are introduced by the in-flight entity-extraction schema + worker PRs (tracking: [#197](https://github.com/open-brain/ob1/pull/197) schema, [#199](https://github.com/open-brain/ob1/pull/199) worker). On the current `main` branch those tables do not exist and every query in `generate-wiki.mjs` will fail with `relation "public.entities" does not exist`. Do not try to install this recipe until both companion PRs are merged. See [Prerequisites](#prerequisites) for details.
+> ⚠️ **Requires the entity-extraction companion PRs — not yet merged into OB1 `main`.** This recipe reads `public.entities`, `public.thought_entities`, and `public.edges`. Those tables are introduced by the in-flight entity-extraction schema + worker PRs (tracking: [#197](https://github.com/NateBJones-Projects/OB1/pull/197) schema, [#199](https://github.com/NateBJones-Projects/OB1/pull/199) worker). On the current `main` branch those tables do not exist and every query in `generate-wiki.mjs` will fail with `relation "public.entities" does not exist`. Do not try to install this recipe until both companion PRs are merged. See [Prerequisites](#prerequisites) for details.
 
 > Auto-generate per-entity markdown wiki pages by aggregating every thought linked to a person, project, topic, organization, tool, or place — then synthesizing a structured narrative with an LLM.
 
@@ -46,7 +46,7 @@ The script groups typed edges by relation, truncates thought content to 300 char
 ## Prerequisites
 
 > [!WARNING]
-> **Schema prereq not yet in OB1 `main`.** The `schemas/entity-extraction/` schema and the `integrations/entity-extraction-worker/` edge function referenced below are in-flight PRs, not merged code. Paths like `../../schemas/entity-extraction/` will 404 on GitHub today. This recipe will not run until both companion PRs land. Track: schema PR [#197](https://github.com/open-brain/ob1/pull/197), worker PR [#199](https://github.com/open-brain/ob1/pull/199).
+> **Schema prereq not yet in OB1 `main`.** The `schemas/entity-extraction/` schema and the `integrations/entity-extraction-worker/` edge function referenced below are in-flight PRs, not merged code. Paths like `../../schemas/entity-extraction/` will 404 on GitHub today. This recipe will not run until both companion PRs land. Track: schema PR [#197](https://github.com/NateBJones-Projects/OB1/pull/197), worker PR [#199](https://github.com/NateBJones-Projects/OB1/pull/199).
 
 - A working Open Brain setup ([guide](../../docs/01-getting-started.md)).
 - The `schemas/entity-extraction/` schema deployed, and the companion `integrations/entity-extraction-worker/` edge function processing the queue. This recipe reads `public.entities`, `public.edges`, and `public.thought_entities` — if those tables are empty, there is nothing to synthesize. Let the worker ingest your thoughts for at least one run before you try this.
