@@ -167,12 +167,20 @@ export async function handleCaptureSynthesis(req: Request): Promise<Response> {
     );
   }
 
+  // Build metadata in a specific order so the caller's `body.metadata` cannot
+  // stomp reserved provenance keys. Order:
+  //   1. autoMetadata (heuristic enrichment from extractMetadata)
+  //   2. caller-supplied body.metadata (may overlay topics/tags/notes etc.)
+  //   3. handler-controlled fields (question/topics/tags) — override caller
+  //   4. reserved provenance fields — LAST, so nothing can spoof them
   const mergedMetadata: Record<string, unknown> = {
     ...autoMetadata,
-    source: "rest_synthesis",
   };
-  if (typeof body.question === "string") {
-    mergedMetadata.question = body.question;
+  if (body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)) {
+    Object.assign(mergedMetadata, body.metadata);
+  }
+  if (typeof body.question === "string" && body.question.trim() !== "") {
+    mergedMetadata.question = body.question.trim();
   }
   if (Array.isArray(body.topics)) {
     mergedMetadata.topics = body.topics;
@@ -180,9 +188,15 @@ export async function handleCaptureSynthesis(req: Request): Promise<Response> {
   if (Array.isArray(body.tags)) {
     mergedMetadata.tags = body.tags;
   }
-  if (body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)) {
-    Object.assign(mergedMetadata, body.metadata);
-  }
+  // Reserved keys — stamped LAST so body.metadata cannot overwrite them.
+  // These identify the write channel and provenance layer for downstream
+  // filtering/reporting. A caller who sets source: "capture_thought" in
+  // body.metadata would otherwise impersonate an MCP-atomic write.
+  mergedMetadata.source = "rest_synthesis";
+  mergedMetadata.source_type = "synthesis";
+  mergedMetadata.derivation_layer = "derived";
+  mergedMetadata.derivation_method = "synthesis";
+  mergedMetadata.derived_from = sourceIds;
 
   const { data: upsertResult, error: upsertError } = await supabase.rpc(
     "upsert_thought",
