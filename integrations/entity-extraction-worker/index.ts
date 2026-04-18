@@ -40,6 +40,21 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 const WORKER_VERSION = "entity-extraction-worker-v1";
 const MAX_ATTEMPTS = 5;
 
+/**
+ * Cap on LLM extraction calls summed across the worker's global lifetime.
+ * 0 (or negative) disables the cap. Default: 10,000 — large enough to process
+ * a reasonable backfill, small enough to block a runaway cron burning spend.
+ * Counter is module-scoped: it resets on every cold start of the Edge Function
+ * (each container boot), which is intentional — we don't want to persist state
+ * across deploys but do want to stop a single hot container from running
+ * unbounded if someone accidentally points a busy cron at this worker.
+ */
+const ENTITY_EXTRACTION_MAX_CALLS = Math.max(
+  0,
+  Number.parseInt(Deno.env.get("ENTITY_EXTRACTION_MAX_CALLS") ?? "10000", 10) || 10000,
+);
+let llmCallCount = 0;
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // ── CORS ────────────────────────────────────────────────────────────────────
@@ -181,8 +196,26 @@ function parseExtractionResult(rawText: string): ExtractionResult {
   return { entities, relationships };
 }
 
+/**
+ * Thrown when ENTITY_EXTRACTION_MAX_CALLS is reached. The handler loop catches
+ * this, aborts cleanly, and returns a summary with truncated=true so the caller
+ * can observe the cap firing.
+ */
+class ExtractionCostCapError extends Error {
+  constructor(public readonly calls: number, public readonly cap: number) {
+    super(`Entity extraction call cap reached (${calls}/${cap})`);
+    this.name = "ExtractionCostCapError";
+  }
+}
+
 /** Try LLM providers in OB1 priority order: OpenRouter → OpenAI → Anthropic. */
 async function extractEntities(content: string): Promise<ExtractionResult> {
+  // Hard cap on LLM calls per container lifetime. 0 disables the cap.
+  if (ENTITY_EXTRACTION_MAX_CALLS > 0 && llmCallCount >= ENTITY_EXTRACTION_MAX_CALLS) {
+    throw new ExtractionCostCapError(llmCallCount, ENTITY_EXTRACTION_MAX_CALLS);
+  }
+  llmCallCount++;
+
   const prompt = ENTITY_EXTRACTION_PROMPT.replace("{content}", content.slice(0, 4000));
 
   // OpenRouter (primary)
@@ -473,11 +506,38 @@ Deno.serve(async (req) => {
     entities_created: 0,
     edges_created: 0,
     dry_run: dryRun,
+    truncated: false,
+    truncated_reason: null as string | null,
+    llm_calls: 0,
     details: [] as Record<string, unknown>[],
   };
 
   // Step 2: Process each queue item
   for (const item of claimed) {
+    // Cost cap: if we've exhausted ENTITY_EXTRACTION_MAX_CALLS, abort the loop
+    // cleanly. Un-claimed remaining items are returned to 'pending' so the next
+    // invocation can pick them up.
+    if (
+      ENTITY_EXTRACTION_MAX_CALLS > 0 &&
+      llmCallCount >= ENTITY_EXTRACTION_MAX_CALLS
+    ) {
+      summary.truncated = true;
+      summary.truncated_reason = "call_cap_reached";
+      if (!dryRun) {
+        const remainingIds = claimed
+          .slice(claimed.indexOf(item))
+          .map((r) => r.thought_id);
+        if (remainingIds.length > 0) {
+          await supabase
+            .from("entity_extraction_queue")
+            .update({ status: "pending", started_at: null, worker_version: null })
+            .in("thought_id", remainingIds)
+            .eq("status", "processing");
+        }
+      }
+      break;
+    }
+
     summary.processed++;
 
     // Fetch thought content
@@ -520,6 +580,26 @@ Deno.serve(async (req) => {
     try {
       result = await extractEntities(thought.content);
     } catch (err) {
+      // Cost cap tripped mid-call: don't mark the item failed, return it to
+      // pending (via the same remaining-rows cleanup the pre-loop gate uses)
+      // so the next invocation picks it up.
+      if (err instanceof ExtractionCostCapError) {
+        summary.truncated = true;
+        summary.truncated_reason = "call_cap_reached";
+        if (!dryRun) {
+          const remainingIds = claimed
+            .slice(claimed.indexOf(item))
+            .map((r) => r.thought_id);
+          if (remainingIds.length > 0) {
+            await supabase
+              .from("entity_extraction_queue")
+              .update({ status: "pending", started_at: null, worker_version: null })
+              .in("thought_id", remainingIds)
+              .eq("status", "processing");
+          }
+        }
+        break;
+      }
       const errMsg = err instanceof Error ? err.message : String(err);
       console.error(`Extraction failed for thought ${item.thought_id}:`, errMsg);
       if (!dryRun) await markError(item.thought_id, errMsg, attemptCount);
@@ -568,5 +648,6 @@ Deno.serve(async (req) => {
     summary.succeeded++;
   }
 
+  summary.llm_calls = llmCallCount;
   return json(summary);
 });
