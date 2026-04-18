@@ -32,6 +32,38 @@ import {
   type StructuredCapture,
 } from "./config.ts";
 
+// ── Fetch with timeout ─────────────────────────────────────────────────────
+
+/**
+ * Wrap fetch() with an AbortController-backed timeout.
+ *
+ * Defaults to FETCH_TIMEOUT_MS env (60000). Pass a specific timeoutMs for
+ * tighter budgets (e.g., 10s fire-and-forget, 30s embedding/DB calls).
+ *
+ * On timeout, throws an Error with "fetch timeout after {ms}ms" — callers
+ * that use isTransientError() will recognize this as retryable.
+ */
+export async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs?: number,
+): Promise<Response> {
+  const defaultMs = Number(Deno.env.get("FETCH_TIMEOUT_MS") ?? 60_000);
+  const ms = timeoutMs ?? defaultMs;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } catch (err) {
+    if (err instanceof Error && (err.name === "AbortError" || /aborted/i.test(err.message))) {
+      throw new Error(`fetch timeout after ${ms}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Type coercion helpers ──────────────────────────────────────────────────
 
 export function asString(value: unknown, fallback: string): string {
@@ -102,7 +134,7 @@ export async function embedText(text: string): Promise<number[]> {
 
   // Primary: OpenRouter
   if (openRouterKey) {
-    const response = await fetch("https://openrouter.ai/api/v1/embeddings", {
+    const response = await fetchWithTimeout("https://openrouter.ai/api/v1/embeddings", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${openRouterKey}`,
@@ -125,7 +157,7 @@ export async function embedText(text: string): Promise<number[]> {
 
   // Fallback: OpenAI direct
   if (openAiKey) {
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
+    const response = await fetchWithTimeout("https://api.openai.com/v1/embeddings", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${openAiKey}`,
@@ -168,7 +200,7 @@ async function fetchOpenRouterMetadata(text: string): Promise<string> {
   if (!apiKey) throw new Error("OPENROUTER_API_KEY is not configured");
 
   const model = Deno.env.get("OPENROUTER_CLASSIFIER_MODEL") ?? CLASSIFIER_MODEL_OPENROUTER;
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const response = await fetchWithTimeout("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
@@ -197,7 +229,7 @@ async function fetchOpenAIMetadata(text: string): Promise<string> {
   if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
 
   const model = Deno.env.get("OPENAI_CLASSIFIER_MODEL") ?? CLASSIFIER_MODEL_OPENAI;
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+  const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
@@ -227,7 +259,7 @@ async function fetchAnthropicMetadata(text: string): Promise<string> {
   if (!apiKey) throw new Error("ANTHROPIC_API_KEY is not configured");
 
   const model = Deno.env.get("ANTHROPIC_CLASSIFIER_MODEL") ?? CLASSIFIER_MODEL_ANTHROPIC;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
@@ -290,13 +322,33 @@ function stripCodeFences(text: string): string {
   return match ? match[1].trim() : trimmed;
 }
 
-/** True for errors worth retrying: network failures, 429, and 5xx statuses. */
+/**
+ * True for errors worth retrying: network failures, timeouts, 429, and 5xx.
+ *
+ * 401 (Unauthorized) and 402 (Payment Required) are NOT transient — those are
+ * hard auth/quota failures that should fail-fast rather than cascade through
+ * the fallback provider chain (which would double-bill the user).
+ */
 function isTransientError(err: unknown): boolean {
   if (!(err instanceof Error)) return false;
   const msg = err.message;
-  if (/fetch failed|network|ECONNRESET|ETIMEDOUT|UND_ERR/i.test(msg)) return true;
-  if (/\b(429|500|502|503|529)\b/.test(msg)) return true;
+  if (/fetch timeout|fetch failed|network|ECONNRESET|ETIMEDOUT|UND_ERR|aborted/i.test(msg)) return true;
+  if (/\b(429|500|502|503|504|529)\b/.test(msg)) return true;
   return false;
+}
+
+/**
+ * True for errors that are hard failures (bad auth, no quota, bad request).
+ *
+ * When we see one of these on the primary provider we should NOT fall through
+ * to secondary/tertiary providers — those will just double-charge the user on
+ * what is clearly a configuration or account-state problem.
+ */
+function isFatalProviderError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message;
+  // 401/403 = auth, 402 = payment required, 400 = malformed request
+  return /\b(400|401|402|403)\b/.test(msg);
 }
 
 /**
