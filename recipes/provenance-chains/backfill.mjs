@@ -436,8 +436,11 @@ async function main() {
     const suffix = summary.parseErrors > summary.parseErrorIds.length
       ? ` (showing first ${summary.parseErrorIds.length})`
       : "";
+    // In --dry-run, no writes happened, so "was flipped" misleads. Prepend a
+    // dry-run qualifier so the message reads as a projection, not a fact.
+    const prefix = args.dryRun ? "DRY-RUN — would have: " : "";
     console.warn(
-      `[backfill] WARN — ${summary.parseErrors} row(s) had parse errors` +
+      `[backfill] WARN — ${prefix}${summary.parseErrors} row(s) had parse errors` +
       `${suffix}: ${sample}. derivation_layer was still flipped to ` +
       `'derived' with backfill_reason set, but provenance was NOT ` +
       `captured. Fix the artifact (or INT_REF_RE policy) and re-run ` +
