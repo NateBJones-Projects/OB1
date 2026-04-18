@@ -3,6 +3,15 @@ node_modules/
 .planning/
 supabase/
 
+# Maintainer-local overlays (not part of upstream contribution contract)
+.local/
+.agent/
+.claude.json
+
+# Python caches
+__pycache__/
+*.pyc
+
 # Credentials & runtime state
 .env
 .env.local
