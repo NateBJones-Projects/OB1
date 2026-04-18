@@ -94,7 +94,7 @@ The dashboard calls these endpoints on your Open Brain REST gateway (all authent
 - **Remove Audit** — delete `app/audit/`, `app/api/audit/`, and the `AuditIcon` nav entry in `components/Sidebar.tsx`.
 - **Remove Duplicates** — delete `app/duplicates/`, `app/api/duplicates/`, and the `DuplicatesIcon` nav entry in `components/Sidebar.tsx`.
 - **Remove Ingest** — delete `app/ingest/`, `app/api/ingest/`, and the `AddIcon` nav entry. The `AddToBrain` component will no longer be reachable; remove its usage from `app/page.tsx` (the Dashboard).
-- **Rebrand** — the wordmark lives in `app/layout.tsx` (`metadata`), `components/Sidebar.tsx` (header), `app/login/page.tsx` (hero), and a few in-page strings (`app/page.tsx`, `app/ingest/page.tsx`). The session cookie name is `open_brain_session` (see `lib/auth.ts` and `proxy.ts`).
+- **Rebrand** — the wordmark lives in `app/layout.tsx` (`metadata`), `components/Sidebar.tsx` (header), `app/login/page.tsx` (hero), and a few in-page strings (`app/page.tsx`, `app/ingest/page.tsx`). The session cookie name is `open_brain_session` (see `lib/auth.ts` and `middleware.ts`).
 - **Change the color palette** — edit `app/globals.css`. The CSS variables under `@theme inline` drive every surface color.
 - **Add a new page** — drop a `page.tsx` under `app/` following the existing patterns. For protected pages, call `await requireSessionOrRedirect()` at the top and do REST work from the server.
 
