@@ -73,10 +73,62 @@ const PRICING = {
   "claude-opus-4-6": { in: 15.0, out: 75.0 },
 };
 
+// Tracks which unknown models we've already warned about so the log
+// isn't spammed on every call. The actual "refuse to run" gate for
+// unknown pricing + --max-cost-usd is in assertPricingKnown at startup;
+// this is just a belt-and-braces WARN for any path that sneaks a new
+// model in after startup.
+const _warnedUnknownPricing = new Set();
+
 function estimateCost(model, inTokens, outTokens) {
   const p = PRICING[model];
-  if (!p) return 0; // unknown model — don't block, but don't count
+  if (!p) {
+    if (!_warnedUnknownPricing.has(model)) {
+      _warnedUnknownPricing.add(model);
+      console.warn(
+        `[classify-edges] WARNING: no pricing info for model "${model}" in PRICING map. ` +
+          `Cost estimates for this model are DISABLED (returning $0); --max-cost-usd ` +
+          `cannot be enforced against it. Add it to PRICING in classify-edges.mjs or ` +
+          `re-run with --no-cost-cap to acknowledge.`,
+      );
+    }
+    return 0;
+  }
   return (inTokens * p.in + outTokens * p.out) / 1_000_000;
+}
+
+/**
+ * Gate: refuse to run with --max-cost-usd if any model we will actually
+ * call has no pricing entry, unless the operator passes --no-cost-cap
+ * to acknowledge.
+ *
+ * The cost cap is a HARD promise to the user. If we can't price the
+ * expensive leg (usually Opus classify), the cap silently degrades to
+ * no cap at all — which is exactly the pricing-drift failure mode that
+ * WARN-1 in REVIEW.md calls out. Better to fail loudly at startup than
+ * to under-report spend.
+ */
+function assertPricingKnown(args) {
+  const used = new Set();
+  if (args.hybrid) used.add(args.filterModel);
+  used.add(args.singleModel || args.classifyModel);
+
+  const unknown = [...used].filter((m) => !PRICING[m]);
+  if (unknown.length === 0) return;
+
+  if (args.noCostCap) {
+    console.warn(
+      `[classify-edges] --no-cost-cap acknowledged. Running with no cost cap on ` +
+        `unknown-pricing model(s): ${unknown.join(", ")}. --max-cost-usd will NOT be enforced.`,
+    );
+    return;
+  }
+
+  throw new Error(
+    `Refusing to run: no pricing info for model(s) ${unknown.join(", ")} and ` +
+      `--max-cost-usd is set. Either add the model to PRICING in classify-edges.mjs ` +
+      `or pass --no-cost-cap to acknowledge that the cap cannot be enforced.`,
+  );
 }
 
 // Worst-case per-pair cost for hard-cap arithmetic in processInChunks.
@@ -103,6 +155,7 @@ function parseArgs(argv) {
     singleModel: null, // if set, skip hybrid and use this model end-to-end
     hybrid: true,
     maxCostUsd: 5.0,
+    noCostCap: false,
     mirrorSupersedes: false,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -121,6 +174,7 @@ function parseArgs(argv) {
     else if (a === "--classify-model") args.classifyModel = argv[++i];
     else if (a === "--no-hybrid") args.hybrid = false;
     else if (a === "--max-cost-usd") args.maxCostUsd = Number(argv[++i]) || 5.0;
+    else if (a === "--no-cost-cap") args.noCostCap = true;
     else if (a === "--mirror-supersedes") args.mirrorSupersedes = true;
     else if (a === "--help" || a === "-h") {
       printHelp();
@@ -150,6 +204,8 @@ function printHelp() {
       "",
       "Cost / safety:",
       "  --max-cost-usd N         Hard cap on estimated spend (default 5.00)",
+      "  --no-cost-cap            Acknowledge that --max-cost-usd cannot be enforced",
+      "                           when pricing is unknown for the selected model(s).",
       "  --dry-run                Classify but do not INSERT",
       "  --min-confidence N       Skip inserts below this confidence (default 0.75)",
       "  --parallelism N          Concurrent API calls (default 3)",
@@ -778,6 +834,13 @@ async function processInChunks(items, fn, parallelism, costState, maxCostUsd, wo
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+
+  // Preflight: if any model we're about to call has no pricing entry,
+  // refuse to run with --max-cost-usd unless --no-cost-cap is set. See
+  // WARN-1 in REVIEW.md. This catches the "unknown model silently runs
+  // uncapped" failure mode before any LLM spend.
+  assertPricingKnown(args);
+
   const env = loadEnv();
   const sb = sbClient(env);
 

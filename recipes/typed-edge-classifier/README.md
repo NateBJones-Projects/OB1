@@ -84,12 +84,33 @@ You can disable the hybrid and run a single model end-to-end with `--model <mode
 
 ## Cost bound
 
+> **Pricing disclaimer.** The `--max-cost-usd` cap uses a hand-maintained `PRICING` map in `classify-edges.mjs` that is updated manually. Check [Anthropic's pricing page](https://www.anthropic.com/pricing) before large runs. If you run with a model that is NOT in the PRICING map, the classifier will **refuse to run** when `--max-cost-usd` is set, and will log `WARNING: no pricing info for model "X"` otherwise. Pass `--no-cost-cap` to explicitly acknowledge an uncapped run; see "Pricing-unknown guard" below.
+
 | Stage | Rough tokens / pair | Model | Approx cost / pair |
 |---|---|---|---|
 | Haiku filter | 300 in / 100 out | `claude-haiku-4-5-20251001` | $0.0005 |
 | Opus classify | 800 in / 200 out | `claude-opus-4-7` | $0.018 |
 
 Typical filter pass rate: 20-40%. On 500 candidate pairs with a 30% pass rate, expect roughly `500 * $0.0005 + 150 * $0.018 = $2.95`.
+
+### Pricing-unknown guard
+
+The classifier refuses to start when all of these are true:
+
+1. `--max-cost-usd` is set (which is the default at $5.00).
+2. At least one of the models actually going to be called (filter model, classify model, or `--model`) is not present in the `PRICING` map in `classify-edges.mjs`.
+
+Error looks like:
+
+```
+Refusing to run: no pricing info for model(s) claude-some-new-model and --max-cost-usd is set.
+Either add the model to PRICING in classify-edges.mjs or pass --no-cost-cap to acknowledge
+that the cap cannot be enforced.
+```
+
+**Remediation (preferred):** add the model to the `PRICING` constant at the top of `classify-edges.mjs`, using the current Anthropic token rates.
+
+**Escape hatch:** pass `--no-cost-cap` to acknowledge that you know the cap won't be enforced for this run.
 
 The `--max-cost-usd` flag is a **hard cap** on estimated spend. The classifier tracks estimated token cost after every call and stops scheduling new pairs the moment the cap is reached. Always pass a cap on first runs.
 
@@ -119,6 +140,8 @@ After a full non-dry run:
 --classify-model MODEL   Opus model for final classification
 --no-hybrid              Skip Haiku filter entirely
 --max-cost-usd N         Hard cap on estimated spend (default 5.00)
+--no-cost-cap            Acknowledge that the cap cannot be enforced when
+                         pricing is unknown for the selected model(s)
 --dry-run                Classify but do not INSERT
 --min-confidence N       Skip inserts below this confidence (default 0.75)
 --parallelism N          Concurrent API calls (default 3)
