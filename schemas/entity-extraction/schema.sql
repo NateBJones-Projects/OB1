@@ -1,8 +1,32 @@
--- Knowledge Graph Tables and Extraction Trigger
+-- Entity Extraction Tables and Extraction Trigger
 -- Adds entities, edges, thought_entities, entity_extraction_queue,
 -- and consolidation_log tables for automatic entity and relationship
 -- extraction from thoughts.
 -- Safe to run multiple times (fully idempotent).
+
+-- ============================================================
+-- 0. PREREQUISITE CHECK
+--    The auto-queue trigger and the optional backfill both read
+--    thoughts.content_fingerprint (added in Step 2.6 of
+--    docs/01-getting-started.md). Without it, the migration would
+--    install silently and then crash the first INSERT INTO
+--    thoughts. Hard-fail here with a clear message instead.
+-- ============================================================
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name   = 'thoughts'
+      AND column_name  = 'content_fingerprint'
+  ) THEN
+    RAISE EXCEPTION
+      'entity-extraction requires the content_fingerprint column on public.thoughts. '
+      'Run docs/01-getting-started.md Step 2.6 first, then re-apply this schema.';
+  END IF;
+END $$;
 
 -- ============================================================
 -- 1. ENTITIES
