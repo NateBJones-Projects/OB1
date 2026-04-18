@@ -80,7 +80,7 @@ OPTIONAL (TIER 3 ONLY)
 4. Verify the script runs:
 
    ```bash
-   node lint-sweep.mjs --tier=1
+   node lint-sweep.js --tier=1
    ```
 
    You should see progress output and a `lint-report-YYYY-MM-DD.md` file in your working directory.
@@ -90,21 +90,21 @@ OPTIONAL (TIER 3 ONLY)
 Run every tier against the defaults:
 
 ```bash
-node lint-sweep.mjs
+node lint-sweep.js
 ```
 
 Pick a single tier:
 
 ```bash
-node lint-sweep.mjs --tier=1                            # SQL-only, free
-node lint-sweep.mjs --tier=2                            # graph-based, free
-node lint-sweep.mjs --tier=3 --max-llm-calls=5          # LLM, capped
+node lint-sweep.js --tier=1                            # SQL-only, free
+node lint-sweep.js --tier=2                            # graph-based, free
+node lint-sweep.js --tier=3 --max-llm-calls=5          # LLM, capped
 ```
 
 Custom output path and sample size:
 
 ```bash
-node lint-sweep.mjs \
+node lint-sweep.js \
   --tier=all \
   --sample-size=200 \
   --max-llm-calls=10 \
@@ -185,7 +185,7 @@ finished_at: 2026-04-17T14:22:11.031Z
 
 ---
 
-**Safety:** `lint-sweep.mjs` is read-only. Every finding above is a suggestion
+**Safety:** `lint-sweep.js` is read-only. Every finding above is a suggestion
 for a human to review. Before acting on any item, verify the thought with
 `get_thought` or the web UI. Never delete or edit a thought based solely on
 this report.
@@ -232,7 +232,7 @@ Run the sweep weekly with cron (Linux/macOS):
 
 ```cron
 # Every Sunday at 02:00 local — writes ~/lint-reports/lint-report-YYYY-MM-DD.md
-0 2 * * 0  cd /home/you/lint-sweep && /usr/bin/node lint-sweep.mjs \
+0 2 * * 0  cd /home/you/lint-sweep && /usr/bin/node lint-sweep.js \
   --tier=all --max-llm-calls=5 \
   --report=/home/you/lint-reports/lint-report-$(date +\%F).md \
   >> /home/you/lint-reports/lint-sweep.log 2>&1
@@ -245,7 +245,7 @@ After each run, open the latest `lint-report-YYYY-MM-DD.md`, triage the findings
 ## Troubleshooting
 
 **Issue: `ERROR: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set`**
-Solution: Create `.env.local` in the same directory as `lint-sweep.mjs` with both variables, or export them in your shell. Fall-through order is `process.env` → `.env.local` → `.env`. The legacy `OPEN_BRAIN_URL` / `OPEN_BRAIN_SERVICE_KEY` names are still accepted (with a one-line deprecation warning).
+Solution: Create `.env.local` in the same directory as `lint-sweep.js` with both variables, or export them in your shell. Fall-through order is `process.env` → `.env.local` → `.env`. The legacy `OPEN_BRAIN_URL` / `OPEN_BRAIN_SERVICE_KEY` names are still accepted (with a one-line deprecation warning).
 
 **Issue: Tier 1 shows `content_fingerprint column missing — see recipes/content-fingerprint-dedup`**
 Solution: Your brain predates the [content-fingerprint-dedup](../content-fingerprint-dedup/) primitive. Apply that recipe (and the [fingerprint-dedup-backfill](../fingerprint-dedup-backfill/) recipe) to get duplicate detection.

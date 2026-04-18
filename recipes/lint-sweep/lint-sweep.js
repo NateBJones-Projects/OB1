@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 /**
- * lint-sweep.mjs — Bounded weekly brain-quality audit for Open Brain.
+ * lint-sweep.js — Bounded weekly brain-quality audit for Open Brain.
+ *
+ * ESM module; see the sibling package.json for `"type": "module"`. We use a
+ * `.js` extension (rather than `.mjs`) to match the OB1 Rule 6 artifact
+ * whitelist in `.github/workflows/ob1-gate.yml`, which only admits
+ * `.sql|.ts|.js|.py`.
  *
  * Inspired by Karpathy's "lint" concept and the CRATE CLI. Scans the
  * `public.thoughts` table for quality issues across three cost tiers:
@@ -19,12 +24,12 @@
  *   gates any destructive action — this script only reports.
  *
  * Usage:
- *   node lint-sweep.mjs                              # all three tiers, default caps
- *   node lint-sweep.mjs --tier=1                     # SQL-only sweep
- *   node lint-sweep.mjs --tier=2                     # graph-based sweep
- *   node lint-sweep.mjs --tier=3 --max-llm-calls=10  # LLM contradiction sampling
- *   node lint-sweep.mjs --tier=all --sample-size=200
- *   node lint-sweep.mjs --report=./out/weekly.md
+ *   node lint-sweep.js                              # all three tiers, default caps
+ *   node lint-sweep.js --tier=1                     # SQL-only sweep
+ *   node lint-sweep.js --tier=2                     # graph-based sweep
+ *   node lint-sweep.js --tier=3 --max-llm-calls=10  # LLM contradiction sampling
+ *   node lint-sweep.js --tier=all --sample-size=200
+ *   node lint-sweep.js --report=./out/weekly.md
  *
  * Environment (loaded from .env or .env.local in the script directory or
  * from process.env):
@@ -153,9 +158,9 @@ function parseArgs(argv) {
 }
 
 const HELP = `
-lint-sweep.mjs — bounded brain-quality audit for Open Brain
+lint-sweep.js — bounded brain-quality audit for Open Brain
 
-Usage: node lint-sweep.mjs [options]
+Usage: node lint-sweep.js [options]
 
 Options:
   --tier=<1|2|3|all>      Which tier(s) to run (default: all)
@@ -675,7 +680,7 @@ function renderReport({ args, tier1, tier2, tier3, startedAt, finishedAt }) {
 
   lines.push("---");
   lines.push("");
-  lines.push("**Safety:** `lint-sweep.mjs` is read-only. Every finding above is a suggestion for a human to review. ");
+  lines.push("**Safety:** `lint-sweep.js` is read-only. Every finding above is a suggestion for a human to review. ");
   lines.push("Before acting on any item, verify the thought with `get_thought` or the web UI. ");
   lines.push("Never delete or edit a thought based solely on this report.");
   return lines.join("\n");
