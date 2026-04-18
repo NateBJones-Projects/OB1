@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteThought, fetchThought, ApiError } from "@/lib/api";
-import { requireSession, AuthError } from "@/lib/auth";
+import { requireSession, AuthError, getSession } from "@/lib/auth";
 
 // BL-03: Cap bulk-delete to prevent accidental or malicious wipes
 const MAX_DELETE_IDS = 50;
@@ -17,6 +17,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     throw err;
   }
+
+  // REVIEW-CODEX-2-P1: honor the session's restricted lock state — never
+  // hard-code `excludeRestricted=false`, or a locked session can bulk-delete
+  // restricted thoughts just by knowing their IDs.
+  const session = await getSession();
+  const excludeRestricted = !session.restrictedUnlocked;
 
   try {
     const { ids } = (await request.json()) as { ids: unknown };
@@ -44,8 +50,11 @@ export async function POST(request: NextRequest) {
 
     // BL-03: Re-verify each thought actually has quality_score < 30 before deleting
     // Prevents a user from passing arbitrary IDs (e.g. importance-6 thoughts) to this route.
+    // REVIEW-CODEX-2-P1: excludeRestricted is derived from session — a locked
+    // session will see 403/404 on restricted thoughts here, which correctly
+    // drops them out of the delete set via the rejected branch below.
     const verifyResults = await Promise.allSettled(
-      sanitized.map((id) => fetchThought(apiKey, id, /* excludeRestricted */ false))
+      sanitized.map((id) => fetchThought(apiKey, id, excludeRestricted))
     );
 
     const verifiedIds: number[] = [];
