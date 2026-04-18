@@ -177,10 +177,17 @@ async function main() {
   console.log(`[backfill] dry-run=${args.dryRun} force=${args.force} patterns=${args.patterns.join("|")} root=${args.root}`);
 
   // Fetch pointer candidates — any source_type ending in one of our patterns.
-  // Use PostgREST 'or=' with 'like' filters to avoid N round-trips.
-  const orClauses = args.patterns.map((p) => `source_type.like.*${p}`).join(",");
+  // Canonical public.thoughts keeps source_type inside metadata, not as a
+  // top-level column, so we filter and select via metadata->>'source_type'.
+  // PostgREST supports the JSON arrow in both select (returned as
+  // `source_type`) and or=() predicates.
+  const orClauses = args.patterns
+    .map((p) => `metadata->>source_type.like.*${p}`)
+    .join(",");
   const limitClause = args.limit ? `&limit=${args.limit}` : "";
-  const query = `thoughts?select=id,source_type,metadata,derivation_layer&or=(${orClauses})&order=created_at.asc${limitClause}`;
+  const query =
+    `thoughts?select=id,source_type:metadata->>source_type,metadata,derivation_layer` +
+    `&or=(${orClauses})&order=created_at.asc${limitClause}`;
   const rows = await sbGet(query);
   console.log(`[backfill] found ${rows.length} candidate thoughts`);
 

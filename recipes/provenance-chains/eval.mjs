@@ -154,7 +154,11 @@ async function sbPatch(queryPath, body) {
 // ── Candidate + parent fetchers ────────────────────────────────────────────
 
 async function fetchCandidates(args) {
-  const select = "select=id,source_type,type,content,metadata,derived_from,derivation_layer";
+  // Canonical public.thoughts stores source_type and type inside metadata, not
+  // as top-level columns. Alias them back via PostgREST's "alias:path" select
+  // so downstream code can keep using child.source_type / child.type without
+  // reaching into metadata at every callsite.
+  const select = "select=id,source_type:metadata->>source_type,type:metadata->>type,content,metadata,derived_from,derivation_layer";
   let query = `thoughts?${select}&order=created_at.desc`;
   if (args.ids) {
     // PostgREST in.(…) with UUIDs needs no quoting per element.
@@ -175,8 +179,10 @@ async function fetchCandidates(args) {
 async function fetchParents(parentIds) {
   if (!parentIds || parentIds.length === 0) return [];
   const sliced = parentIds.slice(0, 40);
-  // PostgREST handles UUID and int ids the same way in in.() lists.
-  const query = `thoughts?select=id,source_type,type,content,created_at&id=in.(${sliced.join(",")})`;
+  // PostgREST handles UUID and int ids the same way in in.() lists. Alias
+  // metadata-stored source_type / type back to flat fields for the prompt
+  // formatter which reads p.source_type / p.type directly.
+  const query = `thoughts?select=id,source_type:metadata->>source_type,type:metadata->>type,content,created_at&id=in.(${sliced.join(",")})`;
   return sbGet(query);
 }
 
