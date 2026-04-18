@@ -10,6 +10,7 @@
   "requires": {
     "open_brain": true
   },
+  "requires_primitives": ["rls"],
   "tags": ["schema", "entity-extraction", "entities", "relationships", "knowledge-graph"],
   "difficulty": "intermediate",
   "estimated_time": "15 minutes",
