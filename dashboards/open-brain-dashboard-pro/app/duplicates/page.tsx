@@ -261,9 +261,15 @@ export default function DuplicatesPage() {
 
       {error && <p className="text-danger text-sm">{error}</p>}
 
-      {pairs.length === 0 && !loading && (
+      {pairs.length === 0 && !loading && offset === 0 && (
         <div className="text-text-muted text-sm py-12 text-center">
           No near-duplicates found at this threshold.
+        </div>
+      )}
+
+      {pairs.length === 0 && !loading && offset > 0 && (
+        <div className="text-text-muted text-sm py-12 text-center">
+          No duplicates on this page. Go back to see earlier results.
         </div>
       )}
 
@@ -441,10 +447,15 @@ export default function DuplicatesPage() {
       </div>
 
       {/* Pagination */}
-      {pairs.length > 0 && (
+      {/* REVIEW-CODEX-6 P1: also render when past page 1 with 0 results, so
+          Previous stays available when the duplicate count is an exact
+          multiple of PER_PAGE and the next fetch returned 0 pairs. */}
+      {(offset > 0 || pairs.length > 0) && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-text-muted">
-            Showing {offset + 1}–{offset + pairs.length}
+            {pairs.length > 0
+              ? `Showing ${offset + 1}–${offset + pairs.length}`
+              : `No results on this page`}
           </p>
           <div className="flex gap-2">
             <button
