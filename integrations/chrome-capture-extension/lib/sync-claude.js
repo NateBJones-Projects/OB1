@@ -213,12 +213,20 @@
 
       try {
         const result = await processOneConversation(orgId, conv, captureHandler);
-        if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' || result.status === 'too_short' || result.status === 'restricted_blocked' || result.status === 'existing')) {
+        // CRITICAL: only persist the timestamp cursor when the ingest truly
+        // succeeded. A {ok:false, status:'queued_retry'} means the payload
+        // went to the retry queue — if we saved the timestamp here, a later
+        // incremental sync would skip this conversation even if the retry
+        // eventually dead-lettered. See REVIEW-CODEX P1 #1.
+        if (result && result.ok === false) {
+          errors++;
+        } else if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' || result.status === 'too_short' || result.status === 'restricted_blocked' || result.status === 'existing')) {
           skipped++;
+          timestamps[conv.uuid] = conv.updated_at;
         } else {
           synced++;
+          timestamps[conv.uuid] = conv.updated_at;
         }
-        timestamps[conv.uuid] = conv.updated_at;
       } catch (err) {
         console.error(`[Open Brain Capture] Failed to sync conversation "${conv.name}":`, err);
         errors++;
@@ -274,12 +282,18 @@
 
       try {
         const result = await processOneConversation(orgId, conv, captureHandler);
-        if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' || result.status === 'too_short' || result.status === 'restricted_blocked' || result.status === 'existing')) {
+        // See note above in syncAll: do NOT persist updatedTimestamps when
+        // the ingest failed. Otherwise a subsequent incremental run will
+        // skip this conversation even though Open Brain never received it.
+        if (result && result.ok === false) {
+          errors++;
+        } else if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' || result.status === 'too_short' || result.status === 'restricted_blocked' || result.status === 'existing')) {
           skipped++;
+          updatedTimestamps[conv.uuid] = conv.updated_at;
         } else {
           synced++;
+          updatedTimestamps[conv.uuid] = conv.updated_at;
         }
-        updatedTimestamps[conv.uuid] = conv.updated_at;
       } catch (err) {
         console.error(`[Open Brain Capture] Failed to sync conversation "${conv.name}":`, err);
         errors++;

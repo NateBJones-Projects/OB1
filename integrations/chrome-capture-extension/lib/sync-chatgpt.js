@@ -261,13 +261,18 @@
 
       try {
         const result = await processOneConversation(accessToken, conv, captureHandler);
-        if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' ||
+        // See REVIEW-CODEX P1 #1: failed ingests must NOT persist the
+        // timestamp cursor, otherwise incremental sync skips them forever.
+        if (result && result.ok === false) {
+          errors++;
+        } else if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' ||
             result.status === 'too_short' || result.status === 'restricted_blocked' || result.status === 'existing')) {
           skipped++;
+          timestamps[conv.id] = String(conv.update_time);
         } else {
           synced++;
+          timestamps[conv.id] = String(conv.update_time);
         }
-        timestamps[conv.id] = String(conv.update_time);
       } catch (err) {
         console.error(`[Open Brain Capture] Failed to sync ChatGPT conversation "${conv.title}":`, err);
         errors++;
@@ -314,13 +319,18 @@
 
       try {
         const result = await processOneConversation(accessToken, conv, captureHandler);
-        if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' ||
+        // See REVIEW-CODEX P1 #1: failed ingests must NOT persist the
+        // timestamp cursor, otherwise incremental sync skips them forever.
+        if (result && result.ok === false) {
+          errors++;
+        } else if (result && (result.status === 'skipped' || result.status === 'duplicate_fingerprint' ||
             result.status === 'too_short' || result.status === 'restricted_blocked' || result.status === 'existing')) {
           skipped++;
+          updatedTimestamps[conv.id] = String(conv.update_time);
         } else {
           synced++;
+          updatedTimestamps[conv.id] = String(conv.update_time);
         }
-        updatedTimestamps[conv.id] = String(conv.update_time);
       } catch (err) {
         console.error(`[Open Brain Capture] Failed to sync ChatGPT conversation "${conv.title}":`, err);
         errors++;
