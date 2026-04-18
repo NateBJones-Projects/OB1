@@ -713,6 +713,29 @@ Deno.serve(async (req) => {
       continue;
     }
 
+    // Idempotency on re-extraction: the knowledge-graph schema's
+    // queue_entity_extraction trigger re-queues a thought when its content
+    // changes. Without cleanup, old thought_entities links from the prior
+    // extraction survive alongside the new ones — e.g. a thought edited from
+    // "Alice, Bob, PostgreSQL" to "Alice, Redis" would end up linked to all
+    // four entities instead of just the two it now mentions. Delete our own
+    // prior links before re-writing (scoped by source='entity_worker' so we
+    // don't clobber links written by other sources).
+    const { error: deleteStaleError } = await supabase
+      .from("thought_entities")
+      .delete()
+      .eq("thought_id", item.thought_id)
+      .eq("source", "entity_worker");
+
+    if (deleteStaleError) {
+      console.error(
+        `Failed to clear stale thought_entities for ${item.thought_id}:`,
+        deleteStaleError,
+      );
+      // Non-fatal: still attempt the upserts below. Drift is better than a
+      // missed extraction.
+    }
+
     // Upsert entities and create thought_entities links
     for (const entity of result.entities) {
       const entityId = await upsertEntity(entity.name, entity.type);
