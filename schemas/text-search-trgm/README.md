@@ -25,6 +25,8 @@ Installs the `pg_trgm` extension and creates a trigram GIN index on `public.thou
 - [`schemas/enhanced-thoughts`](https://github.com/NateBJones-Projects/OB1/pull/191) installed (defines `search_thoughts_text` and the base tsvector index)
 - Supabase project with write access to run migrations
 
+This migration installs without error on stock OB1 (without PR #191), but provides no measurable benefit unless `search_thoughts_text` is installed. Install PR #191 first for the full effect.
+
 ## Credential Tracker
 
 Copy this block into a text editor and fill it in as you go.
@@ -45,8 +47,9 @@ SUPABASE (from your Open Brain setup)
 1. Open your Supabase dashboard and navigate to the **SQL Editor**
 2. Create a new query and paste the full contents of `schema.sql`
 3. Click **Run** to execute the migration (the `CREATE INDEX` will briefly lock the `thoughts` table against writes; ~1-2 minutes at 90K rows)
-4. Navigate to **Database > Extensions** and confirm `pg_trgm` is enabled
-5. Navigate to **Database > Indexes** (or run the verification query below) and confirm `idx_thoughts_content_trgm` exists on `public.thoughts`
+4. In a new query, run `ANALYZE public.thoughts;` to refresh planner statistics so the new index is picked up immediately. `ANALYZE` cannot run inside the migration's transaction, so it must be a separate command.
+5. Navigate to **Database > Extensions** and confirm `pg_trgm` is enabled
+6. Navigate to **Database > Indexes** (or run the verification query below) and confirm `idx_thoughts_content_trgm` exists on `public.thoughts`
 
 ## Expected Outcome
 
@@ -54,7 +57,7 @@ After running the migration:
 
 - The `pg_trgm` extension is installed in the database.
 - A GIN trigram index named `idx_thoughts_content_trgm` exists on `public.thoughts(content)`.
-- The next `search_thoughts_text` call whose ILIKE fallback fires will complete in ~100-150ms instead of ~8s.
+- With `ANALYZE public.thoughts;` run (Step 4), the next `search_thoughts_text` call whose ILIKE fallback fires completes in ~100-150ms instead of ~8s.
 
 ## Verification
 
@@ -101,7 +104,7 @@ The `pg_trgm` extension is left installed; it is harmless on its own and may be 
 Solution: Your Supabase project predates automatic extension availability. In the SQL Editor, run `CREATE EXTENSION pg_trgm;` as a superuser or contact Supabase support. The migration uses `CREATE EXTENSION IF NOT EXISTS`, which works on all current Supabase projects.
 
 **Issue: `EXPLAIN ANALYZE` still shows `Seq Scan on thoughts`**
-Solution: Run `ANALYZE public.thoughts;` to refresh planner statistics, then retry. The planner needs accurate row counts before it will choose an index scan over a seq scan on small tables.
+Solution: If you somehow skipped Step 4, run `ANALYZE public.thoughts;` to refresh planner statistics, then retry. The planner needs accurate row counts before it will choose an index scan over a seq scan on small tables.
 
 **Issue: Migration hangs on `CREATE INDEX`**
 Solution: Check for long-running transactions holding locks on `thoughts` (look at `pg_stat_activity`). The index build needs to acquire a `SHARE` lock on the table. If you can't stop the blocking transaction, switch to `CREATE INDEX CONCURRENTLY` (see Tradeoffs).
