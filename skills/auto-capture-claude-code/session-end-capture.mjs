@@ -184,6 +184,13 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = FETCH_TIMEOUT_MS) {
   }
 }
 
+// HTTP status codes worth retrying. 4xx responses (bad auth, bad payload,
+// not found, etc.) are permanent client errors — retrying wastes API calls
+// and can mask real problems like a revoked MCP_ACCESS_KEY.
+function isRetryableStatus(status) {
+  return status >= 500 || status === 429;
+}
+
 // ── Retry Queue ─────────────────────────────────────────────────────────────
 
 function ensureRetryDirs() {
@@ -246,8 +253,14 @@ async function processRetryQueue(ingestUrl, mcpKey) {
 
       if (response.ok) {
         fs.unlinkSync(filePath);
-      } else {
+      } else if (isRetryableStatus(response.status)) {
         throw new Error(`HTTP ${response.status}`);
+      } else {
+        // 4xx = permanent. Move to dead/ without burning remaining attempts.
+        entry.attempt_count = (entry.attempt_count || 1) + 1;
+        entry.error = `HTTP ${response.status} (permanent)`;
+        fs.writeFileSync(filePath, JSON.stringify(entry, null, 2));
+        fs.renameSync(filePath, path.join(RETRY_DEAD_DIR, file));
       }
     } catch (err) {
       entry.attempt_count = (entry.attempt_count || 1) + 1;
@@ -346,11 +359,16 @@ async function main() {
       const result = await response.json().catch(() => ({}));
       appendLog(parsed.sessionId, projectName, parsed.userTurns,
         `captured:job_${result?.job_id ?? "unknown"}`);
-    } else {
+    } else if (isRetryableStatus(response.status)) {
       const body = await response.text().catch(() => "");
       appendLog(parsed.sessionId, projectName, parsed.userTurns,
         `error:http_${response.status}:${body.slice(0, 100)}`);
       saveToRetryQueue(payload, `HTTP ${response.status}`, parsed.sessionId);
+    } else {
+      // 4xx = permanent client error. Do not retry — log and drop.
+      const body = await response.text().catch(() => "");
+      appendLog(parsed.sessionId, projectName, parsed.userTurns,
+        `error:http_${response.status}:permanent:${body.slice(0, 100)}`);
     }
   } catch (err) {
     const isAbort = err?.name === "AbortError";
