@@ -142,3 +142,141 @@ if (farId && farId !== startId) {
     return `hops=${rows.length ? rows.length - 1 : "no_path"}`;
   });
 }
+
+// ---------------------------------------------------------------------------
+// Scenario tests — seed + assert + clean up. These catch regressions in
+// traverse_graph semantics (multi-path enumeration, parallel relationship
+// types) and in BFS cycle-safety. Each scenario namespaces its nodes by
+// label prefix so reruns are idempotent and a failed run is easy to clean up
+// manually from the Supabase Table Editor (filter by label LIKE 'smoke:%').
+// ---------------------------------------------------------------------------
+
+async function tableInsert(table, rows) {
+  const res = await fetch(`${base}/${table}`, {
+    method: "POST",
+    headers: { ...headers, "Prefer": "return=representation" },
+    body: JSON.stringify(rows),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${res.status} ${text.slice(0, 200)}`);
+  return JSON.parse(text);
+}
+
+async function tableDelete(table, filter) {
+  const res = await fetch(`${base}/${table}?${filter}`, {
+    method: "DELETE",
+    headers,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`${res.status} ${text.slice(0, 200)}`);
+  }
+}
+
+async function cleanupScenario(tag) {
+  // graph_edges has ON DELETE CASCADE from graph_nodes, so deleting the
+  // tagged nodes is enough to also drop their edges.
+  await tableDelete(
+    "graph_nodes",
+    `user_id=eq.${userId}&label=like.smoke:${tag}:%`,
+  );
+}
+
+function assert(cond, msg) {
+  if (!cond) {
+    console.log(`    FAIL: ${msg}`);
+    process.exitCode = 1;
+  } else {
+    console.log(`    ok: ${msg}`);
+  }
+}
+
+// Scenario 1 — multi-path DAG. A → B → D and A → C → D. traverse_graph
+// should return D twice (once via B, once via C). Also A→B has two parallel
+// edges with different relationship_types, so B should appear twice at depth 1.
+async function scenarioMultiPath() {
+  const tag = "multipath";
+  await cleanupScenario(tag);
+  console.log(`scenario: multi-path DAG (tag=smoke:${tag}:*)`);
+  try {
+    const [a, b, c, d] = await tableInsert("graph_nodes", [
+      { user_id: userId, label: `smoke:${tag}:A`, node_type: "concept" },
+      { user_id: userId, label: `smoke:${tag}:B`, node_type: "concept" },
+      { user_id: userId, label: `smoke:${tag}:C`, node_type: "concept" },
+      { user_id: userId, label: `smoke:${tag}:D`, node_type: "concept" },
+    ]);
+    await tableInsert("graph_edges", [
+      { user_id: userId, source_node_id: a.id, target_node_id: b.id, relationship_type: "knows" },
+      { user_id: userId, source_node_id: a.id, target_node_id: b.id, relationship_type: "likes" },
+      { user_id: userId, source_node_id: a.id, target_node_id: c.id, relationship_type: "knows" },
+      { user_id: userId, source_node_id: b.id, target_node_id: d.id, relationship_type: "knows" },
+      { user_id: userId, source_node_id: c.id, target_node_id: d.id, relationship_type: "knows" },
+    ]);
+
+    const rows = await rpc("traverse_graph", {
+      p_user_id: userId,
+      p_start_node_id: a.id,
+      p_max_depth: 2,
+      p_relationship_type: null,
+    });
+
+    const bRows = rows.filter((r) => r.node_id === b.id);
+    const dRows = rows.filter((r) => r.node_id === d.id);
+    // A→B via knows and A→B via likes should both appear at depth 1.
+    assert(bRows.length === 2, `B reached twice at depth 1 via parallel edges (got ${bRows.length})`);
+    // A→B→D and A→C→D should both appear at depth 2.
+    assert(dRows.length === 2, `D reached twice at depth 2 via two distinct paths (got ${dRows.length})`);
+    assert(dRows.every((r) => r.depth === 2), `both D rows at depth 2 (got depths ${dRows.map((r) => r.depth).join(",")})`);
+  } finally {
+    await cleanupScenario(tag);
+  }
+}
+
+// Scenario 2 — cycle. A → B → C → A. find_shortest_path must terminate and
+// not loop; traverse_graph must also terminate (per-path cycle check).
+async function scenarioCycle() {
+  const tag = "cycle";
+  await cleanupScenario(tag);
+  console.log(`scenario: cycle A→B→C→A (tag=smoke:${tag}:*)`);
+  try {
+    const [a, b, c] = await tableInsert("graph_nodes", [
+      { user_id: userId, label: `smoke:${tag}:A`, node_type: "concept" },
+      { user_id: userId, label: `smoke:${tag}:B`, node_type: "concept" },
+      { user_id: userId, label: `smoke:${tag}:C`, node_type: "concept" },
+    ]);
+    await tableInsert("graph_edges", [
+      { user_id: userId, source_node_id: a.id, target_node_id: b.id, relationship_type: "knows" },
+      { user_id: userId, source_node_id: b.id, target_node_id: c.id, relationship_type: "knows" },
+      { user_id: userId, source_node_id: c.id, target_node_id: a.id, relationship_type: "knows" },
+    ]);
+
+    const t0 = Date.now();
+    const traverseRows = await rpc("traverse_graph", {
+      p_user_id: userId,
+      p_start_node_id: a.id,
+      p_max_depth: 5,
+      p_relationship_type: null,
+    });
+    const traverseMs = Date.now() - t0;
+    assert(traverseMs < 2000, `traverse_graph on cycle terminated quickly (${traverseMs}ms)`);
+    assert(traverseRows.length > 0, `traverse_graph on cycle returned rows (${traverseRows.length})`);
+
+    const t1 = Date.now();
+    const pathRows = await rpc("find_shortest_path", {
+      p_user_id: userId,
+      p_start_node_id: a.id,
+      p_end_node_id: c.id,
+      p_max_depth: 6,
+    });
+    const pathMs = Date.now() - t1;
+    assert(pathMs < 2000, `find_shortest_path on cycle terminated quickly (${pathMs}ms)`);
+    assert(pathRows.length === 3, `shortest A→C is 2 hops (3 steps incl. start) — got ${pathRows.length}`);
+  } finally {
+    await cleanupScenario(tag);
+  }
+}
+
+console.log("");
+await scenarioMultiPath();
+console.log("");
+await scenarioCycle();
