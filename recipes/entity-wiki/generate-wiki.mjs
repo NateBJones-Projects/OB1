@@ -318,12 +318,14 @@ async function embedQuery(env, text) {
 }
 
 // Preflight: make sure the embedding provider's output dimension matches what
-// pgvector expects. Without this, --semantic-expand silently fails once per
-// entity with an opaque RPC error and the user has no early signal that every
-// remaining call in a batch will fail for the same reason. Runs once per
-// process. Only called when --semantic-expand is active (gated in main()).
+// pgvector expects. Without this, --semantic-expand and --output-mode=thought
+// silently fail once per entity with an opaque RPC error and the user has no
+// early signal that every remaining call in a batch will fail for the same
+// reason. Runs once per process. `checkMatchRpc` gates the extra
+// match_thoughts-signature probe, which is only needed for --semantic-expand;
+// thought-mode only writes embeddings, it doesn't query them.
 let _embedDimCache = null;
-async function preflightEmbeddingDim(sb, env, expected = 1536) {
+async function preflightEmbeddingDim(sb, env, expected = 1536, checkMatchRpc = true) {
   if (_embedDimCache !== null) return _embedDimCache;
   const probe = await embedQuery(env, "dimension check");
   _embedDimCache = Array.isArray(probe) ? probe.length : 0;
@@ -335,23 +337,25 @@ async function preflightEmbeddingDim(sb, env, expected = 1536) {
         `or ALTER COLUMN thoughts.embedding to match your model's output size.`,
     );
   }
-  // Sanity-check the match_thoughts signature with a dummy vector of the
-  // expected size. If the stock 4-arg RPC is missing or renamed, fail early
-  // with an actionable message instead of 25 per-entity 404s.
-  try {
-    const dummy = new Array(expected).fill(0);
-    await sb.rpc("match_thoughts", {
-      query_embedding: dummy,
-      match_threshold: 0.99,
-      match_count: 1,
-      filter: {},
-    });
-  } catch (rpcErr) {
-    throw new Error(
-      `match_thoughts RPC preflight failed: ${rpcErr.message}. ` +
-        `Expected the stock 4-arg signature (query_embedding, match_threshold, match_count, filter) ` +
-        `from docs/01-getting-started.md. Either recreate it or rerun without --semantic-expand.`,
-    );
+  if (checkMatchRpc) {
+    // Sanity-check the match_thoughts signature with a dummy vector of the
+    // expected size. If the stock 4-arg RPC is missing or renamed, fail early
+    // with an actionable message instead of 25 per-entity 404s.
+    try {
+      const dummy = new Array(expected).fill(0);
+      await sb.rpc("match_thoughts", {
+        query_embedding: dummy,
+        match_threshold: 0.99,
+        match_count: 1,
+        filter: {},
+      });
+    } catch (rpcErr) {
+      throw new Error(
+        `match_thoughts RPC preflight failed: ${rpcErr.message}. ` +
+          `Expected the stock 4-arg signature (query_embedding, match_threshold, match_count, filter) ` +
+          `from docs/01-getting-started.md. Either recreate it or rerun without --semantic-expand.`,
+      );
+    }
   }
   return _embedDimCache;
 }
@@ -655,14 +659,17 @@ async function writeDossierThought(sb, env, entity, wiki, sourceCounts, provenan
 
   // Compute embedding so the dossier is retrievable via match_thoughts. The
   // MCP capture flow in server/index.ts does the same (embed first, then
-  // upsert + patch embedding). Failure to embed is non-fatal — the dossier
-  // is still written as text, it just won't show up in semantic search.
-  let embedding = null;
-  try {
-    embedding = await embedQuery(env, content);
-  } catch (embErr) {
-    console.error(
-      `[wiki] dossier embedding failed for #${entity.id}: ${embErr.message}`,
+  // upsert + patch embedding). Embedding failure is FATAL here: a thought-mode
+  // dossier without an embedding is unreachable via match_thoughts / MCP
+  // search, which is the entire point of this output mode. Writing the row
+  // anyway would silently produce an unsearchable dossier while reporting
+  // success. main() enforces that EMBEDDING_API_KEY is set when
+  // --output-mode=thought, so reaching this code without a key is a bug.
+  const embedding = await embedQuery(env, content);
+  if (!embedding) {
+    throw new Error(
+      `[wiki] dossier embedding returned empty for #${entity.id}; ` +
+        `refusing to write an unsearchable dossier (check EMBEDDING_MODEL output).`,
     );
   }
 
@@ -677,9 +684,8 @@ async function writeDossierThought(sb, env, entity, wiki, sourceCounts, provenan
       )) || [];
     if (existing.length > 0) {
       const existingId = existing[0].id;
-      const patchBody = { content, metadata };
-      if (embedding) patchBody.embedding = embedding;
-      await sb.patch(`thoughts?id=eq.${existingId}`, patchBody);
+      // embedding is required (see fatal check above) — include it unconditionally.
+      await sb.patch(`thoughts?id=eq.${existingId}`, { content, metadata, embedding });
       return existingId;
     }
   } catch (lookupErr) {
@@ -696,24 +702,21 @@ async function writeDossierThought(sb, env, entity, wiki, sourceCounts, provenan
       p_payload: { metadata },
     });
     const thoughtId = Array.isArray(rpcRes) ? rpcRes[0]?.id : rpcRes?.id;
-    if (thoughtId && embedding) {
-      try {
-        await sb.patch(`thoughts?id=eq.${thoughtId}`, { embedding });
-      } catch (patchErr) {
-        console.error(
-          `[wiki] embedding patch failed for dossier ${thoughtId}: ${patchErr.message}`,
-        );
-      }
+    if (!thoughtId) {
+      throw new Error(
+        `upsert_thought returned no id for dossier #${entity.id}`,
+      );
     }
-    return thoughtId ?? null;
+    // embedding is required — patch failure is fatal so we don't leave an
+    // unsearchable dossier behind while reporting success.
+    await sb.patch(`thoughts?id=eq.${thoughtId}`, { embedding });
+    return thoughtId;
   } catch (rpcErr) {
-    // Fallback: direct insert into thoughts. Include embedding in the insert
-    // payload so the dossier is immediately searchable even without the RPC.
-    const insertBody = { content, metadata };
-    if (embedding) insertBody.embedding = embedding;
+    // Fallback: direct insert into thoughts. Embedding is required, included
+    // in the insert payload so the dossier is immediately searchable.
     const inserted = await sb.post(
       "thoughts",
-      insertBody,
+      { content, metadata, embedding },
       { prefer: "return=representation" },
     );
     const row = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -819,16 +822,38 @@ async function main() {
       process.exit(2);
     }
   }
+  // --output-mode=thought writes a dossier row into public.thoughts and relies
+  // on an embedding for match_thoughts / MCP search. Without an embedding the
+  // row is unreachable — the entire point of the mode is defeated. Enforce the
+  // required env up front so we fail at CLI parse instead of after the LLM
+  // call for the first entity. --semantic-expand has its own check further
+  // down, but thought mode needs the key regardless of semantic expansion.
+  if (args.outputMode === "thought" && !env.EMBEDDING_API_KEY) {
+    console.error(
+      "Missing required env var: EMBEDDING_API_KEY " +
+        "(required when --output-mode=thought; dossier rows must be embedded " +
+        "to be retrievable via match_thoughts / MCP search). " +
+        "Set EMBEDDING_API_KEY (and optionally EMBEDDING_BASE_URL / " +
+        "EMBEDDING_MODEL) or switch to --output-mode=file | entity-metadata.",
+    );
+    process.exit(2);
+  }
   const sb = createSupabase(env);
 
-  // Preflight embedding + match_thoughts once per run when semantic expansion
-  // is active. Bails early with an actionable error instead of 25 silent
-  // per-entity failures.
-  if (args.semanticExpand) {
+  // Preflight the embedding provider once per run when semantic expansion is
+  // active OR when thought mode needs embeddings. Bails early with an
+  // actionable error instead of N silent per-entity failures. Thought mode
+  // only needs the dimension check (it writes embeddings, doesn't query them),
+  // so skip the match_thoughts-RPC signature probe unless --semantic-expand
+  // is on. Users without match_thoughts can still use --output-mode=thought.
+  if (args.semanticExpand || args.outputMode === "thought") {
     try {
-      await preflightEmbeddingDim(sb, env);
+      await preflightEmbeddingDim(sb, env, 1536, args.semanticExpand);
     } catch (err) {
-      console.error(`[wiki] --semantic-expand preflight failed: ${err.message}`);
+      const label = args.semanticExpand
+        ? "--semantic-expand"
+        : "--output-mode=thought";
+      console.error(`[wiki] ${label} preflight failed: ${err.message}`);
       process.exit(1);
     }
   }
