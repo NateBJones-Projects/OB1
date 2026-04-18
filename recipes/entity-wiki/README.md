@@ -233,7 +233,7 @@ If you run this on a cron, start with `--batch-limit 10` for a week, measure you
 The script looks for `.env.local` or `.env` in the current working directory, then falls back to the process environment. Either `cd` into the recipe folder before running, or export the vars in your shell.
 
 **Issue: `no entity found for name="..."`**
-The name does not match any `canonical_name`, `normalized_name`, or `aliases` entry. Try:
+`--entity` resolves against `canonical_name` (case-insensitive) and `normalized_name` (exact) only — **alias matching is not implemented** (encoding JSONB `cs` inside a PostgREST `or=(...)` clause is brittle across versions). If your entity is reachable only by alias, find its id in SQL and rerun with `--id`. Try:
 
 ```sql
 SELECT id, entity_type, canonical_name, aliases
