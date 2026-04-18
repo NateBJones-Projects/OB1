@@ -43,6 +43,7 @@ SELECT
   enriched,
   left(content, 180) AS preview
 FROM public.thoughts
+WHERE sensitivity_tier IS DISTINCT FROM 'restricted'
 ORDER BY created_at DESC;
 
 -- ============================================================
@@ -60,6 +61,7 @@ SELECT
   left(content, 180) AS preview
 FROM public.thoughts
 WHERE enriched IS NOT TRUE
+  AND sensitivity_tier IS DISTINCT FROM 'restricted'
 ORDER BY created_at DESC;
 
 -- ============================================================
