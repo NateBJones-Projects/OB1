@@ -880,17 +880,33 @@ export async function prepareThoughtPayload(
 
 // ── Supabase utility ───────────────────────────────────────────────────────
 
-/** Quick existence check: returns true if the table can be queried without error. */
+/**
+ * Quick existence check: returns true if the table or view can be queried
+ * without error.
+ *
+ * Uses `select("*", { head: true, count: "exact" }).limit(0)` so we don't
+ * depend on the target having an `id` column — important for views that
+ * have unusual column sets (e.g. `ops_source_errors_24h` has only
+ * `(source, error_events_24h)`, no `id`).
+ */
 type TableExistsQuery = PromiseLike<{ error: unknown }>;
 
 export async function tableExists(
   supabase: {
     from: (
       name: string,
-    ) => { select: (cols: string) => { limit: (n: number) => TableExistsQuery } };
+    ) => {
+      select: (
+        cols: string,
+        opts?: { head?: boolean; count?: "exact" | "planned" | "estimated" },
+      ) => { limit: (n: number) => TableExistsQuery };
+    };
   },
   tableName: string,
 ): Promise<boolean> {
-  const { error } = await supabase.from(tableName).select("id").limit(0);
+  const { error } = await supabase
+    .from(tableName)
+    .select("*", { head: true, count: "exact" })
+    .limit(0);
   return !error;
 }

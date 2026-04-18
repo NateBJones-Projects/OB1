@@ -1395,15 +1395,19 @@ server.registerTool(
       const raw = params as Record<string, unknown>;
       const sampleLimit = asInteger(raw.sample_limit, 25, 1, 100);
 
-      // Schema guard: check if the ops monitoring view exists
+      // Schema guard: check that one of the views this tool actually reads
+      // exists. The previous guard checked `ops_source_volume_24h`, a view
+      // name that exists in neither this repo nor the brain-health-monitoring
+      // recipe — so once the recipe WAS installed, this tool still returned
+      // "install required views". Use the real view name.
       const hasView = await tableExists(
         supabase,
-        "ops_source_volume_24h",
+        "ops_source_ingestion_24h",
       );
       if (!hasView) {
         return toolSuccess(
           "This tool requires operational monitoring views. " +
-            "Install schemas/enhanced-thoughts and the ops monitoring recipe to enable source monitoring.",
+            "Install the brain-health-monitoring recipe to enable per-source monitoring.",
           { available: false },
         );
       }
@@ -1431,6 +1435,30 @@ server.registerTool(
           .order("created_at", { ascending: false })
           .limit(sampleLimit),
       ]);
+
+      // If one of the individual views is missing (partial install), fall
+      // back to a graceful "not fully installed" response rather than
+      // raising — the tool should light up in best-effort mode.
+      const viewMissing = (err: { message?: string } | null | undefined) =>
+        !!err?.message &&
+        /(does not exist|not found|relation .* does not exist)/i.test(err.message);
+
+      if (
+        viewMissing(sourceIngestionResponse.error) ||
+        viewMissing(sourceErrorsResponse.error) ||
+        viewMissing(sourceFailuresResponse.error)
+      ) {
+        return toolSuccess(
+          "Ops monitoring views are only partially installed. " +
+            "Verify the brain-health-monitoring recipe has been applied in full.",
+          {
+            available: false,
+            ingestion_ok: !viewMissing(sourceIngestionResponse.error),
+            errors_ok: !viewMissing(sourceErrorsResponse.error),
+            failures_ok: !viewMissing(sourceFailuresResponse.error),
+          },
+        );
+      }
 
       if (sourceIngestionResponse.error) {
         throw new Error(
