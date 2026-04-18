@@ -17,6 +17,12 @@ The original `server/` connector remains untouched and safe to leave connected: 
 - Optional: `schemas/smart-ingest` (unlocks `ops_capture_status` tool)
 - Optional: `schemas/knowledge-graph` (unlocks `graph_search`, `entity_detail`, `ops_source_monitor` tools)
 
+## Security
+
+This server authenticates every request against `MCP_ACCESS_KEY` using a constant-time comparison, and accepts the key only through the `x-brain-key` header or `Authorization: Bearer …` — never a URL query string. It runs under the Supabase `service_role`, which bypasses RLS by design; that is intentional for MCP use, but it does mean this Edge Function is the sensitivity-filter boundary. All tools that expose thought content skip `sensitivity_tier = 'restricted'` rows, and `brain_capture_thought` rejects restricted content outright (same for `update_thought`).
+
+**Companion schema exposure — please read before deploying publicly.** The enhanced-thoughts schema this server depends on is intended to install with `service_role`-only grants on the sensitive RPCs (`search_thoughts_text`, `brain_stats_aggregate`, `get_thought_connections`) — no `anon` GRANTs by default. That means those RPCs are reachable only via authenticated server-side code, including this MCP server. If your deployment's copy of that schema also grants `anon`, or if you later add public grants for a dashboard, be aware: `SECURITY DEFINER` + `anon` grant is an RLS bypass because the function body runs with the function owner's privileges. Combined with a publicly-reachable enhanced-mcp deployment, this would let anyone with your Supabase project URL + anon key read thought content directly via those RPCs — routing around this server's sensitivity filtering. Audit the grants on your companion schemas before exposing this MCP outside a trusted network.
+
 ## Credential Tracker
 
 Copy this block into a text editor and fill it in as you go.
