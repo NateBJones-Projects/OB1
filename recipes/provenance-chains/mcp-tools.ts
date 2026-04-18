@@ -57,10 +57,16 @@ server.registerTool(
 
       // Call the SQL helper. It returns a flat rowset, each row is one
       // visited thought with its depth, parent_id, and cycle flag.
+      //
+      // Over-fetch by one row so we can detect truncation exactly: if the
+      // SQL helper returns NODE_CAP + 1 rows, the traversal actually hit
+      // the cap; if it returns NODE_CAP or fewer, nothing was cut off. The
+      // +1 row is dropped before tree building so the emitted tree and
+      // node_count stay bounded at NODE_CAP.
       const { data, error } = await supabase.rpc("trace_provenance", {
         p_thought_id: rootId,
         p_max_depth: maxDepth,
-        p_node_cap: NODE_CAP,
+        p_node_cap: NODE_CAP + 1,
       });
 
       if (error) {
@@ -88,7 +94,15 @@ server.registerTool(
         restricted: boolean;
       };
 
-      const rows = (data ?? []) as TraceRow[];
+      const rawRows = (data ?? []) as TraceRow[];
+
+      // Detect truncation exactly via over-fetch-by-one. If SQL returned
+      // NODE_CAP + 1 rows the traversal hit the cap; drop the extra row
+      // before tree building so node_count and the emitted tree stay
+      // bounded at NODE_CAP. A return of exactly NODE_CAP rows means the
+      // whole graph fits without truncation.
+      const truncated = rawRows.length > NODE_CAP;
+      const rows = truncated ? rawRows.slice(0, NODE_CAP) : rawRows;
 
       // Build an in-memory tree rooted at rootId. Each node is a FRESH
       // object per traversal path (no dedupe). Cycles are detected via an
@@ -194,11 +208,11 @@ server.registerTool(
 
       const root = buildFromRow(anchorRow, new Set<string>());
 
-      // truncated reflects row-level truncation: if SQL returned NODE_CAP
-      // rows it likely hit the cap. Row occurrences (not unique ids) drive
-      // this signal so capped DAG traversals report correctly.
+      // node_count reports row occurrences (post-slice), not unique ids,
+      // so capped DAG traversals report correctly. truncated was computed
+      // above via over-fetch-by-one and is exact: it is only true when the
+      // SQL helper actually returned more than NODE_CAP rows.
       const nodeCount = rows.length;
-      const truncated = rows.length >= NODE_CAP;
       const summary =
         `Traced provenance of ${rootId} (depth=${maxDepth}, ${nodeCount} nodes visited` +
         (truncated ? `, truncated at node_cap=${NODE_CAP}` : "") +
