@@ -128,6 +128,10 @@ If you also have the original `server/` connector active, you will see both tool
 
 - **`delete_thought`** is intentionally not included in this initial PR. It requires a `deleted_at` shadow column and a restore workflow to align with the maintainer's "depreciate and version rather than delete" preference (see PR #127 closure). It will ship in a follow-up once that column lands in `schemas/enhanced-thoughts` and a sibling `restore_thought` tool can be published alongside it.
 
+## Known Limitations
+
+- **Semantic search + date filter on dense recent brains.** `brain_search_thoughts` in semantic mode calls the `match_thoughts` RPC, which returns the top-N matches by cosine similarity. Date filtering is applied client-side on top of those results. When the RPC supports pre-cutoff date filtering via its `filter` JSONB payload, the filter is pushed server-side and the behavior is precise; when it doesn't, this integration over-fetches 3× the requested limit (capped at 500) and filters client-side. On brains with very dense recent activity and a restrictive old date window, this may miss relevant old matches ranked below the over-fetch cutoff. Workaround: use `mode: "text"` (full-text search honours date filters at the SQL level) or narrow the query.
+
 ## Troubleshooting
 
 **Issue: "Invalid or missing access key" error**

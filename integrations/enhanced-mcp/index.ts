@@ -204,17 +204,37 @@ server.registerTool(
       }
 
       // Semantic search (default)
+      //
+      // NOTE: `match_thoughts` returns the top-N by similarity and then we
+      // date-filter client-side. When the RPC supports date/tier filters in
+      // its `filter` JSONB payload they'll be honored pre-cutoff and the
+      // behavior is server-side correct; when it doesn't, we rely on an
+      // over-fetch slack to avoid silently returning zero results on active
+      // brains with old date windows. See `known limitations` in the README.
       const dateFilterActive = !!(startDate || endDate);
-      const fetchCount = Math.min(
-        limit + (dateFilterActive ? 50 : 20),
-        200,
-      );
+      // Forward filters into the RPC payload — ignored by older RPC versions
+      // but used by versions that support them, at which point the
+      // post-filter becomes a no-op.
+      const semanticFilter: Record<string, unknown> = {
+        ...(metadataFilter as Record<string, unknown>),
+        exclude_restricted: true,
+      };
+      if (startDate) semanticFilter.start_date = startDate;
+      if (endDate) semanticFilter.end_date = endDate;
+
+      // Over-fetch when date filter is active so client-side post-filter
+      // has headroom. 3x the requested limit is a reasonable compromise
+      // between cost and correctness for dense recent brains.
+      const fetchCount = dateFilterActive
+        ? Math.min(Math.max(limit * 3, 50), 500)
+        : Math.min(limit + 20, 200);
+
       const queryEmbedding = await embedText(query);
       const { data, error } = await supabase.rpc("match_thoughts", {
         query_embedding: queryEmbedding,
         match_count: fetchCount,
         match_threshold: minSimilarity,
-        filter: metadataFilter,
+        filter: semanticFilter,
       });
 
       if (error) {
