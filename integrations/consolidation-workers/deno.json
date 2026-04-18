@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "check": "deno check bio/index.ts metadata-norm/index.ts"
+  },
+  "compilerOptions": {
+    "strict": true
+  },
+  "imports": {
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2"
+  }
+}
