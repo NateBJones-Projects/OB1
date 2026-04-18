@@ -13,18 +13,18 @@ Adds 8 monitoring views to your Open Brain database that answer the most common 
 | `ops_enrichment_gaps` | Thoughts that haven't been enriched yet |
 | `ops_type_distribution` | Type breakdown (all-time, 7-day, 24-hour windows) |
 | `ops_sensitivity_distribution` | Sensitivity tier breakdown |
-| `ops_ingestion_summary` | Ingestion job status and counts (requires smart-ingest-tables) |
-| `ops_stalled_entity_queue` | Queue items stuck or permanently failed (requires knowledge-graph) |
-| `ops_graph_coverage` | Entity extraction progress and coverage percentage (requires knowledge-graph) |
+| `ops_ingestion_summary` | Ingestion job status and counts (requires `schemas/smart-ingest`) |
+| `ops_stalled_entity_queue` | Queue items stuck or permanently failed (requires `schemas/entity-extraction`) |
+| `ops_graph_coverage` | Entity extraction progress and coverage percentage (requires `schemas/entity-extraction`) |
 
-Views 1-5 work with the base enhanced thoughts schema. Views 6-8 require optional schemas and will error if those tables don't exist — run only the views that match your installed schemas.
+Views 1-5 work with the base enhanced thoughts schema. Views 6-8 are wrapped in `to_regclass` guards, so the SQL file runs cleanly on any shape of install — missing optional tables produce a `NOTICE` and the corresponding view is skipped rather than failing.
 
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - **Enhanced thoughts schema** applied — install `schemas/enhanced-thoughts` (required for all views)
-- Optional: `schemas/smart-ingest-tables` for the ingestion summary view
-- Optional: `schemas/knowledge-graph` for queue and graph coverage views
+- Optional: `schemas/smart-ingest` for the ingestion summary view (view 6)
+- Optional: `schemas/entity-extraction` for the stalled queue and graph coverage views (views 7-8)
 
 ## Steps
 
@@ -38,10 +38,10 @@ Views 1-5 work with the base enhanced thoughts schema. Views 6-8 require optiona
 Open `ops-views.sql` and check which views apply to your setup:
 
 - **Views 1-5** (source volume, recent thoughts, enrichment gaps, type/sensitivity distribution): Work with any Open Brain install that has the enhanced thoughts schema.
-- **View 6** (ingestion summary): Requires the `ingestion_jobs` table from `schemas/smart-ingest-tables`.
-- **Views 7-8** (stalled queue, graph coverage): Require the `entity_extraction_queue` table from `schemas/knowledge-graph`.
+- **View 6** (ingestion summary): Requires the `ingestion_jobs` table from `schemas/smart-ingest`.
+- **Views 7-8** (stalled queue, graph coverage): Require the `entity_extraction_queue` table from `schemas/entity-extraction`.
 
-If you haven't installed the optional schemas, comment out views 6-8 before running.
+You do not need to comment anything out. Views 6-8 are wrapped in `to_regclass` guards; if the underlying tables are missing, the DO blocks emit a `NOTICE` and skip the view without aborting the file.
 
 ### 2. Run the SQL
 
@@ -114,10 +114,10 @@ After running the SQL, you should be able to query any `ops_*` view from the Sup
 ## Troubleshooting
 
 **"relation ops_ingestion_summary does not exist"**
-The `ingestion_jobs` table hasn't been created. Install `schemas/smart-ingest-tables` first, or comment out view 6 in the SQL file.
+The `ingestion_jobs` table isn't installed, so the guarded DO block skipped view 6 and emitted a `NOTICE`. Install `schemas/smart-ingest` and re-run `ops-views.sql` to create the view.
 
-**"relation entity_extraction_queue does not exist"**
-The knowledge graph schema hasn't been applied. Install `schemas/knowledge-graph` first, or comment out views 7-8.
+**"relation ops_stalled_entity_queue does not exist" or "relation ops_graph_coverage does not exist"**
+The `entity_extraction_queue` table isn't installed, so views 7-8 were skipped. Install `schemas/entity-extraction` and re-run `ops-views.sql`.
 
 **Views return empty results**
 This is normal for a fresh install with no thoughts. Capture a few thoughts first, then query the views.
