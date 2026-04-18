@@ -24,6 +24,7 @@
  *   --skip <n>            Skip first N un-enriched thoughts
  *   --model <name>        Model override (default per provider)
  *   --retry-failed        Re-process previously failed thought IDs
+ *   --max-calls <n>       Hard ceiling on LLM calls (default: 10000, 0 = unlimited)
  */
 
 import fs from "node:fs";
@@ -254,12 +255,19 @@ async function main() {
   console.log(`Concurrency: ${config.concurrency}`);
   console.log(`Mode: ${config.dryRun ? "DRY RUN" : "APPLY"}${config.retryFailed ? " (retry-failed)" : ""}`);
   console.log(`Skip: ${config.skip}, Limit: ${config.limit || "none"}`);
+  console.log(`Max LLM calls: ${config.maxCalls === 0 ? "unlimited (--max-calls 0)" : config.maxCalls}`);
   console.log();
 
   const state = loadState();
   let processed = 0;
   let enriched = 0;
   let failed = 0;
+  // Budget tracker shared with classifyAndUpdate via the `budget` arg.
+  // `calls` increments on every LLM call attempt (not counted for empty
+  // content that skips the LLM). We bail out at the top of each loop
+  // iteration once `calls >= maxCalls`.
+  const budget = { calls: 0 };
+  let budgetExceeded = false;
 
   // -- Retry-failed mode: process only previously failed IDs --
   if (config.retryFailed) {
@@ -273,14 +281,22 @@ async function main() {
 
     for (let i = 0; i < failedIds.length; i += BATCH_SIZE) {
       if (config.limit && processed >= config.limit) break;
+      if (config.maxCalls > 0 && budget.calls >= config.maxCalls) {
+        budgetExceeded = true;
+        break;
+      }
       const batchIds = failedIds.slice(i, i + Math.min(BATCH_SIZE, (config.limit || Infinity) - processed));
       const thoughts = await fetchByIds(config, batchIds);
       if (thoughts.length === 0) continue;
 
       for (let j = 0; j < thoughts.length; j += config.concurrency) {
+        if (config.maxCalls > 0 && budget.calls >= config.maxCalls) {
+          budgetExceeded = true;
+          break;
+        }
         const chunk = thoughts.slice(j, j + config.concurrency);
         const results = await Promise.allSettled(
-          chunk.map((t) => classifyAndUpdate(t, config))
+          chunk.map((t) => classifyAndUpdate(t, config, budget))
         );
         for (let k = 0; k < results.length; k++) {
           processed++;
@@ -311,8 +327,9 @@ async function main() {
 
     if (!config.dryRun) checkpointState(state);
     console.log();
-    console.log("=== RETRY COMPLETE ===");
+    console.log(budgetExceeded ? "=== RETRY ABORTED (--max-calls reached) ===" : "=== RETRY COMPLETE ===");
     console.log(`Processed: ${processed}, Fixed: ${enriched}, Still failing: ${failed}`);
+    console.log(`LLM calls made: ${budget.calls}${config.maxCalls > 0 ? " / " + config.maxCalls : ""}`);
     return;
   }
 
@@ -324,6 +341,10 @@ async function main() {
 
   while (true) {
     if (config.limit && processed >= config.limit) break;
+    if (config.maxCalls > 0 && budget.calls >= config.maxCalls) {
+      budgetExceeded = true;
+      break;
+    }
 
     const fetchSize = config.limit ? Math.min(BATCH_SIZE, config.limit - processed) : BATCH_SIZE;
     const thoughts = await fetchUnenriched(config, fetchCursor, fetchSize);
@@ -334,10 +355,14 @@ async function main() {
 
     // API mode: one thought per call, high concurrency
     for (let i = 0; i < thoughts.length; i += config.concurrency) {
+      if (config.maxCalls > 0 && budget.calls >= config.maxCalls) {
+        budgetExceeded = true;
+        break;
+      }
       const chunk = thoughts.slice(i, i + config.concurrency);
 
       const results = await Promise.allSettled(
-        chunk.map((t) => classifyAndUpdate(t, config))
+        chunk.map((t) => classifyAndUpdate(t, config, budget))
       );
 
       for (let j = 0; j < results.length; j++) {
@@ -380,15 +405,16 @@ async function main() {
 
   if (!config.dryRun) checkpointState(state);
   console.log();
-  console.log("=== ENRICHMENT COMPLETE ===");
-  console.log(`Processed: ${processed}`);
-  console.log(`Enriched:  ${enriched}`);
-  console.log(`Failed:    ${failed}`);
+  console.log(budgetExceeded ? "=== ENRICHMENT ABORTED (--max-calls reached) ===" : "=== ENRICHMENT COMPLETE ===");
+  console.log(`Processed:      ${processed}`);
+  console.log(`Enriched:       ${enriched}`);
+  console.log(`Failed:         ${failed}`);
+  console.log(`LLM calls made: ${budget.calls}${config.maxCalls > 0 ? " / " + config.maxCalls : ""}`);
 }
 
 // --- Classification ---
 
-async function classifyAndUpdate(thought, config) {
+async function classifyAndUpdate(thought, config, budget) {
   const content = thought.content || "";
   if (!content.trim()) {
     if (!config.dryRun) {
@@ -408,6 +434,11 @@ async function classifyAndUpdate(thought, config) {
   if (existingSource) inputLines.push(`Existing source_type: ${existingSource}`);
   inputLines.push(`<thought_content>\n${safeContent}\n</thought_content>`);
   const userInput = inputLines.join("\n\n");
+
+  // Count this attempt against the --max-calls budget BEFORE calling
+  // out. `withRetry` may loop internally, but a single classifyAndUpdate
+  // invocation = one logical "call" the user wanted to budget.
+  if (budget) budget.calls += 1;
 
   // Call LLM via selected provider (with retry for transient errors)
   let raw = await withRetry(() => classifyWithProvider(userInput, config));
@@ -659,11 +690,19 @@ function nextFetchCursor(currentCursor, thoughts) {
 
 function buildConfig(args, env) {
   const provider = args.provider || env.ENRICH_PROVIDER || "openrouter";
+  // --max-calls: hard ceiling on LLM calls per run. Default 10000 so a
+  // shell typo (`--limit` dropped, bad `--model`) can't silently burn
+  // through the whole table. Pass `--max-calls 0` to disable the cap.
+  const rawMaxCalls = args.maxCalls !== undefined
+    ? parseInt(args.maxCalls, 10)
+    : parseInt(env.ENRICH_MAX_CALLS || "10000", 10);
+  const maxCalls = Number.isFinite(rawMaxCalls) && rawMaxCalls >= 0 ? rawMaxCalls : 10000;
   return {
     provider,
     concurrency: parseInt(args.concurrency || "20", 10),
     skip: parseInt(args.skip || "0", 10),
     limit: parseInt(args.limit || "0", 10) || 0,
+    maxCalls,
     dryRun: !!args.dryRun,
     apply: !!args.apply,
     retryFailed: !!args.retryFailed,
@@ -693,6 +732,7 @@ function parseArgs(argv) {
     else if (a === "--model" && argv[i + 1]) args.model = argv[++i];
     else if (a === "--provider" && argv[i + 1]) args.provider = argv[++i];
     else if (a === "--retry-failed") args.retryFailed = true;
+    else if (a === "--max-calls" && argv[i + 1]) args.maxCalls = argv[++i];
   }
   return args;
 }
@@ -728,6 +768,8 @@ Options:
   --skip <n>           Skip first N un-enriched thoughts
   --model <name>       Model override (provider-specific)
   --retry-failed       Re-process previously failed thought IDs
+  --max-calls <n>      Hard ceiling on LLM calls this run (default: 10000,
+                       0 = unlimited). Abort cleanly once reached.
   --help               Show this help
 `);
 }
