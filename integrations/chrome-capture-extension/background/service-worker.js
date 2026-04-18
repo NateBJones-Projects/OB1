@@ -634,14 +634,18 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   chrome.alarms.create(RETRY_ALARM_NAME, { periodInMinutes: 5 });
   ensureSyncAlarm();
   ensureChatGPTSyncAlarm();
   refreshBadge();
 
-  // On first install, open the config page so the user is immediately
-  // prompted to supply their Open Brain API URL and key.
+  // Only auto-open the Configure tab on a fresh install. onInstalled also
+  // fires for every update (including silent self-updates from the Chrome
+  // Web Store), and we don't want to fling the config page at users every
+  // time they get a patch release. The yellow "!" badge and the popup's
+  // config-missing banner are enough of a surface when setup is needed.
+  if (details.reason !== 'install') return;
   OBConfig.getConfig().then((config) => {
     if (!OBConfig.isConfigured(config)) {
       chrome.tabs.create({ url: chrome.runtime.getURL('popup/config.html') });
