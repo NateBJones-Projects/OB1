@@ -11,7 +11,7 @@ A Discord bot that monitors designated channels and captures messages into Open 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - A Discord account with permission to add bots to your server
 - Discord Developer Portal access (free)
-- Supabase CLI installed (`npm i -g supabase`)
+- Supabase CLI available ([Homebrew/Scoop/standalone binary or `npx supabase`](https://supabase.com/docs/guides/local-development/cli/getting-started); `npm i -g supabase` is not supported)
 - OpenRouter API key (for generating embeddings)
 
 ## Credential Tracker

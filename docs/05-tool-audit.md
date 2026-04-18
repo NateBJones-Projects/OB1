@@ -81,6 +81,7 @@ Once you've identified bloat, here are the patterns for consolidating.
 Instead of 5 separate tools per table, expose one tool with an `action` parameter:
 
 **Before (5 tools):**
+
 ```
 create_recipe
 get_recipe
@@ -90,6 +91,7 @@ list_recipes
 ```
 
 **After (1 tool):**
+
 ```
 manage_recipe
   action: "create" | "read" | "update" | "delete" | "list"
@@ -107,6 +109,7 @@ manage_recipe
 A gentler consolidation that preserves clear intent:
 
 **Before (5 tools):**
+
 ```
 create_recipe
 get_recipe
@@ -116,6 +119,7 @@ search_recipes
 ```
 
 **After (2 tools):**
+
 ```
 save_recipe       — creates or updates (upsert pattern)
 query_recipes      — search, filter, get by ID, list all
@@ -132,6 +136,7 @@ This maps to how people actually talk to their AI: "save this" or "find that." T
 For tables with similar schemas (all your Open Brain extension tables follow the same `user_id` + timestamps + domain fields pattern), you can go further:
 
 **Before (20+ tools across 4 extensions):**
+
 ```
 add_household_item, search_household_items, get_item_details,
 add_vendor, list_vendors,
@@ -140,6 +145,7 @@ search_maintenance_history, add_family_member, ...
 ```
 
 **After (2–3 tools):**
+
 ```
 save_entity
   entity_type: "household_item" | "vendor" | "maintenance_task" | ...
@@ -177,6 +183,7 @@ Merging tools reduces count within a server. Scoping splits tools across servers
 Most Open Brain users' workflows fall into three modes:
 
 #### Capture server (write-heavy)
+
 **When you use it:** Quick capture moments — jotting down a thought, logging a contact interaction, saving a recipe.
 
 **Tools to include:**
@@ -189,6 +196,7 @@ Most Open Brain users' workflows fall into three modes:
 **Context cost:** ~5–8 tools, ~1,500–3,000 tokens.
 
 #### Query server (read-heavy)
+
 **When you use it:** Research, recall, weekly reviews, planning sessions — any time you're pulling information out rather than putting it in.
 
 **Tools to include:**
@@ -202,6 +210,7 @@ Most Open Brain users' workflows fall into three modes:
 **Context cost:** ~8–12 tools, ~3,000–5,000 tokens.
 
 #### Admin server (rarely used)
+
 **When you use it:** Occasional maintenance — bulk updates, deletions, schema changes, data cleanup.
 
 **Tools to include:**

@@ -49,3 +49,18 @@ body {
   background: var(--color-violet-glow);
   color: var(--color-text-primary);
 }
+
+/* Phone landscape: hide desktop sidebar, keep mobile topbar, remove sidebar margin */
+@media (orientation: landscape) and (max-height: 600px) {
+  aside {
+    display: none !important;
+  }
+  main {
+    margin-left: 0 !important;
+    padding-top: 48px !important;
+  }
+  /* Force mobile topbar visible in landscape */
+  .md\:hidden {
+    display: flex !important;
+  }
+}

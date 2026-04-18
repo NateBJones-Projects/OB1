@@ -1,17 +1,11 @@
 ---
-name: claudeception
-description: |
-  Continuous learning system that extracts reusable knowledge from work sessions.
-  Triggers: (1) /claudeception command to review session learnings, (2) "save this as a skill"
-  or "extract a skill from this", (3) "what did we learn?", (4) After any task involving
-  non-obvious debugging, workarounds, or trial-and-error discovery. Creates new skills
-  when valuable, reusable knowledge is identified. Integrates with Open Brain to prevent
-  duplicates and share knowledge across sessions.
+name: aiception
+description: Continuous learning system that extracts reusable knowledge from work sessions. Triggers: (1) /aiception command, (2) "save this as a skill" or "extract a skill", (3) "what did we learn?", (4) After non-obvious debugging or trial-and-error discovery. Creates new skills when valuable, reusable knowledge is identified. Integrates with Open Brain to prevent duplicates.
 author: Jared Irish
 version: 2.0.0
 ---
 
-# Claudeception
+# Aiception
 
 A continuous learning system that extracts reusable knowledge from work sessions and
 codifies it into new skills. This enables autonomous improvement over time.
@@ -88,9 +82,7 @@ were consulted. Skip this for project-specific internal patterns.
 ```markdown
 ---
 name: [descriptive-kebab-case-name]
-description: |
-  [Precise description with: (1) exact use cases, (2) trigger conditions like
-  specific error messages, (3) what problem this solves.]
+description: [SINGLE LINE, max 1024 chars. Include trigger phrases, output type, use cases. NEVER use pipe (|) or multi-line. Multi-line descriptions break agent routing silently.]
 author: [your name]
 version: 1.0.0
 ---
@@ -151,7 +143,7 @@ Before finalizing, verify:
 
 ## Retrospective Mode
 
-When `/claudeception` is invoked at session end:
+When `/aiception` is invoked at session end:
 
 1. Review the session for extractable knowledge
 2. List candidates with brief justifications
@@ -186,11 +178,7 @@ Found `n8n-docker-troubleshooting` but it covers different issues (Code node san
 ```markdown
 ---
 name: n8n-workflow-api-quirks
-description: |
-  Fix n8n REST API issues when importing/updating workflows. Use when:
-  (1) POST /api/v1/workflows returns "tags is read-only",
-  (2) API key from .env returns 401 but MCP config key works,
-  (3) PATCH doesn't update workflow code (need delete + recreate).
+description: Fix n8n REST API issues when importing/updating workflows. Use when: (1) POST /api/v1/workflows returns "tags is read-only", (2) API key from .env returns 401 but MCP config key works, (3) PATCH doesn't update workflow code (need delete + recreate).
 author: Jared Irish
 version: 1.0.0
 ---
@@ -228,4 +216,4 @@ Invoke this skill after completing a task when ANY of these apply:
 4. Discovered configuration that differs from standard patterns
 5. Tried multiple approaches before finding what worked
 
-Also invoke when the user runs `/claudeception`, says "save this as a skill", or asks "what did we learn?"
+Also invoke when the user runs `/aiception`, says "save this as a skill", or asks "what did we learn?"

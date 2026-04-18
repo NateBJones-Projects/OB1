@@ -10,7 +10,6 @@
 
 </div>
 
-
 A pattern for using LLM-extracted metadata to route unstructured text into the correct database tables automatically. One input message becomes writes to four different tables — `thoughts`, `people`, `interactions`, and `action_items` — based entirely on what the LLM finds in the text.
 
 > [!NOTE]

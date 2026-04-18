@@ -7,6 +7,8 @@ An add-on for [Life Engine](../life-engine/) that replaces (or supplements) text
 > [!IMPORTANT]
 > **Built for [Claude Code](https://claude.ai/download), but not exclusive to it.** The Life Engine core requires Claude Code (it depends on `/loop` and skills), but this video add-on — the Remotion rendering, ElevenLabs TTS, and pipeline scripting — can be driven by any capable AI coding agent. ChatGPT handles Remotion well; other agents may work too. If you're adapting this to a different tool, the architecture and components in this guide give you everything you need.
 
+<!-- -->
+
 > [!NOTE]
 > **Expect iteration.** Your first rendered video will have timing issues, subtitle drift, or a voiceover script that sounds stilted. That's normal. Each render gives you feedback — adjust the VO script guidelines, tweak the subtitle chunking, tune the ElevenLabs voice settings. The structured data flowing from your Open Brain means the *content* improves automatically as your knowledge base grows. The *presentation* improves as you and your agent dial in the rendering pipeline together.
 
@@ -320,6 +322,7 @@ export const SubtitleBar: React.FC<{
   );
 };
 ```
+
 </details>
 
 <details>
@@ -341,6 +344,7 @@ export const ProgressBar: React.FC = () => {
   );
 };
 ```
+
 </details>
 
 <details>
@@ -390,6 +394,7 @@ export const TaskCard: React.FC<{
   );
 };
 ```
+
 </details>
 
 <details>
@@ -435,6 +440,7 @@ export const SectionHeader: React.FC<{
   );
 };
 ```
+
 </details>
 
 ### 2.3 Scene Components
@@ -486,6 +492,7 @@ export const TitleScene: React.FC<{
   );
 };
 ```
+
 </details>
 
 ### 2.4 Main Composition
@@ -761,15 +768,19 @@ Place in `public/music.mp3`. The composition plays it at 12-15% volume under the
 ## Going Further
 
 ### Dynamic Scene Assembly
+
 Instead of fixed scene types, let Claude decide which scenes to include based on the data. If there are no habits, skip the habits scene. If there's a lot of OB1 context for a meeting, add an extra context scene. The composition adapts to the data.
 
 ### Weekly Recap Videos
+
 Every Sunday, render a 60-second recap of the week: meetings attended, habits completed, mood trends, and highlights. Use chart/graph animations for habit streaks.
 
 ### Voice Briefings (Audio Only)
+
 Skip the video render entirely and just send the TTS audio as a voice message via Telegram. Much faster (seconds instead of minutes), still personal. Good for quick habit reminders.
 
 ### Screen Recording Integration
+
 For meeting prep, capture a screenshot of the client's website or relevant dashboard and animate it into the prep briefing video. Use `@remotion/gif` to embed Chrome GIF captures.
 
 ---

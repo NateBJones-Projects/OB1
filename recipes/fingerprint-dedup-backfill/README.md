@@ -14,7 +14,7 @@
 
 ## What It Does
 
-If you imported thoughts before the [Content Fingerprint Dedup](../../primitives/content-fingerprint-dedup/) primitive was in place, those rows will have a NULL `content_fingerprint`. This recipe computes fingerprints for all existing rows and then identifies and removes duplicates — rows whose content already exists in the table under a properly fingerprinted copy.
+If you imported thoughts before the [Content Fingerprint Dedup](../../recipes/content-fingerprint-dedup/) primitive was in place, those rows will have a NULL `content_fingerprint`. This recipe computes fingerprints for all existing rows and then identifies and removes duplicates — rows whose content already exists in the table under a properly fingerprinted copy.
 
 Two scripts work together:
 
@@ -25,7 +25,7 @@ Two scripts work together:
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
-- [Content Fingerprint Dedup](../../primitives/content-fingerprint-dedup/) primitive applied (so `content_fingerprint` column exists)
+- [Content Fingerprint Dedup](../../recipes/content-fingerprint-dedup/) primitive applied (so `content_fingerprint` column exists)
 - Node.js 18+
 
 ## Credential Tracker
@@ -114,7 +114,7 @@ limit 10;
 
 ## How the Fingerprint Is Computed
 
-The normalization matches the [Content Fingerprint Dedup](../../primitives/content-fingerprint-dedup/) primitive exactly:
+The normalization matches the [Content Fingerprint Dedup](../../recipes/content-fingerprint-dedup/) primitive exactly:
 
 1. Trim whitespace and collapse runs of whitespace to single spaces
 2. Lowercase
@@ -134,7 +134,7 @@ Solution: This means the computed fingerprint already exists on another row. The
 Solution: The scripts use cursor-based pagination and save state after each batch. If a request times out, the script retries after 5 seconds. For very large tables (100K+), expect the backfill to take 10-30 minutes.
 
 **Issue: `content_fingerprint` column doesn't exist**
-Solution: Apply the [Content Fingerprint Dedup](../../primitives/content-fingerprint-dedup/) primitive first. The column must exist before running these scripts.
+Solution: Apply the [Content Fingerprint Dedup](../../recipes/content-fingerprint-dedup/) primitive first. The column must exist before running these scripts.
 
 **Issue: Want to reset and start over**
 Solution: Delete the state file (`backfill-state.json` or `cleanup-state.json`) and run the script again. It will start from the beginning.

@@ -173,6 +173,7 @@ When you generate a new key on openrouter.ai/keys, the old key is revoked immedi
 **Places your OpenRouter key lives (update ALL of them):**
 
 1. **Supabase Edge Function secrets** — This is the most common one to miss. Your MCP server reads the key from here at runtime.
+
    ```bash
    supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-new-key
    ```

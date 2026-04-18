@@ -6,7 +6,7 @@
     "name": "Jonathan Edwards",
     "github": "jonathanedwards"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "requires": {
     "open_brain": true,
     "services": [
@@ -38,5 +38,5 @@
   "difficulty": "intermediate",
   "estimated_time": "45-60 minutes",
   "created": "2026-03-18",
-  "updated": "2026-03-19"
+  "updated": "2026-04-01"
 }

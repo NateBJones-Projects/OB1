@@ -1,20 +1,20 @@
 {
   "name": "ChatGPT Conversation Import",
-  "description": "Parse your ChatGPT data export, filter trivial conversations, summarize each via LLM into standalone thoughts, and ingest them into Open Brain with embeddings.",
+  "description": "Parse your ChatGPT data export, resolve conversation branches, extract 2-5 typed thoughts per conversation via LLM knowledge extraction (decisions, preferences, learnings, context, brainstorms, references), and ingest them into Open Brain with enriched metadata and embeddings.",
   "category": "recipes",
   "author": {
     "name": "Matt Hallett",
     "github": "matthallett1"
   },
-  "version": "1.0.0",
+  "version": "2.0.0",
   "requires": {
     "open_brain": true,
     "services": ["OpenRouter"],
     "tools": ["Python 3.10+"]
   },
-  "tags": ["chatgpt", "import", "conversations", "migration", "summarization"],
+  "tags": ["chatgpt", "import", "conversations", "migration", "knowledge-extraction"],
   "difficulty": "beginner",
   "estimated_time": "20 minutes",
   "created": "2026-03-10",
-  "updated": "2026-03-13"
+  "updated": "2026-04-10"
 }
