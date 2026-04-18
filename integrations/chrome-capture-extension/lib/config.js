@@ -17,6 +17,15 @@
     // per-device and must not follow the user's Google account across
     // profiles. See README Security section for rationale.
     apiEndpoint: 'ob_capture_api_endpoint',
+    // Explicit boolean flag (chrome.storage.local) that signals the last
+    // setConfig() write had to fall back to local because chrome.storage.sync
+    // rejected the write (QUOTA_BYTES, managed policy, sync disabled).
+    // While this flag is true, getConfig() MUST read the non-secret settings
+    // blob from chrome.storage.local, not from sync — otherwise a subsequent
+    // sync read would return whatever stale/empty value sync holds and
+    // silently snap toggles back to defaults. The flag is cleared on the
+    // next successful sync write.
+    localFallbackActive: 'ob_capture_local_fallback_active',
     captureLog: 'ob_capture_log',
     retryQueue: 'ob_capture_retry_queue',
     seenFingerprints: 'ob_capture_seen_fingerprints',
@@ -166,7 +175,8 @@
       }).catch(() => ({ [STORAGE_KEYS.settings]: DEFAULT_SETTINGS })),
       chrome.storage.local.get({
         [STORAGE_KEYS.apiKey]: '',
-        [STORAGE_KEYS.apiEndpoint]: ''
+        [STORAGE_KEYS.apiEndpoint]: '',
+        [STORAGE_KEYS.localFallbackActive]: false
       }),
       // Fallback local-only settings blob (used when sync is unavailable).
       chrome.storage.local.get({
@@ -177,6 +187,7 @@
     const syncSettings = mergeSettings(syncStored[STORAGE_KEYS.settings]);
     const localApiKey = String(localStored[STORAGE_KEYS.apiKey] || '').trim();
     const localApiEndpoint = String(localStored[STORAGE_KEYS.apiEndpoint] || '').trim();
+    const localFallbackActive = Boolean(localStored[STORAGE_KEYS.localFallbackActive]);
     const localFallbackSettings = localSettings[STORAGE_KEYS.settings];
 
     // Migrate legacy installs where the API key lived in sync storage.
@@ -221,13 +232,27 @@
       }
     }
 
-    // If sync storage was empty or unavailable and we have a local
-    // fallback settings blob, prefer the local one (covers policy-managed
-    // profiles and QUOTA_BYTES failures that forced a fallback at setConfig time).
-    const baseSettings = (!syncStored[STORAGE_KEYS.settings] ||
-      syncStored[STORAGE_KEYS.settings] === DEFAULT_SETTINGS) && localFallbackSettings
-        ? mergeSettings(localFallbackSettings)
-        : syncSettings;
+    // Fallback selection:
+    //   * If the explicit `localFallbackActive` flag is true, trust the
+    //     local-stored settings — the last setConfig() write couldn't reach
+    //     sync, so sync is known to be stale/empty/rejected.
+    //   * Otherwise fall through to syncSettings. We intentionally do NOT
+    //     use reference-identity against DEFAULT_SETTINGS here: deserialized
+    //     chrome.storage.sync.get() results are always fresh objects and
+    //     would never match the module-scope DEFAULT_SETTINGS instance, so
+    //     the old `=== DEFAULT_SETTINGS` check was effectively dead and let
+    //     non-secret settings silently snap back to defaults after a sync
+    //     failure. Console-log while the fallback is active so the user can
+    //     diagnose persistence issues.
+    let baseSettings;
+    if (localFallbackActive && localFallbackSettings) {
+      console.warn(
+        '[Open Brain Capture] Local fallback active — reading settings from chrome.storage.local (last sync write failed).'
+      );
+      baseSettings = mergeSettings(localFallbackSettings);
+    } else {
+      baseSettings = syncSettings;
+    }
 
     return mergeSettings({
       ...baseSettings,
@@ -264,18 +289,26 @@
       await chrome.storage.sync.set({
         [STORAGE_KEYS.settings]: nonSecretSettings
       });
-      // If we previously wrote a local fallback copy, it's fine to leave it —
-      // getConfig() prefers sync when present. Overwriting the fallback on
-      // success would just be tidy-up and risks an extra failure vector.
+      // Sync write succeeded — clear the fallback flag so getConfig() resumes
+      // reading from sync. A stale local-fallback blob left behind is
+      // harmless; the flag is what controls the read path.
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.localFallbackActive]: false
+      });
     } catch (err) {
       // Typical causes: QUOTA_BYTES_PER_ITEM, enterprise policy disables
-      // sync, or the user signed out of Chrome sync. Fall back to local.
+      // sync, or the user signed out of Chrome sync. Fall back to local and
+      // flip the explicit flag so getConfig() reads from local on the next
+      // pass. Without the flag the fallback blob would be written but never
+      // read back (sync reads return an empty/stale value, so settings
+      // silently snap to defaults).
       console.warn(
         '[Open Brain Capture] chrome.storage.sync.set failed, falling back to local-only',
         err
       );
       await chrome.storage.local.set({
-        [STORAGE_KEYS.settings]: nonSecretSettings
+        [STORAGE_KEYS.settings]: nonSecretSettings,
+        [STORAGE_KEYS.localFallbackActive]: true
       });
     }
 
