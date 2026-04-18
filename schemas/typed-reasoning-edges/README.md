@@ -53,7 +53,17 @@ After running the migration:
 - Four indexes on `thought_edges`: outgoing `(from_thought_id, relation)`, incoming `(to_thought_id, relation)`, "currently valid" partial index (`valid_until IS NULL`), and a decay-sweep index on `valid_until`.
 - Three new columns on `edges`: `valid_from`, `valid_until`, `decay_weight`, plus a range-check constraint and two new indexes for temporal queries.
 - An `updated_at` trigger on `thought_edges`.
-- Row Level Security enabled on `thought_edges`: `service_role` has full access, `authenticated` has SELECT-only, `anon` has no access — matching the pattern from [`schemas/entity-extraction/`](../entity-extraction/).
+- Row Level Security enabled on `thought_edges`: **`service_role` only** — `authenticated` and `anon` have no access. This matches the posture of `public.thoughts` in [`docs/01-getting-started.md`](../../docs/01-getting-started.md). See [RLS posture](#rls-posture-service-role-only) below.
+
+## RLS posture (service-role only)
+
+`thought_edges` is readable and writable **only by `service_role`**. We deliberately do **not** grant `SELECT` to `authenticated`.
+
+**Why.** Each row carries `from_thought_id`, `to_thought_id`, and `metadata.rationale`. Together those expose derived relationships between private thoughts. Since the underlying `public.thoughts` table is service-role-only in stock Open Brain, exposing `thought_edges` to `authenticated` via PostgREST would leak derived private-thought relationships that the base table intentionally hides. The only safe posture is to mirror `public.thoughts`.
+
+If you ever want authenticated clients to read reasoning edges directly (skipping the MCP server / service-role path), that must be an **explicit product decision** with a per-user `USING` policy that filters by ownership, not a blanket `SELECT`.
+
+The temporal-validity columns added to the existing `public.edges` table do **not** add any new GRANTs — they inherit the posture of `edges` from `schemas/entity-extraction/` unchanged.
 
 ## Relation Vocabulary
 

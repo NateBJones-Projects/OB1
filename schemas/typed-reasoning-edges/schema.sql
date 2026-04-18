@@ -148,10 +148,19 @@ CREATE TRIGGER trg_thought_edges_updated_at
 
 -- ============================================================
 -- 4. ROW LEVEL SECURITY
---    Mirror the pattern from schemas/entity-extraction/: service_role
---    gets full access (used by the MCP server and classifier via the
---    service-role key server-side), authenticated gets SELECT-only as
---    a scaffold, anon has no access.
+--    Mirror the posture of public.thoughts (see docs/01-getting-started.md):
+--    service_role only. No authenticated or anon access.
+--
+--    Reasoning: each thought_edge row carries from_thought_id,
+--    to_thought_id, and metadata.rationale — it exposes derived
+--    relationships between private thoughts. Since the underlying
+--    public.thoughts table is service-role-only, thought_edges MUST
+--    match that posture, otherwise any logged-in client could read
+--    derived private-thought relationships that the base table
+--    intentionally hides.
+--
+--    Any future change to open SELECT to authenticated must be an
+--    explicit product decision, not a default.
 -- ============================================================
 
 ALTER TABLE public.thought_edges ENABLE ROW LEVEL SECURITY;
@@ -164,16 +173,16 @@ CREATE POLICY "service_role full access"
   USING (true)
   WITH CHECK (true);
 
+-- Explicitly drop any previously-granted authenticated read policy so
+-- re-applying this migration on an older deployment tightens the posture.
 DROP POLICY IF EXISTS "authenticated read" ON public.thought_edges;
-CREATE POLICY "authenticated read"
-  ON public.thought_edges
-  FOR SELECT
-  TO authenticated
-  USING (true);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.thought_edges TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.thought_edges_id_seq TO service_role;
-GRANT SELECT ON public.thought_edges TO authenticated;
+-- Revoke any inherited or previously-granted read from authenticated /
+-- anon to keep the posture aligned with public.thoughts.
+REVOKE ALL ON public.thought_edges FROM authenticated;
+REVOKE ALL ON public.thought_edges FROM anon;
 
 -- ============================================================
 -- 5. TEMPORAL VALIDITY ON ENTITY `edges`
