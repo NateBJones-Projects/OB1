@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 // Smoke test for the ob-graph traversal RPCs.
 //
-// After applying the iterative-BFS rewrite in schema.sql, run this against a
-// Supabase project that has the ob-graph schema installed to confirm both RPCs
-// return sensible shapes and complete inside normal statement_timeout bounds.
+// Run this against a Supabase project that has the ob-graph schema installed
+// to confirm both RPCs (traverse_graph + find_shortest_path) return sensible
+// shapes and complete inside normal statement_timeout bounds.
 //
 // Usage:
-//   1. Copy .env.local.example to .env.local (or reuse the one from your
-//      ob-graph recipe setup) with these vars set:
-//        SUPABASE_PROJECT_REF   — the xxxx part of xxxx.supabase.co
+//   1. Copy .env.example to .env.local (same file, same variables — this
+//      script just reads .env.local so your real secrets stay gitignored):
+//        SUPABASE_URL               — https://YOUR_PROJECT_REF.supabase.co
 //        SUPABASE_SERVICE_ROLE_KEY  — service role key (used server-side only)
-//        OB_GRAPH_USER_ID       — the UUID the graph belongs to (DEFAULT_USER_ID)
+//        DEFAULT_USER_ID            — the UUID the graph belongs to
 //   2. Seed the graph with at least one edge (create_node + create_edge via the
 //      MCP server, or insert directly in the Supabase table editor).
 //   3. node recipes/ob-graph/smoke-graph-rpcs.mjs
@@ -28,7 +28,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 function loadEnv() {
   const envPath = path.join(__dirname, ".env.local");
   if (!fs.existsSync(envPath)) {
-    console.error(`missing ${envPath} — create one with SUPABASE_PROJECT_REF, SUPABASE_SERVICE_ROLE_KEY, OB_GRAPH_USER_ID`);
+    console.error(`missing ${envPath} — copy .env.example to .env.local and fill in SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DEFAULT_USER_ID`);
     process.exit(1);
   }
   const env = {};
@@ -36,7 +36,7 @@ function loadEnv() {
     const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
     if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, "");
   }
-  const required = ["SUPABASE_PROJECT_REF", "SUPABASE_SERVICE_ROLE_KEY", "OB_GRAPH_USER_ID"];
+  const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DEFAULT_USER_ID"];
   for (const k of required) {
     if (!env[k]) {
       console.error(`missing ${k} in .env.local`);
@@ -47,8 +47,8 @@ function loadEnv() {
 }
 
 const env = loadEnv();
-const base = `https://${env.SUPABASE_PROJECT_REF}.supabase.co/rest/v1`;
-const userId = env.OB_GRAPH_USER_ID;
+const base = `${env.SUPABASE_URL.replace(/\/+$/, "")}/rest/v1`;
+const userId = env.DEFAULT_USER_ID;
 const headers = {
   "apikey": env.SUPABASE_SERVICE_ROLE_KEY,
   "Authorization": `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,

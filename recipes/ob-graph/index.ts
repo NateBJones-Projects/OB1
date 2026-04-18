@@ -2,7 +2,9 @@
  * OB-Graph: Knowledge Graph MCP Server for Open Brain
  *
  * Provides tools for building and querying a knowledge graph on top of
- * PostgreSQL. Uses a nodes + edges model with recursive CTEs for traversal.
+ * PostgreSQL. Uses a nodes + edges model: traverse_graph is a recursive CTE
+ * (enumerates acyclic paths); find_shortest_path is an iterative plpgsql BFS
+ * with a seen-set.
  *
  * Tools:
  *   - create_node       — Add a node to the graph

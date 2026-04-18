@@ -1,6 +1,6 @@
 {
   "name": "ob-graph",
-  "description": "A knowledge graph layer for Open Brain. Adds graph database functionality using PostgreSQL nodes + edges with recursive CTE traversal, shortest-path queries, and a full MCP server for building and exploring relationship networks across your thoughts and entities.",
+  "description": "A knowledge graph layer for Open Brain. Adds graph database functionality using PostgreSQL nodes + edges with recursive-CTE traversal, iterative-BFS shortest-path queries, and a full MCP server for building and exploring relationship networks across your thoughts and entities.",
   "category": "recipes",
   "author": {
     "name": "Nate Jones",
@@ -26,5 +26,5 @@
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
   "created": "2026-04-05",
-  "updated": "2026-04-05"
+  "updated": "2026-04-17"
 }
