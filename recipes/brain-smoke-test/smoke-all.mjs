@@ -540,28 +540,57 @@ const authChecks = [
 const SMOKE_TAG = `ob1-smoke-${randomUUID()}`;
 let createdSmokeId = null;
 let cleanupInstalled = false;
+// Three-state cleanup machine:
+//   cleanupRan      -- DELETE confirmed 2xx from PostgREST. Safe.
+//   cleanupFailed   -- DELETE was attempted but errored (non-2xx, network
+//                      error, or thrown exception). Residue may exist.
+//   neither         -- Cleanup never attempted (e.g., SIGINT mid-test before
+//                      the category-level finally ran).
+// The finally handler at category exit and the SIGINT/SIGTERM hooks consult
+// these flags to decide whether to run, retry, or skip cleanup.
 let cleanupRan = false;
+let cleanupFailed = false;
+let cleanupInFlight = null; // Promise if a DELETE is currently pending.
 
 async function deleteSmokeRows(reason = "cleanup") {
-  if (cleanupRan) return;
-  cleanupRan = true;
-  try {
-    const res = await fetch(
-      `${REST_BASE}/thoughts?metadata->>tag=eq.${encodeURIComponent(SMOKE_TAG)}`,
-      { method: "DELETE", headers: SVC_HEADERS },
-    );
-    if (!res.ok) {
+  if (cleanupRan) return { ok: true, reason: "already-clean" };
+  // Dedupe concurrent callers (signal handler + finally fired together).
+  // Wait for the in-flight attempt and return its state so the caller sees
+  // the real outcome rather than a stale "already-clean".
+  if (cleanupInFlight) return cleanupInFlight;
+
+  cleanupInFlight = (async () => {
+    try {
+      const res = await fetch(
+        `${REST_BASE}/thoughts?metadata->>tag=eq.${encodeURIComponent(SMOKE_TAG)}`,
+        { method: "DELETE", headers: SVC_HEADERS },
+      );
+      if (!res.ok) {
+        cleanupFailed = true;
+        const bodySnippet = (await res.text().catch(() => "")).slice(0, 160);
+        process.stderr.write(
+          `WARN: ${reason} failed to delete smoke rows (HTTP ${res.status})${
+            bodySnippet ? `: ${bodySnippet}` : ""
+          }. Tag: ${SMOKE_TAG}\n`,
+        );
+        return { ok: false, status: res.status, reason };
+      }
+      cleanupRan = true;
+      cleanupFailed = false;
+      return { ok: true, status: res.status, reason };
+    } catch (err) {
+      cleanupFailed = true;
       process.stderr.write(
-        `WARN: ${reason} failed to delete smoke rows (HTTP ${res.status}). ` +
+        `WARN: ${reason} threw while deleting smoke rows: ${String(err.message || err)}. ` +
         `Tag: ${SMOKE_TAG}\n`,
       );
+      return { ok: false, error: err, reason };
+    } finally {
+      cleanupInFlight = null;
     }
-  } catch (err) {
-    process.stderr.write(
-      `WARN: ${reason} threw while deleting smoke rows: ${String(err.message || err)}. ` +
-      `Tag: ${SMOKE_TAG}\n`,
-    );
-  }
+  })();
+
+  return cleanupInFlight;
 }
 
 function installDestructiveCleanupHooks() {
@@ -655,9 +684,16 @@ const coreChecks = [
     fn: async (_s) => {
       // Delegate to deleteSmokeRows -- same function the SIGINT/SIGTERM
       // handlers call, so the cleanup path is identical in the happy case
-      // and the interrupted case. cleanupRan dedupes both.
-      await deleteSmokeRows("normal cleanup");
-      return "deleted";
+      // and the interrupted case. The three-state flags dedupe both AND
+      // make the actual outcome visible to the check result instead of
+      // false-greening on a failed DELETE.
+      const outcome = await deleteSmokeRows("normal cleanup");
+      if (outcome?.ok) return "deleted";
+      // Fail loudly: the finally handler will attempt one more retry, but
+      // the user still needs to see this in the dashboard so they know to
+      // check for residue tagged with SMOKE_TAG.
+      const code = outcome?.status ? `HTTP ${outcome.status}` : "threw";
+      throw new Error(`cleanup-failed (${code}); manual delete: tag=${SMOKE_TAG}`);
     },
   },
 ];
@@ -796,6 +832,7 @@ async function main() {
   }
 
   const results = [];
+  let coreFeaturesRan = false;
 
   for (const category of selected) {
     // Core Features is gated behind --destructive because it INSERTs rows via
@@ -818,6 +855,7 @@ async function main() {
     if (category.name === "Core Features") {
       // Wrap the whole category in try/finally so cleanup runs even if a check
       // mid-way throws. The SIGINT/SIGTERM handlers cover ctrl-c / kill.
+      coreFeaturesRan = true;
       installDestructiveCleanupHooks();
       try {
         for (const check of category.checks) {
@@ -825,7 +863,31 @@ async function main() {
           results.push({ category: category.name, name: check.name, ...outcome });
         }
       } finally {
-        await deleteSmokeRows("finally cleanup");
+        // Three-state retry policy:
+        //   1. If cleanup never attempted (SIGINT mid-test, early throw before
+        //      the normal cleanup check), run it now.
+        //   2. If cleanup was attempted and failed, retry exactly once before
+        //      giving up -- transient 5xx is common and the UUID tag keeps
+        //      the retry scoped to this run.
+        //   3. If cleanup already succeeded (cleanupRan), deleteSmokeRows
+        //      short-circuits and returns immediately.
+        if (!cleanupRan && !cleanupFailed) {
+          await deleteSmokeRows("finally cleanup");
+        } else if (cleanupFailed) {
+          process.stderr.write(
+            `WARN: previous cleanup attempt failed; retrying once. Tag: ${SMOKE_TAG}\n`,
+          );
+          // Reset the failed flag so deleteSmokeRows runs again rather than
+          // short-circuiting on the in-flight/failed state.
+          cleanupFailed = false;
+          await deleteSmokeRows("finally retry");
+          if (cleanupFailed) {
+            process.stderr.write(
+              `ERROR: cleanup still failed after retry. Manually delete rows ` +
+              `where metadata->>tag = '${SMOKE_TAG}'\n`,
+            );
+          }
+        }
       }
       continue;
     }
@@ -843,7 +905,13 @@ async function main() {
     return acc;
   }, { pass: 0, skip: 0, fail: 0 });
 
-  const allPass = totals.fail === 0;
+  // Cleanup residue is a FAIL condition even if every check otherwise passed.
+  // If Core Features ran AND the cleanup state machine ended in cleanupFailed
+  // (retry also failed), exit non-zero so CI catches rows that need manual
+  // deletion. Without this, a false-green run could leak smoke rows into a
+  // shared database forever.
+  const cleanupResidue = coreFeaturesRan && cleanupFailed;
+  const allPass = totals.fail === 0 && !cleanupResidue;
 
   if (FLAG_JSON) {
     process.stdout.write(JSON.stringify({
@@ -874,6 +942,12 @@ async function main() {
       `Summary: ${totals.pass} pass, ${totals.skip} skip, ${totals.fail} fail ` +
       `(${results.length} total)\n`
     );
+    if (cleanupResidue) {
+      process.stdout.write(
+        `Cleanup: FAILED -- smoke rows may remain. ` +
+        `Manual delete: metadata->>tag = '${SMOKE_TAG}'\n`,
+      );
+    }
     process.stdout.write(allPass ? "Result: OK\n" : "Result: FAIL\n");
   }
 
