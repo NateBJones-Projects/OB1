@@ -4,12 +4,12 @@
 
 ## What It Does
 
-Open Brain's knowledge graph (from [`schemas/entity-extraction/`](../entity-extraction/)) currently only has entity-to-entity edges like `co_occurs_with` or `works_on`. This schema adds the second half: semantic reasoning edges **between thoughts**, so the graph can express "thought A supports thought B" or "thought C supersedes thought D." It also bolts temporal validity onto the existing entity edges so old relationships can be aged out without losing history.
+Open Brain's knowledge graph (from the [`entity-extraction` schema (PR #197)](https://github.com/NateBJones-Projects/OB1/pull/197)) currently only has entity-to-entity edges like `co_occurs_with` or `works_on`. This schema adds the second half: semantic reasoning edges **between thoughts**, so the graph can express "thought A supports thought B" or "thought C supersedes thought D." It also bolts temporal validity onto the existing entity edges so old relationships can be aged out without losing history.
 
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
-- [`schemas/entity-extraction/`](../entity-extraction/) applied (this schema extends its `edges` table)
+- [`entity-extraction` schema (PR #197)](https://github.com/NateBJones-Projects/OB1/pull/197) applied (this schema extends its `edges` table)
 - (Recommended) the companion [`recipes/typed-edge-classifier/`](../../recipes/typed-edge-classifier/) to populate `thought_edges` automatically
 
 ## Credential Tracker
@@ -115,7 +115,7 @@ This PR **recommends** the classifier mirror (see the classifier recipe README),
 ## Troubleshooting
 
 **Issue: `ERROR: typed-reasoning-edges requires the public.edges table from schemas/entity-extraction/`**
-Solution: Apply [`schemas/entity-extraction/schema.sql`](../entity-extraction/schema.sql) first, then re-run this migration. The prereq check is there on purpose — without the entity `edges` table, the temporal-validity `ALTER TABLE` would fail mid-migration and leave you in a half-applied state.
+Solution: Apply the [`entity-extraction` schema (PR #197 — schema.sql)](https://github.com/NateBJones-Projects/OB1/pull/197/files) first, then re-run this migration. The prereq check is there on purpose — without the entity `edges` table, the temporal-validity `ALTER TABLE` would fail mid-migration and leave you in a half-applied state.
 
 **Issue: `ERROR: insert or update on table "thought_edges" violates foreign key constraint`**
 Solution: The `from_thought_id` / `to_thought_id` you tried to insert doesn't exist in `public.thoughts`. Either the thought was deleted between classifier fetch and insert, or you're using a numeric ID where a UUID is expected — the FK is UUID because stock Open Brain's `thoughts.id` is UUID.

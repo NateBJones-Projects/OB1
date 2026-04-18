@@ -10,7 +10,7 @@ Walks candidate pairs of thoughts (pairs that share at least N entities via `tho
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - [`schemas/typed-reasoning-edges/`](../../schemas/typed-reasoning-edges/) applied (this recipe writes to `thought_edges`)
-- [`schemas/entity-extraction/`](../../schemas/entity-extraction/) applied — this is where candidate pairs come from (thoughts that share entities via `thought_entities`). You can skip this if you only ever pass explicit `--pair UUID_A,UUID_B`.
+- [`entity-extraction` schema (PR #197)](https://github.com/NateBJones-Projects/OB1/pull/197) applied — this is where candidate pairs come from (thoughts that share entities via `thought_entities`). You can skip this if you only ever pass explicit `--pair UUID_A,UUID_B`.
 - Node.js 18+
 - Anthropic API key
 
