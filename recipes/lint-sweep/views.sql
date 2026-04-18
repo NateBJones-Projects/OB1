@@ -108,8 +108,10 @@ BEGIN
 END $$;
 
 -- 7. High-importance thoughts with no graph links. Requires the
---    public.thought_entities table (see recipes/ob-graph). Skipped
---    silently when missing.
+--    public.thought_entities table from the `entity-extraction` schema
+--    (see PRs #197 and #199), NOT the `ob-graph` recipe (which uses
+--    different table names: graph_nodes / graph_edges). Skipped silently
+--    when `thought_entities` is missing.
 DO $$
 BEGIN
   IF EXISTS (

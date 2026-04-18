@@ -13,7 +13,7 @@ Inspired by Andrej Karpathy's "lint the wiki" pattern and the [CRATE CLI](https:
 | Tier | What it checks | Cost | Runs for |
 | ---- | -------------- | ---- | -------- |
 | **1 — SQL-only**   | Orphans by tag, exact fingerprint duplicates, missing fingerprints, low-signal noise, over-tagged thoughts, empty content, unchunked dumps | $0 (no LLM) | Any brain, any size |
-| **2 — Graph-based** | High-importance thoughts with no entity links, entities with zero edges | $0 (no LLM) | Brains that have the [ob-graph](../ob-graph/) recipe applied |
+| **2 — Graph-based** | High-importance thoughts with no entity links, entities with zero edges | $0 (no LLM) | Brains that have the `entity-extraction` schema applied (ships `entities`, `edges`, `thought_entities` tables) |
 | **3 — LLM-assisted** | Semantic contradictions, stale facts, superseded decisions, missing-link suggestions, orphan content, low-signal despite high importance | ~$0.01–0.05 per 100 thoughts sampled (Claude Haiku via OpenRouter) | Brains with OpenRouter key configured |
 
 Tier 1 and Tier 2 run against your Supabase project via PostgREST and complete in seconds against a 100K-thought brain. Tier 3 is the only tier that calls an external API — and it is hard-capped by `--max-llm-calls`.
@@ -22,8 +22,11 @@ Tier 1 and Tier 2 run against your Supabase project via PostgREST and complete i
 
 - Working [Open Brain setup](../../docs/01-getting-started.md) with `public.thoughts` populated
 - Node.js 18 or later
-- (Optional, Tier 2) [ob-graph](../ob-graph/) recipe applied for graph-based lint
+- (Optional, Tier 2) The `entity-extraction` schema applied (ships the `entities`, `edges`, and `thought_entities` tables Tier 2 walks). If your brain was set up before that schema landed, see the schema PRs [#197](https://github.com/NateBJones-Projects/OB1/pull/197) and [#199](https://github.com/NateBJones-Projects/OB1/pull/199). Tier 2 is skipped gracefully when these tables are absent — it does NOT use the `ob-graph` recipe's `graph_nodes` / `graph_edges` tables.
 - (Optional, Tier 3) An OpenRouter API key with credit available
+
+> [!IMPORTANT]
+> Tier 2 depends on the `entity-extraction` schema (`entities`, `edges`, `thought_entities`), not the `ob-graph` recipe. `ob-graph` creates differently-named tables (`graph_nodes`, `graph_edges`) and is not compatible with Tier 2. If you only have `ob-graph` installed, Tier 2 will log the tables as missing and skip.
 
 ## Credential Tracker
 
@@ -244,7 +247,7 @@ Solution: Create `.env.local` in the same directory as `lint-sweep.mjs` with bot
 Solution: Your brain predates the [content-fingerprint-dedup](../content-fingerprint-dedup/) primitive. Apply that recipe (and the [fingerprint-dedup-backfill](../fingerprint-dedup-backfill/) recipe) to get duplicate detection.
 
 **Issue: Tier 2 reports `Graph tables absent`**
-Solution: The graph is optional. Install the [ob-graph](../ob-graph/) recipe to create `entities`, `edges`, and `thought_entities`, or run the sweep with `--tier=1,3` equivalent via two invocations.
+Solution: Tier 2 requires the `entity-extraction` schema (`entities`, `edges`, `thought_entities`). If your brain predates that schema, see PRs [#197](https://github.com/NateBJones-Projects/OB1/pull/197) and [#199](https://github.com/NateBJones-Projects/OB1/pull/199), or skip Tier 2 entirely by running `--tier=1` and `--tier=3` separately. Note: the `ob-graph` recipe uses different table names (`graph_nodes`, `graph_edges`) and does NOT satisfy this dependency.
 
 **Issue: Tier 3 fails with `OpenRouter HTTP 401`**
 Solution: Your `OPENROUTER_API_KEY` is missing, wrong, or out of credit. Verify at https://openrouter.ai/keys. The sweep does not fall back to a different provider on its own.
@@ -259,5 +262,5 @@ Solution: Run with `--verbose` to see the raw response. Switch to a stronger mod
 
 - **[content-fingerprint-dedup](../content-fingerprint-dedup/)** — installs the `content_fingerprint` column Tier 1 needs for duplicate detection.
 - **[fingerprint-dedup-backfill](../fingerprint-dedup-backfill/)** — backfills fingerprints on pre-existing rows so Tier 1 duplicate scanning is accurate.
-- **[ob-graph](../ob-graph/)** — installs the `entities`, `edges`, and `thought_entities` tables Tier 2 walks.
+- **`entity-extraction` schema** — installs the `entities`, `edges`, and `thought_entities` tables Tier 2 walks. See PRs [#197](https://github.com/NateBJones-Projects/OB1/pull/197) and [#199](https://github.com/NateBJones-Projects/OB1/pull/199). (The `ob-graph` recipe is a separate build with different table names and is NOT compatible with Tier 2.)
 - **[thought-enrichment](../thought-enrichment/)** — populates `metadata.topics`, `metadata.tags`, and `metadata.people` so Tier 1 orphan-by-tag detection is meaningful.

@@ -592,7 +592,7 @@ function renderReport({ args, tier1, tier2, tier3, startedAt, finishedAt }) {
     lines.push("## Tier 2 — Graph-based lint (free)");
     lines.push("");
     if (tier2.graphTablesMissing.length > 0) {
-      lines.push(`*Graph tables absent: ${tier2.graphTablesMissing.join(", ")}. Install \`recipes/ob-graph\` first for full Tier 2 coverage.*`);
+      lines.push(`*Graph tables absent: ${tier2.graphTablesMissing.join(", ")}. Tier 2 requires the \`entity-extraction\` schema (which ships \`entities\`, \`edges\`, \`thought_entities\`) — see PRs #197 and #199. The \`ob-graph\` recipe uses different table names and does NOT satisfy this dependency.*`);
       lines.push("");
     }
     lines.push(`- High-importance (≥4) thoughts with no entity links: **${tier2.highImportanceIsolated.length}**`);
