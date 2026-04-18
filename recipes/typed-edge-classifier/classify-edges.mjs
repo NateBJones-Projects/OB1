@@ -299,10 +299,17 @@ async function sampleCandidatePairs(sb, minSupport, limit) {
 }
 
 async function fetchPairAlreadyClassified(sb, a, b) {
-  // Any existing non-related_to edge in either direction means we've
-  // already classified this pair; skip it.
+  // Any existing NON-related_to edge in either direction means we've
+  // already classified this pair with a stronger label; skip it.
+  //
+  // Important: the query must filter `relation != 'related_to'` so that
+  // a pair previously tagged with the fallback `related_to` label can
+  // still be reclassified into a real relation on a later run. Without
+  // this filter the classifier would permanently lock `related_to`
+  // pairs out of reclassification. See README "Expected Outcome".
   const rows = await sb.get(
     `thought_edges?select=relation,from_thought_id,to_thought_id` +
+      `&relation=neq.related_to` +
       `&or=(and(from_thought_id.eq.${a},to_thought_id.eq.${b}),and(from_thought_id.eq.${b},to_thought_id.eq.${a}))` +
       `&limit=1`,
   );
