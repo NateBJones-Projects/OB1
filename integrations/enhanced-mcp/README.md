@@ -72,9 +72,9 @@ In Claude Desktop (or any MCP-compatible client), add a new remote connector:
 
 - **Name:** `Open Brain Enhanced`
 - **URL:** `https://<your-project-ref>.supabase.co/functions/v1/enhanced-mcp`
-- **Header:** `x-brain-key: <your-mcp-access-key>`
+- **Header:** `x-brain-key: <your-mcp-access-key>` _(or `Authorization: Bearer <your-mcp-access-key>`)_
 
-You can also pass the key as a query parameter: `?key=<your-mcp-access-key>`.
+Header-only authentication — the access key is NOT accepted as a `?key=` URL query parameter. Query strings surface in Supabase, CDN, and proxy access logs, which leaks the credential into places that don't get rotated with the secret itself. Use the header (or `Authorization: Bearer …`) exclusively.
 
 ### 4. Test Core Tools
 
@@ -131,7 +131,7 @@ If you also have the original `server/` connector active, you will see both tool
 ## Troubleshooting
 
 **Issue: "Invalid or missing access key" error**
-Solution: Ensure your `MCP_ACCESS_KEY` secret is set in Supabase and matches the key in your connector configuration. The key can be passed via the `x-brain-key` header or `?key=` query parameter.
+Solution: Ensure your `MCP_ACCESS_KEY` secret is set in Supabase and matches the key in your connector configuration. The key must be passed via the `x-brain-key` header or `Authorization: Bearer …`. Query-string auth (`?key=…`) is intentionally not supported — it would leak the credential into access logs.
 
 **Issue: "No embedding API key configured" error**
 Solution: At least one of `OPENROUTER_API_KEY` or `OPENAI_API_KEY` must be set. OpenRouter is the default and recommended provider for OB1.

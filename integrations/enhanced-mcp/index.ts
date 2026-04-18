@@ -1545,17 +1545,46 @@ const corsHeaders = {
 
 const app = new Hono();
 
+/**
+ * Constant-time compare for the MCP access key. Uses
+ * `crypto.subtle.timingSafeEqual` where available (Deno >= 1.41), falling
+ * back to a manual XOR loop on older runtimes. Both paths short-circuit
+ * on length mismatch — for fixed-length 32-char keys this is acceptable;
+ * a variable-length key deployment should prefer the SubtleCrypto path
+ * which operates on equal-length Uint8Array buffers.
+ */
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const enc = new TextEncoder();
+  const aBuf = enc.encode(a);
+  const bBuf = enc.encode(b);
+  const subtle = (crypto as unknown as {
+    subtle?: { timingSafeEqual?: (x: ArrayBufferView, y: ArrayBufferView) => boolean };
+  }).subtle;
+  if (typeof subtle?.timingSafeEqual === "function") {
+    return subtle.timingSafeEqual(aBuf, bBuf);
+  }
+  // Fallback: manual XOR loop — constant-time across equal-length inputs.
+  let diff = 0;
+  for (let i = 0; i < aBuf.length; i++) diff |= aBuf[i] ^ bBuf[i];
+  return diff === 0;
+}
+
 // CORS preflight -- required for browser/Electron-based clients (Claude Desktop, claude.ai)
 app.options("*", (c) => {
   return c.text("ok", 200, corsHeaders);
 });
 
 app.all("*", async (c) => {
-  // Accept access key via header OR URL query parameter
-  const provided =
-    c.req.header("x-brain-key") ||
-    new URL(c.req.url).searchParams.get("key");
-  if (!provided || provided !== MCP_ACCESS_KEY) {
+  // Header-only auth: `x-brain-key: <key>` or `Authorization: Bearer <key>`.
+  // We do NOT accept the key via a `?key=` query parameter — URL query
+  // strings end up in Supabase/CDN/proxy access logs, which leaks the
+  // credential into places that don't get rotated with the secret itself.
+  const headerKey = c.req.header("x-brain-key");
+  const authHeader = c.req.header("authorization") ?? c.req.header("Authorization");
+  const bearerKey = authHeader?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const provided = headerKey ?? bearerKey;
+  if (!provided || !timingSafeEqualStrings(provided, MCP_ACCESS_KEY)) {
     return c.json(
       { error: "Invalid or missing access key" },
       401,
@@ -1565,7 +1594,6 @@ app.all("*", async (c) => {
 
   // Fix: Claude Desktop connectors don't send the Accept header that
   // StreamableHTTPTransport requires. Build a patched request if missing.
-  // See: https://github.com/NateBJones-Projects/OB1/issues/33
   if (!c.req.header("accept")?.includes("text/event-stream")) {
     const headers = new Headers(c.req.raw.headers);
     headers.set("Accept", "application/json, text/event-stream");
