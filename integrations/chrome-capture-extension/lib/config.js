@@ -145,15 +145,6 @@
     return null;
   }
 
-  async function safe(label, fn, fallbackValue) {
-    try {
-      return await fn();
-    } catch (error) {
-      console.error(`[Open Brain Capture] ${label}`, error);
-      return fallbackValue;
-    }
-  }
-
   /**
    * Read the full merged configuration from chrome.storage.
    *
@@ -309,7 +300,6 @@
     getPlatformDefinition,
     getSourceType,
     resolvePlatformFromUrl,
-    safe,
     getConfig,
     setConfig,
     isConfigured

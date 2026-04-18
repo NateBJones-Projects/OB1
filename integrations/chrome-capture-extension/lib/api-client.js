@@ -73,30 +73,15 @@
     });
   }
 
-  async function captureThought(payload, options) {
-    return apiFetch('/capture', {
-      apiKey: options.apiKey,
-      endpoint: options.endpoint,
-      method: 'POST',
-      body: payload
-    });
-  }
-
-  async function searchThoughts(payload, options) {
-    return apiFetch('/search', {
-      apiKey: options.apiKey,
-      endpoint: options.endpoint,
-      method: 'POST',
-      body: payload
-    });
-  }
+  // NOTE: /capture and /search helpers were dropped from the initial release
+  // — the extension is a one-way capture source. If a future revision needs
+  // to query Open Brain from the popup, reintroduce them here and wire
+  // through apiFetch with the same auth pattern.
 
   global.OBApiClient = {
     REQUEST_TIMEOUT_MS,
     apiFetch,
     healthCheck,
-    ingestDocument,
-    captureThought,
-    searchThoughts
+    ingestDocument
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

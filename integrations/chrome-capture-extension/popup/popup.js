@@ -1,9 +1,6 @@
 (function () {
   'use strict';
 
-  const settingsKey = OBConfig.STORAGE_KEYS.settings;
-  const apiKeyStorageKey = OBConfig.STORAGE_KEYS.apiKey;
-
   const statusDot = document.getElementById('status-dot');
   const configMissing = document.getElementById('config-missing');
   const openConfigBtn = document.getElementById('open-config-btn');
