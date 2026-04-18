@@ -613,39 +613,34 @@ const coreChecks = [
 ];
 
 // ---------------------------------------------------------------------------
-// Category 6: Safety Rails
+// Category 6: Access Key Enforcement
+//
+// Proves that the Supabase PostgREST gateway itself rejects requests that
+// are missing or carry an invalid apikey header. This runs BEFORE table
+// policies are evaluated, so it does NOT prove RLS is configured -- see
+// the Row-Level Security category below for that.
 // ---------------------------------------------------------------------------
 
-const safetyChecks = [
+const accessKeyChecks = [
   {
-    name: "RLS enabled on thoughts",
+    name: "PostgREST rejects missing apikey",
     fn: async (s) => {
-      // Query pg_tables via PostgREST is not possible without a helper RPC.
-      // Proxy: anon+apikey-less request must fail; see next check. We call
-      // the public schema's /thoughts without auth and require a rejection.
       const res = await fetch(`${REST_BASE}/thoughts?select=id&limit=1`, { signal: s });
       if (res.status === 401 || res.status === 403 || res.status === 404) {
-        return `HTTP ${res.status} (unauthenticated access rejected)`;
+        return `HTTP ${res.status} (rejected before RLS)`;
       }
       throw new Error(`expected 401/403/404 without apikey, got ${res.status}`);
     },
   },
   {
-    name: "Anon/publishable key cannot read thoughts",
+    name: "PostgREST rejects invalid apikey",
     fn: async (s) => {
-      // If the caller didn't provide a separate anon key, this is best-effort:
-      // we call with an obviously-invalid apikey, which PostgREST rejects with 401.
       const res = await fetch(`${REST_BASE}/thoughts?select=id&limit=1`, {
         headers: { apikey: "invalid-anon-smoke" },
         signal: s,
       });
-      if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
-      // Some setups return 200 + empty rows for RLS-filtered anon queries.
-      if (res.status === 200) {
-        const rows = await res.json().catch(() => []);
-        if (Array.isArray(rows) && rows.length === 0) return "empty (RLS filtered)";
-      }
-      throw new Error(`expected rejection or empty rows, got HTTP ${res.status}`);
+      if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected before RLS)`;
+      throw new Error(`expected 401/403, got HTTP ${res.status}`);
     },
   },
   {
@@ -653,6 +648,72 @@ const safetyChecks = [
     fn: async (s) => {
       const n = await tableCount("thoughts", s);
       return `rows=${n ?? "?"}`;
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Category 7: Row-Level Security
+//
+// Actually probes whether RLS is enabled on public.thoughts and whether
+// policies are restrictive. Two independent probes:
+//
+//   1) pg_class.relrowsecurity lookup. Requires either a helper RPC named
+//      pg_class_rls (not part of stock OB1) OR access via the supabase_admin
+//      endpoint. If neither is reachable we skip this probe and rely on #2.
+//
+//   2) Anon-key read of public.thoughts. If RLS is off or a permissive
+//      ALL USING (true) policy exists, anon gets rows back -- fail. If RLS
+//      is on with no anon-select policy, anon gets HTTP 200 with an empty
+//      array (PostgREST filter behaviour). Requires SUPABASE_ANON_KEY; if
+//      unset, skip with a clear note that RLS could not be verified.
+// ---------------------------------------------------------------------------
+
+const rlsChecks = [
+  {
+    name: "pg_class.relrowsecurity = true for public.thoughts",
+    fn: async (s) => {
+      // Try a named helper RPC first (opt-in, not part of stock OB1).
+      const rpcRes = await fetch(`${REST_BASE}/rpc/pg_class_rls`, {
+        method: "POST",
+        headers: SVC_HEADERS,
+        body: JSON.stringify({ p_schema: "public", p_table: "thoughts" }),
+        signal: s,
+      });
+      if (rpcRes.status === 404) {
+        throw new SkipError("pg_class_rls helper RPC not installed (rely on anon probe)");
+      }
+      if (!rpcRes.ok) throw new Error(`HTTP ${rpcRes.status}`);
+      const body = await rpcRes.json().catch(() => null);
+      const flag = Array.isArray(body) ? body[0]?.relrowsecurity : body?.relrowsecurity;
+      if (flag === true) return "relrowsecurity=true";
+      throw new Error(`relrowsecurity=${flag} -- RLS is OFF on public.thoughts`);
+    },
+  },
+  {
+    name: "Anon key cannot read thoughts (real RLS probe)",
+    fn: async (s) => {
+      if (!ANON_KEY) {
+        throw new SkipError("SUPABASE_ANON_KEY unset -- RLS not verified end-to-end");
+      }
+      const res = await fetch(`${REST_BASE}/thoughts?select=id&limit=1`, {
+        headers: { apikey: ANON_KEY, Authorization: `Bearer ${ANON_KEY}` },
+        signal: s,
+      });
+      if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
+      if (res.status === 200) {
+        const rows = await res.json().catch(() => null);
+        if (Array.isArray(rows) && rows.length === 0) {
+          return "HTTP 200 with 0 rows (RLS filtering works)";
+        }
+        // Non-empty rows under anon = RLS is off or a permissive policy leaks data.
+        throw new Error(
+          `HTTP 200 with ${Array.isArray(rows) ? rows.length : "?"} rows -- ` +
+          `anon can read public.thoughts. RLS is OFF or a permissive ` +
+          `ALL USING (true) policy exists. FIX IMMEDIATELY.`,
+        );
+      }
+      throw new Error(`unexpected HTTP ${res.status} under anon key`);
     },
   },
 ];
@@ -667,7 +728,8 @@ const categories = [
   { name: "DB Schema", checks: dbChecks },
   { name: "Auth", checks: authChecks },
   { name: "Core Features", checks: coreChecks },
-  { name: "Safety Rails", checks: safetyChecks },
+  { name: "Access Key Enforcement", checks: accessKeyChecks },
+  { name: "Row-Level Security", checks: rlsChecks },
 ];
 
 function categoryFilter(name) {
