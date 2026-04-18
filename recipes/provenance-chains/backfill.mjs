@@ -106,22 +106,31 @@ async function sbPatch(queryPath, body) {
 // Accepts standard 8-4-4-4-12 hex, case-insensitive.
 const UUID_RE = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
 
-// Matches BIGINT-style `#123` references for installations that stored thought
-// IDs as integers in metadata. Returned as strings; the upstream function
-// tolerates either shape via the GIN index.
+// Matches BIGINT-style `#123` references. The canonical OB1 install uses
+// UUIDs, and trace_provenance / find_derivatives cast every derived_from
+// element to ::uuid — so writing integer strings here would silently
+// corrupt provenance and make downstream RPCs throw 22P02. We detect the
+// pattern only so we can FAIL LOUDLY instead of writing junk.
 const INT_REF_RE = /#(\d{1,18})\b/g;
 
-function parseParentIds(markdown) {
+function parseParentIds(markdown, rowId) {
   if (!markdown) return [];
   const ids = new Set();
   const uuidMatches = markdown.match(UUID_RE) ?? [];
   for (const u of uuidMatches) ids.add(u.toLowerCase());
   const intMatches = markdown.match(INT_REF_RE) ?? [];
-  for (const m of intMatches) {
-    const n = m.slice(1);
-    // Only add integer refs when no UUIDs were found — mixing formats into
-    // derived_from breaks containment queries. UUID installs should dominate.
-    if (uuidMatches.length === 0) ids.add(n);
+  if (intMatches.length > 0) {
+    // Reject — canonical OB1 is UUID-typed and downstream consumers cast
+    // every parent id to ::uuid. A user on a BIGINT fork must skip backfill
+    // and repopulate derived_from themselves (or hand-edit the INT_REF_RE
+    // logic to return the integers uncasted).
+    throw new Error(
+      `id=${rowId}: refusing to write ${intMatches.length} integer ref(s) ` +
+      `(${intMatches.slice(0, 3).map((m) => m).join(", ")}${intMatches.length > 3 ? ", …" : ""}) ` +
+      `to derived_from on a UUID install. Integer IDs are not supported by the ` +
+      `canonical trace_provenance / find_derivatives helpers. If your fork uses ` +
+      `BIGINT, remove the integer refs from the artifact or skip this row.`,
+    );
   }
   return Array.from(ids);
 }
@@ -175,7 +184,12 @@ async function main() {
       try {
         if (fs.existsSync(artifactPath)) {
           const md = fs.readFileSync(artifactPath, "utf8");
-          const parsed = parseParentIds(md);
+          // Throws on any integer-style (#123) reference. We surface the
+          // error on this row and keep processing the rest — the row is
+          // still flipped to derivation_layer='derived' but without
+          // derived_from, so operators can fix the artifact and re-run
+          // with --force.
+          const parsed = parseParentIds(md, row.id);
           if (parsed.length > 0) {
             derivedFrom = parsed;
             reason = `parsed ${parsed.length} parent id(s) from ${path.basename(artifactPath)}`;
@@ -186,7 +200,7 @@ async function main() {
           reason = `artifact file not found: ${artifactPath}`;
         }
       } catch (err) {
-        reason = `read error: ${err.message}`;
+        reason = `parse error: ${err.message}`;
       }
     }
 

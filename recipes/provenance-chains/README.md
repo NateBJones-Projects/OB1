@@ -126,7 +126,7 @@ After the full pipeline:
 This recipe assumes `public.thoughts.id` is a `UUID` (the canonical Open Brain setup). If you have customized your schema to a `BIGINT` primary key:
 
 - In `mcp-tools.ts`, change the `z.string().uuid()` input schemas to `z.number().int().positive()` and remove the UUID casts.
-- In `backfill.mjs`, the `parseParentIds` helper already supports integer `#123` references as a fallback — no edit needed, but `derived_from` should be a uniform shape (all UUIDs or all integers) for GIN containment to match.
+- In `backfill.mjs`, **integer-style `#123` references are rejected outright on the canonical UUID install**. The script raises `refusing to write N integer ref(s) to derived_from on a UUID install` and skips that row so nothing corrupt reaches PostgREST. Users on a BIGINT fork must skip this recipe's backfill and repopulate `derived_from` themselves (or edit the `parseParentIds` helper to emit the integers uncasted). Mixing UUID and integer elements in one `derived_from` array also breaks the GIN containment index; keep one ID shape per array.
 - In `eval.mjs`, PostgREST `in.(…)` accepts either shape without changes.
 
 See the schema README's ID Type Note for the SQL-side adjustments.
