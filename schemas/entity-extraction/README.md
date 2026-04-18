@@ -65,7 +65,7 @@ After running the migration:
 - Eight indexes for efficient querying: entity type and normalized name lookups, edge traversal by source/target/relation, thought-entity joins, and a partial index on pending queue items.
 - One trigger function (`queue_entity_extraction`) that automatically enqueues thoughts for extraction on insert or content/metadata change, with guards for system-generated artifacts and no-op fingerprint changes.
 - One trigger (`trg_queue_entity_extraction`) attached to the `thoughts` table firing after insert or update of content/metadata.
-- Service role has full access to all five tables and their sequences. Anonymous and authenticated roles have read access for MCP tools and REST API queries.
+- Row Level Security enabled on all five tables. `service_role` bypasses RLS (used by the MCP server and workers via the service-role key server-side) and has a full-access policy. `authenticated` has a minimum `SELECT`-only policy as a scaffold for future multi-tenant dashboards -- when per-user ownership is wired, tighten to `auth.uid() = user_id`. `anon` has no access: stock Open Brain's MCP path is an Edge Function using the service-role key, not the anon key, so no anon grant is needed.
 - New thoughts are automatically queued for entity extraction. Pre-existing thoughts require the optional backfill step.
 
 ## How This Differs From `ob-graph`
