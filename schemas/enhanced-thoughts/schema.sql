@@ -269,7 +269,7 @@ BEGIN
       ) AS shared_people
     FROM thoughts bt
     WHERE bt.id != p_thought_id
-      AND (NOT p_exclude_restricted OR bt.sensitivity_tier != 'restricted')
+      AND (NOT p_exclude_restricted OR bt.sensitivity_tier IS DISTINCT FROM 'restricted')
       AND (
         EXISTS (
           SELECT 1 FROM jsonb_array_elements_text(bt.metadata->'topics') val
