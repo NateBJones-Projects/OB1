@@ -82,9 +82,11 @@ export async function GET() {
       // then restore this field with the computed value.
       types,
       topTopics,
-      // WR-02: sources is not yet populated by /stats — keep as empty until
-      // the REST gateway ships a source breakdown.
-      sources: {},
+      // REVIEW-CODEX-2-P3: `sources` previously shipped as an empty object
+      // while the README promised a source breakdown. No backend endpoint
+      // currently supplies this, so the field is removed entirely and the
+      // README no longer claims to render it. Re-add here (and in the UI
+      // consumer) when /stats or a sibling endpoint returns source counts.
       apiKeyPrefix: apiKey.substring(0, 8),
     });
   } catch (err) {

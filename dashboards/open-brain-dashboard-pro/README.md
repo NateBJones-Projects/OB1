@@ -15,7 +15,7 @@ Seven server-rendered pages backed by iron-session auth and the Open Brain REST 
 | **Audit** (`/audit`) | Quality audit of thoughts with `quality_score < 30`, sorted ascending, with two-step bulk delete. |
 | **Duplicates** (`/duplicates`) | Semantic near-duplicate pairs with threshold control, side-by-side comparison, and batch resolution (keep A / keep B / keep both). |
 | **Ingest** (`/ingest`) | Smart-ingest UI with dry-run preview, extracted-item cards, execute button, and job history. |
-| **Settings** (`/settings`) | Connection status, thought type breakdown, source breakdown, and masked API key prefix. |
+| **Settings** (`/settings`) | Connection status, thought type breakdown, top topics, and masked API key prefix. |
 
 ## Screenshots
 

@@ -8,7 +8,9 @@ interface BrainStatus {
   // CR-01: embeddingCoverage removed from API response; card no longer shown.
   types: Record<string, number>;
   topTopics: Array<{ topic: string; count: number }>;
-  sources: Record<string, number>;
+  // REVIEW-CODEX-2-P3: `sources` removed from the API response — no backend
+  // endpoint provides a real source breakdown yet, and shipping an empty
+  // placeholder was both a spec drift and a UX lie. Re-add when available.
   apiKeyPrefix: string;
 }
 
@@ -58,7 +60,6 @@ export default function SettingsPage() {
   if (!status) return null;
 
   const typeEntries = Object.entries(status.types).sort((a, b) => b[1] - a[1]);
-  const sourceEntries = Object.entries(status.sources).sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="space-y-8">
@@ -159,29 +160,9 @@ export default function SettingsPage() {
         </section>
       )}
 
-      {/* Source breakdown */}
-      {sourceEntries.length > 0 && (
-        <section className="bg-bg-surface border border-border rounded-lg p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wider">
-            Sources
-          </h2>
-          <div className="grid grid-cols-2 gap-2">
-            {sourceEntries.map(([source, count]) => (
-              <div
-                key={source}
-                className="flex items-center justify-between px-3 py-2 bg-bg-elevated border border-border rounded-md"
-              >
-                <span className="text-xs text-text-secondary truncate">
-                  {source.replace(/_/g, " ")}
-                </span>
-                <span className="text-xs text-text-muted font-medium ml-2">
-                  {count.toLocaleString()}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* REVIEW-CODEX-2-P3: Source breakdown section removed — no backend
+          endpoint currently supplies these counts. Restore this block when
+          /stats (or a sibling endpoint) returns a real source map. */}
 
       {/* Top topics */}
       {status.topTopics.length > 0 && (
