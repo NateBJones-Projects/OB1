@@ -104,6 +104,15 @@ COMMENT ON COLUMN public.thoughts.supersedes IS
 --    of each visited thought with its depth. Cycles terminate at the first
 --    re-visit and are flagged. Restricted ancestors return with content=NULL
 --    and a flag so callers can redact downstream.
+--
+--    Canonical-schema compatibility note: the canonical OB1 public.thoughts
+--    table only defines id, content, embedding, metadata, created_at,
+--    updated_at (plus content_fingerprint in 2.6). The `sensitivity_tier`,
+--    `source_type`, and `type` values that this function exposes are read
+--    from `metadata->>'…'` rather than top-level columns, so the migration
+--    installs cleanly on a stock setup without requiring you to ADD COLUMN
+--    for those fields. If you have already promoted them to real columns
+--    on a fork, change the metadata reads below to direct column reads.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.trace_provenance(
@@ -141,20 +150,22 @@ BEGIN
   RETURN QUERY
   WITH RECURSIVE walk AS (
     -- Seed: the root thought at depth 0.
+    -- type / source_type / sensitivity_tier are read from metadata because
+    -- the canonical public.thoughts table does not define them as columns.
     SELECT
-      t.id          AS thought_id,
-      0             AS depth,
-      NULL::uuid    AS parent_id,
+      t.id                                 AS thought_id,
+      0                                    AS depth,
+      NULL::uuid                           AS parent_id,
       t.content,
-      t.type,
-      t.source_type,
+      (t.metadata->>'type')                AS type,
+      (t.metadata->>'source_type')         AS source_type,
       t.derivation_method,
       t.derivation_layer,
-      t.sensitivity_tier,
+      (t.metadata->>'sensitivity_tier')    AS sensitivity_tier,
       t.created_at,
       t.derived_from,
-      ARRAY[t.id]   AS visited,
-      false         AS cycle
+      ARRAY[t.id]                          AS visited,
+      false                                AS cycle
     FROM public.thoughts t
     WHERE t.id = p_thought_id
 
@@ -167,11 +178,11 @@ BEGIN
       w.depth + 1,
       w.thought_id,
       parent.content,
-      parent.type,
-      parent.source_type,
+      (parent.metadata->>'type')             AS type,
+      (parent.metadata->>'source_type')      AS source_type,
       parent.derivation_method,
       parent.derivation_layer,
-      parent.sensitivity_tier,
+      (parent.metadata->>'sensitivity_tier') AS sensitivity_tier,
       parent.created_at,
       parent.derived_from,
       w.visited || parent.id,
@@ -262,19 +273,23 @@ BEGIN
   -- containment operator can use idx_thoughts_derived_from.
   v_needle := jsonb_build_array(p_thought_id::text);
 
+  -- type / source_type / sensitivity_tier come from metadata so the migration
+  -- works on the canonical public.thoughts schema (which does not define them
+  -- as top-level columns). If you have promoted them to real columns on a
+  -- fork, swap the metadata reads below for direct column reads.
   RETURN QUERY
   SELECT
     t.id,
     t.content,
-    t.type,
-    t.source_type,
+    (t.metadata->>'type')                AS type,
+    (t.metadata->>'source_type')         AS source_type,
     t.derivation_method,
     t.derivation_layer,
-    t.sensitivity_tier,
+    (t.metadata->>'sensitivity_tier')    AS sensitivity_tier,
     t.created_at
   FROM public.thoughts t
   WHERE t.derived_from @> v_needle
-    AND t.sensitivity_tier IS DISTINCT FROM 'restricted'
+    AND (t.metadata->>'sensitivity_tier') IS DISTINCT FROM 'restricted'
   ORDER BY t.created_at DESC
   LIMIT v_limit;
 END;

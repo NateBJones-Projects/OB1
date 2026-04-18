@@ -23,6 +23,14 @@ The two functions power the **Provenance Chains Pipeline** recipe (backfill, eva
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - Access to the Supabase SQL Editor or CLI
 
+### Canonical-schema compatibility
+
+The helpers `trace_provenance` and `find_derivatives` surface three fields — `type`, `source_type`, and `sensitivity_tier` — that the canonical `public.thoughts` table stores inside `metadata`, not as top-level columns. This migration reads them via `metadata->>'…'` so it installs cleanly on a stock OB1 setup. No extra `ADD COLUMN` is required. If your fork has already promoted any of these to real columns, edit the metadata reads inside `schema.sql` to direct column reads before you run the migration.
+
+### RLS compatibility
+
+The four new columns (`derived_from`, `derivation_method`, `derivation_layer`, `supersedes`) are plain columns on `public.thoughts`. Row-level security operates at the row granularity, not the column granularity, so any policies you already have on `public.thoughts` continue to apply unchanged — the new columns are simply returned or withheld alongside the rest of the row. If you need to hide specific columns from certain roles, use PostgREST's `select` column grants or a dedicated view. The helper functions are `SECURITY DEFINER` and granted to `service_role` only, so they run outside the caller's RLS context by design.
+
 ## Credential Tracker
 
 ```text
