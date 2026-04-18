@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 interface BrainStatus {
   healthy: boolean;
   totalThoughts: number;
-  embeddingCoverage: string;
+  // CR-01: embeddingCoverage removed from API response; card no longer shown.
   types: Record<string, number>;
   topTopics: Array<{ topic: string; count: number }>;
   sources: Record<string, number>;
@@ -112,15 +112,24 @@ export default function SettingsPage() {
             </a>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <StatCard label="Total Thoughts" value={status.totalThoughts.toLocaleString()} />
-            <StatCard label="Embeddings" value={status.embeddingCoverage} />
             <StatCard label="Types" value={String(typeEntries.length)} />
           </div>
         )}
       </section>
 
       {/* Type breakdown */}
+      {typeEntries.length === 0 && status.totalThoughts > 0 && (
+        <section className="bg-bg-surface border border-border rounded-lg p-5">
+          <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wider mb-2">
+            Thought Types
+          </h2>
+          <p className="text-text-muted text-sm">
+            Type distribution not available.
+          </p>
+        </section>
+      )}
       {typeEntries.length > 0 && (
         <section className="bg-bg-surface border border-border rounded-lg p-5 space-y-4">
           <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wider">

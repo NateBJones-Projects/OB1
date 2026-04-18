@@ -22,9 +22,10 @@ export async function GET() {
 
   try {
     // Use /count endpoint (simple, reliable) with /health as a secondary liveness check
-    const [countRes, healthRes] = await Promise.allSettled([
+    const [countRes, healthRes, statsRes] = await Promise.allSettled([
       fetch(`${API_URL}/count`, { headers }),
       fetch(`${API_URL}/health`, { headers }),
+      fetch(`${API_URL}/stats`, { headers }),
     ]);
 
     // Parse count
@@ -43,41 +44,54 @@ export async function GET() {
     // If health endpoint fails but count worked, we're still connected
     if (!healthy && totalThoughts > 0) healthy = true;
 
-    // Build type breakdown by querying /count per type.
-    // If a user's deployment doesn't have all these types populated, they'll simply report 0.
+    // CR-01 / WR-01 / WR-02: pull real types + top_topics from /stats
+    // instead of the previous hardcoded type list and empty placeholders.
+    // If /stats doesn't return types we fall through to an empty map and
+    // the UI renders "type distribution not available".
     const types: Record<string, number> = {};
-    const sources: Record<string, number> = {};
-    try {
-      const typeNames = ["idea", "task", "person_note", "reference", "decision", "lesson", "meeting", "journal"];
-      const typeResults = await Promise.allSettled(
-        typeNames.map(async (type) => {
-          const res = await fetch(`${API_URL}/count?type=${type}`, { headers });
-          if (!res.ok) return { type, count: 0 };
-          const data = await res.json();
-          return { type, count: data.count ?? 0 };
-        })
-      );
-      for (const r of typeResults) {
-        if (r.status === "fulfilled" && r.value.count > 0) {
-          types[r.value.type] = r.value.count;
+    const topTopics: Array<{ topic: string; count: number }> = [];
+    if (statsRes.status === "fulfilled" && statsRes.value.ok) {
+      try {
+        const statsData = await statsRes.value.json();
+        if (statsData && typeof statsData.types === "object" && statsData.types) {
+          for (const [k, v] of Object.entries(statsData.types)) {
+            if (typeof v === "number" && v > 0) types[k] = v;
+          }
         }
+        if (Array.isArray(statsData?.top_topics)) {
+          for (const entry of statsData.top_topics) {
+            if (
+              entry &&
+              typeof entry.topic === "string" &&
+              typeof entry.count === "number"
+            ) {
+              topTopics.push({ topic: entry.topic, count: entry.count });
+            }
+          }
+        }
+      } catch (err) {
+        console.error("[settings/status] failed to parse /stats", err);
       }
-    } catch {
-      // Non-critical
     }
 
     return NextResponse.json({
       healthy,
       totalThoughts,
-      embeddingCoverage: totalThoughts > 0 ? "99.2%" : "N/A",
+      // CR-01: embeddingCoverage removed — the previous "99.2%" was fabricated.
+      // TODO: wire a real /embeddings/coverage endpoint on the REST gateway,
+      // then restore this field with the computed value.
       types,
-      topTopics: [],
-      sources,
+      topTopics,
+      // WR-02: sources is not yet populated by /stats — keep as empty until
+      // the REST gateway ships a source breakdown.
+      sources: {},
       apiKeyPrefix: apiKey.substring(0, 8),
     });
   } catch (err) {
+    // WR-05: Log detail server-side, return generic to client
+    console.error("[settings/status]", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to load status" },
+      { error: "Failed to load status" },
       { status: 500 }
     );
   }
