@@ -368,3 +368,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.graph_edges TO service_role
 -- ============================================================================
 REVOKE ALL ON FUNCTION public.reconstruct_bfs_path(jsonb, uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reconstruct_bfs_path(jsonb, uuid, uuid) TO service_role;
+
+-- ============================================================================
+-- Lock down RPC entry points
+-- find_shortest_path and traverse_graph are intended for server-side callers
+-- (edge functions using SUPABASE_SERVICE_ROLE_KEY). Revoke default PUBLIC
+-- EXECUTE so PostgREST rejects anon/authenticated calls at the entry point
+-- rather than crashing inside reconstruct_bfs_path on a permission error.
+-- ============================================================================
+REVOKE ALL ON FUNCTION public.find_shortest_path(uuid, uuid, uuid, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.find_shortest_path(uuid, uuid, uuid, int) TO service_role;
+
+REVOKE ALL ON FUNCTION public.traverse_graph(uuid, uuid, int, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.traverse_graph(uuid, uuid, int, text) TO service_role;
