@@ -109,4 +109,4 @@ Solution: Check for long-running transactions holding locks on `thoughts` (look 
 ## References
 
 - [PostgreSQL `pg_trgm` documentation](https://www.postgresql.org/docs/current/pgtrgm.html) -- official reference for trigram matching and index operator classes
-- [`schemas/enhanced-thoughts`](../enhanced-thoughts/README.md) -- defines `search_thoughts_text`, the consumer of this index
+- [`schemas/enhanced-thoughts` (PR #191)](https://github.com/NateBJones-Projects/OB1/pull/191) -- defines `search_thoughts_text`, the consumer of this index
