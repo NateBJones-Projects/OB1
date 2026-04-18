@@ -93,6 +93,10 @@ Typical filter pass rate: 20-40%. On 500 candidate pairs with a 30% pass rate, e
 
 The `--max-cost-usd` flag is a **hard cap** on estimated spend. The classifier tracks estimated token cost after every call and stops scheduling new pairs the moment the cap is reached. Always pass a cap on first runs.
 
+**Hard-cap semantics under `--parallelism > 1`.** Before launching each chunk, the runner computes the remaining budget and clamps the chunk size so that `chunk_size * worst_case_per_pair <= remaining_budget`. As spend approaches the cap, parallelism drops to 1; once spend meets or exceeds the cap, no new pairs are scheduled. Worst-case overshoot is bounded by the cost of the **single** in-flight task that discovers the cap has been hit, which is `worst_case_per_pair` (roughly $0.018 for Opus 4.7 on the default prompt). Previously, up to `parallelism - 1` extra pairs could spend past the cap because all in-flight tasks checked `costState.spent` before any of them had resolved. This is now fixed.
+
+The proactive clamp requires the classify model to be priced in `PRICING` (in `classify-edges.mjs`). Unknown models disable the clamp; the classifier will **refuse to run with `--max-cost-usd`** under an unknown model unless you explicitly pass `--no-cost-cap` (see pricing warning below).
+
 ## Expected Outcome
 
 After a full non-dry run:

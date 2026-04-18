@@ -79,6 +79,15 @@ function estimateCost(model, inTokens, outTokens) {
   return (inTokens * p.in + outTokens * p.out) / 1_000_000;
 }
 
+// Worst-case per-pair cost for hard-cap arithmetic in processInChunks.
+// Derived from the classify stage with the generous token budget the
+// prompt could actually hit (800 in / 512 out matches max_tokens=512
+// in classifyPair). Unknown models return 0 which correctly disables
+// the proactive parallelism clamp (see estimateCost + WARN-1 refusal).
+function worstCasePerPair(model) {
+  return estimateCost(model, 800, 512);
+}
+
 // ── args + env ─────────────────────────────────────────────────────────────
 
 function parseArgs(argv) {
@@ -602,12 +611,61 @@ async function processPair(env, sb, args, pair, costState) {
 
 // ── chunked runner ─────────────────────────────────────────────────────────
 
-async function processInChunks(items, fn, parallelism) {
+/**
+ * Chunked parallel runner with a HARD cost-cap contract.
+ *
+ * The naive version (Promise.all across `parallelism` items with no
+ * cap-awareness) can overshoot `--max-cost-usd` by up to
+ * `(parallelism - 1) * worstCasePerPair` because all in-flight tasks
+ * check `costState.spent` before any of them has resolved. With
+ * Opus classify at ~$0.018/pair and parallelism=3, the overshoot can
+ * reach ~$0.036 past the cap — not catastrophic, but the README
+ * promises a hard cap.
+ *
+ * Fix: before each chunk, compute the remaining budget. If the
+ * remaining budget is not large enough to absorb `parallelism` fresh
+ * worst-case pairs, clamp the chunk size down — all the way to 1 if
+ * we are inside one worst-case pair of the cap. Once spend meets or
+ * exceeds the cap, stop scheduling entirely; `processPair` still
+ * short-circuits with `skip_cost_cap` on any stragglers.
+ *
+ * This makes the cap a hard bound (modulo the cost of the single
+ * in-flight task that discovers we've hit the cap, which is bounded
+ * by `worstCasePerPair`).
+ */
+async function processInChunks(items, fn, parallelism, costState, maxCostUsd, worstCost) {
   const results = [];
-  for (let i = 0; i < items.length; i += parallelism) {
-    const chunk = items.slice(i, i + parallelism);
+  // If we cannot price a pair (unknown model), we cannot do the
+  // proactive clamp — just fall back to the naive behavior. The
+  // pricing-unknown warning / cost-cap refusal at startup is what
+  // protects users in that case (see loadEnv + parseArgs).
+  const canProactivelyClamp = typeof worstCost === "number" && worstCost > 0;
+
+  for (let i = 0; i < items.length; ) {
+    // Stop scheduling once the cap is reached. In-flight tasks cannot
+    // exceed by more than `worstCost` because we clamp below.
+    if (typeof maxCostUsd === "number" && costState.spent >= maxCostUsd) {
+      // Drain remaining items as cap-skipped for reporting symmetry.
+      for (; i < items.length; i++) {
+        results.push(await fn(items[i]));
+      }
+      break;
+    }
+
+    let chunkSize = parallelism;
+    if (canProactivelyClamp && typeof maxCostUsd === "number") {
+      const remaining = maxCostUsd - costState.spent;
+      // Only launch as many parallel tasks as the remaining budget can
+      // absorb in the worst case. This clamps to 1 when we're close to
+      // the cap and to 0 when we're already at it (handled above).
+      const safe = Math.max(1, Math.floor(remaining / worstCost));
+      chunkSize = Math.min(parallelism, safe);
+    }
+
+    const chunk = items.slice(i, i + chunkSize);
     const chunkResults = await Promise.all(chunk.map(fn));
     results.push(...chunkResults);
+    i += chunkSize;
   }
   return results;
 }
@@ -641,10 +699,20 @@ async function main() {
   );
 
   const costState = { spent: 0 };
+  // Worst-case per-pair cost for the hard cost cap. Uses the classify
+  // model because that's the expensive leg. Returns 0 for unknown
+  // models, which disables the proactive parallelism clamp — the
+  // pricing-unknown refusal in parseArgs/loadEnv is what protects
+  // users in that case.
+  const classifyModel = args.singleModel || args.classifyModel;
+  const worstCost = worstCasePerPair(classifyModel);
   const results = await processInChunks(
     pairs,
     (p) => processPair(env, sb, args, p, costState),
     args.parallelism,
+    costState,
+    args.maxCostUsd,
+    worstCost,
   );
 
   const counts = {};
