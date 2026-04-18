@@ -60,9 +60,18 @@ const categoryArg = args.find((a) => a.startsWith("--category="));
 const CATEGORY_FILTER = categoryArg ? categoryArg.slice("--category=".length) : null;
 
 if (FLAG_HELP) {
-  const lines = fs.readFileSync(new URL(import.meta.url), "utf8")
-    .split(/\r?\n/)
-    .slice(1, 45)
+  // Extract the docblock that starts at line 2 (`/**`) and ends at the first
+  // line containing `*/`. We intentionally don't use a hardcoded slice bound
+  // so adding or removing lines inside the docblock won't leak `import` lines
+  // into --help output.
+  const source = fs.readFileSync(new URL(import.meta.url), "utf8").split(/\r?\n/);
+  const docLines = [];
+  for (let i = 1; i < source.length; i++) {
+    const line = source[i];
+    if (/\*\//.test(line)) break;
+    docLines.push(line);
+  }
+  const lines = docLines
     .map((l) => l.replace(/^ ?\*\/?/, "").replace(/^ \* ?/, ""))
     .filter((l) => !l.startsWith("/**"))
     .join("\n");
