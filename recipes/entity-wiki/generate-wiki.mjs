@@ -315,6 +315,45 @@ async function embedQuery(env, text) {
   return body?.data?.[0]?.embedding ?? null;
 }
 
+// Preflight: make sure the embedding provider's output dimension matches what
+// pgvector expects. Without this, --semantic-expand silently fails once per
+// entity with an opaque RPC error and the user has no early signal that every
+// remaining call in a batch will fail for the same reason. Runs once per
+// process. Only called when --semantic-expand is active (gated in main()).
+let _embedDimCache = null;
+async function preflightEmbeddingDim(sb, env, expected = 1536) {
+  if (_embedDimCache !== null) return _embedDimCache;
+  const probe = await embedQuery(env, "dimension check");
+  _embedDimCache = Array.isArray(probe) ? probe.length : 0;
+  if (_embedDimCache !== expected) {
+    throw new Error(
+      `Embedding dim mismatch: EMBEDDING_MODEL returned ${_embedDimCache} dims ` +
+        `but thoughts.embedding is vector(${expected}). ` +
+        `Either set EMBEDDING_MODEL to a ${expected}-dim model (default: text-embedding-3-small), ` +
+        `or ALTER COLUMN thoughts.embedding to match your model's output size.`,
+    );
+  }
+  // Sanity-check the match_thoughts signature with a dummy vector of the
+  // expected size. If the stock 4-arg RPC is missing or renamed, fail early
+  // with an actionable message instead of 25 per-entity 404s.
+  try {
+    const dummy = new Array(expected).fill(0);
+    await sb.rpc("match_thoughts", {
+      query_embedding: dummy,
+      match_threshold: 0.99,
+      match_count: 1,
+      filter: {},
+    });
+  } catch (rpcErr) {
+    throw new Error(
+      `match_thoughts RPC preflight failed: ${rpcErr.message}. ` +
+        `Expected the stock 4-arg signature (query_embedding, match_threshold, match_count, filter) ` +
+        `from docs/01-getting-started.md. Either recreate it or rerun without --semantic-expand.`,
+    );
+  }
+  return _embedDimCache;
+}
+
 async function semanticExpand(sb, env, entity) {
   const query = `${entity.canonical_name} (${entity.entity_type})`;
   const embedding = await embedQuery(env, query);
@@ -784,6 +823,18 @@ async function main() {
     }
   }
   const sb = createSupabase(env);
+
+  // Preflight embedding + match_thoughts once per run when semantic expansion
+  // is active. Bails early with an actionable error instead of 25 silent
+  // per-entity failures.
+  if (args.semanticExpand) {
+    try {
+      await preflightEmbeddingDim(sb, env);
+    } catch (err) {
+      console.error(`[wiki] --semantic-expand preflight failed: ${err.message}`);
+      process.exit(1);
+    }
+  }
 
   if (args.batch) {
     const candidates = await listBatchCandidates(sb, args.batchMinLinked, args.batchLimit);
