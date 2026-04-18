@@ -151,9 +151,28 @@ async function sbPatch(queryPath, body) {
   if (!res.ok) throw new Error(`PATCH ${queryPath}: ${res.status} ${await res.text()}`);
 }
 
+// Tag attached to errors raised by sbRpc when the server-side plpgsql
+// function signalled a missing-row RAISE (SQLSTATE 22023 no_data_found,
+// surfaced by PostgREST as HTTP 400/404 with a JSON body containing
+// "code":"P0001" or the mapped no_data_found code). Callers that care —
+// applyScoresFromFile — test err.notFound to classify the write as a
+// failed write rather than a success.
+class RpcNotFoundError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "RpcNotFoundError";
+    this.notFound = true;
+  }
+}
+
 // POST to a PostgREST RPC endpoint. The server-side function is expected to
 // RETURNS VOID, so we ask PostgREST not to send a body back (`return=minimal`)
 // and we do not try to parse one here. Matches the RPC helper in backfill.mjs.
+//
+// Zero-row merges raise "Thought <id> not found" (no_data_found, 22023) —
+// PostgREST maps that to HTTP 400/404 with a JSON body. We detect the
+// message and surface it as RpcNotFoundError so apply-scores can classify
+// the write as a failed write instead of a silent success.
 async function sbRpc(fnName, body) {
   const res = await fetch(`${REST}/rpc/${fnName}`, {
     method: "POST",
@@ -162,6 +181,19 @@ async function sbRpc(fnName, body) {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
+    // PostgREST surfaces plpgsql RAISE ... USING ERRCODE = 'no_data_found'
+    // as HTTP 404 (or 400 on older builds) with a JSON body whose `message`
+    // field carries our "Thought <id> not found" string. Detect either the
+    // status or the message so the caller can treat it as a failed write.
+    const isNotFound =
+      res.status === 404 ||
+      /Thought\s+[0-9a-f-]+\s+not found/i.test(text) ||
+      /no_data_found/i.test(text);
+    if (isNotFound) {
+      throw new RpcNotFoundError(
+        `RPC ${fnName}: target thought not found (${res.status} ${text.slice(0, 200)})`,
+      );
+    }
     throw new Error(`RPC ${fnName}: ${res.status} ${text.slice(0, 300)}`);
   }
 }
@@ -397,14 +429,33 @@ async function applyScoresFromFile(file, dryRun) {
       continue;
     }
     const avg = (score.existence + score.relevance + score.sufficiency) / 3;
-    results.push({ id: obj.thought_id, score, avg, sourceType: obj.source_type ?? "?", parentCount: obj.parent_count ?? 0 });
+    const entry = { id: obj.thought_id, score, avg, sourceType: obj.source_type ?? "?", parentCount: obj.parent_count ?? 0 };
     if (!dryRun) {
-      // No GET-before-write: merge_thought_eval_metadata performs a
-      // server-side `metadata = metadata || p_eval` on the current row, so
-      // there is no stale JS snapshot that could clobber a concurrent
-      // backfill RPC. If the thought has been deleted, the UPDATE simply
-      // affects zero rows — there is nothing to mirror back.
-      await writeScore(obj.thought_id, score, obj.grader ?? "queue");
+      // merge_thought_eval_metadata performs a server-side
+      // `metadata = metadata || p_eval` on the current row. No stale JS
+      // snapshot, no clobber of a concurrent backfill RPC. The RPC now
+      // RAISEs `no_data_found` (HTTP 404) when the target row is missing
+      // — stale score files or mistyped thought_ids used to look
+      // "applied" in the report even though nothing was written. Catch
+      // that and classify the row as an error so the summary reflects
+      // reality and downstream automation can detect the miss.
+      try {
+        await writeScore(obj.thought_id, score, obj.grader ?? "queue");
+        results.push(entry);
+      } catch (err) {
+        if (err && err.notFound) {
+          console.error(`  ${obj.thought_id} MISSING: target thought not found in DB`);
+          results.push({ id: obj.thought_id, sourceType: entry.sourceType, parentCount: entry.parentCount, error: "thought not found (deleted or mistyped id)" });
+        } else {
+          console.error(`  ${obj.thought_id} FAILED: ${err.message}`);
+          results.push({ id: obj.thought_id, sourceType: entry.sourceType, parentCount: entry.parentCount, error: err.message });
+        }
+      }
+    } else {
+      // Dry-run: no write attempted, so we cannot detect missing rows.
+      // Still record the entry as scored so the report mirrors the input
+      // queue faithfully.
+      results.push(entry);
     }
   }
   return results;
@@ -470,8 +521,18 @@ async function main() {
     console.log(`[eval] applying scores from ${args.applyScores} (dry-run=${args.dryRun})`);
     const results = await applyScoresFromFile(args.applyScores, args.dryRun);
     const scored = results.filter((r) => !r.error);
+    const errors = results.filter((r) => r.error);
+    const missing = errors.filter((r) => /thought not found/i.test(String(r.error ?? "")));
     writeReport(results, summarize(scored), "queue", args.report);
-    console.log(`[eval] applied ${scored.length}/${results.length} scores`);
+    console.log(`[eval] applied ${scored.length}/${results.length} scores (errors=${errors.length}, missing=${missing.length})`);
+    if (missing.length > 0) {
+      const ids = missing.slice(0, 10).map((r) => r.id);
+      const more = missing.length > ids.length ? `, +${missing.length - ids.length} more` : "";
+      console.error(`[eval] WARN — ${missing.length} score(s) targeted missing thoughts: ${ids.join(", ")}${more}. Re-verify the score file or regenerate with --grader queue.`);
+    }
+    // Non-zero exit if any write failed so unattended automation can detect
+    // half-applied runs. Dry-run never writes, so never exits non-zero here.
+    if (!args.dryRun && errors.length > 0) process.exit(1);
     return;
   }
 
