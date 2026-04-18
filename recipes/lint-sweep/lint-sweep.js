@@ -567,22 +567,47 @@ function renderReport({ args, tier1, tier2, tier3, startedAt, finishedAt }) {
   lines.push("*Read-only audit. This script never mutates thoughts.*");
   lines.push("");
 
+  // Scan scope — make sampling caps explicit so the counts below are not
+  // misread as whole-brain totals on large installs.
+  lines.push("## Scan scope");
+  lines.push("");
+  lines.push("This run inspects bounded samples, not your entire brain. Counts below are relative to these samples.");
+  lines.push("");
+  if (tier1) {
+    lines.push("- **Tier 1** — most recent **2000 thoughts** (ordered by `id desc`) for orphan/over-tag/length checks; up to **5000 rows** with a populated `content_fingerprint` for duplicate detection; full-table exact row counts for `thoughts` and `content_fingerprint IS NULL` (no cap).");
+  }
+  if (tier2) {
+    lines.push("- **Tier 2** — first **500 high-importance thoughts** (`importance >= 4`), first **2000 entities**, first **5000 edges**.");
+  }
+  if (tier3) {
+    if (tier3.enabled) {
+      lines.push(`- **Tier 3** — up to **${args.sampleSize} thoughts** from the last **${args.days} days**, batched ~20 per LLM call, hard-capped at **${args.maxLlmCalls} LLM calls**.`);
+    } else {
+      lines.push(`- **Tier 3** — skipped (${tier3.skippedReason}).`);
+    }
+  }
+  lines.push("");
+  lines.push("On brains larger than these caps, Tier 1/2 counts represent a **slice**, not the global total. Example: \"Entities with zero edges: 12\" under a 2000-entity cap means *12 isolated entities among the first 2000 returned*, not \"12 total isolated entities.\" For whole-brain coverage, run the SQL views in [`views.sql`](./views.sql) directly.");
+  lines.push("");
+
   // Summary header
   const tier3Count = tier3
     ? Object.values(tier3.findings || {}).reduce((n, a) => n + (Array.isArray(a) ? a.length : 0), 0)
     : 0;
   lines.push("## Summary");
   lines.push("");
+  lines.push("*Counts below reflect the bounded scan scope described above — not whole-brain totals.*");
+  lines.push("");
   if (tier1) {
-    lines.push(`- Total thoughts inspected (Tier 1 sample): ${tier1.totalThoughts}`);
-    lines.push(`- Orphans by tag (recent 2000): ${tier1.orphansByTag}`);
-    lines.push(`- Exact-duplicate fingerprint groups: ${Array.isArray(tier1.exactDuplicates) ? tier1.exactDuplicates.filter((x) => x.ids).length : 0}`);
-    lines.push(`- Rows missing content_fingerprint: ${tier1.noFingerprint}`);
-    lines.push(`- Low-signal noise candidates: ${tier1.lowSignalNoise}`);
+    lines.push(`- Total thoughts in table (exact count, uncapped): ${tier1.totalThoughts}`);
+    lines.push(`- Orphans by tag (in recent 2000 sampled): ${tier1.orphansByTag}`);
+    lines.push(`- Exact-duplicate fingerprint groups (in first 5000 fingerprinted rows): ${Array.isArray(tier1.exactDuplicates) ? tier1.exactDuplicates.filter((x) => x.ids).length : 0}`);
+    lines.push(`- Rows missing content_fingerprint (exact count, uncapped): ${tier1.noFingerprint}`);
+    lines.push(`- Low-signal noise candidates (in recent 2000 sampled): ${tier1.lowSignalNoise}`);
   }
   if (tier2) {
-    lines.push(`- High-importance isolated (no entity links): ${tier2.highImportanceIsolated.length}`);
-    lines.push(`- Entities with zero edges: ${tier2.entitiesWithNoEdges}`);
+    lines.push(`- High-importance isolated — no entity links (in first 500 high-importance sampled): ${tier2.highImportanceIsolated.length}`);
+    lines.push(`- Entities with zero edges (among first 2000 entities ∩ first 5000 edges): ${tier2.entitiesWithNoEdges}`);
   }
   if (tier3) {
     if (tier3.enabled) {
@@ -623,18 +648,20 @@ function renderReport({ args, tier1, tier2, tier3, startedAt, finishedAt }) {
   if (tier2) {
     lines.push("## Tier 2 — Graph-based lint (free)");
     lines.push("");
+    lines.push("*Scope: first 500 high-importance thoughts, first 2000 entities, first 5000 edges. Counts below are within that slice, not the whole brain.*");
+    lines.push("");
     if (tier2.graphTablesMissing.length > 0) {
       lines.push(`*Graph tables absent: ${tier2.graphTablesMissing.join(", ")}. Tier 2 requires the \`entity-extraction\` schema (which ships \`entities\`, \`edges\`, \`thought_entities\`) — see PRs #197 and #199. The \`ob-graph\` recipe uses different table names and does NOT satisfy this dependency.*`);
       lines.push("");
     }
-    lines.push(`- High-importance (≥4) thoughts with no entity links: **${tier2.highImportanceIsolated.length}**`);
+    lines.push(`- High-importance (≥4) thoughts with no entity links (in first 500 high-importance sampled): **${tier2.highImportanceIsolated.length}**`);
     for (const row of tier2.highImportanceIsolated.slice(0, 15)) {
       lines.push(`  - #${row.id} (imp=${row.importance}, ${row.created_at?.slice(0, 10)}) — ${row.preview}${row.preview.length >= 120 ? "…" : ""}`);
     }
     if (tier2.highImportanceIsolated.length > 15) {
       lines.push(`  - …and ${tier2.highImportanceIsolated.length - 15} more`);
     }
-    lines.push(`- Entities with zero edges: **${tier2.entitiesWithNoEdges}**`);
+    lines.push(`- Entities with zero edges (among first 2000 entities ∩ first 5000 edges): **${tier2.entitiesWithNoEdges}**`);
     lines.push("");
   }
 
