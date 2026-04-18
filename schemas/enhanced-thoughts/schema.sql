@@ -78,7 +78,7 @@ BEGIN
       AND (SELECT count(*) FROM tsvector_hits) < (p_limit + p_offset)
       AND t.content ILIKE '%' || q.raw_query || '%'
       AND t.metadata @> coalesce(p_filter, '{}'::jsonb)
-      AND t.id NOT IN (SELECT th.hit_id FROM tsvector_hits th)
+      AND NOT EXISTS (SELECT 1 FROM tsvector_hits th WHERE th.hit_id = t.id)
     LIMIT 500
   ),
   all_hits AS (
