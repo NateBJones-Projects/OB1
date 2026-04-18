@@ -571,6 +571,12 @@ Deno.serve(async (req) => {
   const limit = Math.min(Math.max(parseInt(url.searchParams.get("limit") ?? "10", 10) || 10, 1), 50);
   const dryRun = url.searchParams.get("dry_run") === "true";
 
+  // Wall-clock budget. Supabase Edge Functions hard-kill at 150s; we stop
+  // claiming new items at 140s so the in-flight item can finish and we can
+  // return a real JSON response rather than a 504.
+  const INVOCATION_BUDGET_MS = 140_000;
+  const startTime = Date.now();
+
   // Step 1: Fetch queue items — peek only for dry-run, claim for real processing
   const claimed = dryRun
     ? await peekQueueItems(limit)
@@ -595,15 +601,17 @@ Deno.serve(async (req) => {
 
   // Step 2: Process each queue item
   for (const item of claimed) {
-    // Cost cap: if we've exhausted ENTITY_EXTRACTION_MAX_CALLS, abort the loop
-    // cleanly. Un-claimed remaining items are returned to 'pending' so the next
-    // invocation can pick them up.
-    if (
+    // Wall-clock / cost-cap shared cleanup: if either ceiling has been hit,
+    // release remaining claimed rows back to 'pending' and break.
+    const elapsed = Date.now() - startTime;
+    const budgetTripped = elapsed >= INVOCATION_BUDGET_MS;
+    const capTripped =
       ENTITY_EXTRACTION_MAX_CALLS > 0 &&
-      llmCallCount >= ENTITY_EXTRACTION_MAX_CALLS
-    ) {
+      llmCallCount >= ENTITY_EXTRACTION_MAX_CALLS;
+
+    if (budgetTripped || capTripped) {
       summary.truncated = true;
-      summary.truncated_reason = "call_cap_reached";
+      summary.truncated_reason = budgetTripped ? "wall_clock_budget" : "call_cap_reached";
       if (!dryRun) {
         const remainingIds = claimed
           .slice(claimed.indexOf(item))
@@ -730,5 +738,6 @@ Deno.serve(async (req) => {
   }
 
   summary.llm_calls = llmCallCount;
+  (summary as Record<string, unknown>).elapsed_ms = Date.now() - startTime;
   return json(summary);
 });
