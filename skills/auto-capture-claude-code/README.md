@@ -2,6 +2,10 @@
 
 > Claude Code adapter for the [auto-capture](../auto-capture/) skill, adding automatic session-end thought capture via Claude Code hooks.
 
+## Relationship to Upstream Skill
+
+This adapter implements the session-end capture behavior defined by the upstream [auto-capture skill](../auto-capture/) by **Jared Irish**. The base skill is a behavioral protocol — it describes when and what to capture during interactive session closes. This adapter is the concrete Claude Code binding: a Stop-hook script that fires the same capture behavior automatically when a session ends without a verbal trigger (terminal close, Ctrl+C, timeout). The upstream skill and this adapter are complementary; install both for full coverage.
+
 ## What It Does
 
 This adapter extends the base [auto-capture skill](../auto-capture/) with automatic ambient capture for Claude Code sessions. While the base skill handles interactive session-close captures (when the user explicitly says "wrap up"), this adapter ensures that sessions which end without a verbal trigger — terminal close, Ctrl+C, timeout — are still captured to Open Brain.

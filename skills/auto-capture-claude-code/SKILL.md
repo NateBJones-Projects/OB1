@@ -14,6 +14,10 @@ requires_skills:
 
 # Auto-Capture: Claude Code Adapter
 
+## Relationship to Upstream Skill
+
+This adapter implements the session-end capture behavior defined by the upstream [auto-capture skill](../auto-capture/) by **Jared Irish**. The base skill is a behavioral protocol — it describes when and what to capture during interactive session closes. This adapter is the concrete Claude Code binding: a Stop-hook script that fires the same capture behavior automatically when a session ends without a verbal trigger. The upstream skill and this adapter are complementary; install both for full coverage.
+
 ## Problem
 
 The base auto-capture skill requires a verbal trigger ("wrap up", "park this")

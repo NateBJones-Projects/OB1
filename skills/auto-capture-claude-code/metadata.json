@@ -15,5 +15,6 @@
   "requires_skills": ["auto-capture"],
   "tags": ["skill", "capture", "claude-code", "hooks", "session-end", "ambient"],
   "difficulty": "beginner",
-  "estimated_time": "10 minutes"
+  "estimated_time": "10 minutes",
+  "created": "2026-04-06"
 }
