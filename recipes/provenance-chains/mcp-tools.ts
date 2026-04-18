@@ -115,7 +115,8 @@ server.registerTool(
         parents?: Node[];
       };
 
-      // Index rows by child -> list of parent rows so we can walk upward.
+      // Index rows by child -> list of parent ROWS (not just ids) so we can
+      // walk upward with per-edge depth/metadata.
       //
       // SQL contract (schema.sql recursive CTE):
       //   - anchor row: thought_id = root, parent_id = NULL
@@ -125,51 +126,52 @@ server.registerTool(
       //
       // So each step row encodes the edge "parent_id (child) ← thought_id
       // (parent)". To build child→parents we index by r.parent_id (the
-      // child) and push r.thought_id (the parent). The naming is counter-
-      // intuitive but matches schema.sql:185,187 exactly.
-      const rowsById = new Map<string, TraceRow>();
-      const parentIdsByChild = new Map<string, string[]>();
+      // child) and push the FULL row for the parent (the naming is counter-
+      // intuitive but matches schema.sql:185,187 exactly).
+      //
+      // Why full rows per edge (not canonical-by-thought_id): in a DAG a
+      // shared ancestor can legitimately appear at different depths on
+      // different paths (e.g. root←A and root←B←A — the A reached via B
+      // is at depth 2, not A's direct depth of 1). Storing the edge's own
+      // row preserves per-path depth instead of collapsing to the first
+      // occurrence.
+      const anchorRow = rows.find((r) => r.thought_id === rootId && r.parent_id === null);
+      const parentRowsByChild = new Map<string, TraceRow[]>();
       for (const r of rows) {
-        // Keep the first row we see for each thought_id as the canonical
-        // metadata carrier (depth, type, etc.). Later rows differ only in
-        // the edge's parent_id field.
-        if (!rowsById.has(r.thought_id)) rowsById.set(r.thought_id, r);
         if (r.parent_id) {
           // r.parent_id is the CHILD (downstream) in this edge.
           // r.thought_id is the PARENT (upstream) in this edge.
-          const arr = parentIdsByChild.get(r.parent_id) ?? [];
-          if (!arr.includes(r.thought_id)) arr.push(r.thought_id);
-          parentIdsByChild.set(r.parent_id, arr);
+          const arr = parentRowsByChild.get(r.parent_id) ?? [];
+          arr.push(r);
+          parentRowsByChild.set(r.parent_id, arr);
         }
       }
 
-      if (!rowsById.has(rootId)) {
+      if (!anchorRow) {
         return {
           content: [{ type: "text", text: `Thought ${rootId} not found` }],
           isError: true,
         };
       }
 
-      function buildNode(id: string, ancestors: Set<string>): Node {
-        // Ancestor-path cycle: emit a stub that references the thought but
-        // does NOT recurse. This is the only place we produce
-        // `{ thought_id, cycle: true }` without other fields — downstream
-        // consumers and tests can distinguish stubs from fully-hydrated
-        // nodes by the absence of `parents`.
-        if (ancestors.has(id)) {
-          return { thought_id: id, cycle: true };
-        }
-        const r = rowsById.get(id);
-        if (!r) {
-          // Referenced parent id not in the returned rowset (e.g., SQL
-          // capped traversal at node_cap before reaching it). Emit a
-          // minimal stub so the tree stays a tree.
-          return { thought_id: id };
-        }
+      // buildFromRow takes a specific row so depth/metadata come from THAT
+      // edge, not from a canonical-by-id lookup. The root case uses the
+      // anchor row (depth 0, parent_id NULL).
+      function buildFromRow(r: TraceRow, ancestors: Set<string>): Node {
         const nextAncestors = new Set(ancestors);
-        nextAncestors.add(id);
-        const parentIds = parentIdsByChild.get(id) ?? [];
-        const parents = parentIds.map((pid) => buildNode(pid, nextAncestors));
+        nextAncestors.add(r.thought_id);
+        const parentRows = parentRowsByChild.get(r.thought_id) ?? [];
+        const parents = parentRows.map((pr) => {
+          // Ancestor-path cycle: emit a stub that references the thought but
+          // does NOT recurse. This is the only place we produce
+          // `{ thought_id, cycle: true }` without other fields — downstream
+          // consumers and tests can distinguish stubs from fully-hydrated
+          // nodes by the absence of `parents`.
+          if (nextAncestors.has(pr.thought_id)) {
+            return { thought_id: pr.thought_id, cycle: true } as Node;
+          }
+          return buildFromRow(pr, nextAncestors);
+        });
         return {
           thought_id: r.thought_id,
           depth: r.depth,
@@ -190,10 +192,13 @@ server.registerTool(
         };
       }
 
-      const root = buildNode(rootId, new Set<string>());
+      const root = buildFromRow(anchorRow, new Set<string>());
 
-      const nodeCount = rowsById.size;
-      const truncated = nodeCount >= NODE_CAP;
+      // truncated reflects row-level truncation: if SQL returned NODE_CAP
+      // rows it likely hit the cap. Row occurrences (not unique ids) drive
+      // this signal so capped DAG traversals report correctly.
+      const nodeCount = rows.length;
+      const truncated = rows.length >= NODE_CAP;
       const summary =
         `Traced provenance of ${rootId} (depth=${maxDepth}, ${nodeCount} nodes visited` +
         (truncated ? `, truncated at node_cap=${NODE_CAP}` : "") +
