@@ -11,12 +11,17 @@ Open Brain captures atomic thoughts, but as soon as you start synthesizing — w
 - `derivation_layer` (TEXT): `'primary'` (atomic capture) or `'derived'` (regenerable artifact). Defaults to `'primary'` so all existing rows keep working.
 - `supersedes` (UUID): optional pointer to a prior thought this one replaces — e.g., a regenerated digest replacing yesterday's.
 
-It also installs two helper functions (both `SECURITY DEFINER`, both **granted to `service_role` only** — call them from your edge function, not from client code):
+It also installs three helper functions (all `SECURITY DEFINER`, all **granted to `service_role` only** — call them from your edge function, not from client code):
 
 - `trace_provenance(thought_id UUID, max_depth INT, node_cap INT)` — walks `derived_from` upward and returns a flat ancestor rowset with depth, cycle detection, and restricted-tier redaction.
 - `find_derivatives(thought_id UUID, limit INT)` — reverse lookup via the GIN index; "what derived artifacts cite this atomic thought?" Restricted rows are always filtered out; there is no client-visible override.
+- `merge_thought_provenance_metadata(thought_id UUID, provenance JSONB)` — atomically merges a provenance subtree into `metadata.provenance` server-side. The recipe uses this to avoid read-modify-write races with other writers (e.g., `eval.mjs`) that update the same `metadata` blob.
 
-The two functions power the **Provenance Chains Pipeline** recipe (backfill, eval, and MCP tool handlers).
+These functions power the **Provenance Chains Pipeline** recipe (backfill, eval, and MCP tool handlers).
+
+### Provenance round-trip for stock RPC
+
+The canonical `upsert_thought` RPC only preserves the `metadata` blob on `content_fingerprint` conflicts — not the new top-level `derived_from` / `derivation_layer` / `derivation_method` columns. To keep provenance durable across re-captures, the recipe mirrors those fields into `metadata.provenance`. That mirror is applied via `merge_thought_provenance_metadata`, which atomically merges the subtree into `metadata.provenance` server-side, avoiding read-modify-write races with other writers (e.g., `eval.mjs` storing `eval_score`).
 
 ## Prerequisites
 

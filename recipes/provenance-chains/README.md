@@ -81,6 +81,8 @@ Legacy names (still accepted with a deprecation warning):
 
    The script is idempotent — re-runs skip rows already marked `derivation_layer='derived'`. Pass `--force` if you need to re-process (e.g., after regenerating artifacts).
 
+   The metadata mirror (`metadata.provenance`) is written via the `merge_thought_provenance_metadata` RPC, which performs the merge in a single server-side `UPDATE`. This is race-free against concurrent writers like `eval.mjs` — no stale JS snapshot of `metadata` is ever replayed back.
+
 ![Step 5](https://img.shields.io/badge/Step_5-Evaluate_Quality-1E88E5?style=for-the-badge)
 
 5. Score the backfilled chains. For a quick smoke test with the default OpenRouter grader:
