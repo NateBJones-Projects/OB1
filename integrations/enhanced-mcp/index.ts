@@ -632,6 +632,35 @@ server.registerTool(
         );
       }
 
+      // Fingerprint-first dedup: if the exact content was already captured,
+      // short-circuit BEFORE paying for LLM classification + embedding.
+      // The upsert_thought RPC also dedups, but it runs after we've already
+      // spent a full enrichment cycle — this saves the cost entirely.
+      const preFingerprint = await computeContentFingerprint(content);
+      if (preFingerprint) {
+        const { data: existing, error: existingError } = await supabase
+          .from("thoughts")
+          .select(
+            "id, type, sensitivity_tier, importance, quality_score, source_type, metadata, content_fingerprint",
+          )
+          .eq("content_fingerprint", preFingerprint)
+          .maybeSingle();
+
+        if (!existingError && existing) {
+          return toolSuccess(
+            `Duplicate of thought #${existing.id} (${existing.type}). No new capture.`,
+            {
+              thought_id: existing.id,
+              action: "deduplicated",
+              content_fingerprint: existing.content_fingerprint,
+              type: existing.type,
+              sensitivity_tier: existing.sensitivity_tier,
+              metadata: existing.metadata,
+            },
+          );
+        }
+      }
+
       // Use canonical pipeline with live LLM classification
       const prepared = await prepareThoughtPayload(content, {
         source,

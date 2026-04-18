@@ -351,10 +351,39 @@ function isFatalProviderError(err: unknown): boolean {
   return /\b(400|401|402|403)\b/.test(msg);
 }
 
+// ── LLM call budget ────────────────────────────────────────────────────────
+
+/**
+ * Process-wide LLM classification call counter. Provides a hard ceiling on
+ * how many chat-completion round-trips extractMetadata() can issue during
+ * the lifetime of this Edge Function instance.
+ *
+ * Default 10,000 — override via ENHANCED_MCP_MAX_CALLS env. Set to 0 to
+ * disable the classifier entirely and always return fallback metadata
+ * (useful for pure-text bulk imports that don't need enrichment).
+ */
+let _llmCallCount = 0;
+
+function getLlmCallCap(): number {
+  const raw = Deno.env.get("ENHANCED_MCP_MAX_CALLS");
+  if (raw === undefined) return 10_000;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return 10_000;
+  return Math.floor(parsed);
+}
+
 /**
  * Multi-provider metadata extraction with retry and fallback logic.
  *
  * OB1 adaptation: provider priority is openrouter > openai > anthropic.
+ *
+ * Cost safety:
+ *   - Global ENHANCED_MCP_MAX_CALLS cap on classifier invocations.
+ *   - Primary + one retry (transient only), then at most ONE fallback
+ *     provider — never two — so a broken primary never triggers double
+ *     billing on all three providers.
+ *   - Fatal errors (400/401/402/403) from the primary fail-fast instead
+ *     of cascading. Those are account-level problems, not transient.
  */
 export async function extractMetadata(
   text: string,
@@ -368,12 +397,26 @@ export async function extractMetadata(
     return { ...fallback, _enrichment_status: "fallback" };
   }
 
-  const fetchProvider = (p: MetadataProvider) =>
-    p === "openrouter"
+  // Global call-budget guardrail: once exhausted, stop classifying.
+  const cap = getLlmCallCap();
+  if (cap === 0) {
+    return { ...fallback, _enrichment_status: "fallback" };
+  }
+  if (_llmCallCount >= cap) {
+    console.warn(
+      `Enhanced MCP LLM call budget exhausted (${_llmCallCount} / ${cap}); returning fallback metadata.`,
+    );
+    return { ...fallback, _enrichment_status: "fallback" };
+  }
+
+  const fetchProvider = (p: MetadataProvider) => {
+    _llmCallCount += 1;
+    return p === "openrouter"
       ? fetchOpenRouterMetadata(text)
       : p === "openai"
       ? fetchOpenAIMetadata(text)
       : fetchAnthropicMetadata(text);
+  };
 
   const parseResult = (raw: string): ThoughtMetadata | null => {
     if (!raw.trim()) return null;
@@ -391,25 +434,50 @@ export async function extractMetadata(
     console.warn("Primary metadata classification failed (attempt 1)", primary, err);
   }
 
+  // Fail-fast on fatal provider errors (bad auth, out of quota, malformed
+  // request). These never become transient — cascading wastes money on
+  // providers that have nothing to do with the broken one.
+  if (isFatalProviderError(lastError)) {
+    console.warn(
+      "Primary metadata classification failed with fatal provider error; skipping fallback providers",
+      primary,
+      lastError,
+    );
+    return { ...fallback, _enrichment_status: "fallback" };
+  }
+
   // Attempt 2: retry primary after delay for transient failures only
-  if (isTransientError(lastError)) {
+  if (isTransientError(lastError) && _llmCallCount < cap) {
     try {
       await new Promise((r) => setTimeout(r, ENRICHMENT_RETRY_DELAY_MS));
       const result = parseResult(await fetchProvider(primary));
       if (result) return { ...result, _enrichment_status: "complete" };
     } catch (err) {
       console.warn("Primary metadata classification failed (attempt 2)", primary, err);
+      lastError = err;
+      if (isFatalProviderError(err)) {
+        return { ...fallback, _enrichment_status: "fallback" };
+      }
     }
   }
 
-  // Attempt 3: fall through to other configured providers
+  // Attempt 3: at most ONE fallback provider — never cascade through all
+  // three, that's the scenario where a single capture can rack up three
+  // separate LLM charges.
   for (const fallbackProvider of configuredProviders.filter((p) => p !== primary)) {
+    if (_llmCallCount >= cap) break;
     try {
       const result = parseResult(await fetchProvider(fallbackProvider));
       if (result) return { ...result, _enrichment_status: "complete" };
     } catch (err) {
       console.warn("Fallback metadata classification failed", fallbackProvider, err);
+      if (isFatalProviderError(err)) {
+        // If the fallback also fails fatally, don't keep trying.
+        break;
+      }
     }
+    // Stop after a single fallback attempt regardless of outcome.
+    break;
   }
 
   return { ...fallback, _enrichment_status: "fallback" };
