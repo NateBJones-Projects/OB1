@@ -170,9 +170,9 @@ This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default
 
 **Atomicity caveat (NOT atomic in this version).** The edge INSERT and the `thoughts.supersedes` PATCH are two separate HTTP calls. There is no transaction across them.
 
-- **Preflight:** when `--mirror-supersedes` is passed, the classifier queries `information_schema.columns` at startup and fails fast if `public.thoughts.supersedes` does not exist (i.e. `schemas/provenance-chains/` is not applied). This catches the common "column missing -> silent half-write" class of failure before any LLM spend.
-- **Failure mode:** if the PATCH fails mid-run (network, 5xx, RLS), the edge is written but `thoughts.supersedes` is NOT updated. The run logs `[warn] mirror supersedes failed ...` and continues. Downstream readers that hit the edge table will see the relation; readers that hit `thoughts.supersedes` directly will not.
-- **Reconciliation:** the mirror is idempotent. Re-running the classifier on the affected pair will hit the unique constraint on the edge (no-op) and retry the PATCH. A one-off reconciliation query for all drifted rows:
+- **Best-effort, no preflight.** Mirror is best-effort. If the column doesn't exist (e.g. `schemas/provenance-chains/` hasn't been applied), the edge still writes successfully and a `[warn] Mirror to thoughts.supersedes failed ...` line is logged. There is no startup preflight — PostgREST [does not expose `information_schema` over REST](https://docs.postgrest.org/en/latest/references/api/schemas.html), so a REST-based column probe is not available on standard Supabase deployments. Check logs for mirror warnings.
+- **Failure mode:** if the PATCH fails mid-run (column missing, network, 5xx, RLS), the edge is written but `thoughts.supersedes` is NOT updated. The run logs the warning and continues. Downstream readers that hit the edge table will see the relation; readers that hit `thoughts.supersedes` directly will not.
+- **Reconciliation:** re-running an affected pair calls `thought_edges_upsert`, which increments `support_count` and refreshes `valid_until`. If `--mirror-supersedes` is on, the mirror PATCH is retried on rerun. A one-off reconciliation query for all drifted rows:
   ```sql
   -- Supersedes edges whose mirror is missing
   SELECT te.from_thought_id AS newer, te.to_thought_id AS older

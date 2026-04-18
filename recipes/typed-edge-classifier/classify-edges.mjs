@@ -382,34 +382,6 @@ async function fetchThoughts(sb, ids) {
   );
 }
 
-/**
- * Preflight check for --mirror-supersedes.
- *
- * The mirror path is NOT atomic: the edge INSERT and the `thoughts.supersedes`
- * PATCH are two separate HTTP calls. If the PATCH fails because the column
- * doesn't exist, PostgREST returns 400 (NOT a no-op). That turns every
- * supersedes classification into a half-applied write.
- *
- * This preflight catches the common case — column missing because
- * `schemas/provenance-chains/` hasn't been applied — before any LLM
- * spend. Atomicity on transient PATCH failures (network, 5xx) still
- * requires an RPC; see CRIT-2 in REVIEW.md and the documented
- * reconciliation path in the README.
- */
-async function assertMirrorColumnExists(sb) {
-  const rows = await sb.get(
-    `information_schema.columns?select=column_name` +
-      `&table_schema=eq.public&table_name=eq.thoughts&column_name=eq.supersedes`,
-  );
-  if (!Array.isArray(rows) || rows.length === 0) {
-    throw new Error(
-      "--mirror-supersedes requires public.thoughts.supersedes " +
-        "(from schemas/provenance-chains/). Apply that schema first, " +
-        "or drop the flag.",
-    );
-  }
-}
-
 // ── Anthropic calls ────────────────────────────────────────────────────────
 
 // Retry policy for Anthropic API calls. We retry on 429 (rate limit)
@@ -624,24 +596,30 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
         // Update thoughts.supersedes on the OLDER thought so "what replaced me?"
         // queries have a direct pointer.
         //
-        // NOT ATOMIC: this PATCH is a second HTTP round-trip after the
-        // edge INSERT. If the PATCH fails (network, 5xx, RLS), the edge
-        // exists but `thoughts.supersedes` does not, leaving the
-        // denormalized pointer out of sync. See CRIT-2 in REVIEW.md.
-        // We preflight at startup (assertMirrorColumnExists) so a
-        // MISSING column fails the run fast instead of silently here;
-        // true atomicity requires an RPC (future PR). The mirror is
-        // idempotent — re-running classification will re-apply it.
+        // BEST-EFFORT, NOT ATOMIC: this PATCH is a second HTTP round-trip
+        // after the edge INSERT. If the PATCH fails for any reason
+        // (column missing because schemas/provenance-chains/ is not
+        // applied, RLS, network, 5xx), we log a warning and continue —
+        // the edge is the source of truth. Do NOT preflight via
+        // information_schema: PostgREST does not expose that schema over
+        // REST (https://docs.postgrest.org/en/latest/references/api/schemas.html).
+        // True atomicity requires an RPC (future PR). The mirror is
+        // idempotent — re-running classification will re-apply it via
+        // the thought_edges_upsert path.
         await sb.patch(
           `thoughts?id=eq.${to}`,
           { supersedes: from },
         );
       } catch (e) {
         // Don't fail the edge insert if the mirror fails — the edge is
-        // the source of truth. To reconcile, re-run the classifier on
-        // the same pair; the edge will hit the unique constraint and
-        // the mirror PATCH will be retried.
-        console.warn(`  [warn] mirror supersedes failed (edge written, thoughts.supersedes NOT updated): ${String(e.message).slice(0, 200)}`);
+        // the source of truth. Reconciliation: re-run the classifier on
+        // the affected pair. thought_edges_upsert bumps support_count on
+        // the existing edge and the mirror PATCH is retried.
+        console.warn(
+          `  [warn] Mirror to thoughts.supersedes failed — column may not exist ` +
+            `or permissions may be restricted. Edge inserted; manual reconciliation ` +
+            `may be needed. See README. ${String(e.message).slice(0, 200)}`,
+        );
       }
     }
 
@@ -843,12 +821,6 @@ async function main() {
 
   const env = loadEnv();
   const sb = sbClient(env);
-
-  // Preflight: if --mirror-supersedes is set, require public.thoughts.supersedes
-  // up front so we fail before spending any LLM money. See CRIT-2 in REVIEW.md.
-  if (args.mirrorSupersedes) {
-    await assertMirrorColumnExists(sb);
-  }
 
   let pairs;
   if (args.pair) {
