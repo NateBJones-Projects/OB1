@@ -558,14 +558,13 @@ async function fetchByIds(config, ids) {
   return res.json();
 }
 
-async function patchThought(id, patch, config) {
+async function patchThought(id, patch, config, retries = 4) {
   const url = `${config.supabaseUrl}/rest/v1/thoughts?id=eq.${id}`;
   const body = { ...patch };
   if (body.metadata) {
     body.metadata = JSON.stringify(body.metadata);
   }
-
-  const res = await fetchWithTimeout(url, {
+  const opts = {
     method: "PATCH",
     headers: {
       ...supabaseHeaders(config),
@@ -573,25 +572,32 @@ async function patchThought(id, patch, config) {
       Prefer: "return=minimal",
     },
     body: JSON.stringify(body),
-  }, SUPABASE_TIMEOUT_MS);
+  };
 
-  if (!res.ok) {
-    const text = await res.text();
-    // Retry once after 2s
-    await sleep(2000);
-    const res2 = await fetchWithTimeout(url, {
-      method: "PATCH",
-      headers: {
-        ...supabaseHeaders(config),
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
-      body: JSON.stringify(body),
-    }, SUPABASE_TIMEOUT_MS);
-    if (!res2.ok) {
-      const text2 = await res2.text();
-      throw new Error(`PATCH thought ${id} failed after retry (${res2.status}): ${text2.substring(0, 200)}`);
+  // Retry only on transient errors (429 + 5xx + AbortError/network).
+  // 4xx (400/401/403/404/422) means the request is structurally wrong —
+  // "column does not exist", bad auth, or RLS denial. Retrying will burn
+  // time + a round trip without ever succeeding, so fail fast so the
+  // operator sees the real reason on row 1 instead of row N.
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    let res;
+    try {
+      res = await fetchWithTimeout(url, opts, SUPABASE_TIMEOUT_MS);
+    } catch (err) {
+      // Network/abort. Treat as transient up to `retries` times.
+      if (attempt === retries) throw err;
+      const delay = Math.min(16000, 1000 * Math.pow(2, attempt));
+      await sleep(delay);
+      continue;
     }
+    if (res.ok) return;
+    const text = await res.text();
+    const isTransient = [429, 500, 502, 503, 504].includes(res.status);
+    if (!isTransient || attempt === retries) {
+      throw new Error(`PATCH thought ${id} failed (${res.status}): ${text.substring(0, 300)}`);
+    }
+    const delay = Math.min(16000, 1000 * Math.pow(2, attempt));
+    await sleep(delay);
   }
 }
 
