@@ -280,7 +280,7 @@ async function upsertEntity(name: string, entityType: string): Promise<number | 
 }
 
 async function linkThoughtEntity(
-  thoughtId: number,
+  thoughtId: string,
   entityId: number,
   confidence: number,
 ): Promise<boolean> {
@@ -363,7 +363,7 @@ async function upsertEdge(
 // ── Queue Management ────────────────────────────────────────────────────────
 
 /** Peek at pending items without changing their status (for dry-run mode). */
-async function peekQueueItems(limit: number): Promise<Array<{ thought_id: number }>> {
+async function peekQueueItems(limit: number): Promise<Array<{ thought_id: string }>> {
   const { data, error } = await supabase
     .from("entity_extraction_queue")
     .select("thought_id")
@@ -376,7 +376,7 @@ async function peekQueueItems(limit: number): Promise<Array<{ thought_id: number
 }
 
 /** Atomically claim pending items — returns only items this worker actually acquired. */
-async function claimQueueItems(limit: number): Promise<Array<{ thought_id: number }>> {
+async function claimQueueItems(limit: number): Promise<Array<{ thought_id: string }>> {
   const { data: pending, error: fetchError } = await supabase
     .from("entity_extraction_queue")
     .select("thought_id")
@@ -410,14 +410,14 @@ async function claimQueueItems(limit: number): Promise<Array<{ thought_id: numbe
   return claimed ?? [];
 }
 
-async function markComplete(thoughtId: number): Promise<void> {
+async function markComplete(thoughtId: string): Promise<void> {
   await supabase
     .from("entity_extraction_queue")
     .update({ status: "complete", processed_at: new Date().toISOString() })
     .eq("thought_id", thoughtId);
 }
 
-async function markError(thoughtId: number, error: string, attemptCount: number): Promise<void> {
+async function markError(thoughtId: string, error: string, attemptCount: number): Promise<void> {
   const newStatus = attemptCount + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
   const isRetry = newStatus === "pending";
   await supabase
