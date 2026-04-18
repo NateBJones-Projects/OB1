@@ -151,6 +151,10 @@ async function fetchPage(table, orderBy, offset, limit) {
 /** Export one table, streaming rows to disk. */
 async function exportTable(tableName, orderBy, backupDir, dateStr, required) {
   const filePath = path.join(backupDir, `${tableName}-${dateStr}.json`);
+  // Write to a sibling .tmp file and atomically rename on success. Any crash
+  // (network error, process kill) leaves only the .tmp behind, so yesterday's
+  // valid backup is never overwritten by today's partial one.
+  const tmpPath = `${filePath}.tmp`;
   let offset = 0;
   let total = null;
   let rowCount = 0;
@@ -170,44 +174,64 @@ async function exportTable(tableName, orderBy, backupDir, dateStr, required) {
 
   if (first.rows.length === 0) {
     process.stdout.write(`${label}: 0 rows (empty table)\n`);
-    fs.writeFileSync(filePath, "[]");
+    // Even the two-byte "[]" path writes via tmp+rename so we never leave a
+    // half-written file in the final location.
+    try {
+      fs.writeFileSync(tmpPath, "[]");
+      fs.renameSync(tmpPath, filePath);
+    } catch (err) {
+      try { fs.unlinkSync(tmpPath); } catch {}
+      throw err;
+    }
     return { rowCount: 0, filePath, fileSize: 2 };
   }
 
-  const fd = fs.openSync(filePath, "w");
-  fs.writeSync(fd, "[\n");
-  let firstRow = true;
+  const fd = fs.openSync(tmpPath, "w");
+  let closed = false;
+  try {
+    fs.writeSync(fd, "[\n");
+    let firstRow = true;
 
-  function writeRows(rows) {
-    for (const row of rows) {
-      if (!firstRow) fs.writeSync(fd, ",\n");
-      fs.writeSync(fd, JSON.stringify(row));
-      firstRow = false;
-      rowCount++;
+    function writeRows(rows) {
+      for (const row of rows) {
+        if (!firstRow) fs.writeSync(fd, ",\n");
+        fs.writeSync(fd, JSON.stringify(row));
+        firstRow = false;
+        rowCount++;
+      }
     }
-  }
 
-  writeRows(first.rows);
-  process.stdout.write(
-    `${label}: ${rowCount}${total != null ? "/" + total : ""} rows\r`
-  );
-
-  let lastPageSize = first.rows.length;
-  offset = PAGE_SIZE;
-  while (lastPageSize === PAGE_SIZE && (total == null || offset < total)) {
-    const page = await fetchPage(tableName, orderBy, offset, PAGE_SIZE);
-    lastPageSize = page.rows.length;
-    if (lastPageSize === 0) break;
-    writeRows(page.rows);
-    offset += lastPageSize;
-
+    writeRows(first.rows);
     process.stdout.write(
       `${label}: ${rowCount}${total != null ? "/" + total : ""} rows\r`
     );
-  }
 
-  fs.writeSync(fd, "\n]");
-  fs.closeSync(fd);
+    let lastPageSize = first.rows.length;
+    offset = PAGE_SIZE;
+    while (lastPageSize === PAGE_SIZE && (total == null || offset < total)) {
+      const page = await fetchPage(tableName, orderBy, offset, PAGE_SIZE);
+      lastPageSize = page.rows.length;
+      if (lastPageSize === 0) break;
+      writeRows(page.rows);
+      offset += lastPageSize;
+
+      process.stdout.write(
+        `${label}: ${rowCount}${total != null ? "/" + total : ""} rows\r`
+      );
+    }
+
+    fs.writeSync(fd, "\n]");
+    fs.closeSync(fd);
+    closed = true;
+
+    fs.renameSync(tmpPath, filePath);
+  } catch (err) {
+    if (!closed) {
+      try { fs.closeSync(fd); } catch {}
+    }
+    try { fs.unlinkSync(tmpPath); } catch {}
+    throw err;
+  }
 
   const fileSize = fs.statSync(filePath).size;
 
