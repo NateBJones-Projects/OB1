@@ -145,6 +145,20 @@ When the classifier decides that thought A `supersedes` thought B, there are two
 
 This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default**. When on, after inserting a `supersedes` edge from A -> B, the classifier also issues `UPDATE thoughts SET supersedes = A WHERE id = B`. When off, only the edge table is written.
 
+**Atomicity caveat (NOT atomic in this version).** The edge INSERT and the `thoughts.supersedes` PATCH are two separate HTTP calls. There is no transaction across them.
+
+- **Preflight:** when `--mirror-supersedes` is passed, the classifier queries `information_schema.columns` at startup and fails fast if `public.thoughts.supersedes` does not exist (i.e. `schemas/provenance-chains/` is not applied). This catches the common "column missing -> silent half-write" class of failure before any LLM spend.
+- **Failure mode:** if the PATCH fails mid-run (network, 5xx, RLS), the edge is written but `thoughts.supersedes` is NOT updated. The run logs `[warn] mirror supersedes failed ...` and continues. Downstream readers that hit the edge table will see the relation; readers that hit `thoughts.supersedes` directly will not.
+- **Reconciliation:** the mirror is idempotent. Re-running the classifier on the affected pair will hit the unique constraint on the edge (no-op) and retry the PATCH. A one-off reconciliation query for all drifted rows:
+  ```sql
+  -- Supersedes edges whose mirror is missing
+  SELECT te.from_thought_id AS newer, te.to_thought_id AS older
+  FROM public.thought_edges te
+  LEFT JOIN public.thoughts t ON t.id = te.to_thought_id
+  WHERE te.relation = 'supersedes' AND (t.supersedes IS DISTINCT FROM te.from_thought_id);
+  ```
+- **Future fix (tracked):** truly atomic mirroring requires a PostgreSQL RPC / stored procedure that wraps both writes in a single transaction. That lives in a follow-up PR; current users should treat `--mirror-supersedes` as best-effort with the reconciliation path above.
+
 **Recommendation (TBD, pending review).** The classifier **should** mirror once `provenance-chains` lands, because:
 
 - Downstream features like `trace_provenance(thought_id)` are likely to hit `thoughts.supersedes` directly rather than joining through `thought_edges`.

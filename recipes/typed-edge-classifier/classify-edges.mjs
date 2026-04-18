@@ -319,6 +319,34 @@ async function fetchThoughts(sb, ids) {
   );
 }
 
+/**
+ * Preflight check for --mirror-supersedes.
+ *
+ * The mirror path is NOT atomic: the edge INSERT and the `thoughts.supersedes`
+ * PATCH are two separate HTTP calls. If the PATCH fails because the column
+ * doesn't exist, PostgREST returns 400 (NOT a no-op). That turns every
+ * supersedes classification into a half-applied write.
+ *
+ * This preflight catches the common case — column missing because
+ * `schemas/provenance-chains/` hasn't been applied — before any LLM
+ * spend. Atomicity on transient PATCH failures (network, 5xx) still
+ * requires an RPC; see CRIT-2 in REVIEW.md and the documented
+ * reconciliation path in the README.
+ */
+async function assertMirrorColumnExists(sb) {
+  const rows = await sb.get(
+    `information_schema.columns?select=column_name` +
+      `&table_schema=eq.public&table_name=eq.thoughts&column_name=eq.supersedes`,
+  );
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error(
+      "--mirror-supersedes requires public.thoughts.supersedes " +
+        "(from schemas/provenance-chains/). Apply that schema first, " +
+        "or drop the flag.",
+    );
+  }
+}
+
 // ── Anthropic calls ────────────────────────────────────────────────────────
 
 async function callAnthropic(env, model, system, userMsg, maxTokens) {
@@ -474,15 +502,26 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
       try {
         // The newer thought (the `from`) supersedes the older thought (the `to`).
         // Update thoughts.supersedes on the OLDER thought so "what replaced me?"
-        // queries have a direct pointer. PATCH is a no-op if the column is missing.
+        // queries have a direct pointer.
+        //
+        // NOT ATOMIC: this PATCH is a second HTTP round-trip after the
+        // edge INSERT. If the PATCH fails (network, 5xx, RLS), the edge
+        // exists but `thoughts.supersedes` does not, leaving the
+        // denormalized pointer out of sync. See CRIT-2 in REVIEW.md.
+        // We preflight at startup (assertMirrorColumnExists) so a
+        // MISSING column fails the run fast instead of silently here;
+        // true atomicity requires an RPC (future PR). The mirror is
+        // idempotent — re-running classification will re-apply it.
         await sb.patch(
           `thoughts?id=eq.${to}`,
           { supersedes: from },
         );
       } catch (e) {
         // Don't fail the edge insert if the mirror fails — the edge is
-        // the source of truth.
-        console.warn(`  [warn] mirror supersedes failed: ${String(e.message).slice(0, 160)}`);
+        // the source of truth. To reconcile, re-run the classifier on
+        // the same pair; the edge will hit the unique constraint and
+        // the mirror PATCH will be retried.
+        console.warn(`  [warn] mirror supersedes failed (edge written, thoughts.supersedes NOT updated): ${String(e.message).slice(0, 200)}`);
       }
     }
 
@@ -676,6 +715,12 @@ async function main() {
   const args = parseArgs(process.argv.slice(2));
   const env = loadEnv();
   const sb = sbClient(env);
+
+  // Preflight: if --mirror-supersedes is set, require public.thoughts.supersedes
+  // up front so we fail before spending any LLM money. See CRIT-2 in REVIEW.md.
+  if (args.mirrorSupersedes) {
+    await assertMirrorColumnExists(sb);
+  }
 
   let pairs;
   if (args.pair) {
