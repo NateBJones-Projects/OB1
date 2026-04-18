@@ -25,7 +25,7 @@ This is a "consumption format" companion to your capture habit. Captures alone p
   - `ANTHROPIC_API_KEY` (preferred — direct Anthropic API)
   - `OPENROUTER_API_KEY` (fallback — routes through OpenRouter)
 - **Optional:** a Telegram bot for delivery. If you don't have one, use `--output=stdout` or `--output=file` and skip the Telegram setup entirely.
-- **Optional but recommended:** the [sensitivity-tiers primitive](../../primitives/) so `restricted` and `personal` filtering actually means something. If `sensitivity_tier` isn't present on your install, the script warns and falls back to an unfiltered query.
+- **Required for the out-of-the-box safety guarantee:** a `sensitivity_tier TEXT` column on `public.thoughts`. No official Open Brain primitive ships this yet; if you haven't added the column, either install your own migration or wait for the sensitivity-tiers primitive to land upstream. On stock OB1, the recipe **fails closed** — it refuses to run and tells you how to proceed (see the Sensitivity section below). If you explicitly accept the data-leakage risk, pass `--no-sensitivity-filter` to run unfiltered.
 
 ## Credential Tracker
 
@@ -120,16 +120,16 @@ If you already have a Telegram bot wired to Open Brain for capture (e.g., via a 
 
 ## Sensitivity
 
-Open Brain's [sensitivity-tiers](../../primitives/) primitive adds a `sensitivity_tier` column to `public.thoughts` with values like `standard`, `personal`, and `restricted`. The digest honors that signal:
+This recipe expects a `sensitivity_tier TEXT` column on `public.thoughts` with values like `standard`, `personal`, and `restricted`. No official Open Brain primitive ships this today; once a `sensitivity-tiers` primitive lands upstream you can install it, or you can add the column via your own migration in the meantime. The digest honors the signal:
 
 - **`restricted`** — never included. These are thoughts you've explicitly flagged as off-limits; a synthesis pass that surfaces them to a Telegram chat defeats the purpose of the tier.
 - **`personal`** — excluded by default. Your week probably contains private material (health, relationships, finances) that you'd rather not summarize over an unencrypted wire to a third-party API. Pass `--include-personal` when you want the fuller picture — e.g., a private file output you keep locally.
 - **`standard`** (or null) — always included.
 
-If the `sensitivity_tier` column isn't present on your install, the script logs a one-time warning and continues unfiltered. Install the sensitivity-tiers primitive to activate the filter.
+**Fail-closed behavior on stock OB1:** if the `sensitivity_tier` column is not present (e.g., a vanilla Open Brain install), the recipe **refuses to run** and prints instructions. It does not silently fall back to an unfiltered query, because that would violate the guarantee below. To override this safety net — at your own risk — pass `--no-sensitivity-filter`; the script will print a loud warning and send every row in the window to the LLM and delivery target.
 
 > [!IMPORTANT]
-> Filtering happens at the PostgREST query level, not after the fact. Restricted thoughts never leave the database, so they can never reach the LLM.
+> Filtering happens at the PostgREST query level, not after the fact. When the `sensitivity_tier` column exists and `--no-sensitivity-filter` is NOT set, restricted thoughts never leave the database, so they can never reach the LLM. The only way restricted/personal rows can reach the LLM is if (a) the column is missing and you passed `--no-sensitivity-filter`, or (b) you misconfigured the column values.
 
 ## Scheduling
 
@@ -238,8 +238,8 @@ With `--output=telegram`, the digest arrives as one (or two, if long) messages i
 **Issue: `Missing SUPABASE_URL env var`**
 Solution: Export `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` before running. (`OPEN_BRAIN_URL` / `OPEN_BRAIN_SERVICE_KEY` also work as legacy aliases but print a deprecation warning.) The script does not auto-load `.env` files — wrap the call in `dotenv-cli` (`npx dotenv -e .env.local -- node weekly-digest.mjs`) or let your scheduler inject the env.
 
-**Issue: `sensitivity_tier column not found — falling back to unfiltered query`**
-Solution: Your Open Brain install doesn't have the sensitivity-tiers primitive yet. The script still works, but restricted/personal thoughts will be included in the pool. Install the primitive to enable filtering, or audit the output carefully if you're posting publicly.
+**Issue: `FATAL: sensitivity_tier column not found on public.thoughts`**
+Solution: Your Open Brain install doesn't have a `sensitivity_tier` column on `public.thoughts`. The recipe fails closed rather than silently leak restricted thoughts to the LLM and Telegram. Options: (a) add the column via your own migration (or install the sensitivity-tiers primitive once it ships) and re-run; (b) if you understand the risk and your brain contains nothing sensitive, pass `--no-sensitivity-filter` to run unfiltered — the script will print a loud warning and proceed.
 
 **Issue: `thoughts fetch failed: 401`**
 Solution: `SUPABASE_SERVICE_ROLE_KEY` is wrong or expired. This must be the **service_role** key (not the anon key), because the recipe needs to read rows regardless of RLS policies. Double-check in Supabase → Project Settings → API.
