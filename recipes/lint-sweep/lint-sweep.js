@@ -226,22 +226,7 @@ function makeRestClient(baseUrl, serviceKey) {
     return Array.isArray(arr) ? arr.length : 0;
   }
 
-  async function rpc(fnName, payload) {
-    const url = `${rest}/rpc/${fnName}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload || {}),
-    });
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`RPC ${fnName} → ${res.status} ${body.slice(0, 300)}`);
-    }
-    const text = await res.text();
-    return text ? JSON.parse(text) : null;
-  }
-
-  return { get, count, rpc };
+  return { get, count };
 }
 
 // ── Tier 1: SQL-only lint (free) ────────────────────────────────────────────
@@ -338,8 +323,6 @@ async function tier2GraphLint(db, args) {
   const out = {
     highImportanceIsolated: [],   // importance >= 4 thoughts with no entity links
     entitiesWithNoEdges: 0,
-    thoughtEntityDanglingThought: 0,  // thought_entities rows whose thought id is gone
-    thoughtEntityDanglingEntity: 0,   // thought_entities rows whose entity id is gone
     graphTablesMissing: [],       // which of (entities, edges, thought_entities) are absent
   };
 
