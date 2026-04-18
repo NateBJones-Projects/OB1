@@ -1,0 +1,26 @@
+{
+  "name": "Open Brain Dashboard Pro",
+  "description": "Next.js 16 dashboard with browse, search, audit, and ingest views, plus iron-session auth",
+  "category": "dashboards",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["REST API gateway (PR #201)"],
+    "tools": ["Node.js 20+", "Next.js 16"]
+  },
+  "tags": [
+    "dashboard",
+    "nextjs",
+    "iron-session",
+    "audit",
+    "search"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "1 hour",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}
