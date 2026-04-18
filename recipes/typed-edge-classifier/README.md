@@ -172,7 +172,7 @@ This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default
 
 - **Best-effort, no preflight.** Mirror is best-effort. If the column doesn't exist (e.g. `schemas/provenance-chains/` hasn't been applied), the edge still writes successfully and a `[warn] Mirror to thoughts.supersedes failed ...` line is logged. There is no startup preflight — PostgREST [does not expose `information_schema` over REST](https://docs.postgrest.org/en/latest/references/api/schemas.html), so a REST-based column probe is not available on standard Supabase deployments. Check logs for mirror warnings.
 - **Failure mode:** if the PATCH fails mid-run (column missing, network, 5xx, RLS), the edge is written but `thoughts.supersedes` is NOT updated. The run logs the warning and continues. Downstream readers that hit the edge table will see the relation; readers that hit `thoughts.supersedes` directly will not.
-- **Reconciliation:** re-running an affected pair calls `thought_edges_upsert` (see `schemas/typed-reasoning-edges/schema.sql`), which increments `support_count` and refreshes `valid_until` via `ON CONFLICT DO UPDATE`. `support_count` is bumped on every rerun, and the temporal bounds widen (GREATEST for `valid_until`, LEAST for `valid_from`, NULL-safe). If `--mirror-supersedes` is on, the mirror PATCH is retried on rerun. A one-off reconciliation query for all drifted rows:
+- **Reconciliation (NOT automatic):** reruns will NOT retry a failed mirror PATCH. Once the `supersedes` edge exists in `thought_edges`, `processPair` short-circuits via `skip_already_classified` before reaching the mirror write, so `thought_edges_upsert` is never called and the PATCH is never re-issued. If the PATCH fails once, `thoughts.supersedes` stays stale until an operator runs the manual repair below. A one-off query to find all drifted rows:
   ```sql
   -- Supersedes edges whose mirror is missing
   SELECT te.from_thought_id AS newer, te.to_thought_id AS older
@@ -180,7 +180,25 @@ This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default
   LEFT JOIN public.thoughts t ON t.id = te.to_thought_id
   WHERE te.relation = 'supersedes' AND (t.supersedes IS DISTINCT FROM te.from_thought_id);
   ```
-- **Future fix (tracked):** truly atomic mirroring requires a PostgreSQL RPC / stored procedure that wraps both writes in a single transaction. That lives in a follow-up PR; current users should treat `--mirror-supersedes` as best-effort with the reconciliation path above.
+
+### Manual mirror repair
+
+If the run log shows one or more `[warn] Mirror to thoughts.supersedes failed ...` lines, reconcile `thoughts.supersedes` against the `thought_edges` source of truth with this one SQL statement. Run it as `service_role` in the Supabase SQL Editor (or via `psql` with the service-role connection string):
+
+```sql
+-- Reconcile thoughts.supersedes with the thought_edges source of truth.
+-- Run after any run where the log shows "Mirror to thoughts.supersedes failed".
+UPDATE public.thoughts t
+SET supersedes = te.to_thought_id
+FROM public.thought_edges te
+WHERE te.from_thought_id = t.id
+  AND te.relation = 'supersedes'
+  AND (t.supersedes IS NULL OR t.supersedes <> te.to_thought_id);
+```
+
+Safe to run anytime: it only touches rows where `thoughts.supersedes` disagrees with the corresponding edge. If everything is already in sync, it updates zero rows. It does **not** delete or invalidate any existing `supersedes` pointers that still match an edge; it only fixes drift in one direction (edge → mirror).
+
+- **Future fix (tracked):** truly atomic mirroring requires a PostgreSQL RPC / stored procedure that wraps both writes in a single transaction. That lives in a follow-up PR; current users should treat `--mirror-supersedes` as best-effort and run the manual repair SQL above whenever the log shows a mirror warning.
 
 **Recommendation (TBD, pending review).** The classifier **should** mirror once `provenance-chains` lands, because:
 
