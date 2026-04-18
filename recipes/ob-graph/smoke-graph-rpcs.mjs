@@ -224,8 +224,9 @@ async function scenarioMultiPath() {
     const dRows = rows.filter((r) => r.node_id === d.id);
     // A→B via knows and A→B via likes should both appear at depth 1.
     assert(bRows.length === 2, `B reached twice at depth 1 via parallel edges (got ${bRows.length})`);
-    // A→B→D and A→C→D should both appear at depth 2.
-    assert(dRows.length === 2, `D reached twice at depth 2 via two distinct paths (got ${dRows.length})`);
+    // Each of the 2 B-rows joins the single B→D edge (2 D-rows via B), plus 1 D-row via C.
+    assert(dRows.length === 3,
+      `D reached 3 times (2 via B parallel edges → D, 1 via C → D) — got ${dRows.length}`);
     assert(dRows.every((r) => r.depth === 2), `both D rows at depth 2 (got depths ${dRows.map((r) => r.depth).join(",")})`);
   } finally {
     await cleanupScenario(tag);
