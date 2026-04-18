@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configure Open Brain Capture</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="config-page">
+    <h1>Configure Open Brain</h1>
+    <p class="subtitle">First-run setup</p>
+
+    <div class="hint-block">
+      Paste the base URL of your Open Brain REST API gateway and the API key you generated when deploying the
+      <code>rest-api</code> integration. Nothing leaves this browser until both fields are filled in and you
+      save this form — the extension refuses outbound requests while unconfigured.
+    </div>
+
+    <div class="form-group">
+      <label for="cfg-api-endpoint">Open Brain REST API URL</label>
+      <input type="url" id="cfg-api-endpoint" placeholder="https://your-project-ref.supabase.co/functions/v1" required>
+      <p class="permission-note">
+        Supabase-hosted example: <code>https://your-project-ref.supabase.co/functions/v1</code><br>
+        Self-hosted example: <code>https://brain.example.com</code>
+      </p>
+    </div>
+
+    <div class="form-group">
+      <label for="cfg-api-key">API Key (<code>x-brain-key</code>)</label>
+      <input type="password" id="cfg-api-key" placeholder="Paste your MCP_ACCESS_KEY" required>
+      <p class="permission-note">
+        Stored in <code>chrome.storage.local</code> on this device only. The key is NOT synced across Chrome
+        profiles. Rotate by coming back to this screen and re-entering.
+      </p>
+    </div>
+
+    <div class="hint-block">
+      <strong>Host permission:</strong> after saving, Chrome will ask you to grant the extension permission to
+      talk to this specific origin. That one-time grant is how we avoid requesting access to every website on
+      install. You can revoke it any time under <code>chrome://extensions</code>.
+    </div>
+
+    <div class="config-actions">
+      <button id="cfg-save-btn" class="btn btn-capture">Save & Grant Permission</button>
+      <button id="cfg-test-btn" class="btn btn-secondary">Test Connection</button>
+    </div>
+    <div id="cfg-result" class="result"></div>
+  </div>
+
+  <script src="../lib/config.js"></script>
+  <script src="../lib/api-client.js"></script>
+  <script src="config.js"></script>
+</body>
+</html>
