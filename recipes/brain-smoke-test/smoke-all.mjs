@@ -270,11 +270,14 @@ const restChecks = [
     },
   },
   {
-    name: "GET /recent?limit=3",
+    // /thoughts is the documented data-path endpoint on open-brain-rest --
+    // see dashboards/open-brain-dashboard-next/README.md under
+    // "REST API Endpoints Required" for the full canonical list.
+    name: "GET /thoughts?limit=3",
     fn: async (s) => {
       try {
-        const body = await fetchJson(`${restBase}/recent?limit=3`, { headers: MCP_HEADERS }, s);
-        const rows = body?.data ?? body?.results ?? [];
+        const body = await fetchJson(`${restBase}/thoughts?limit=3`, { headers: MCP_HEADERS }, s);
+        const rows = body?.data ?? body?.results ?? (Array.isArray(body) ? body : []);
         return `rows=${rows.length}`;
       } catch (err) {
         if (err.status === 404) throw new SkipError("REST API not installed");
