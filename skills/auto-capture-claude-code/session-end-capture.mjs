@@ -163,23 +163,6 @@ function formatTranscript(parsed, projectName) {
   return `${header}\n\n<thought_content>\n${body}\n</thought_content>`;
 }
 
-function buildSessionSummary(parsed, projectName) {
-  const topics = new Set();
-  for (const t of parsed.turns) {
-    if (t.role === "human") {
-      // Extract potential topic keywords from user messages
-      const words = t.content.toLowerCase().split(/\s+/).filter(w => w.length > 4);
-      for (const w of words.slice(0, 5)) topics.add(w);
-    }
-  }
-
-  return [
-    `Claude Code session on ${projectName}`,
-    `(${parsed.gitBranch || "unknown branch"}, ${parsed.userTurns} turns).`,
-    parsed.createdAt ? `Started: ${parsed.createdAt}.` : "",
-  ].filter(Boolean).join(" ");
-}
-
 // ── Import key (idempotency) ────────────────────────────────────────────────
 
 function buildImportKey(sessionId, formattedText) {
@@ -335,9 +318,8 @@ async function main() {
     process.exit(0);
   }
 
-  // 6. Format transcript and build summary
+  // 6. Format transcript and compute idempotency key
   const formattedText = formatTranscript(parsed, projectName);
-  const sessionSummary = buildSessionSummary(parsed, projectName);
   const importKey = buildImportKey(parsed.sessionId, formattedText);
 
   // 7. Load env and POST to ingest endpoint

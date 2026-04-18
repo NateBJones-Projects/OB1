@@ -15,8 +15,7 @@ The adapter installs as a Claude Code `Stop` hook. When a session ends:
 1. The hook script reads the session transcript
 2. Short sessions (< 3 user turns), agent-only sessions, and restricted content are skipped
 3. The formatted transcript is POSTed to the Open Brain ingest endpoint for thought extraction
-4. A session summary is captured as a journal entry
-5. Failed captures are saved to a retry queue and retried on subsequent session ends
+4. Failed captures are saved to a retry queue and retried on subsequent session ends
 
 ## Prerequisites
 

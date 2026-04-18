@@ -45,8 +45,7 @@ Together they ensure no valuable session falls through the cracks.
    short or agent-only sessions, and formats the content.
 3. The formatted transcript is POSTed to the Open Brain REST ingest endpoint
    (or smart-ingest edge function) for automatic thought extraction.
-4. A session summary thought is captured separately as a journal entry.
-5. Failed captures are saved to a local retry queue and retried on subsequent
+4. Failed captures are saved to a local retry queue and retried on subsequent
    session ends.
 
 ## Skip Heuristics
@@ -124,7 +123,6 @@ When working correctly:
 
 - Every meaningful Claude Code session (3+ user turns, non-agent, non-restricted)
   is automatically ingested into Open Brain for thought extraction.
-- A session summary journal entry is captured alongside the full transcript.
 - Failed captures are queued locally and retried on subsequent session ends.
 - Short, agent, and restricted sessions are silently skipped.
 - All outcomes are logged to `logs/ambient-capture.log` for debugging.
