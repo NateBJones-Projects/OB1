@@ -79,6 +79,29 @@ After running the migration:
 
 Install whichever matches your workflow. They don't conflict.
 
+## Pruning and Retention
+
+`entity_extraction_queue` and `consolidation_log` are both unbounded by default -- neither has a TTL and both grow with the size of the brain. For a personal install this is usually fine for years. For brains with hundreds of thousands of thoughts, or as a matter of hygiene, operators may want to prune terminal-state queue rows and archive old consolidation records periodically.
+
+We deliberately do not ship automatic pruning. Retention is an operator choice: you know your audit requirements better than the schema does.
+
+**Queue pruning** -- `entity_extraction_queue` keeps one row per thought for the thought's lifetime. Rows in terminal states (`complete`, `skipped`, `failed`) are safe to delete; the trigger will re-queue the thought if it's later edited. Example: drop terminal-state rows older than 30 days.
+
+```sql
+DELETE FROM public.entity_extraction_queue
+WHERE status IN ('complete', 'skipped', 'failed')
+  AND processed_at < now() - interval '30 days';
+```
+
+**Consolidation log** -- `consolidation_log` is an append-only audit trail. It has no TTL by design. Typical operators either (a) archive and truncate yearly, or (b) prune rows beyond a retention window. Example: drop log rows older than 90 days.
+
+```sql
+DELETE FROM public.consolidation_log
+WHERE created_at < now() - interval '90 days';
+```
+
+Wire either of these into a scheduled Edge Function or a `pg_cron` job if you want them to run automatically. For most personal brains, running them ad hoc when the tables get large is sufficient.
+
 ## Troubleshooting
 
 **Issue: "relation already exists" warnings**
