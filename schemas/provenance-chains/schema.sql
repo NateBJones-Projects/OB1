@@ -310,7 +310,57 @@ GRANT EXECUTE ON FUNCTION public.find_derivatives(UUID, INT)
   TO service_role;
 
 -- ============================================================
--- 7. RELOAD PostgREST SCHEMA CACHE
+-- 7. HELPER: merge_thought_provenance_metadata
+--    Atomic server-side merge of a provenance subtree into
+--    thoughts.metadata.provenance. Use this instead of a
+--    client-side GET metadata -> mutate in JS -> PATCH metadata
+--    round trip, which is a read-modify-write race: any other
+--    writer (e.g., recipes/provenance-chains/eval.mjs, which
+--    writes eval_score / eval_dimensions / eval_rationale into
+--    the same metadata blob) that lands between the GET and the
+--    PATCH would be silently overwritten.
+--
+--    The function only touches metadata->'provenance'; all other
+--    keys in metadata are preserved via the `||` jsonb concat,
+--    which is right-biased on conflicts (so `provenance` is the
+--    only key that gets replaced wholesale).
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.merge_thought_provenance_metadata(
+  p_thought_id UUID,
+  p_provenance JSONB
+) RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF p_thought_id IS NULL THEN
+    RETURN;
+  END IF;
+
+  UPDATE public.thoughts
+  SET metadata = COALESCE(metadata, '{}'::jsonb) ||
+                 jsonb_build_object(
+                   'provenance',
+                   COALESCE(metadata->'provenance', '{}'::jsonb) || COALESCE(p_provenance, '{}'::jsonb)
+                 )
+  WHERE id = p_thought_id;
+END;
+$$;
+
+-- Service-role-only (same reasoning as the other provenance RPCs: the edge
+-- function authenticates callers and reaches PostgREST as service_role;
+-- letting `authenticated` invoke this directly would let signed-in users
+-- rewrite arbitrary rows' metadata.provenance subtree).
+REVOKE EXECUTE ON FUNCTION public.merge_thought_provenance_metadata(UUID, JSONB) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.merge_thought_provenance_metadata(UUID, JSONB) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION public.merge_thought_provenance_metadata(UUID, JSONB) FROM anon;
+GRANT EXECUTE ON FUNCTION public.merge_thought_provenance_metadata(UUID, JSONB)
+  TO service_role;
+
+-- ============================================================
+-- 8. RELOAD PostgREST SCHEMA CACHE
 -- ============================================================
 
 NOTIFY pgrst, 'reload schema';
