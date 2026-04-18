@@ -54,6 +54,16 @@ After running the migration:
 - Three new RPC functions callable via the Supabase client or REST API.
 - Any existing thoughts with `type` or `source` in their metadata JSONB will have those values copied into the new top-level columns.
 
+## Security
+
+This schema follows stock Open Brain's "service_role only" posture:
+
+- `brain_stats_aggregate` and `get_thought_connections` are `SECURITY DEFINER` with `SET search_path = public` (defense in depth against search-path hijacks). They can read the full `thoughts` table regardless of RLS.
+- `search_thoughts_text` is `SECURITY INVOKER` and respects RLS.
+- **None of the three RPCs are granted to `anon`.** Execute privilege is limited to `authenticated` and `service_role`. The publishable anon key cannot call them.
+
+If you want to expose any of these to `anon` (for example, a public-read dashboard), add your own `GRANT EXECUTE ... TO anon;` in a follow-up migration and confirm that `p_exclude_restricted := true` (the default) plus your sensitivity-tier hygiene gives you the exposure surface you actually want. This is an explicit opt-in: the default stance is private.
+
 ## Troubleshooting
 
 **Issue: "column already exists" warnings**

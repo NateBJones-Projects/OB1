@@ -134,8 +134,12 @@ BEGIN
 END;
 $$;
 
+-- Do NOT grant to `anon`. Stock Open Brain keeps `thoughts` behind RLS
+-- (service_role only). Broadening execution to the publishable anon key
+-- would expose the entire brain to anyone who knows the project URL.
+-- See README "Security" section.
 GRANT EXECUTE ON FUNCTION search_thoughts_text(TEXT, INTEGER, JSONB, INTEGER)
-  TO authenticated, anon, service_role;
+  TO authenticated, service_role;
 
 -- ============================================================
 -- 3. BRAIN STATS AGGREGATE RPC
@@ -191,8 +195,10 @@ BEGIN
 END;
 $$;
 
+-- Do NOT grant to `anon`. This RPC is SECURITY DEFINER and would bypass
+-- RLS on the thoughts table. See README "Security" section.
 GRANT EXECUTE ON FUNCTION brain_stats_aggregate(INTEGER, BOOLEAN)
-  TO authenticated, anon, service_role;
+  TO authenticated, service_role;
 
 -- ============================================================
 -- 4. THOUGHT CONNECTIONS RPC
@@ -284,8 +290,12 @@ BEGIN
 END;
 $$;
 
+-- Do NOT grant to `anon`. This RPC is SECURITY DEFINER and exposes
+-- a 200-char content preview plus metadata for any thought by UUID;
+-- granting to anon would let anyone with the project URL pull content.
+-- See README "Security" section.
 GRANT EXECUTE ON FUNCTION get_thought_connections(UUID, INT, BOOLEAN)
-  TO authenticated, anon, service_role;
+  TO authenticated, service_role;
 
 -- ============================================================
 -- 5. BACKFILL EXISTING DATA
