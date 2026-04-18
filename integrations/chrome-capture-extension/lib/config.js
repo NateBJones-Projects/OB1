@@ -13,6 +13,10 @@
   const STORAGE_KEYS = {
     settings: 'ob_capture_settings',
     apiKey: 'ob_capture_api_key',
+    // apiEndpoint moved to chrome.storage.local alongside apiKey — both are
+    // per-device and must not follow the user's Google account across
+    // profiles. See README Security section for rationale.
+    apiEndpoint: 'ob_capture_api_endpoint',
     captureLog: 'ob_capture_log',
     retryQueue: 'ob_capture_retry_queue',
     seenFingerprints: 'ob_capture_seen_fingerprints',
@@ -149,65 +153,136 @@
   /**
    * Read the full merged configuration from chrome.storage.
    *
-   * The API key lives in chrome.storage.local (NOT chrome.storage.sync — sync
-   * would replicate the key across every Chrome profile on the user's Google
-   * account, which is a footgun). All non-secret settings live in
-   * chrome.storage.sync so platform toggles, endpoint, and capture-mode
-   * choices follow the user between devices.
+   * Privacy posture (post REVIEW BLOCKER fix):
+   *   - apiKey AND apiEndpoint now both live in chrome.storage.local only.
+   *     Neither follows the user's Google account across devices. This
+   *     avoids leaking the endpoint to loaner Chromebooks / shared profiles
+   *     and sidesteps chrome.storage.sync's 8KB-per-item / 100KB-total
+   *     quota, which can reject silently for long URLs + settings.
+   *   - Non-secret preferences (platform toggles, captureMode,
+   *     minResponseLength) still live in chrome.storage.sync so they
+   *     follow the user. If sync is disabled or over quota we fall back
+   *     to local-only transparently.
    */
   async function getConfig() {
-    const [syncStored, localStored] = await Promise.all([
+    const [syncStored, localStored, localSettings] = await Promise.all([
       chrome.storage.sync.get({
         [STORAGE_KEYS.settings]: DEFAULT_SETTINGS
-      }),
+      }).catch(() => ({ [STORAGE_KEYS.settings]: DEFAULT_SETTINGS })),
       chrome.storage.local.get({
-        [STORAGE_KEYS.apiKey]: ''
+        [STORAGE_KEYS.apiKey]: '',
+        [STORAGE_KEYS.apiEndpoint]: ''
+      }),
+      // Fallback local-only settings blob (used when sync is unavailable).
+      chrome.storage.local.get({
+        [STORAGE_KEYS.settings]: null
       })
     ]);
 
     const syncSettings = mergeSettings(syncStored[STORAGE_KEYS.settings]);
     const localApiKey = String(localStored[STORAGE_KEYS.apiKey] || '').trim();
+    const localApiEndpoint = String(localStored[STORAGE_KEYS.apiEndpoint] || '').trim();
+    const localFallbackSettings = localSettings[STORAGE_KEYS.settings];
 
-    // Migrate legacy installs that may have left the API key in sync storage.
+    // Migrate legacy installs where the API key lived in sync storage.
     if (!localApiKey && syncSettings.apiKey) {
-      await Promise.all([
-        chrome.storage.local.set({
-          [STORAGE_KEYS.apiKey]: syncSettings.apiKey
-        }),
-        chrome.storage.sync.set({
-          [STORAGE_KEYS.settings]: {
-            ...syncSettings,
-            apiKey: ''
-          }
-        })
-      ]);
+      try {
+        await Promise.all([
+          chrome.storage.local.set({
+            [STORAGE_KEYS.apiKey]: syncSettings.apiKey
+          }),
+          chrome.storage.sync.set({
+            [STORAGE_KEYS.settings]: {
+              ...syncSettings,
+              apiKey: '',
+              apiEndpoint: ''
+            }
+          })
+        ]);
+      } catch (err) {
+        console.warn('[Open Brain Capture] Legacy key migration hit storage error', err);
+      }
     }
 
+    // Migrate legacy installs where the API endpoint lived in sync storage.
+    // After this migration, sync keeps a blank apiEndpoint and the real
+    // value lives in chrome.storage.local only.
+    if (!localApiEndpoint && syncSettings.apiEndpoint) {
+      try {
+        await Promise.all([
+          chrome.storage.local.set({
+            [STORAGE_KEYS.apiEndpoint]: syncSettings.apiEndpoint
+          }),
+          chrome.storage.sync.set({
+            [STORAGE_KEYS.settings]: {
+              ...syncSettings,
+              apiEndpoint: '',
+              apiKey: ''
+            }
+          })
+        ]);
+      } catch (err) {
+        console.warn('[Open Brain Capture] Legacy endpoint migration hit storage error', err);
+      }
+    }
+
+    // If sync storage was empty or unavailable and we have a local
+    // fallback settings blob, prefer the local one (covers policy-managed
+    // profiles and QUOTA_BYTES failures that forced a fallback at setConfig time).
+    const baseSettings = (!syncStored[STORAGE_KEYS.settings] ||
+      syncStored[STORAGE_KEYS.settings] === DEFAULT_SETTINGS) && localFallbackSettings
+        ? mergeSettings(localFallbackSettings)
+        : syncSettings;
+
     return mergeSettings({
-      ...syncSettings,
-      apiKey: localApiKey || syncSettings.apiKey || ''
+      ...baseSettings,
+      apiEndpoint: localApiEndpoint || baseSettings.apiEndpoint || '',
+      apiKey: localApiKey || baseSettings.apiKey || ''
     });
   }
 
   /**
-   * Persist a configuration update. Splits the secret apiKey into
-   * chrome.storage.local and everything else into chrome.storage.sync.
+   * Persist a configuration update. Writes:
+   *   - apiKey + apiEndpoint to chrome.storage.local (private, per-device)
+   *   - everything else to chrome.storage.sync (so toggles follow the user)
+   * If sync writes fail (QUOTA_BYTES, managed policy, disabled sync) we
+   * fall back to writing the non-secret settings blob to chrome.storage.local
+   * so the extension keeps working instead of silently dropping saves.
    */
   async function setConfig(partial) {
     const current = await getConfig();
     const merged = mergeSettings({ ...current, ...(partial || {}) });
 
-    await Promise.all([
-      chrome.storage.sync.set({
-        [STORAGE_KEYS.settings]: {
-          ...merged,
-          apiKey: ''
-        }
-      }),
-      chrome.storage.local.set({
-        [STORAGE_KEYS.apiKey]: merged.apiKey
-      })
-    ]);
+    // Always write secrets to local first — this must not fail silently.
+    await chrome.storage.local.set({
+      [STORAGE_KEYS.apiKey]: merged.apiKey,
+      [STORAGE_KEYS.apiEndpoint]: merged.apiEndpoint
+    });
+
+    const nonSecretSettings = {
+      ...merged,
+      apiKey: '',
+      apiEndpoint: ''
+    };
+
+    try {
+      await chrome.storage.sync.set({
+        [STORAGE_KEYS.settings]: nonSecretSettings
+      });
+      // If we previously wrote a local fallback copy, it's fine to leave it —
+      // getConfig() prefers sync when present. Overwriting the fallback on
+      // success would just be tidy-up and risks an extra failure vector.
+    } catch (err) {
+      // Typical causes: QUOTA_BYTES_PER_ITEM, enterprise policy disables
+      // sync, or the user signed out of Chrome sync. Fall back to local.
+      console.warn(
+        '[Open Brain Capture] chrome.storage.sync.set failed, falling back to local-only',
+        err
+      );
+      await chrome.storage.local.set({
+        [STORAGE_KEYS.settings]: nonSecretSettings
+      });
+    }
 
     return merged;
   }

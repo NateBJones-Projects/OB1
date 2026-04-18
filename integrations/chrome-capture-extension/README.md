@@ -67,7 +67,8 @@ When you click **Save & Grant Permission**, Chrome shows a native permission pro
 
 **Storage details:**
 - API key → `chrome.storage.local` (per-device only, **never** synced across Chrome profiles)
-- API URL + platform toggles + thresholds → `chrome.storage.sync` (follows your Google account across devices)
+- API URL (`apiEndpoint`) → `chrome.storage.local` (per-device only). Rationale: the URL alone isn't a secret, but combining it with your Google-account-wide synced profiles would let anyone signed into the same Google account on a shared or loaner laptop see a pre-filled target for your Open Brain. Treating the endpoint as per-device avoids that surface, and also sidesteps `chrome.storage.sync`'s 8KB-per-item quota, which could silently reject saves for very long URLs.
+- Platform toggles + capture mode + minimum response length → `chrome.storage.sync` (follows your Google account across devices). If `chrome.storage.sync` is unavailable (policy-managed profile, sync disabled, or quota exceeded) the extension transparently falls back to `chrome.storage.local` so saves never silently fail.
 
 ## Usage
 
@@ -136,6 +137,8 @@ The `content_scripts` entries for `claude.ai`, `chatgpt.com`, and `gemini.google
 ## Security
 
 - **API key storage.** The `x-brain-key` lives in `chrome.storage.local`. Chrome encrypts local storage on disk with OS-level keys, and the key is **never** written to `chrome.storage.sync` — meaning it does not propagate to your other Chrome profiles on the same Google account. Rotate by reopening the Configure screen and saving a new value. Uninstalling the extension removes the key along with it.
+- **API URL storage.** The Open Brain API URL (`apiEndpoint`) also lives in `chrome.storage.local` only, alongside the key. The URL itself isn't a secret, but sync-replicating it would leak your brain's location to any Chrome profile signed into the same Google account (shared laptops, family devices, loaner Chromebooks). Keeping the endpoint per-device avoids that pre-fill attack surface.
+- **Transport security.** The Configure screen rejects any API URL that isn't `https://…` or `http://localhost` / `http://127.0.0.1` (with optional port). The manifest's `optional_host_permissions` reflects the same policy: `https://*/*` plus narrow loopback exceptions only. Plaintext `http://` endpoints over the public internet are not accepted — the `x-brain-key` header and captured conversation text would travel in the clear.
 - **Client-side sensitivity filtering.** `data/sensitivity-patterns.json` holds regex patterns for SSNs, passports, bank accounts, API keys, credit cards, passwords-in-URLs, and medical/financial markers. Anything matching a `restricted` pattern is blocked locally before the request is even built — the text never leaves the browser. `personal` matches are logged but allowed through. Patterns compile once per session and are tested with `String.prototype.match` regex semantics.
 - **Outbound requests.** Only the service worker calls `fetch()`, and only to the user-configured origin. No telemetry, no analytics, no third-party hosts.
 - **Retry queue integrity.** Failed captures live in `chrome.storage.local` with the full payload and a `nextRetryAt` timestamp. Retries honour exponential backoff (1, 2, 4, 8, 16 minutes, capped at 60), max 5 attempts, then a dead-letter entry in the activity log. Fingerprints live across retries so a retry-then-manual-retry doesn't produce duplicates in Open Brain.
