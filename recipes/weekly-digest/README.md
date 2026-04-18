@@ -13,7 +13,7 @@ This is a "consumption format" companion to your capture habit. Captures alone p
 1. **Query** `public.thoughts` for the last `--window` days (default 7) via PostgREST.
 2. **Filter** by `sensitivity_tier` — restricted is always excluded; personal is excluded by default (opt in with `--include-personal`).
 3. **Paginate** the full window so a busy capture day can't push earlier high-signal thoughts out of the sample. Capped at 400 thoughts per run.
-4. **Rank** by `importance` (highest first, recency as tiebreaker). If fewer than 10 thoughts clear the `--min-importance` threshold, the pool widens to the top 60 by importance + recency so a quiet week still produces something worth reading.
+4. **Rank** by importance (highest first, recency as tiebreaker). Importance is read from `metadata.importance` on each thought — stock OB1 `public.thoughts` has no top-level `importance` column, so capture pipelines that score importance should stash the value under `metadata.importance`. Thoughts without a score fall to `0`. If fewer than 10 thoughts clear the `--min-importance` threshold, the script logs a widening notice and falls back to the top 60 by importance + recency so a quiet week still produces something worth reading. (On a brain that doesn't score importance, pass `--min-importance=0`.)
 5. **Synthesize** via Claude (Anthropic API direct, or OpenRouter as fallback). The system prompt asks for a Telegram-formatted digest under 1500 characters with fixed sections.
 6. **Deliver** to Telegram (default), stdout, or a local markdown file under `./digests/YYYY-MM-DD.md`.
 

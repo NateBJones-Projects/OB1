@@ -203,9 +203,17 @@ async function fetchThoughts(cfg, { windowDays, includePersonal, noSensitivityFi
   const excluded = includePersonal ? ["restricted"] : ["restricted", "personal"];
   // When --no-sensitivity-filter is set, skip the filter entirely so a missing
   // column won't trip the 400. Otherwise, apply the exclusion filter.
+  //
+  // NOTE on importance: stock OB1 `public.thoughts` does NOT have an
+  // `importance` column. This recipe reads it from `metadata->>'importance'`
+  // on the client side (see `thoughtImportance()` below), so we do not select
+  // a bare `importance` column here. Installs that do add a native
+  // `importance` column can expose it via `metadata.importance` in their
+  // capture pipeline, or future work can add a COALESCE path that prefers
+  // the native column when present.
   const selectCols = noSensitivityFilter
-    ? "id,content,created_at,importance,metadata"
-    : "id,content,created_at,importance,metadata,sensitivity_tier";
+    ? "id,content,created_at,metadata"
+    : "id,content,created_at,metadata,sensitivity_tier";
   const excludeFilter = noSensitivityFilter
     ? ""
     : `&sensitivity_tier=not.in.(${excluded.join(",")})`;
@@ -283,6 +291,27 @@ async function fetchThoughts(cfg, { windowDays, includePersonal, noSensitivityFi
 }
 
 /**
+ * Read the importance score for a thought. Stock OB1 has no `importance`
+ * column on public.thoughts; capture pipelines that score importance stash
+ * it under `metadata.importance`. We prefer a native top-level `importance`
+ * if a given install happens to have one (via COALESCE-style logic), then
+ * fall back to `metadata.importance`, then 0.
+ *
+ * Accepts number or numeric string in metadata (JSON round-trip safety).
+ */
+function thoughtImportance(t) {
+  const native = t?.importance;
+  if (typeof native === "number" && Number.isFinite(native)) return native;
+  const m = t?.metadata?.importance;
+  if (typeof m === "number" && Number.isFinite(m)) return m;
+  if (typeof m === "string") {
+    const n = Number(m);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+/**
  * Ranks the fetched pool by importance, falling back to recency when
  * importance ties or is missing. If there aren't enough thoughts at or above
  * the minImportance threshold we widen the pool so the digest doesn't come
@@ -291,13 +320,21 @@ async function fetchThoughts(cfg, { windowDays, includePersonal, noSensitivityFi
  */
 function rankAndTrim(thoughts, minImportance) {
   const sorted = [...thoughts].sort((a, b) => {
-    const ai = a.importance ?? 0;
-    const bi = b.importance ?? 0;
+    const ai = thoughtImportance(a);
+    const bi = thoughtImportance(b);
     if (bi !== ai) return bi - ai;
     return String(b.created_at).localeCompare(String(a.created_at));
   });
 
-  const highImportance = sorted.filter((t) => (t.importance ?? 0) >= minImportance);
+  const highImportance = sorted.filter((t) => thoughtImportance(t) >= minImportance);
+  if (highImportance.length < 10) {
+    console.warn(
+      `[weekly-digest] only ${highImportance.length} thought(s) at or above ` +
+        `--min-importance=${minImportance}; widening pool to top 60 by importance+recency. ` +
+        `If your brain doesn't score importance (stock OB1 has no importance column ` +
+        `and this recipe reads metadata.importance), pass --min-importance=0.`,
+    );
+  }
   const pool = highImportance.length >= 10 ? highImportance : sorted.slice(0, 60);
   return pool.slice(0, 200);
 }
@@ -319,7 +356,7 @@ function buildUserPrompt(thoughts, startDate, endDate) {
     id: t.id,
     date: String(t.created_at || "").slice(0, 10),
     type: t.metadata?.type ?? null,
-    importance: t.importance ?? null,
+    importance: thoughtImportance(t) || null,
     content: String(t.content || "").slice(0, 280),
     topics: (t.metadata?.topics ?? []).slice(0, 5),
     tags: (t.metadata?.tags ?? []).slice(0, 5),
