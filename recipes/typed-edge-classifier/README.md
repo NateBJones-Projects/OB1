@@ -181,7 +181,7 @@ Solution: Either apply the `entity-extraction` schema (so this recipe has a pool
 Solution: That's usually correct — most co-mentioning pairs don't have a reasoning relation. If you're sure there are real relations being missed, try `--no-hybrid` to send every pair to Opus directly. Be warned: cost goes up roughly 15-20x.
 
 **Issue: `Anthropic claude-opus-4-7: 429` (rate limit)**
-Solution: Drop `--parallelism` to 1 or 2 and retry. The classifier does not back off automatically — that's a TODO.
+Solution: The classifier now retries 429 and 5xx responses automatically with exponential backoff + jitter (base 1s, doubles each attempt, capped at 60s, up to 5 retries per call). You will see `[classify-edges] Anthropic ... 429: retry N/5 in Nms` lines on each retry. If retries still run out, drop `--parallelism` to 1 or 2; sustained 429s usually mean the account-level rate limit is saturated, not a transient burst.
 
 **Issue: Duplicate-key errors on insert**
 Solution: Should not occur in this recipe — the classifier calls the `thought_edges_upsert` RPC (from `schemas/typed-reasoning-edges/schema.sql`) which uses `INSERT ... ON CONFLICT DO UPDATE`. Repeat classifications of the same `(from, to, relation)` bump `support_count`, take the max confidence, and refresh the temporal bounds (GREATEST for `valid_until`, LEAST for `valid_from`, NULL-safe). If you see a duplicate-key error, the RPC is not installed — re-apply `schemas/typed-reasoning-edges/schema.sql`.

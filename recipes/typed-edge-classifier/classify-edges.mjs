@@ -356,7 +356,27 @@ async function assertMirrorColumnExists(sb) {
 
 // ── Anthropic calls ────────────────────────────────────────────────────────
 
-async function callAnthropic(env, model, system, userMsg, maxTokens) {
+// Retry policy for Anthropic API calls. We retry on 429 (rate limit)
+// and 5xx (transient server errors). Exponential backoff with jitter:
+// base 1s, doubles each attempt, capped at 60s, 5 retries total.
+// Other errors (400, 401, 403, 404 etc.) are real and surfaced immediately.
+const ANTHROPIC_RETRY_MAX = 5;
+const ANTHROPIC_RETRY_BASE_MS = 1000;
+const ANTHROPIC_RETRY_CAP_MS = 60_000;
+
+function shouldRetryAnthropicStatus(status) {
+  return status === 429 || (status >= 500 && status < 600);
+}
+
+function backoffDelayMs(attempt) {
+  // attempt starts at 0 → 1s, 2s, 4s, 8s, 16s ... capped at 60s,
+  // with +/- 20% jitter so concurrent retries don't synchronize.
+  const exp = Math.min(ANTHROPIC_RETRY_BASE_MS * 2 ** attempt, ANTHROPIC_RETRY_CAP_MS);
+  const jitter = exp * (0.8 + Math.random() * 0.4);
+  return Math.floor(jitter);
+}
+
+async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -373,7 +393,10 @@ async function callAnthropic(env, model, system, userMsg, maxTokens) {
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Anthropic ${model}: ${res.status} ${body.slice(0, 400)}`);
+    const err = new Error(`Anthropic ${model}: ${res.status} ${body.slice(0, 400)}`);
+    err.status = res.status;
+    err.retryable = shouldRetryAnthropicStatus(res.status);
+    throw err;
   }
   const body = await res.json();
   const raw = body?.content?.[0]?.text?.trim() ?? "";
@@ -383,6 +406,27 @@ async function callAnthropic(env, model, system, userMsg, maxTokens) {
     inTokens: usage.input_tokens || 0,
     outTokens: usage.output_tokens || 0,
   };
+}
+
+async function callAnthropic(env, model, system, userMsg, maxTokens) {
+  let lastErr;
+  for (let attempt = 0; attempt <= ANTHROPIC_RETRY_MAX; attempt++) {
+    try {
+      return await callAnthropicOnce(env, model, system, userMsg, maxTokens);
+    } catch (e) {
+      lastErr = e;
+      // Bail immediately on non-retryable errors (4xx except 429).
+      if (!e.retryable || attempt === ANTHROPIC_RETRY_MAX) {
+        throw e;
+      }
+      const delay = backoffDelayMs(attempt);
+      console.warn(
+        `[classify-edges] Anthropic ${model} ${e.status || "network"}: retry ${attempt + 1}/${ANTHROPIC_RETRY_MAX} in ${delay}ms`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
 }
 
 function parseJsonStrict(raw) {
