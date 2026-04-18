@@ -53,6 +53,53 @@ CREATE INDEX IF NOT EXISTS ingestion_items_job_idx
   ON public.ingestion_items(job_id);
 
 -- ============================================================
+-- 2a. MULTI-TENANT SCOPING (optional)
+--     Add a nullable user_id to both tables so shared (multi-tenant)
+--     deployments can isolate ingestion history per user. Stock
+--     single-tenant OB1 setups can leave user_id NULL on every row.
+--
+--     The FK to auth.users is added only when Supabase's auth schema
+--     exists, so these statements are safe to run on non-Supabase
+--     Postgres instances too.
+-- ============================================================
+
+ALTER TABLE public.ingestion_jobs
+  ADD COLUMN IF NOT EXISTS user_id uuid;
+ALTER TABLE public.ingestion_items
+  ADD COLUMN IF NOT EXISTS user_id uuid;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_namespace WHERE nspname = 'auth'
+  ) AND EXISTS (
+    SELECT 1
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid = c.relnamespace
+     WHERE n.nspname = 'auth' AND c.relname = 'users'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+       WHERE conname = 'ingestion_jobs_user_id_fkey'
+    ) THEN
+      ALTER TABLE public.ingestion_jobs
+        ADD CONSTRAINT ingestion_jobs_user_id_fkey
+        FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+       WHERE conname = 'ingestion_items_user_id_fkey'
+    ) THEN
+      ALTER TABLE public.ingestion_items
+        ADD CONSTRAINT ingestion_items_user_id_fkey
+        FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+    END IF;
+  END IF;
+END
+$$;
+
+-- ============================================================
 -- 3. APPEND THOUGHT EVIDENCE RPC
 --    Appends an evidence entry to thoughts.metadata.evidence[].
 --    Idempotent via SHA256 identity of (source_label + excerpt + thought_id).
