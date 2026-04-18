@@ -498,7 +498,14 @@ async function processPair(env, sb, args, pair, costState) {
   const already = await fetchPairAlreadyClassified(sb, a, b);
   if (already) return { ...pair, status: "skip_already_classified" };
 
-  const [thoughtA, thoughtB] = await fetchThoughts(sb, [a, b]);
+  // PostgREST `id=in.(A,B)` does NOT guarantee result order. Build a
+  // Map<id, row> and look up by ID so A/B cannot silently swap — a
+  // swap would corrupt edge direction (supersedes, depends_on, etc.)
+  // and the supersedes mirror target.
+  const rows = await fetchThoughts(sb, [a, b]);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const thoughtA = byId.get(a);
+  const thoughtB = byId.get(b);
   if (!thoughtA || !thoughtB) return { ...pair, status: "skip_missing_thought" };
 
   // Stage 1: Haiku filter (unless hybrid disabled).
