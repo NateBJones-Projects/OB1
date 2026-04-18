@@ -282,4 +282,4 @@ Solution: Run with `--verbose` to see the raw response. Switch to a stronger mod
 - **[content-fingerprint-dedup](../content-fingerprint-dedup/)** — installs the `content_fingerprint` column Tier 1 needs for duplicate detection.
 - **[fingerprint-dedup-backfill](../fingerprint-dedup-backfill/)** — backfills fingerprints on pre-existing rows so Tier 1 duplicate scanning is accurate.
 - **`entity-extraction` schema** — installs the `entities`, `edges`, and `thought_entities` tables Tier 2 walks. See PRs [#197](https://github.com/NateBJones-Projects/OB1/pull/197) and [#199](https://github.com/NateBJones-Projects/OB1/pull/199). (The `ob-graph` recipe is a separate build with different table names and is NOT compatible with Tier 2.)
-- **[thought-enrichment](../thought-enrichment/)** — populates `metadata.topics`, `metadata.tags`, and `metadata.people` so Tier 1 orphan-by-tag detection is meaningful.
+- **[thought-enrichment recipe (PR #192)](https://github.com/NateBJones-Projects/OB1/pull/192)** — populates `metadata.topics`, `metadata.tags`, and `metadata.people` so Tier 1 orphan-by-tag detection is meaningful.
