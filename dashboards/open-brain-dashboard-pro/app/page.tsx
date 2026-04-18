@@ -1,4 +1,4 @@
-import { fetchStats, fetchThoughts } from "@/lib/api";
+import { fetchStats, fetchThoughts, ApiError } from "@/lib/api";
 import { requireSessionOrRedirect, getSession } from "@/lib/auth";
 import { StatsWidget } from "@/components/StatsWidget";
 import { ThoughtCard } from "@/components/ThoughtCard";
@@ -18,15 +18,25 @@ export default async function DashboardPage() {
       fetchThoughts(apiKey, { page: 1, per_page: 5, exclude_restricted: excludeRestricted }),
     ]);
   } catch (err) {
+    // REVIEW-CODEX-2-P2: log upstream detail server-side, render only a
+    // generic user-safe message. ApiError.upstreamBody can contain SQL /
+    // schema / stack trace content and must never reach HTML.
+    if (err instanceof ApiError) {
+      console.error("[dashboard] upstream", err.status, err.upstreamBody);
+    } else {
+      console.error("[dashboard]", err);
+    }
+    const safeMessage =
+      err instanceof ApiError
+        ? err.message
+        : "Unknown error";
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <div className="bg-danger/10 border border-danger/30 rounded-lg p-4 text-danger text-sm">
           Failed to load dashboard data. Check API connection.
           <br />
-          <span className="text-text-muted">
-            {err instanceof Error ? err.message : "Unknown error"}
-          </span>
+          <span className="text-text-muted">{safeMessage}</span>
         </div>
       </div>
     );

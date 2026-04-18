@@ -30,9 +30,19 @@ try {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number) {
+  /**
+   * REVIEW-CODEX-2-P2: `message` is a short, generic, user-safe string ("API 500").
+   * The full upstream response body lives on `upstreamBody` and MUST NOT be
+   * rendered into HTML — it frequently contains SQL errors, schema details,
+   * or internal stack traces. Server code should `console.error` the
+   * upstream body for debugging but only ever render `message` (or a
+   * hand-written fallback) in the response to the client.
+   */
+  upstreamBody: string;
+  constructor(message: string, public status: number, upstreamBody: string = "") {
     super(message);
     this.name = "ApiError";
+    this.upstreamBody = upstreamBody;
   }
 }
 
@@ -55,7 +65,9 @@ async function apiFetch<T>(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new ApiError(`API ${res.status}: ${text || res.statusText}`, res.status);
+    // REVIEW-CODEX-2-P2: generic message for rendering; raw upstream body is
+    // stashed on .upstreamBody for server-side logging only. Never render it.
+    throw new ApiError(`Upstream API error (${res.status})`, res.status, text);
   }
   return res.json();
 }

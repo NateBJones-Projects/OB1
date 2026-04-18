@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { fetchThoughts } from "@/lib/api";
+import { fetchThoughts, ApiError } from "@/lib/api";
 import { requireSessionOrRedirect, getSession } from "@/lib/auth";
 import { TypeBadge } from "@/components/ThoughtCard";
 import { ThoughtsFilter } from "@/components/ThoughtsFilter";
@@ -45,12 +45,19 @@ export default async function ThoughtsPage({
       exclude_restricted: excludeRestricted,
     });
   } catch (err) {
+    // REVIEW-CODEX-2-P2: log upstream detail server-side, render only a
+    // generic user-safe message. Never print ApiError.upstreamBody to HTML.
+    if (err instanceof ApiError) {
+      console.error("[thoughts] upstream", err.status, err.upstreamBody);
+    } else {
+      console.error("[thoughts]", err);
+    }
+    const safeMessage = err instanceof ApiError ? err.message : "";
     return (
       <div className="space-y-6">
         <h1 className="text-2xl font-semibold">Thoughts</h1>
         <p className="text-danger text-sm">
-          Failed to load thoughts.{" "}
-          {err instanceof Error ? err.message : ""}
+          Failed to load thoughts. {safeMessage}
         </p>
       </div>
     );
