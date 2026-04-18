@@ -1,7 +1,9 @@
 -- OB-Graph: Knowledge Graph Layer for Open Brain
 -- Adds graph database functionality on top of PostgreSQL using a nodes + edges
--- pattern with iterative plpgsql BFS (with a per-call seen-set) for traversal.
--- Integrates with the core thoughts table without modifying it.
+-- pattern. traverse_graph uses a recursive CTE (enumerates acyclic paths);
+-- find_shortest_path uses an iterative plpgsql BFS (one row per reachable
+-- node along the shortest path). Integrates with the core thoughts table
+-- without modifying it.
 
 -- ============================================================================
 -- Table: graph_nodes
@@ -95,14 +97,14 @@ CREATE TRIGGER update_graph_nodes_updated_at
 
 -- ============================================================================
 -- Function: traverse_graph
--- Walks the graph from a starting node up to max_depth hops (outgoing edges
--- only), returning every reachable node with the depth at which it was first
--- discovered and the relationship that was used to reach it.
+-- Walks the graph from a starting node up to max_depth hops, returning all
+-- reachable nodes and the paths taken. Uses a recursive CTE.
 --
--- Implemented as an iterative plpgsql BFS with a per-user seen-set. Each node
--- is visited at most once, which keeps the function bounded on densely
--- connected graphs where a recursive CTE would enumerate every path to every
--- reachable node and hit statement_timeout.
+-- Semantics: one row per acyclic path. If there are multiple paths to the
+-- same node (e.g. A→B via two different relationship_types, or A→B→D and
+-- A→C→D), each path is emitted as its own row. The per-path cycle check
+-- (NOT n.id = ANY(gw.path)) prevents infinite recursion; bound execution
+-- further with p_max_depth on dense graphs.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION traverse_graph(
     p_user_id UUID,
@@ -118,111 +120,40 @@ RETURNS TABLE (
     path UUID[],
     via_relationship TEXT
 ) AS $$
-DECLARE
-    v_depth INT := 0;
-    v_frontier UUID[] := ARRAY[p_start_node_id]::UUID[];
-    v_seen UUID[] := ARRAY[p_start_node_id]::UUID[];
-    -- parent_map: { "<node_id>": { "parent": "<uuid>", "relation": "<text>" } }
-    v_parent_map JSONB := '{}'::jsonb;
-    v_next_ids UUID[];
-    v_next_map JSONB;
-    v_start_exists BOOLEAN;
 BEGIN
-    -- Validate the start node exists and belongs to the caller. If not,
-    -- emit nothing (mirrors the original CTE behaviour, which just returned
-    -- an empty result set when the base case produced no rows).
-    SELECT EXISTS (
-        SELECT 1 FROM graph_nodes
-        WHERE id = p_start_node_id AND user_id = p_user_id
-    ) INTO v_start_exists;
-
-    IF NOT v_start_exists THEN
-        RETURN;
-    END IF;
-
-    -- Iterative BFS: at each layer, collect all unseen outgoing neighbours of
-    -- the current frontier, record the first parent + relationship that
-    -- reached each, add them to the seen-set, then recurse on the new layer.
-    WHILE v_depth < p_max_depth
-          AND v_frontier IS NOT NULL
-          AND array_length(v_frontier, 1) IS NOT NULL LOOP
-
-        SELECT
-            COALESCE(array_agg(next_id), ARRAY[]::UUID[]),
-            COALESCE(
-                jsonb_object_agg(
-                    next_id::text,
-                    jsonb_build_object('parent', parent_id, 'relation', relation_type)
-                ),
-                '{}'::jsonb
-            )
-        INTO v_next_ids, v_next_map
-        FROM (
-            -- DISTINCT ON keeps only the first (parent, relation) pair that
-            -- reached each new node in this layer, which mirrors BFS's
-            -- "first discovery wins" invariant.
-            SELECT DISTINCT ON (next_id) next_id, parent_id, relation_type
-            FROM (
-                SELECT
-                    e.target_node_id AS next_id,
-                    e.source_node_id AS parent_id,
-                    e.relationship_type AS relation_type
-                FROM graph_edges e
-                JOIN graph_nodes n ON n.id = e.target_node_id
-                                  AND n.user_id = p_user_id
-                WHERE e.user_id = p_user_id
-                  AND e.source_node_id = ANY(v_frontier)
-                  AND NOT (e.target_node_id = ANY(v_seen))
-                  AND (p_relationship_type IS NULL
-                       OR e.relationship_type = p_relationship_type)
-            ) layer
-            ORDER BY next_id
-        ) dedup;
-
-        IF v_next_ids IS NULL OR array_length(v_next_ids, 1) IS NULL THEN
-            EXIT;
-        END IF;
-
-        v_parent_map := v_parent_map || v_next_map;
-        v_seen := v_seen || v_next_ids;
-        v_frontier := v_next_ids;
-        v_depth := v_depth + 1;
-    END LOOP;
-
-    -- Emit one row per discovered node. The start node sits at depth 0 with
-    -- a single-element path and NULL via_relationship. Every other node
-    -- reconstructs its path by walking parent pointers back to the start.
     RETURN QUERY
-    WITH walked AS (
+    WITH RECURSIVE graph_walk AS (
+        -- Base case: the start node
         SELECT
-            seen_id AS nid,
-            ordinality - 1 AS seen_idx
-        FROM unnest(v_seen) WITH ORDINALITY AS s(seen_id, ordinality)
-    ),
-    reconstructed AS (
+            n.id AS node_id,
+            n.label AS node_label,
+            n.node_type AS node_type,
+            0 AS depth,
+            ARRAY[n.id] AS path,
+            NULL::TEXT AS via_relationship
+        FROM graph_nodes n
+        WHERE n.id = p_start_node_id
+          AND n.user_id = p_user_id
+
+        UNION ALL
+
+        -- Recursive case: follow outgoing edges
         SELECT
-            w.nid,
-            w.seen_idx,
-            CASE
-                WHEN w.nid = p_start_node_id THEN ARRAY[w.nid]::UUID[]
-                ELSE reconstruct_bfs_path(v_parent_map, p_start_node_id, w.nid)
-            END AS node_path,
-            CASE
-                WHEN w.nid = p_start_node_id THEN NULL
-                ELSE v_parent_map -> (w.nid::text) ->> 'relation'
-            END AS via_relation_text
-        FROM walked w
+            n.id,
+            n.label,
+            n.node_type,
+            gw.depth + 1,
+            gw.path || n.id,
+            e.relationship_type
+        FROM graph_walk gw
+        JOIN graph_edges e ON e.source_node_id = gw.node_id AND e.user_id = p_user_id
+        JOIN graph_nodes n ON n.id = e.target_node_id AND n.user_id = p_user_id
+        WHERE gw.depth < p_max_depth
+          AND NOT n.id = ANY(gw.path)  -- prevent cycles
+          AND (p_relationship_type IS NULL OR e.relationship_type = p_relationship_type)
     )
-    SELECT
-        n.id AS node_id,
-        n.label AS node_label,
-        n.node_type AS node_type,
-        (COALESCE(array_length(r.node_path, 1), 1) - 1)::INT AS depth,
-        r.node_path AS path,
-        r.via_relation_text AS via_relationship
-    FROM reconstructed r
-    JOIN graph_nodes n ON n.id = r.nid AND n.user_id = p_user_id
-    ORDER BY (COALESCE(array_length(r.node_path, 1), 1) - 1), n.label;
+    SELECT * FROM graph_walk
+    ORDER BY graph_walk.depth, graph_walk.node_label;
 END;
 $$ LANGUAGE plpgsql;
 
