@@ -101,18 +101,24 @@ console.log(`Mode: ${dryRun ? "DRY RUN (no changes)" : "APPLY (will update DB)"}
 console.log();
 
 const BATCH_SIZE = 500;
-let offset = 0;
+const PROGRESS_EVERY = 5000;
+let afterId = 0;
 let scanned = 0;
+let scannedAtLastProgress = 0;
 let upgradedPersonal = 0;
 let upgradedRestricted = 0;
 let errors = 0;
 
+// Cursor-based pagination on id. Offset-pagination is unsafe here:
+// successful PATCHes shift the "where sensitivity_tier in
+// (null,standard,'')" result set, so `offset += BATCH_SIZE` would skip
+// un-processed rows. Cursor on id ASC is stable under mutation.
 while (true) {
-  const url = `${BASE_URL}/thoughts?select=id,content,sensitivity_tier&or=(sensitivity_tier.is.null,sensitivity_tier.eq.standard,sensitivity_tier.eq.)&order=id&offset=${offset}&limit=${BATCH_SIZE}`;
+  const url = `${BASE_URL}/thoughts?select=id,content,sensitivity_tier&or=(sensitivity_tier.is.null,sensitivity_tier.eq.standard,sensitivity_tier.eq.)&id=gt.${afterId}&order=id.asc&limit=${BATCH_SIZE}`;
   const res = await fetchWithTimeout(url, { headers }, SUPABASE_TIMEOUT_MS);
 
   if (!res.ok) {
-    console.error(`Query error at offset ${offset}: ${res.status} ${await res.text()}`);
+    console.error(`Query error after id ${afterId}: ${res.status} ${await res.text()}`);
     errors++;
     break;
   }
@@ -150,11 +156,16 @@ while (true) {
     }
   }
 
-  offset += data.length;
+  // Advance the cursor past the last id seen, regardless of whether
+  // any rows in this page were upgraded.
+  afterId = data[data.length - 1].id;
   if (data.length < BATCH_SIZE) break;
 
-  if (offset % 5000 === 0) {
+  // Progress reporter independent of a multiple-of-offset check, so
+  // partial batches do not silently stop emitting progress.
+  if (Math.floor(scanned / PROGRESS_EVERY) > Math.floor(scannedAtLastProgress / PROGRESS_EVERY)) {
     console.log(`  ... scanned ${scanned} thoughts so far (${upgradedPersonal} personal, ${upgradedRestricted} restricted)`);
+    scannedAtLastProgress = scanned;
   }
 }
 
