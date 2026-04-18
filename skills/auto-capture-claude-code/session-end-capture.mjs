@@ -246,6 +246,11 @@ async function processRetryQueue(ingestUrl, mcpKey) {
           source_label: entry.source_label,
           source_type: entry.source_type,
           auto_execute: entry.auto_execute ?? true,
+          // Forward the same import_key the main POST used, so a retry that
+          // races with a belated success from the original request is
+          // de-duped by the ingest endpoint instead of creating a second
+          // thought. Entries written before this field existed simply omit it.
+          ...(entry.import_key ? { import_key: entry.import_key } : {}),
         }),
       });
 
@@ -343,6 +348,9 @@ async function main() {
     source_label: `claude_code:${projectName}`,
     source_type: "claude_code_ambient",
     auto_execute: true,
+    // import_key lets the ingest endpoint de-dupe when a retry races with a
+    // belated success from the original POST (common on flaky networks).
+    import_key: importKey,
   };
 
   try {
