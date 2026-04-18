@@ -492,12 +492,19 @@ async function deliverTelegram(cfg, text) {
   return messageIds;
 }
 
-function deliverFile(text, startDate, endDate, model, sourceCount) {
+function deliverFile(text, startDate, endDate, model, counts) {
   const dir = path.resolve(process.cwd(), "digests");
   fs.mkdirSync(dir, { recursive: true });
   const filename = `${endDate.toISOString().slice(0, 10)}.md`;
   const filepath = path.join(dir, filename);
 
+  // We record two distinct counts so the saved metadata is honest about
+  // what influenced the digest:
+  //   - source_thought_count_used: how many rows were actually serialized
+  //     into the LLM prompt (capped at SYNTHESIZE_INPUT_CAP).
+  //   - source_pool_size: the full ranked pool before the prompt cap.
+  // If pool_size > count_used, the LLM only saw the top `count_used` by
+  // importance+recency; the rest were ranked but truncated before send.
   const frontmatter = [
     "---",
     `title: Weekly Digest ${endDate.toISOString().slice(0, 10)}`,
@@ -506,7 +513,8 @@ function deliverFile(text, startDate, endDate, model, sourceCount) {
     `period_end: ${endDate.toISOString().slice(0, 10)}`,
     `generated_at: ${new Date().toISOString()}`,
     `generated_by_model: ${model}`,
-    `source_thought_count: ${sourceCount}`,
+    `source_thought_count_used: ${counts.used}`,
+    `source_pool_size: ${counts.poolSize}`,
     "tags: [weekly-digest, synthesis]",
     "---",
     "",
@@ -564,12 +572,17 @@ async function main() {
   }
 
   if (args.output === "file") {
+    // `used` reflects only what was serialized into the prompt (top
+    // SYNTHESIZE_INPUT_CAP by importance+recency); `poolSize` is the full
+    // ranked pool before the cap. Once the pool exceeds the cap, these
+    // differ and both are recorded for auditability.
+    const used = Math.min(ranked.length, SYNTHESIZE_INPUT_CAP);
     const filepath = deliverFile(
       digest,
       startDate,
       endDate,
       args.model,
-      ranked.length,
+      { used, poolSize: ranked.length },
     );
     console.log(`[weekly-digest] wrote ${filepath}`);
     return;
