@@ -78,6 +78,15 @@ export async function handleCaptureSynthesis(req: Request): Promise<Response> {
   if (!content) {
     return jsonResponse({ error: "content is required" }, 400);
   }
+  // Size cap: 50KB matches the MCP Zod schema. Guards against accidental or
+  // adversarial floods that would balloon embedding and DB write costs.
+  // Adjust both sides (MCP + REST) together if you need longer syntheses.
+  if (content.length > 50_000) {
+    return jsonResponse(
+      { error: "content exceeds 50000 character limit" },
+      413,
+    );
+  }
 
   // Accept either numeric BIGINT IDs or string UUIDs — OB1 installs vary.
   // Stock schema in docs/01-getting-started.md uses UUID; enhanced / provenance
@@ -85,6 +94,14 @@ export async function handleCaptureSynthesis(req: Request): Promise<Response> {
   const rawIds = Array.isArray(body.source_thought_ids)
     ? body.source_thought_ids
     : [];
+  // Cap raw input length BEFORE normalization so a caller cannot flood the
+  // normalize loop with 100k items. 50 matches the MCP schema upper bound.
+  if (rawIds.length > 50) {
+    return jsonResponse(
+      { error: "source_thought_ids exceeds 50 item limit" },
+      413,
+    );
+  }
   const normalized = rawIds
     .map((v) => {
       if (typeof v === "number" && Number.isInteger(v) && v > 0) return v;

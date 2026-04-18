@@ -50,22 +50,32 @@ server.registerTool(
     description:
       "Capture a derived-synthesis thought from 3+ source thoughts (Query-as-Ingest). At least one source must be a primary (atomic) thought. No source may already be a synthesis. Use this after answering a complex question so the answer itself becomes reusable knowledge with provenance back to the sources.",
     inputSchema: {
+      // Size cap rationale: 50KB of UTF-8 covers a very long synthesis
+      // (~10k words) without leaving the endpoint wide open for DoS or
+      // accidental prompt-injection payload floods. Adjust upward only if
+      // you actually need longer syntheses — the embedding and DB write
+      // costs scale with content length.
       content: z
         .string()
         .min(1)
-        .describe("The synthesized answer/prose to save as a new thought."),
+        .max(50_000, "content must be 50KB or less")
+        .describe("The synthesized answer/prose to save as a new thought (max 50KB)."),
       // Accepts numeric IDs (BIGINT installs) or string IDs (UUID installs).
       // The handler below treats IDs as opaque and only compares by equality.
+      // Cap at 50 to keep the `.in("id", ...)` query plan sane — a real
+      // synthesis rarely cites more than a dozen sources.
       source_thought_ids: z
         .array(z.union([z.number().int().positive(), z.string().min(1)]))
         .min(3)
-        .describe("Parent thought IDs the synthesis was derived from (minimum 3). Accepts integers or UUID strings depending on your thoughts.id type."),
+        .max(50, "source_thought_ids must be 50 or fewer items")
+        .describe("Parent thought IDs the synthesis was derived from (minimum 3, maximum 50). Accepts integers or UUID strings depending on your thoughts.id type."),
       question: z
         .string()
+        .max(2_000, "question must be 2000 chars or less")
         .optional()
         .describe("Optional: the original question that prompted the synthesis."),
-      topics: z.array(z.string()).optional(),
-      tags: z.array(z.string()).optional(),
+      topics: z.array(z.string().max(200)).max(20).optional(),
+      tags: z.array(z.string().max(200)).max(20).optional(),
     },
   },
   async ({ content, source_thought_ids, question, topics, tags }) => {
