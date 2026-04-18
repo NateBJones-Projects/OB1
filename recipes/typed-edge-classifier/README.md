@@ -187,11 +187,25 @@ This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default
 
 ### Manual mirror repair
 
-If the run log shows one or more `[warn] Mirror to thoughts.supersedes failed ...` lines, reconcile `thoughts.supersedes` against the `thought_edges` source of truth with this one SQL statement. Run it as `service_role` in the Supabase SQL Editor (or via `psql` with the service-role connection string):
+If the run log shows one or more `[warn] Mirror to thoughts.supersedes failed ...` lines, reconcile `thoughts.supersedes` against the `thought_edges` source of truth with the two-step SQL below. Run it as `service_role` in the Supabase SQL Editor (or via `psql` with the service-role connection string).
+
+> **Important — pre-fix installs have backwards writes.** Earlier versions of this classifier (prior to the round-6 fix) wrote the mirror pointer **backwards**: they set `supersedes` on the TO (older) thought pointing at the FROM (newer) thought, inverting the provenance-chains contract (`newer.supersedes = older`). If you ran `--mirror-supersedes` with any pre-fix build, Step 1 below clears those backwards writes before Step 2 sets the correct direction. Running both steps is **safe on fresh installs** — Step 1 is a no-op when nothing is backwards.
 
 ```sql
--- Reconcile thoughts.supersedes with the thought_edges source of truth.
--- Run after any run where the log shows "Mirror to thoughts.supersedes failed".
+-- Step 1: Clear backwards writes from pre-fix runs.
+-- Earlier versions of this classifier set supersedes on the TO (older) thought
+-- pointing at the FROM (newer) thought, which inverts the provenance-chains
+-- contract. This UPDATE clears those backwards entries.
+UPDATE public.thoughts t
+SET supersedes = NULL
+FROM public.thought_edges te
+WHERE te.to_thought_id = t.id
+  AND te.relation = 'supersedes'
+  AND t.supersedes = te.from_thought_id;
+
+-- Step 2: Set the correct direction — newer.supersedes = older.
+-- Edge (from=newer, to=older, relation='supersedes') implies
+-- thoughts(id=from).supersedes = to, per the provenance-chains contract.
 UPDATE public.thoughts t
 SET supersedes = te.to_thought_id
 FROM public.thought_edges te
@@ -200,7 +214,7 @@ WHERE te.from_thought_id = t.id
   AND (t.supersedes IS NULL OR t.supersedes <> te.to_thought_id);
 ```
 
-Safe to run anytime: it only touches rows where `thoughts.supersedes` disagrees with the corresponding edge. If everything is already in sync, it updates zero rows. It does **not** delete or invalidate any existing `supersedes` pointers that still match an edge; it only fixes drift in one direction (edge → mirror).
+Safe to run anytime and idempotent: Step 1 only clears rows where `thoughts.supersedes` currently points the wrong way (TO-side holding a FROM-side pointer), and Step 2 only touches rows where the FROM-side's `supersedes` disagrees with the corresponding edge. If everything is already in sync, both steps update zero rows. Neither step deletes or invalidates any `supersedes` pointer that still matches the contract; they only fix drift in one direction (edge → mirror).
 
 - **Future fix (tracked):** truly atomic mirroring requires a PostgreSQL RPC / stored procedure that wraps both writes in a single transaction. That lives in a follow-up PR; current users should treat `--mirror-supersedes` as best-effort and run the manual repair SQL above whenever the log shows a mirror warning.
 
