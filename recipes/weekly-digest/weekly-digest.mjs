@@ -464,7 +464,11 @@ async function synthesizeOpenRouter(cfg, model, systemPrompt, userPrompt) {
 
 async function synthesize(cfg, thoughts, windowDays, model) {
   const endDate = new Date();
-  const startDate = new Date(Date.now() - (windowDays - 1) * 86_400_000);
+  // Match the fetch window exactly: fetchThoughts computes `sinceIso` as
+  // `now - windowDays * 86_400_000` (e.g., --window=7 ⇒ 7×24h lookback).
+  // The printed digest header must reflect that same span, otherwise
+  // "Apr 11 – Apr 17" misrepresents a 7-day fetch as a 6-day span.
+  const startDate = new Date(Date.now() - windowDays * 86_400_000);
   const userPrompt = buildUserPrompt(thoughts, startDate, endDate);
 
   const text =

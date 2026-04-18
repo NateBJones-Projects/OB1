@@ -27,6 +27,9 @@ This is a "consumption format" companion to your capture habit. Captures alone p
 - **Optional:** a Telegram bot for delivery. If you don't have one, use `--output=stdout` or `--output=file` and skip the Telegram setup entirely.
 - **Required for the out-of-the-box safety guarantee:** a `sensitivity_tier TEXT` column on `public.thoughts`. No official Open Brain primitive ships this yet; if you haven't added the column, either install your own migration or wait for the sensitivity-tiers primitive to land upstream. On stock OB1, the recipe **fails closed** — it refuses to run and tells you how to proceed (see the Sensitivity section below). If you explicitly accept the data-leakage risk, pass `--no-sensitivity-filter` to run unfiltered.
 
+> [!WARNING]
+> This recipe uses your Supabase **service role key** (`SUPABASE_SERVICE_ROLE_KEY`). That key **bypasses Row Level Security entirely** — the script can read every row in `public.thoughts` regardless of your RLS policies. On an install without `sensitivity_tier` (or with it misconfigured), that means every capture in the window is eligible to be shipped to the LLM provider and your Telegram chat. Treat those two endpoints as extensions of your brain's trust boundary, and do not run this recipe against a brain that holds material you don't want exfiltrated unless the sensitivity tagging is in place.
+
 ## Credential Tracker
 
 Copy this block into a text editor and fill it in as you go.
