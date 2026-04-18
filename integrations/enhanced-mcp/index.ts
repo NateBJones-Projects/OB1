@@ -566,67 +566,18 @@ server.registerTool(
   },
 );
 
-// ── 5. delete_thought ───────────────────────────────────────────────────
+// ── 5. capture_thought ──────────────────────────────────────────────────
+//
+// NOTE: `delete_thought` is intentionally not shipped in this initial PR.
+// Hard `DELETE FROM thoughts WHERE id = ?` is irreversible and the
+// companion schema (`schemas/enhanced-thoughts`) has no `deleted_at`
+// tombstone column, so there is no safe soft-delete path today.
+//
+// The upstream maintainer's guidance on PR #127 was "depreciate and
+// version rather than delete" — we will honour that in a follow-up
+// once `deleted_at` + a `restore_thought` flow lands in the schema.
+// See the README "Intentionally excluded" section for user-facing text.
 
-server.registerTool(
-  "delete_thought",
-  {
-    title: "Delete Thought",
-    description: "Permanently delete a thought by ID.",
-    inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID to delete"),
-    }),
-  },
-  async (params) => {
-    try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
-
-      if (!id) {
-        return toolFailure("id is required");
-      }
-
-      const { data: existing, error: fetchError } = await supabase
-        .from("thoughts")
-        .select("id, content, type, sensitivity_tier")
-        .eq("id", id)
-        .single();
-
-      if (fetchError || !existing) {
-        return toolFailure(`Thought #${id} not found`);
-      }
-
-      if (existing.sensitivity_tier === "restricted") {
-        return toolFailure("Cannot delete restricted thought");
-      }
-
-      const preview = existing.content.slice(0, 120);
-
-      const { error: deleteError } = await supabase
-        .from("thoughts")
-        .delete()
-        .eq("id", id);
-
-      if (deleteError) {
-        throw new Error(`delete_thought failed: ${deleteError.message}`);
-      }
-
-      return toolSuccess(
-        `Deleted thought #${id} (${existing.type}): "${preview}"`,
-        { id, type: existing.type, preview },
-      );
-    } catch (error) {
-      console.error("delete_thought failed", error);
-      return toolFailure(String(error));
-    }
-  },
-);
-
-// ── 6. capture_thought ──────────────────────────────────────────────────
 
 server.registerTool(
   "capture_thought",
@@ -738,7 +689,7 @@ server.registerTool(
   },
 );
 
-// ── 7. thought_stats ────────────────────────────────────────────────────
+// ── 6. thought_stats ────────────────────────────────────────────────────
 
 server.registerTool(
   "thought_stats",
@@ -804,7 +755,7 @@ server.registerTool(
   },
 );
 
-// ── 8. search_thoughts_text ─────────────────────────────────────────────
+// ── 7. search_thoughts_text ─────────────────────────────────────────────
 
 server.registerTool(
   "search_thoughts_text",
@@ -859,7 +810,7 @@ server.registerTool(
   },
 );
 
-// ── 9. count_thoughts ───────────────────────────────────────────────────
+// ── 8. count_thoughts ───────────────────────────────────────────────────
 
 server.registerTool(
   "count_thoughts",
@@ -933,7 +884,7 @@ server.registerTool(
   },
 );
 
-// ── 10. related_thoughts ────────────────────────────────────────────────
+// ── 9. related_thoughts ─────────────────────────────────────────────────
 
 server.registerTool(
   "related_thoughts",
@@ -1015,7 +966,7 @@ server.registerTool(
   },
 );
 
-// ── 11. ops_capture_status (schema-backed: needs Smart Ingest Pipeline) ─
+// ── 10. ops_capture_status (schema-backed: needs Smart Ingest Pipeline) ─
 
 server.registerTool(
   "ops_capture_status",
@@ -1111,7 +1062,7 @@ server.registerTool(
   },
 );
 
-// ── 12. graph_search (schema-backed: needs Knowledge Graph) ─────────────
+// ── 11. graph_search (schema-backed: needs Knowledge Graph) ─────────────
 
 server.registerTool(
   "graph_search",
@@ -1224,7 +1175,7 @@ server.registerTool(
   },
 );
 
-// ── 13. entity_detail (schema-backed: needs Knowledge Graph) ────────────
+// ── 12. entity_detail (schema-backed: needs Knowledge Graph) ────────────
 
 server.registerTool(
   "entity_detail",
@@ -1421,7 +1372,7 @@ server.registerTool(
   },
 );
 
-// ── 14. ops_source_monitor (schema-backed: needs ops views) ─────────────
+// ── 13. ops_source_monitor (schema-backed: needs ops views) ────────────
 
 server.registerTool(
   "ops_source_monitor",

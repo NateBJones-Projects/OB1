@@ -1,6 +1,6 @@
 # Enhanced MCP Server
 
-> Production-grade remote MCP server expanding the Open Brain tool surface from 4 to 14 tools with enhanced search, CRUD, enrichment, sensitivity detection, and operational monitoring.
+> Production-grade remote MCP server expanding the Open Brain tool surface from 4 to 13 tools with enhanced search, CRUD, enrichment, sensitivity detection, and operational monitoring.
 
 ## What It Does
 
@@ -100,7 +100,7 @@ If a required schema is not installed, the tool returns a clear message explaini
 
 ## Expected Outcome
 
-After completing the steps above, you should have 14 tools available in your AI client under the "Open Brain Enhanced" connector. Running `capture_thought` should save a thought with automatic type classification, topic extraction, and sensitivity detection. Running `search_thoughts` should return results with similarity scores. Running `thought_stats` should show your brain's statistics using server-side aggregation.
+After completing the steps above, you should have 13 tools available in your AI client under the "Open Brain Enhanced" connector. Running `capture_thought` should save a thought with automatic type classification, topic extraction, and sensitivity detection. Running `search_thoughts` should return results with similarity scores. Running `thought_stats` should show your brain's statistics using server-side aggregation.
 
 If you also have the original `server/` connector active, you will temporarily see both tool sets. Once you have verified the enhanced server works, you can disable the original connector to reduce tool count.
 
@@ -112,16 +112,19 @@ If you also have the original `server/` connector active, you will temporarily s
 | 2 | `list_thoughts` | Paginated browsing with type, source, date filters and sorting | Enhanced Thoughts |
 | 3 | `get_thought` | Fetch a single thought by ID with full metadata | Enhanced Thoughts |
 | 4 | `update_thought` | Update content with automatic re-embedding and re-classification | Enhanced Thoughts |
-| 5 | `delete_thought` | Permanently delete a thought by ID | Enhanced Thoughts |
-| 6 | `capture_thought` | Capture with dedup, sensitivity detection, and LLM classification | Enhanced Thoughts |
-| 7 | `thought_stats` | Type and topic statistics via server-side aggregation | Enhanced Thoughts |
-| 8 | `search_thoughts_text` | Direct full-text search (faster for exact phrase matching) | Enhanced Thoughts |
-| 9 | `count_thoughts` | Fast filtered count without returning content | Enhanced Thoughts |
-| 10 | `related_thoughts` | Find thoughts connected by shared topics or people | Enhanced Thoughts |
-| 11 | `ops_capture_status` | Ingestion health: job status, error rates, recent failures | Smart Ingest |
-| 12 | `graph_search` | Search knowledge graph entities with thought counts | Knowledge Graph |
-| 13 | `entity_detail` | Full entity profile: aliases, linked thoughts, relationship edges | Knowledge Graph |
-| 14 | `ops_source_monitor` | Per-source ingestion volume, errors, and failure samples | Ops Views |
+| 5 | `capture_thought` | Capture with dedup, sensitivity detection, and LLM classification | Enhanced Thoughts |
+| 6 | `thought_stats` | Type and topic statistics via server-side aggregation | Enhanced Thoughts |
+| 7 | `search_thoughts_text` | Direct full-text search (faster for exact phrase matching) | Enhanced Thoughts |
+| 8 | `count_thoughts` | Fast filtered count without returning content | Enhanced Thoughts |
+| 9 | `related_thoughts` | Find thoughts connected by shared topics or people | Enhanced Thoughts |
+| 10 | `ops_capture_status` | Ingestion health: job status, error rates, recent failures | Smart Ingest |
+| 11 | `graph_search` | Search knowledge graph entities with thought counts | Knowledge Graph |
+| 12 | `entity_detail` | Full entity profile: aliases, linked thoughts, relationship edges | Knowledge Graph |
+| 13 | `ops_source_monitor` | Per-source ingestion volume, errors, and failure samples | Ops Views |
+
+### Intentionally Excluded From This Release
+
+- **`delete_thought`** is intentionally not included in this initial PR. It requires a `deleted_at` shadow column and a restore workflow to align with the maintainer's "depreciate and version rather than delete" preference (see PR #127 closure). It will ship in a follow-up once that column lands in `schemas/enhanced-thoughts` and a sibling `restore_thought` tool can be published alongside it.
 
 ## Troubleshooting
 
@@ -142,4 +145,4 @@ Solution: Check that your LLM provider API key is valid and has sufficient quota
 
 ## Tool Surface Area
 
-This integration adds up to 14 tools to your AI's context. If you are managing multiple connectors, review the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on keeping your tool count manageable as your Open Brain grows.
+This integration adds up to 13 tools to your AI's context. If you are managing multiple connectors, review the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on keeping your tool count manageable as your Open Brain grows.

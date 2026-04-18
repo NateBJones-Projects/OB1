@@ -1,6 +1,6 @@
 {
   "name": "Enhanced MCP Server",
-  "description": "Production-grade remote MCP server expanding the tool surface from 4 to 14 tools with enhanced search, CRUD, enrichment, and operational monitoring.",
+  "description": "Production-grade remote MCP server expanding the tool surface from 4 to 13 tools with enhanced search, CRUD, enrichment, and operational monitoring.",
   "category": "integrations",
   "author": {
     "name": "Alan Shurafa",
