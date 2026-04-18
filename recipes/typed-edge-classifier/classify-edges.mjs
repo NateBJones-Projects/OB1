@@ -475,25 +475,38 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
     to = thoughtB.id;
   }
 
-  const row = {
-    from_thought_id: from,
-    to_thought_id: to,
-    relation: cls.relation,
-    confidence: Math.round(cls.confidence * 100) / 100,
-    support_count: pair.support || 1,
-    classifier_version: CLASSIFIER_VERSION,
-    metadata: {
-      classifier_model: modelUsed,
-      rationale: cls.rationale,
-      direction: cls.direction,
-    },
+  const metadata = {
+    classifier_model: modelUsed,
+    rationale: cls.rationale,
+    direction: cls.direction,
   };
-  if (cls.valid_from && cls.valid_from !== "null") row.valid_from = cls.valid_from;
-  if (cls.valid_until && cls.valid_until !== "null") row.valid_until = cls.valid_until;
+  const validFrom = cls.valid_from && cls.valid_from !== "null" ? cls.valid_from : null;
+  const validUntil = cls.valid_until && cls.valid_until !== "null" ? cls.valid_until : null;
+
+  // Call the thought_edges_upsert RPC so duplicates bump support_count
+  // and refresh valid_until atomically (see schemas/typed-reasoning-edges/
+  // schema.sql section 4b, and README duplicate-handling contract). A
+  // plain POST to the table would raise a unique-violation on repeat
+  // classifications and we would lose the evidence accumulation the
+  // docs promise.
+  const rpcArgs = {
+    p_from_thought_id: from,
+    p_to_thought_id: to,
+    p_relation: cls.relation,
+    p_confidence: Math.round(cls.confidence * 100) / 100,
+    p_support_count: pair.support || 1,
+    p_classifier_version: CLASSIFIER_VERSION,
+    p_valid_from: validFrom,
+    p_valid_until: validUntil,
+    p_metadata: metadata,
+  };
 
   try {
-    const inserted = await sb.post("thought_edges", row);
-    const edgeId = inserted?.[0]?.id ?? null;
+    const inserted = await sb.post("rpc/thought_edges_upsert", rpcArgs);
+    // RPC returning a composite type yields an object directly; if
+    // PostgREST wraps it in an array for some versions, unwrap.
+    const row = Array.isArray(inserted) ? inserted[0] : inserted;
+    const edgeId = row?.id ?? null;
 
     // Optional: mirror supersedes onto public.thoughts.supersedes (see
     // the README "Design Tensions" section). This is off by default and
@@ -527,9 +540,10 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
 
     return { ok: true, id: edgeId };
   } catch (e) {
-    if (String(e.body || e.message).toLowerCase().includes("duplicate")) {
-      return { ok: false, reason: "duplicate" };
-    }
+    // The RPC uses ON CONFLICT DO UPDATE, so unique-violation cannot
+    // occur for valid inputs. Any error here is a real failure (FK
+    // violation on a deleted thought, RLS denial, network, schema
+    // cache stale after migration, etc.).
     return { ok: false, reason: e.message };
   }
 }

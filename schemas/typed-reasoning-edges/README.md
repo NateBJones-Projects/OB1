@@ -124,7 +124,7 @@ Solution: The `from_thought_id` / `to_thought_id` you tried to insert doesn't ex
 Solution: You tried to insert a relation that isn't in the allowed set. Either expand the `CHECK` constraint (and the classifier vocabulary) with a new migration, or remap your input to one of the six supported labels.
 
 **Issue: Duplicate `ERROR: duplicate key value violates unique constraint "thought_edges_from_thought_id_to_thought_id_relation_key"`**
-Solution: An edge with the same `(from, to, relation)` already exists. The classifier treats this as a no-op and bumps `support_count` + refreshes `valid_until` via an explicit `ON CONFLICT` clause; if you're inserting manually, either `ON CONFLICT DO NOTHING` or handle the duplicate yourself.
+Solution: An edge with the same `(from, to, relation)` already exists. For callers that want "insert or bump support_count + refresh temporal bounds" in one atomic write, call the `public.thought_edges_upsert(...)` RPC exposed at `POST /rpc/thought_edges_upsert` — it uses `ON CONFLICT DO UPDATE` against the unique `(from_thought_id, to_thought_id, relation)` constraint. The typed-edge-classifier recipe does this by default. If you're inserting manually and don't want accumulation, either use `ON CONFLICT DO NOTHING` or handle the duplicate yourself.
 
 **Issue: I want a different vocabulary than the six labels.**
 Solution: Drop the `relation` `CHECK` constraint and either (a) replace it with a broader list, or (b) remove it entirely and let the classifier enforce vocabulary at write time. The text column is flexible; the `CHECK` is a guardrail against typos, not a hard design commitment.

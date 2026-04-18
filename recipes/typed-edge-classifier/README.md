@@ -184,7 +184,7 @@ Solution: That's usually correct — most co-mentioning pairs don't have a reaso
 Solution: Drop `--parallelism` to 1 or 2 and retry. The classifier does not back off automatically — that's a TODO.
 
 **Issue: Duplicate-key errors on insert**
-Solution: Expected. When two concurrent runs try to classify the same pair, one wins and the other sees `duplicate` and skips. The classifier treats duplicates as a no-op, not a failure.
+Solution: Should not occur in this recipe — the classifier calls the `thought_edges_upsert` RPC (from `schemas/typed-reasoning-edges/schema.sql`) which uses `INSERT ... ON CONFLICT DO UPDATE`. Repeat classifications of the same `(from, to, relation)` bump `support_count`, take the max confidence, and refresh the temporal bounds (GREATEST for `valid_until`, LEAST for `valid_from`, NULL-safe). If you see a duplicate-key error, the RPC is not installed — re-apply `schemas/typed-reasoning-edges/schema.sql`.
 
 **Issue: Cost cap triggered before processing finished**
 Solution: Working as designed. Raise `--max-cost-usd` if you want to continue. The next invocation will `skip_already_classified` any pairs already written.

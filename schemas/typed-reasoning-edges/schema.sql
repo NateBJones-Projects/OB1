@@ -185,6 +185,88 @@ REVOKE ALL ON public.thought_edges FROM authenticated;
 REVOKE ALL ON public.thought_edges FROM anon;
 
 -- ============================================================
+-- 4b. UPSERT RPC
+--     Callers that want "insert OR bump support_count + refresh
+--     valid_until" in one atomic write use this function. PostgREST
+--     exposes it as POST /rpc/thought_edges_upsert.
+--
+--     The UNIQUE (from_thought_id, to_thought_id, relation) constraint
+--     is the conflict target — on conflict we bump support_count, take
+--     the max confidence, and extend valid_until (GREATEST, NULL-safe:
+--     a NULL valid_until means "still current", so NULL wins). This
+--     matches the documented duplicate-handling contract in the
+--     typed-edge-classifier README.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.thought_edges_upsert(
+  p_from_thought_id UUID,
+  p_to_thought_id UUID,
+  p_relation TEXT,
+  p_confidence NUMERIC,
+  p_support_count INT,
+  p_classifier_version TEXT,
+  p_valid_from TIMESTAMPTZ,
+  p_valid_until TIMESTAMPTZ,
+  p_metadata JSONB
+)
+RETURNS public.thought_edges
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_row public.thought_edges;
+BEGIN
+  INSERT INTO public.thought_edges (
+    from_thought_id, to_thought_id, relation,
+    confidence, support_count, classifier_version,
+    valid_from, valid_until, metadata
+  )
+  VALUES (
+    p_from_thought_id, p_to_thought_id, p_relation,
+    p_confidence, COALESCE(p_support_count, 1), p_classifier_version,
+    p_valid_from, p_valid_until, COALESCE(p_metadata, '{}'::jsonb)
+  )
+  ON CONFLICT (from_thought_id, to_thought_id, relation)
+  DO UPDATE SET
+    support_count = public.thought_edges.support_count + COALESCE(EXCLUDED.support_count, 1),
+    confidence = GREATEST(public.thought_edges.confidence, EXCLUDED.confidence),
+    -- NULL valid_until means "still current" — prefer NULL if either side is NULL,
+    -- otherwise take the later bound.
+    valid_until = CASE
+      WHEN public.thought_edges.valid_until IS NULL OR EXCLUDED.valid_until IS NULL THEN NULL
+      ELSE GREATEST(public.thought_edges.valid_until, EXCLUDED.valid_until)
+    END,
+    -- valid_from: take the earlier known bound (NULL means "always/unknown",
+    -- a concrete date is more informative, so prefer the non-NULL; if both
+    -- are non-NULL, take the earlier).
+    valid_from = CASE
+      WHEN public.thought_edges.valid_from IS NULL THEN EXCLUDED.valid_from
+      WHEN EXCLUDED.valid_from IS NULL THEN public.thought_edges.valid_from
+      ELSE LEAST(public.thought_edges.valid_from, EXCLUDED.valid_from)
+    END,
+    classifier_version = EXCLUDED.classifier_version,
+    metadata = public.thought_edges.metadata || EXCLUDED.metadata,
+    updated_at = now()
+  RETURNING * INTO v_row;
+
+  RETURN v_row;
+END;
+$$;
+
+COMMENT ON FUNCTION public.thought_edges_upsert IS
+  'Insert or (on duplicate key) bump support_count + refresh temporal bounds. ' ||
+  'Call via POST /rpc/thought_edges_upsert. Use instead of a plain INSERT when ' ||
+  'you want repeated classifications of the same pair to accumulate evidence.';
+
+REVOKE ALL ON FUNCTION public.thought_edges_upsert(
+  UUID, UUID, TEXT, NUMERIC, INT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, JSONB
+) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.thought_edges_upsert(
+  UUID, UUID, TEXT, NUMERIC, INT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, JSONB
+) TO service_role;
+
+-- ============================================================
 -- 5. TEMPORAL VALIDITY ON ENTITY `edges`
 --    Adds valid_from / valid_until / decay_weight to the existing
 --    entity-to-entity edges table. Idempotent: ADD COLUMN IF NOT
