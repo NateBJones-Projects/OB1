@@ -112,15 +112,51 @@ async function sbGet(queryPath) {
 }
 
 async function sbPatch(queryPath, body) {
+  // `return=representation` forces PostgREST to send the affected rows back
+  // in the response body, and `count=exact` adds a Content-Range header
+  // with the row count. We need BOTH because under the old
+  // `return=minimal` semantics a zero-row PATCH is silent — the HTTP 200
+  // reply looks identical whether we updated a row or matched nothing.
+  // That silence used to hide concurrent deletes (the row vanished between
+  // candidate fetch and PATCH) as "half-migrated" once the follow-up RPC
+  // raised `no_data_found`. Returning the rows lets the caller classify
+  // "deleted during backfill" distinctly.
+  //
+  // See: https://docs.postgrest.org/en/v12/references/api/preferences.html
   const res = await fetch(`${REST}/${queryPath}`, {
     method: "PATCH",
-    headers: { ...HEADERS, Prefer: "return=minimal" },
+    headers: {
+      ...HEADERS,
+      Prefer: "return=representation,count=exact",
+    },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`PATCH ${queryPath}: ${res.status} ${text.slice(0, 300)}`);
   }
+  // Prefer Content-Range (`0-0/1`, `*/0`, etc.) when available; fall back
+  // to counting the returned body array length if the header is missing.
+  let rowCount = null;
+  const cr = res.headers.get("content-range");
+  if (cr) {
+    // Content-Range: "0-0/1" → matched 1 row, "*/0" → matched 0.
+    const m = cr.match(/\/(\d+|\*)$/);
+    if (m && m[1] !== "*") {
+      const n = Number(m[1]);
+      if (Number.isFinite(n)) rowCount = n;
+    }
+  }
+  if (rowCount === null) {
+    try {
+      const body = await res.json();
+      if (Array.isArray(body)) rowCount = body.length;
+    } catch {
+      // If we cannot parse the body, leave rowCount null so callers can
+      // fall back to pre-fix behavior rather than crash.
+    }
+  }
+  return { rowCount };
 }
 
 // POST to a PostgREST RPC endpoint. The server-side function is expected to
@@ -222,6 +258,12 @@ async function main() {
     patchedWithoutParents: 0,
     errors: 0,
     halfMigrated: 0,
+    // Rows that vanished between the candidate GET and the PATCH — the
+    // PATCH matched zero rows. These are NOT half-migrated: there is no
+    // row left to repair, so `--force` wouldn't help. Counted separately
+    // so operators can tell "the row is gone" from "the row exists but
+    // metadata.provenance is missing." Does not trigger non-zero exit.
+    deletedDuringBackfill: 0,
   };
 
   for (const row of rows) {
@@ -291,7 +333,24 @@ async function main() {
       try {
         // PATCH top-level columns first. If this fails we have not yet
         // touched metadata, so there is nothing to roll back.
-        await sbPatch(`thoughts?id=eq.${row.id}`, columnPatch);
+        //
+        // Under `return=representation,count=exact` (set in sbPatch) the
+        // response includes a row count. A zero-row result means the
+        // thought was deleted between our candidate GET and this PATCH —
+        // concurrent delete, not a half-migration. Skip the follow-up RPC
+        // (it would raise `no_data_found` anyway) and classify the row
+        // as `deletedDuringBackfill`. Re-running with `--force` cannot
+        // resurrect a deleted row, so this case is NOT an exit-code-1
+        // signal; it's neutral info.
+        const patchResult = await sbPatch(`thoughts?id=eq.${row.id}`, columnPatch);
+        if (patchResult.rowCount === 0) {
+          console.log(
+            `  INFO id=${row.id}: thought deleted during backfill — ` +
+            `skipping metadata merge (no row to repair).`,
+          );
+          summary.deletedDuringBackfill++;
+          continue;
+        }
 
         // Then merge the provenance subtree into metadata via a server-side
         // RPC. The RPC performs UPDATE … SET metadata = metadata || … in a
@@ -345,6 +404,19 @@ async function main() {
       `Re-run with --force to repair; both writes are idempotent.`,
     );
   }
+  if (summary.deletedDuringBackfill > 0) {
+    console.log(
+      `[backfill] INFO — ${summary.deletedDuringBackfill} row(s) were ` +
+      `deleted during the backfill window. These are not half-migrated — ` +
+      `there is nothing to repair — and do not trigger a non-zero exit.`,
+    );
+  }
+  // Exit codes:
+  //   2 — hard errors (HTTP failure, parse error, etc.). Operator must
+  //       investigate; re-running blindly may not help.
+  //   1 — half-migrated rows only. Safe to re-run with --force; idempotent.
+  //   0 — clean completion, including "deleted during backfill" cases
+  //       (no repair possible).
   if (summary.errors > 0) process.exit(2);
   if (summary.halfMigrated > 0) process.exit(1);
 }

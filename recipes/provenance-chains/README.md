@@ -157,14 +157,18 @@ Drop it in cron or a systemd timer. For a weekly deep-dive on low scorers, add `
 Backfill performs two server writes per row: a column PATCH (top-level
 provenance fields like `derivation_layer`, `derivation_method`, and
 `derived_from`) followed by an RPC call (`merge_thought_provenance_metadata`,
-which merges into `metadata.provenance`). If the second call fails due to
-transient network, PostgREST schema cache lag, or a permission error, the row
-is left half-migrated — the top-level columns are set but the metadata mirror
-is missing. The script logs an explicit warning when this happens and keeps
-processing.
+which merges into `metadata.provenance`). Three terminal states per row
+are tracked in the summary counters, and they map 1:1 to exit codes:
 
-Default reruns skip rows that already have `derivation_layer='derived'`, so
-these half-migrated rows will not self-heal. To repair, run:
+| Counter                   | What it means                                                                                   | Exit trigger |
+| ------------------------- | ----------------------------------------------------------------------------------------------- | ------------ |
+| `errors`                  | Hard failure — HTTP error, parse error, or any exception not handled below.                     | exit `2`     |
+| `halfMigrated`            | Column PATCH succeeded but the metadata merge RPC failed (transient, cache lag, permission).    | exit `1`     |
+| `deletedDuringBackfill`   | The row vanished between the candidate GET and the PATCH — PATCH matched zero rows.             | no effect    |
+
+Half-migrated rows leave the top-level columns set but `metadata.provenance`
+missing. Default reruns skip rows that already have `derivation_layer='derived'`,
+so these half-migrated rows will not self-heal. To repair, run:
 
 ```bash
 node backfill.mjs --force
@@ -172,13 +176,19 @@ node backfill.mjs --force
 
 which re-processes all candidate rows regardless of current state. Safe
 because both writes are idempotent: the column PATCH writes the same values
-it wrote last time, and the RPC merge is a `COALESCE || ` server-side
+it wrote last time, and the RPC merge is a server-side `metadata = metadata || …`
 concat so running it twice produces the same blob.
 
-The script exits non-zero when any row is left half-migrated so CI/cron can
-detect the condition: `exit 2` for hard errors and `exit 1` for
-half-migrated rows only. Re-run with `--force` to repair; exit `0` means
-every candidate finished cleanly.
+`deletedDuringBackfill` is distinct from `halfMigrated`: under
+`Prefer: return=representation,count=exact` the PATCH reports a zero-row
+result when the thought was deleted by a concurrent process between
+backfill's candidate fetch and its PATCH. There is no row left to repair,
+so `--force` cannot resurrect it and this case is neutral info — it does
+NOT trigger a non-zero exit.
+
+Exit code summary: `2` for hard errors, `1` for half-migrated rows only,
+`0` for clean completion (including concurrent-delete cases). Re-run with
+`--force` to repair half-migrations.
 
 ## Troubleshooting
 
