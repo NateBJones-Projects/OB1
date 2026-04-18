@@ -116,8 +116,9 @@ Legacy names (still accepted with a deprecation warning):
 
 After the full pipeline:
 
-- Every derived artifact row has `derivation_layer = 'derived'` and `derivation_method = 'synthesis'`.
-- Rows whose artifact files expose thought IDs have a non-empty `derived_from` array.
+- Every derived artifact row has `derivation_layer = 'derived'` and `derivation_method = 'synthesis'` at the top level.
+- The same fields (plus `backfilled_at`, `backfill_reason`, and, when parsed, `derived_from`) are mirrored into `metadata.provenance` so the canonical `upsert_thought` RPC — which only preserves the metadata blob on `content_fingerprint` conflicts — round-trips provenance if the row is ever re-upserted.
+- Rows whose artifact files expose thought IDs have a non-empty top-level `derived_from` array.
 - Derived rows have `metadata.eval_score` and the three `eval_dimensions` set.
 - Two new MCP tools are live: `trace_provenance(thought_id, depth?)` and `find_derivatives(thought_id, limit?)`. Restricted-tier rows are always filtered out by `find_derivatives` at the SQL layer — there is no caller-visible override.
 - Claude can now answer questions like:
@@ -130,7 +131,7 @@ After the full pipeline:
 This recipe assumes `public.thoughts.id` is a `UUID` (the canonical Open Brain setup). If you have customized your schema to a `BIGINT` primary key:
 
 - In `mcp-tools.ts`, change the `z.string().uuid()` input schemas to `z.number().int().positive()` and remove the UUID casts.
-- In `backfill.mjs`, **integer-style `#123` references are rejected outright on the canonical UUID install**. The script raises `refusing to write N integer ref(s) to derived_from on a UUID install` and skips that row so nothing corrupt reaches PostgREST. Users on a BIGINT fork must skip this recipe's backfill and repopulate `derived_from` themselves (or edit the `parseParentIds` helper to emit the integers uncasted). Mixing UUID and integer elements in one `derived_from` array also breaks the GIN containment index; keep one ID shape per array.
+- In `backfill.mjs`, **integer-style `#123` references raise a hard error** on the canonical UUID install — the script logs `parse error: refusing to write N integer ref(s) ...` and continues. That row is still flipped to `derivation_layer='derived'` but without any `derived_from`, so operators can fix the artifact and re-run with `--force`. Nothing corrupt reaches PostgREST. Users on a BIGINT fork must skip this recipe's backfill and repopulate `derived_from` themselves (or edit the `parseParentIds` helper to emit the integers uncasted). Mixing UUID and integer elements in one `derived_from` array also breaks the GIN containment index; keep one ID shape per array.
 - In `eval.mjs`, PostgREST `in.(…)` accepts either shape without changes.
 
 See the schema README's ID Type Note for the SQL-side adjustments.
@@ -155,7 +156,7 @@ Drop it in cron or a systemd timer. For a weekly deep-dive on low scorers, add `
 Solution: Apply the [Provenance Chains schema](../../schemas/provenance-chains/) first. This recipe depends on the columns and helper functions it installs.
 
 **Issue: Backfill patches rows but `derived_from` stays NULL**
-Solution: Most artifact files don't print thought IDs in a machine-parseable way. The script will still mark the row `derived` (so `trace_provenance` knows it's regenerable), but can't reconstruct parents. For new artifacts, write the parent ID list into `metadata.derived_from` at generation time — the `upsert_thought` RPC pass-through will store it correctly.
+Solution: Most artifact files don't print thought IDs in a machine-parseable way. The script will still mark the row `derived` (so `trace_provenance` knows it's regenerable) and still mirror provenance into `metadata.provenance` for durability, but without a `derived_from` array the row appears as a synthesis with no known parents. For new artifacts, write the parent ID list into `metadata.provenance.derived_from` at generation time so `upsert_thought` (which only persists the metadata blob on content_fingerprint conflicts) keeps it across re-captures; a companion recipe or migration can then promote metadata.provenance.derived_from → the top-level `derived_from` column for fast GIN lookup.
 
 **Issue: `eval.mjs` "grader returned no valid score"**
 Solution: The model returned something other than strict JSON. Try a stronger/temperature-0 model via `--model anthropic/claude-3.5-sonnet`, or use `--grader stdin` to inspect the prompt and craft the JSON yourself.

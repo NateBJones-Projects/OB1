@@ -234,9 +234,26 @@ async function main() {
       }
     }
 
+    // Mirror provenance into metadata so the canonical upsert_thought RPC,
+    // which only preserves the metadata blob on content_fingerprint conflicts,
+    // can round-trip these fields if the row is ever re-upserted. Matches the
+    // synthesis-capture pattern used elsewhere in OB1 recipes: top-level
+    // columns are the query surface, metadata.provenance is the durable copy.
+    const existingMeta = row.metadata ?? {};
+    const existingProv = (existingMeta && typeof existingMeta === "object" && existingMeta.provenance) || {};
+    const mergedProv = {
+      ...existingProv,
+      derivation_layer: "derived",
+      derivation_method: "synthesis",
+      backfilled_at: new Date().toISOString(),
+      backfill_reason: reason,
+    };
+    if (derivedFrom) mergedProv.derived_from = derivedFrom;
+
     const patch = {
       derivation_layer: "derived",
       derivation_method: "synthesis",
+      metadata: { ...existingMeta, provenance: mergedProv },
     };
     if (derivedFrom) patch.derived_from = derivedFrom;
 
