@@ -31,7 +31,7 @@ Run it:
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - Node.js 18 or later (uses the built-in `fetch` and `AbortController`)
-- A local `.env.local` file (or exported environment variables) sitting next to `smoke-all.mjs`. The script looks for `.env.local` in its own directory first (so `node recipes/brain-smoke-test/smoke-all.mjs` works from any cwd) and falls back to the current working directory.
+- A local `.env.local` file (or exported environment variables) sitting next to `smoke-all.js`. The script looks for `.env.local` in its own directory first (so `node recipes/brain-smoke-test/smoke-all.js` works from any cwd) and falls back to the current working directory.
 
 ## Credential Tracker
 
@@ -60,7 +60,7 @@ OPTIONAL (unlocks extra checks, safe to leave blank on stock installs)
 
 No build step. Just drop the file in and run it.
 
-1. Copy `smoke-all.mjs` into a local folder on your machine (any folder is fine -- it does not need to live inside your Supabase project directory).
+1. Copy `smoke-all.js` into a local folder on your machine (any folder is fine -- it does not need to live inside your Supabase project directory).
 
 2. Create `.env.local` next to it:
 
@@ -83,7 +83,7 @@ No build step. Just drop the file in and run it.
 3. Run it:
 
    ```bash
-   node smoke-all.mjs
+   node smoke-all.js
    ```
 
 ## Usage
@@ -91,27 +91,27 @@ No build step. Just drop the file in and run it.
 ```bash
 # Pretty-printed dashboard (default). Read-only: no data is inserted or
 # deleted, no LLM calls are made. Core Features is SKIPPED.
-node smoke-all.mjs
+node smoke-all.js
 
 # Machine-readable JSON -- pipe into jq, a log aggregator, or CI assertions
-node smoke-all.mjs --json
+node smoke-all.js --json
 
 # Opt in to the destructive Core Features category. Inserts a uniquely-
 # tagged row via the service-role key, triggers embedding + LLM metadata
 # generation, then deletes by tag. Cleanup runs on normal exit, on a
 # thrown check, and on SIGINT/SIGTERM, so ctrl-c does not leave residue.
 # Use this against a dev/scratch project, NOT a shared/prod instance.
-node smoke-all.mjs --destructive
-node smoke-all.mjs --write         # alias
+node smoke-all.js --destructive
+node smoke-all.js --write         # alias
 
 # Run only one category (names are case-insensitive)
-node smoke-all.mjs --category="DB Schema"
-node smoke-all.mjs --category=Auth
-node smoke-all.mjs --category="Core Features" --destructive
-node smoke-all.mjs --category="Row-Level Security"
+node smoke-all.js --category="DB Schema"
+node smoke-all.js --category=Auth
+node smoke-all.js --category="Core Features" --destructive
+node smoke-all.js --category="Row-Level Security"
 
 # Show this usage
-node smoke-all.mjs --help
+node smoke-all.js --help
 ```
 
 The seven category names are `MCP Server`, `REST API`, `DB Schema`, `Auth`, `Core Features`, `Access Key Enforcement`, and `Row-Level Security`.
@@ -127,7 +127,7 @@ One Auth category check (`MCP accepts correct access key (?key=)`) verifies the 
 
 The header-based auth check (`x-brain-key`) does **not** have this problem and is always preferred.
 
-If you run this harness from a network with HTTPS proxying, or ship the output anywhere public, **rotate `MCP_ACCESS_KEY`** afterward (Step 5 of the getting-started guide). To skip the `?key=` check entirely on sensitive networks, run `node smoke-all.mjs --category=MCP\ Server` and the other categories except `Auth` -- you lose a small amount of coverage but the key never touches a URL.
+If you run this harness from a network with HTTPS proxying, or ship the output anywhere public, **rotate `MCP_ACCESS_KEY`** afterward (Step 5 of the getting-started guide). To skip the `?key=` check entirely on sensitive networks, run `node smoke-all.js --category=MCP\ Server` and the other categories except `Auth` -- you lose a small amount of coverage but the key never touches a URL.
 
 ## Example Output
 
@@ -209,7 +209,7 @@ Skipped checks never fail the run, so you can wire this into CI without it going
 
 Each category is a plain array of `{ name, fn }` entries. To add a check:
 
-1. Pick the category array (`mcpChecks`, `restChecks`, `dbChecks`, `authChecks`, `coreChecks`, `accessKeyChecks`, or `rlsChecks`) inside `smoke-all.mjs`.
+1. Pick the category array (`mcpChecks`, `restChecks`, `dbChecks`, `authChecks`, `coreChecks`, `accessKeyChecks`, or `rlsChecks`) inside `smoke-all.js`.
 2. Append an entry:
 
    ```js

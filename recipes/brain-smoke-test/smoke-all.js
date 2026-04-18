@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * smoke-all.mjs -- Full-surface smoke test for an Open Brain install.
+ * smoke-all.js -- Full-surface smoke test for an Open Brain install.
  *
  * ~30 independent checks across seven categories: MCP endpoint, REST API
  * gateway, database schema, access-key (MCP), core capture/search features,
@@ -15,11 +15,11 @@
  * the run.
  *
  * Usage:
- *   node smoke-all.mjs                       # pretty-print dashboard (read-only)
- *   node smoke-all.mjs --json                # machine-readable JSON
- *   node smoke-all.mjs --destructive         # also run Core Features (writes + LLM calls)
- *   node smoke-all.mjs --category=DB\ Schema # run only one category
- *   node smoke-all.mjs --help                # show this usage
+ *   node smoke-all.js                       # pretty-print dashboard (read-only)
+ *   node smoke-all.js --json                # machine-readable JSON
+ *   node smoke-all.js --destructive         # also run Core Features (writes + LLM calls)
+ *   node smoke-all.js --category=DB\ Schema # run only one category
+ *   node smoke-all.js --help                # show this usage
  *
  * By default, Core Features is SKIPPED because it inserts rows via the
  * service-role key and triggers embedding/LLM metadata generation. Pass
@@ -99,7 +99,7 @@ function parseEnvFile(envPath) {
 }
 
 function loadEnvFile() {
-  // Primary: .env.local next to the script (survives `node path/to/smoke-all.mjs`
+  // Primary: .env.local next to the script (survives `node path/to/smoke-all.js`
   // from any cwd). Fallback: .env.local in cwd if the script-dir copy is absent.
   const scriptDirEnv = path.join(__dirname, ".env.local");
   const cwdEnv = path.join(process.cwd(), ".env.local");
