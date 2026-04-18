@@ -53,6 +53,23 @@ supabase secrets set \
   ANTHROPIC_API_KEY="your-anthropic-key"
 ```
 
+Optional safety knobs:
+
+```bash
+supabase secrets set \
+  ENTITY_EXTRACTION_MAX_CALLS="10000" \
+  FETCH_TIMEOUT_MS="60000"
+```
+
+- `ENTITY_EXTRACTION_MAX_CALLS` — cap on LLM extraction calls per container
+  lifetime (default `10000`; set to `0` to disable). When the cap trips,
+  the worker releases remaining claimed rows back to `pending` and returns
+  `{ truncated: true, truncated_reason: "call_cap_reached", ... }` so the
+  next invocation resumes cleanly.
+- `FETCH_TIMEOUT_MS` — hard timeout on every LLM fetch (default `60000`).
+  Protects against stalled upstreams consuming the 150s Edge Function
+  wall-clock.
+
 ### 3. Backfill the Extraction Queue
 
 If you have existing thoughts that need entity extraction, enqueue them:
@@ -120,9 +137,32 @@ LIMIT 20;
   "failed": 2,
   "entities_created": 15,
   "edges_created": 7,
-  "dry_run": false
+  "dry_run": false,
+  "truncated": false,
+  "truncated_reason": null,
+  "llm_calls": 10,
+  "elapsed_ms": 8421
 }
 ```
+
+- `truncated` — `true` when the worker aborted early because a safety cap
+  was hit. Remaining claimed rows are returned to `pending`.
+- `truncated_reason` — `"call_cap_reached"` (ENTITY_EXTRACTION_MAX_CALLS)
+  or `"wall_clock_budget"` (approaching the 150s platform timeout).
+- `llm_calls` — cumulative LLM calls across this container's lifetime.
+- `elapsed_ms` — wall-clock duration of this invocation.
+
+**Queue statuses:**
+
+- `pending` — awaiting extraction
+- `processing` — currently being worked on
+- `complete` — entities extracted and written
+- `skipped` — intentionally not extracted (e.g. `metadata.generated_by`
+  is set, indicating a system-synthesized artifact)
+- `failed` — exceeded `MAX_ATTEMPTS` (5) retries; check `last_error`
+
+Dry-run preview leaves the queue untouched — rows stay in `pending` until
+the worker runs without `dry_run=true`.
 
 ## How It Connects to Other Components
 
