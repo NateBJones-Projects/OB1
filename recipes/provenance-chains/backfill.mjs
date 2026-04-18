@@ -123,6 +123,21 @@ async function sbPatch(queryPath, body) {
   }
 }
 
+// POST to a PostgREST RPC endpoint. The server-side function is expected to
+// RETURNS VOID, so we ask PostgREST not to send a body back (`return=minimal`)
+// and we do not try to parse one here.
+async function sbRpc(fnName, body) {
+  const res = await fetch(`${REST}/rpc/${fnName}`, {
+    method: "POST",
+    headers: { ...HEADERS, Prefer: "return=minimal" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`RPC ${fnName}: ${res.status} ${text.slice(0, 300)}`);
+  }
+}
+
 // ── ID extractors ──────────────────────────────────────────────────────────
 
 // Matches UUIDv4-like strings in markdown: "citations: 6f7e…" or "#<uuid>".
@@ -185,6 +200,14 @@ async function main() {
     .map((p) => `metadata->>source_type.like.*${p}`)
     .join(",");
   const limitClause = args.limit ? `&limit=${args.limit}` : "";
+  // We still select `metadata` because resolveArtifactPath reads pointer
+  // paths (wiki_path / report_path / digest_path / artifact_path) from it.
+  // The snapshot is READ-ONLY in this script: the metadata mirror is now
+  // performed server-side via `merge_thought_provenance_metadata`, which
+  // does its read-modify-write inside a single UPDATE. We never PATCH the
+  // whole `metadata` blob back from a stale JS copy, so eval.mjs writes
+  // (eval_score, eval_dimensions, …) landing between this GET and the
+  // merge RPC cannot be silently overwritten.
   const query =
     `thoughts?select=id,source_type:metadata->>source_type,metadata,derivation_layer` +
     `&or=(${orClauses})&order=created_at.asc${limitClause}`;
@@ -234,28 +257,29 @@ async function main() {
       }
     }
 
-    // Mirror provenance into metadata so the canonical upsert_thought RPC,
-    // which only preserves the metadata blob on content_fingerprint conflicts,
-    // can round-trip these fields if the row is ever re-upserted. Matches the
-    // synthesis-capture pattern used elsewhere in OB1 recipes: top-level
-    // columns are the query surface, metadata.provenance is the durable copy.
-    const existingMeta = row.metadata ?? {};
-    const existingProv = (existingMeta && typeof existingMeta === "object" && existingMeta.provenance) || {};
-    const mergedProv = {
-      ...existingProv,
+    // Build the provenance subtree. This is what gets merged into
+    // metadata.provenance server-side by merge_thought_provenance_metadata,
+    // so the canonical upsert_thought RPC — which only preserves the metadata
+    // blob on content_fingerprint conflicts — can round-trip these fields if
+    // the row is ever re-upserted. Matches the synthesis-capture pattern used
+    // elsewhere in OB1 recipes: top-level columns are the query surface,
+    // metadata.provenance is the durable copy.
+    const provenancePatch = {
       derivation_layer: "derived",
       derivation_method: "synthesis",
       backfilled_at: new Date().toISOString(),
       backfill_reason: reason,
     };
-    if (derivedFrom) mergedProv.derived_from = derivedFrom;
+    if (derivedFrom) provenancePatch.derived_from = derivedFrom;
 
-    const patch = {
+    // Top-level column PATCH is independent of the metadata merge: these are
+    // separate columns on public.thoughts, not fields inside metadata, so
+    // concurrent writers to metadata (eval.mjs) cannot clobber them.
+    const columnPatch = {
       derivation_layer: "derived",
       derivation_method: "synthesis",
-      metadata: { ...existingMeta, provenance: mergedProv },
     };
-    if (derivedFrom) patch.derived_from = derivedFrom;
+    if (derivedFrom) columnPatch.derived_from = derivedFrom;
 
     console.log(
       `  ${args.dryRun ? "[DRY]" : "[PATCH]"} id=${row.id} source=${row.source_type} ` +
@@ -264,7 +288,20 @@ async function main() {
 
     if (!args.dryRun) {
       try {
-        await sbPatch(`thoughts?id=eq.${row.id}`, patch);
+        // PATCH top-level columns first. If this fails we have not yet
+        // touched metadata, so there is nothing to roll back.
+        await sbPatch(`thoughts?id=eq.${row.id}`, columnPatch);
+
+        // Then merge the provenance subtree into metadata via a server-side
+        // RPC. The RPC performs UPDATE … SET metadata = metadata || … in a
+        // single statement, so any concurrent write to metadata (e.g.,
+        // eval.mjs storing eval_score) either lands before and gets preserved
+        // by the `||` concat, or lands after and overwrites only its own
+        // keys. There is no stale JS snapshot in the loop body.
+        await sbRpc("merge_thought_provenance_metadata", {
+          p_thought_id: row.id,
+          p_provenance: provenancePatch,
+        });
         summary.patched++;
         if (derivedFrom) summary.patchedWithParents++;
         else summary.patchedWithoutParents++;
