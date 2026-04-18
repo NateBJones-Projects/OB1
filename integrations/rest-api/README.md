@@ -97,6 +97,45 @@ All requests require authentication via one of:
 - Header: `x-brain-key: your-access-key`
 - Header: `Authorization: Bearer your-access-key`
 
+Key comparison uses constant-time byte-wise equality to prevent
+timing-based key discovery.
+
+## Security
+
+This function is deployed with `--no-verify-jwt`, which means
+`MCP_ACCESS_KEY` is the only authentication layer. Additional hardening
+is controlled by two env vars:
+
+### CORS
+
+| Env var | Default | Notes |
+|---------|---------|-------|
+| `CORS_ALLOWED_ORIGINS` | unset (`*`) | Comma-separated origin allowlist. When unset the gateway responds with `Access-Control-Allow-Origin: *` for backward compatibility. |
+
+**Warning:** `*` combined with write methods (`POST`, `PUT`, `PATCH`,
+`DELETE`) is unsafe for production. Any webpage a victim visits can
+attempt a cross-origin write if it can obtain the key from another
+channel. Set `CORS_ALLOWED_ORIGINS` to your dashboard origin(s):
+
+```bash
+supabase secrets set CORS_ALLOWED_ORIGINS="https://brain.example.com,https://dashboard.example.com"
+```
+
+### Rate Limiting
+
+| Env var | Default | Notes |
+|---------|---------|-------|
+| `RATE_LIMIT_PER_MIN` | `100` | Per-key request cap per rolling 60-second window. Returns `429` with `Retry-After` when exceeded. |
+
+State is kept in-memory per Edge Function instance, so the limit resets
+on cold start. This is sufficient to block naive burn attacks against a
+leaked key; it is not a replacement for a durable token-bucket. If you
+expect high volume or need durability across cold starts, swap the
+in-memory Map in `index.ts` for `Deno.KV` or a Postgres-backed bucket.
+
+Keys are SHA-256-hashed before being used as bucket identifiers so raw
+keys never touch log output.
+
 ## How It Connects to Other Components
 
 The REST API uses the same `_shared/` helpers as the Enhanced MCP Server (`integrations/enhanced-mcp`), ensuring consistent behavior for search, capture, and enrichment. The `/ingest` endpoints proxy to the Smart Ingest Edge Function (`integrations/smart-ingest`).
@@ -129,4 +168,12 @@ The smart-ingest Edge Function (`integrations/smart-ingest`) must be deployed se
 The knowledge graph schema (`schemas/knowledge-graph`) must be applied first. Without it, entity endpoints will fail with table-not-found errors.
 
 **CORS errors from browser**
-The gateway allows all origins (`*`). If you still see CORS errors, check that your Supabase project allows Edge Function CORS headers.
+If `CORS_ALLOWED_ORIGINS` is unset, the gateway responds with `*` for backward
+compatibility. If it is set, confirm your browser's `Origin` header matches
+one of the allowlisted origins exactly (scheme + host + port). Also check
+that your Supabase project allows Edge Function CORS headers.
+
+**429 rate_limited**
+Requests from a single key exceeded `RATE_LIMIT_PER_MIN` (default 100) in a
+rolling 60-second window. Honor the `Retry-After` response header or raise
+the limit via `supabase secrets set RATE_LIMIT_PER_MIN="300"`.

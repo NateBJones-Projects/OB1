@@ -64,15 +64,106 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // ── CORS ────────────────────────────────────────────────────────────────────
 
-const CORS_HEADERS: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, x-brain-key",
-  "Content-Type": "application/json",
-};
+/**
+ * CORS allowlist from env (comma-separated). When unset, defaults to "*"
+ * for backward compatibility. See README Security section — combining "*"
+ * with write methods is unsafe for production; set CORS_ALLOWED_ORIGINS
+ * to your dashboard origin(s) to restrict.
+ */
+const CORS_ALLOWED_ORIGINS = (Deno.env.get("CORS_ALLOWED_ORIGINS") ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
-function json(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data, null, 2), { status, headers: CORS_HEADERS });
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? "";
+  let allow: string;
+  if (CORS_ALLOWED_ORIGINS.length === 0) {
+    // Legacy default: permissive. README warns against this for writes.
+    allow = "*";
+  } else if (origin && CORS_ALLOWED_ORIGINS.includes(origin)) {
+    allow = origin;
+  } else {
+    allow = "null";
+  }
+  return {
+    "Access-Control-Allow-Origin": allow,
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-brain-key",
+    "Vary": "Origin",
+    "Content-Type": "application/json",
+  };
+}
+
+function json(data: unknown, status = 200, req?: Request): Response {
+  const headers = req ? corsHeadersFor(req) : {
+    "Access-Control-Allow-Origin": CORS_ALLOWED_ORIGINS.length === 0 ? "*" : "null",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-brain-key",
+    "Vary": "Origin",
+    "Content-Type": "application/json",
+  };
+  return new Response(JSON.stringify(data, null, 2), { status, headers });
+}
+
+// ── Rate Limiting ───────────────────────────────────────────────────────────
+
+/**
+ * Simple in-memory per-key rate limiter. Window is 60 seconds; cap from
+ * RATE_LIMIT_PER_MIN env var (default 100). State is process-local so it
+ * resets on Edge Function cold start — good enough to block naive burn
+ * attacks against a leaked key, not a replacement for a durable limiter.
+ */
+const RATE_LIMIT_PER_MIN = (() => {
+  const raw = Number(Deno.env.get("RATE_LIMIT_PER_MIN") ?? "100");
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : 100;
+})();
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+async function hashKey(key: string): Promise<string> {
+  const data = new TextEncoder().encode(key);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/** Returns null if under limit, or a Response (429) if the key is over. */
+async function checkRateLimit(key: string, req: Request): Promise<Response | null> {
+  const hashed = await hashKey(key);
+  const now = Date.now();
+  const bucket = rateBuckets.get(hashed);
+  if (!bucket || now >= bucket.resetAt) {
+    rateBuckets.set(hashed, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return null;
+  }
+  if (bucket.count >= RATE_LIMIT_PER_MIN) {
+    const retryAfter = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+    return new Response(
+      JSON.stringify({ error: "rate_limited", retry_after_seconds: retryAfter }, null, 2),
+      {
+        status: 429,
+        headers: {
+          ...corsHeadersFor(req),
+          "Retry-After": String(retryAfter),
+        },
+      },
+    );
+  }
+  bucket.count++;
+  return null;
+}
+
+/** Extract the presented key for rate-limit bucketing. Caller must pass only authenticated keys. */
+function presentedKey(req: Request): string {
+  const url = new URL(req.url);
+  return (
+    req.headers.get("x-brain-key")?.trim() ||
+    url.searchParams.get("key")?.trim() ||
+    (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim()
+  );
 }
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -169,15 +260,23 @@ function parseAggregateCounts(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
+    return new Response(null, { status: 204, headers: corsHeadersFor(req) });
   }
 
   if (!MCP_ACCESS_KEY) {
     console.warn("MCP_ACCESS_KEY is not set — all requests will be rejected.");
-    return json({ error: "Service misconfigured: auth key not set" }, 503);
+    return json({ error: "Service misconfigured: auth key not set" }, 503, req);
   }
   if (!isAuthorized(req)) {
-    return json({ error: "Unauthorized" }, 401);
+    return json({ error: "Unauthorized" }, 401, req);
+  }
+
+  // Per-key rate limit (applied after auth so unauthenticated probes
+  // don't compete for buckets with legitimate traffic).
+  const key = presentedKey(req);
+  if (key) {
+    const limited = await checkRateLimit(key, req);
+    if (limited) return limited;
   }
 
   const url = new URL(req.url);
