@@ -118,10 +118,20 @@ The seven category names are `MCP Server`, `REST API`, `DB Schema`, `Auth`, `Cor
 
 ## Example Output
 
-A healthy stock install where the REST API integration is not installed, run without `--destructive`:
+The harness prints one row per check, grouped by category, then a summary line. Row glyphs:
+
+- `✓` **pass** -- the surface is wired correctly. Detail column shows what the check saw (`HTTP 204`, `rows=1247`, `callable`, etc.).
+- `⚠` **skip** -- an optional dependency is not installed, or a prerequisite env var is unset. Detail column explains why (e.g. `REST API not installed`, `SUPABASE_ANON_KEY unset -- RLS not verified end-to-end`). Skipped checks never fail the run.
+- `✗` **fail** -- the surface exists but answered wrong. Detail column shows the error (`HTTP 500`, `content mismatch`, `RLS is OFF or a permissive ALL USING (true) policy exists`).
+
+Each row ends with the elapsed milliseconds for that check so a slow endpoint is visible at a glance.
+
+The summary line has the form `Summary: <N> pass, <N> skip, <N> fail (<total> total)` where `<total>` matches the number of rows printed above it, followed by `Result: OK` (exit 0) or `Result: FAIL` (exit 1).
+
+A representative shape on a healthy stock install, run without `--destructive` (no REST API, no ob-graph, no smart-ingest, no enhanced-thoughts, no `SUPABASE_ANON_KEY`):
 
 ```text
-Open Brain Smoke Test -- 27 checks across 7 categories
+Open Brain Smoke Test -- 28 checks across 7 categories
 Target: https://abcd1234.supabase.co
 
 MCP Server:
@@ -143,9 +153,9 @@ DB Schema:
   ✓ match_thoughts RPC                                       301ms -- callable
   ✓ upsert_thought RPC                                       198ms -- callable
   ✓ thoughts recently written (last 7d)                      165ms -- rows_7d=84
-  ⚠ entities table (optional recipe: ob-graph)               142ms -- entities table not installed
-  ⚠ edges table (optional recipe: ob-graph)                  141ms -- edges table not installed
-  ⚠ ingestion_jobs table (optional integration: smart-ingest) 139ms -- ingestion_jobs table not installed
+  ⚠ graph_nodes table (optional recipe: ob-graph)            142ms -- graph_nodes table not installed
+  ⚠ graph_edges table (optional recipe: ob-graph)            141ms -- graph_edges table not installed
+  ⚠ ingestion_jobs table (optional integration: smart-ingest) 139ms -- ingestion_jobs table (requires schemas/smart-ingest-tables, not yet on main) not installed
   ⚠ search_thoughts_text RPC (optional schema: enhanced-thoughts) 138ms -- enhanced-thoughts not installed
 
 Auth:
@@ -166,13 +176,13 @@ Row-Level Security:
   ⚠ pg_class.relrowsecurity = true for public.thoughts        94ms -- pg_class_rls helper RPC not installed (rely on anon probe)
   ⚠ Anon key cannot read thoughts (real RLS probe)             1ms -- SUPABASE_ANON_KEY unset -- RLS not verified end-to-end
 
-Summary: 17 pass, 10 skip, 0 fail (27 total)
+Summary: 16 pass, 12 skip, 0 fail (28 total)
 Result: OK
 ```
 
-Legend: `✓` pass, `⚠` skipped (optional feature not installed), `✗` failed.
+Row counts by category on a stock install without `--destructive`: MCP Server=3, REST API=5, DB Schema=10, Auth=4, Core Features=1 (synthetic skip), Access Key Enforcement=3, Row-Level Security=2 -- **28 total**. Pass/skip split depends on which optional recipes are installed; `16 pass + 12 skip + 0 fail` is the stock-install baseline above.
 
-Note: with `--destructive` and `SUPABASE_ANON_KEY` set, the skip count drops as Core Features and the RLS anon probe become real checks.
+With `--destructive` the Core Features skip row is replaced by 5 real checks (insert, retrieve, MCP capture, MCP search, cleanup), so the total grows to 32. Installing ob-graph, smart-ingest (once its schema lands), enhanced-thoughts, REST API, and setting `SUPABASE_ANON_KEY` converts skips into passes without changing the row count.
 
 ## Exit Codes
 
