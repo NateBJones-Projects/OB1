@@ -621,18 +621,21 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
         // the edge is the source of truth. Do NOT preflight via
         // information_schema: PostgREST does not expose that schema over
         // REST (https://docs.postgrest.org/en/latest/references/api/schemas.html).
-        // True atomicity requires an RPC (future PR). The mirror is
-        // idempotent — re-running classification will re-apply it via
-        // the thought_edges_upsert path.
+        // True atomicity requires an RPC (future PR). Reruns will NOT
+        // retry this PATCH — processPair short-circuits on existing
+        // non-related_to edges via skip_already_classified, so this
+        // branch is unreachable on a second pass. See README "Manual
+        // mirror repair" for the SQL reconciliation command.
         await sb.patch(
           `thoughts?id=eq.${to}`,
           { supersedes: from },
         );
       } catch (e) {
-        // Don't fail the edge insert if the mirror fails — the edge is
-        // the source of truth. Reconciliation: re-run the classifier on
-        // the affected pair. thought_edges_upsert bumps support_count on
-        // the existing edge and the mirror PATCH is retried.
+        // Mirror to thoughts.supersedes failed. The edge is written, but
+        // the denormalized pointer on public.thoughts is stale. Reruns
+        // will NOT retry this — processPair short-circuits via
+        // skip_already_classified once the edge exists. To repair
+        // manually, see README "Manual mirror repair".
         console.warn(
           `  [warn] Mirror to thoughts.supersedes failed — column may not exist ` +
             `or permissions may be restricted. Edge inserted; manual reconciliation ` +
