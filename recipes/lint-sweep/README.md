@@ -130,26 +130,38 @@ The output is a self-contained markdown file ready for human review. Sample outp
 
 ```markdown
 ---
-title: Lint Sweep — 2026-04-17
-generated_at: 2026-04-17T14:22:11.031Z
+title: Lint Sweep — 2026-04-18
+generated_at: 2026-04-18T14:22:11.031Z
 tier: all
-started_at: 2026-04-17T14:22:04.112Z
-finished_at: 2026-04-17T14:22:11.031Z
+started_at: 2026-04-18T14:22:04.112Z
+finished_at: 2026-04-18T14:22:11.031Z
 ---
 
-# Open Brain Lint Sweep — 2026-04-17
+# Open Brain Lint Sweep — 2026-04-18
 
 *Read-only audit. This script never mutates thoughts.*
 
+## Scan scope
+
+This run inspects bounded samples, not your entire brain. Counts below are relative to these samples.
+
+- **Tier 1** — most recent **2000 thoughts** (ordered by `id desc`) for orphan/over-tag/length checks; up to **5000 rows** with a populated `content_fingerprint` for duplicate detection; full-table exact row counts for `thoughts` and `content_fingerprint IS NULL` (no cap).
+- **Tier 2** — first **500 high-importance thoughts** (`importance >= 4`), first **2000 entities**, first **5000 edges**.
+- **Tier 3** — up to **100 thoughts** from the last **365 days**, batched ~20 per LLM call, hard-capped at **5 LLM calls**.
+
+On brains larger than these caps, Tier 1/2 counts represent a **slice**, not the global total. Example: "Entities with zero edges: 12" under a 2000-entity cap means *12 isolated entities among the first 2000 returned*, not "12 total isolated entities." For whole-brain coverage, run the SQL views in [`views.sql`](./views.sql) directly.
+
 ## Summary
 
-- Total thoughts inspected (Tier 1 sample): 12847
-- Orphans by tag (recent 2000): 43
-- Exact-duplicate fingerprint groups: 2
-- Rows missing content_fingerprint: 0
-- Low-signal noise candidates: 18
-- High-importance isolated (no entity links): 7
-- Entities with zero edges: 12
+*Counts below reflect the bounded scan scope described above — not whole-brain totals.*
+
+- Total thoughts in table (exact count, uncapped): 12847
+- Orphans by tag (in recent 2000 sampled): 43
+- Exact-duplicate fingerprint groups (in first 5000 fingerprinted rows): 2
+- Rows missing content_fingerprint (exact count, uncapped): 0
+- Low-signal noise candidates (in recent 2000 sampled): 18
+- High-importance isolated — no entity links (in first 500 high-importance sampled): 7
+- Entities with zero edges (among first 2000 entities ∩ first 5000 edges): 12
 - LLM contradiction findings: 4 (over 100 thoughts, 5 LLM calls)
 
 ## Tier 1 — SQL-only lint (free)
@@ -158,14 +170,20 @@ finished_at: 2026-04-17T14:22:11.031Z
 - Over-tagged (>10 tags): **3** — typically import noise.
   - thought #48221 → 14 tags
   - thought #48219 → 12 tags
+- Empty content: **0**
+- Very long content (>20K chars): **2** — usually unchunked dumps.
 - Low-signal noise (importance ≤2, content <40 chars): **18**
 - Exact-duplicate fingerprint groups: **2**
   - fingerprint a1b2c3d4e5f6… → 2 copies (ids: 11032, 11418)
+- Rows missing content_fingerprint: **0** — consider running the fingerprint-dedup-backfill recipe.
 
 ## Tier 2 — Graph-based lint (free)
 
-- High-importance (≥4) thoughts with no entity links: **7**
+*Scope: first 500 high-importance thoughts, first 2000 entities, first 5000 edges. Counts below are within that slice, not the whole brain.*
+
+- High-importance (≥4) thoughts with no entity links (in first 500 high-importance sampled): **7**
   - #12033 (imp=5, 2026-01-14) — Moving biweekly 1:1 from Thursday to Tuesday starting next month…
+- Entities with zero edges (among first 2000 entities ∩ first 5000 edges): **12**
 
 ## Tier 3 — LLM-assisted contradiction sampling (budgeted)
 
@@ -185,10 +203,7 @@ finished_at: 2026-04-17T14:22:11.031Z
 
 ---
 
-**Safety:** `lint-sweep.js` is read-only. Every finding above is a suggestion
-for a human to review. Before acting on any item, verify the thought with
-`get_thought` or the web UI. Never delete or edit a thought based solely on
-this report.
+**Safety:** `lint-sweep.js` is read-only. Every finding above is a suggestion for a human to review. Before acting on any item, verify the thought with `get_thought` or the web UI. Never delete or edit a thought based solely on this report.
 ```
 
 ## Expected Outcome
