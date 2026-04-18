@@ -92,6 +92,11 @@ Scans thought content for patterns matching SSNs, credit cards, API keys, passwo
 13. Run `enrich-thoughts.mjs --dry-run --limit 20` to preview LLM classifications.
 14. Run `enrich-thoughts.mjs --apply` to enrich all remaining thoughts.
 
+## Security notes
+
+- **Prompt injection:** thought content is wrapped in `<thought_content>` tags and the system prompt instructs the model to treat everything inside as untrusted data. Any literal tag occurrences in content are escaped. Output fields (`summary`, `topics`, `tags`, `people`, `action_items`) are length-capped and control-char-stripped before they are written to `metadata`. Even so, enriching hostile third-party imports (shared chat exports, scraped feeds) can still influence classification labels — review before trusting them as ground truth.
+- **Bearer token on the wire:** every request carries your Supabase service-role key. Double-check that `SUPABASE_URL` points at your own Supabase project, not a proxy or debug server.
+
 ## Cost expectations
 
 The default OpenRouter model is `openai/gpt-4o-mini` at roughly $0.001--0.002 per thought. For 1,000 thoughts, expect approximately $1--2. The `backfill-type` and `backfill-sensitivity` scripts are free (no LLM calls -- they use local logic only).
