@@ -1,8 +1,10 @@
-# Copy to wrangler.toml and substitute <SUPABASE_REF> with your Supabase
+# Copy to wrangler.toml and replace <SUPABASE_REF> with your Supabase
 # project ref (the random string in your Supabase dashboard URL).
 #
-# Two environments — one per MCP function. Each deploys to its own
-# workers.dev subdomain.
+# Each [env.*] block deploys as a separate Worker with its own
+# workers.dev subdomain. Start with [env.core] for the core Open Brain
+# MCP server; copy the block and rename to add a Worker for each
+# additional MCP server (recipe, extension, etc.) you want to proxy.
 
 name = "ob-proxy"
 main = "src/index.ts"
@@ -15,9 +17,12 @@ name = "ob-core"
 UPSTREAM_BASE = "https://<SUPABASE_REF>.supabase.co"
 FUNCTION_NAME = "open-brain-mcp"
 
-[env.life-crm]
-name = "ob-life-crm"
-
-[env.life-crm.vars]
-UPSTREAM_BASE = "https://<SUPABASE_REF>.supabase.co"
-FUNCTION_NAME = "life-crm-mcp"
+# Example: a second Worker for an additional MCP server. Uncomment and
+# rename to match the Edge Function you're proxying.
+#
+# [env.my-extension]
+# name = "ob-my-extension"
+#
+# [env.my-extension.vars]
+# UPSTREAM_BASE = "https://<SUPABASE_REF>.supabase.co"
+# FUNCTION_NAME = "my-extension-mcp"

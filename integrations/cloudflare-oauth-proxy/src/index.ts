@@ -21,7 +21,7 @@
 
 export interface Env {
   UPSTREAM_BASE: string;    // e.g. "https://<ref>.supabase.co"
-  FUNCTION_NAME: string;    // e.g. "open-brain-mcp" or "life-crm-mcp"
+  FUNCTION_NAME: string;    // e.g. "open-brain-mcp"
 }
 
 export default {
