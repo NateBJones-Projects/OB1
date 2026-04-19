@@ -114,6 +114,7 @@ Done when: Your AI client can connect to the OB-Graph MCP server without authent
 Try these commands with your AI:
 
 **Build a small graph:**
+
 ```
 Create these graph nodes:
 - "Supabase" (type: tool)
@@ -127,6 +128,7 @@ Then connect them:
 ```
 
 **Query relationships:**
+
 ```
 What are all the neighbors of "Open Brain" in my graph?
 ```
