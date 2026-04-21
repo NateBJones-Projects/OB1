@@ -1,14 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Open Brain Capture",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Capture AI conversations from Claude, ChatGPT, and Gemini into your Open Brain via the REST API gateway.",
   "permissions": [
     "storage",
     "alarms",
     "activeTab",
     "tabs",
-    "cookies"
+    "cookies",
+    "debugger",
+    "scripting"
   ],
   "optional_host_permissions": [
     "https://*/*",
