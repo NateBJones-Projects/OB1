@@ -87,7 +87,11 @@
   // Also mirrored into persisted state for resume-after-wake behavior.
   let cancelRequested = false;
 
-  // Guards against concurrent startSync invocations from the popup.
+  // Guards against concurrent startSync invocations from the popup. This is
+  // set synchronously by every entry point (startSync, syncIncremental,
+  // resumeSync, resumeIfInterrupted) BEFORE any await, so a second entry
+  // that lands during the first entry's first microtask turn still observes
+  // the lock. Cleared in the finally block of each entry point.
   let syncInFlight = false;
 
   // ---------------------------------------------------------------------------
@@ -859,32 +863,51 @@
   // ---------------------------------------------------------------------------
 
   async function resumeIfInterrupted() {
+    // Claim the lock synchronously BEFORE any await. Otherwise a popup-
+    // triggered startSync/resumeSync or an alarm-triggered syncIncremental
+    // can land in the gap between `await loadState()` and `syncInFlight=true`
+    // below and double-enter the main loop against the same persisted queue.
+    if (syncInFlight) return;
+    syncInFlight = true;
+
     const stateMod = getStateModule();
-    const record = await loadState();
+    let record;
+    try {
+      record = await loadState();
 
-    if (record.state !== stateMod.STATES.SYNCING && record.state !== stateMod.STATES.ENUMERATING) {
+      if (record.state !== stateMod.STATES.SYNCING && record.state !== stateMod.STATES.ENUMERATING) {
+        return;
+      }
+
+      const lastBeat = Number(record.lastHeartbeatAt) || 0;
+      const age = Date.now() - lastBeat;
+
+      if (!lastBeat || age > STALE_HEARTBEAT_MS) {
+        LOG(`stale state detected (age=${age}ms) — resetting to idle`);
+        await updateState((rec) => {
+          const fresh = stateMod.resetToIdle(rec);
+          fresh.lastError = 'interrupted by service worker restart';
+          return fresh;
+        });
+        return;
+      }
+    } catch (err) {
+      ERR('resumeIfInterrupted: pre-flight load failed:', err?.message || err);
       return;
+    } finally {
+      // If we hit one of the early-return paths above, release the lock so
+      // public entry points can claim it. The happy-path below takes over
+      // its own finally to cover mainLoop completion.
+      if (!record || (record.state !== stateMod.STATES.SYNCING && record.state !== stateMod.STATES.ENUMERATING)) {
+        syncInFlight = false;
+      }
     }
 
-    const lastBeat = Number(record.lastHeartbeatAt) || 0;
-    const age = Date.now() - lastBeat;
-
-    if (!lastBeat || age > STALE_HEARTBEAT_MS) {
-      LOG(`stale state detected (age=${age}ms) — resetting to idle`);
-      await updateState((rec) => {
-        const fresh = stateMod.resetToIdle(rec);
-        fresh.lastError = 'interrupted by service worker restart';
-        return fresh;
-      });
-      return;
-    }
-
-    LOG(`warm state detected (age=${age}ms) — resuming sync with ${record.pendingIds.length} pending`);
+    LOG(`warm state detected — resuming sync with ${record.pendingIds.length} pending`);
     // The previous SW's tab may or may not still exist; ensureSyncTab handles
     // both. We skip re-enumeration on resume to avoid re-adding completed IDs
     // (they'd be filtered by mergePendingIds anyway, but the extra work is
     // wasteful).
-    syncInFlight = true;
     cancelRequested = false;
     try {
       const syncTabId = await ensureSyncTab(record.syncTabId);
