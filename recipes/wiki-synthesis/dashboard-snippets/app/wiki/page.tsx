@@ -93,7 +93,15 @@ export default async function WikiIndexPage() {
     formData: FormData,
   ): Promise<GenerateAutobiographyActionState> {
     "use server";
-    const scopeYear = String(formData.get("scope_year") ?? "").trim();
+    // Add your dashboard's auth guard here before spawning a subprocess
+    // that holds service-role credentials. e.g.
+    //   const session = await requireSessionOrRedirect();
+    //   if (!session.isAdmin) return { status: "error", message: "unauthorized" };
+    const rawYear = String(formData.get("scope_year") ?? "").trim();
+    if (rawYear && !/^(19|20)\d{2}$/.test(rawYear)) {
+      return { status: "error", message: "Invalid year — expected YYYY." };
+    }
+    const scopeYear = rawYear;
     const repoRoot = resolve(process.cwd(), "..");
     try {
       await runSynthesizer(repoRoot, scopeYear);
@@ -202,9 +210,38 @@ function runSynthesizer(repoRoot: string, scopeYear: string): Promise<void> {
   return new Promise((resolvePromise, rejectPromise) => {
     const args = [SYNTHESIZE_SCRIPT, "--topic", "autobiography"];
     if (scopeYear) args.push("--scope", `year=${scopeYear}`);
+    // Pass only the env vars synthesize-wiki.mjs needs. Don't forward
+    // the full process.env — that would leak every unrelated host secret
+    // (session keys, cloud tokens, etc.) to a long-lived child process.
+    // The script also reads .env.local from its cwd, so missing vars can
+    // be supplied there.
+    const allowlist = [
+      "OPEN_BRAIN_URL",
+      "OPEN_BRAIN_SERVICE_KEY",
+      "LLM_BASE_URL",
+      "LLM_API_KEY",
+      "LLM_MODEL",
+      "SUBJECT_NAME",
+      "SOURCE_TYPE_FILTER",
+      "WIKI_OUTPUT_DIR",
+      "PATH",
+      "NODE_PATH",
+      "HOME",
+      "USERPROFILE",
+      "APPDATA",
+      "LOCALAPPDATA",
+      "TEMP",
+      "TMP",
+      "SystemRoot",
+    ];
+    const childEnv: NodeJS.ProcessEnv = {};
+    for (const k of allowlist) {
+      const v = process.env[k];
+      if (typeof v === "string") childEnv[k] = v;
+    }
     const child = spawn(process.execPath, args, {
       cwd: repoRoot,
-      env: process.env,
+      env: childEnv,
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stderr = "";
