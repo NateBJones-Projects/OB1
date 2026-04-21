@@ -11,7 +11,7 @@
     "open_brain": true
   },
   "tags": ["schema", "statistics", "heatmap", "dashboard", "rpc", "aggregation"],
-  "difficulty": "beginner",
+  "difficulty": "intermediate",
   "estimated_time": "10 minutes",
   "created": "2026-04-21",
   "updated": "2026-04-21"
