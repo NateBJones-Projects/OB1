@@ -25,6 +25,10 @@ export interface HeatmapSourceOption {
   value: string;
 }
 
+// Example values only — replace these with `source_type` values that
+// actually exist in your `thoughts` table. Run
+//   select source_type, count(*) from thoughts group by 1 order by 2 desc;
+// in the Supabase SQL Editor to see yours, then edit this list.
 export const HEATMAP_SOURCE_OPTIONS: HeatmapSourceOption[] = [
   { label: "All", value: "" },
   { label: "LifeLog", value: "google_drive_import" },
@@ -48,12 +52,15 @@ export function HeatmapSourceFilter({
       </span>
       {HEATMAP_SOURCE_OPTIONS.map((opt) => {
         const active = opt.value === currentSource;
-        const href = opt.value ? `/?heat_source=${opt.value}` : "/";
+        const href = opt.value
+          ? `/?heat_source=${encodeURIComponent(opt.value)}`
+          : "/";
         return (
           <Link
             key={opt.value || "all"}
             href={href}
             prefetch={false}
+            aria-current={active ? "page" : undefined}
             className={[
               "px-2 py-0.5 text-[11px] rounded-full border transition-colors",
               active
