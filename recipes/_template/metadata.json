@@ -12,6 +12,7 @@
     "services": [],
     "tools": []
   },
+  "requires_primitives": [],
   "requires_skills": [],
   "tags": ["tag1", "tag2"],
   "difficulty": "beginner",

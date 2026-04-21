@@ -11,6 +11,7 @@
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - List any additional requirements (API keys, tools, services)
 - If this recipe depends on a reusable skill from `skills/`, link it here and declare it in `metadata.json` via `requires_skills`
+- If this recipe imports raw text for storage or embeddings, link the [Sensitive Data Redaction](../../primitives/sensitive-data-redaction/) primitive here and declare it in `metadata.json` via `requires_primitives`
 
 ## Credential Tracker
 

@@ -61,6 +61,27 @@ Your contribution's README must include these sections:
 4. **Expected outcome** — What should the user see when it's working? Be specific.
 5. **Troubleshooting** — At least 2-3 common issues and how to fix them.
 
+### Sensitive Text Ingestion Rule
+
+If your contribution imports or captures raw text that will be embedded or stored in Open Brain, it must use the [Sensitive Data Redaction](primitives/sensitive-data-redaction/) primitive.
+
+This applies to:
+- Email importers
+- Chat export importers
+- Social, blog, and document importers
+- Bulk capture pipelines that ingest third-party text
+
+This does not apply to:
+- Dashboards
+- Schema-only contributions
+- Metadata backfills or analytics jobs that do not ingest new raw text
+
+If this rule applies, your contribution must:
+- Add `"requires_primitives": ["sensitive-data-redaction"]` to `metadata.json`
+- Link the primitive in the README
+- Apply redaction before embeddings and before database insert
+- Default the redaction pass to on, even if you expose an explicit opt-out flag
+
 ### Visual Formatting Requirements
 
 These patterns are required for **extensions** and strongly recommended for all other contributions. They match the [Getting Started guide](docs/01-getting-started.md) and make guides scannable, beginner-friendly, and consistent across the repo.
@@ -237,6 +258,30 @@ Example for a recipe that depends on a reusable skill:
 }
 ```
 
+Example for a raw-text ingestion recipe that depends on the redaction primitive:
+
+```json
+{
+  "name": "Email History Import",
+  "description": "Import your Gmail history into Open Brain as searchable thoughts.",
+  "category": "recipes",
+  "author": {
+    "name": "Your Name",
+    "github": "your-github-username"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Gmail API"],
+    "tools": ["Deno"]
+  },
+  "requires_primitives": ["sensitive-data-redaction"],
+  "tags": ["email", "gmail", "import"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes"
+}
+```
+
 ## PR Format
 
 **Title:** `[category] Short description`
@@ -298,3 +343,5 @@ Every PR is checked against these rules. All must pass before human review.
 13. **Internal links** — All relative links in READMEs resolve to existing files
 14. **Remote MCP pattern** — Extensions and integrations must use remote MCP via Supabase Edge Functions. No `claude_desktop_config.json`, no local Node.js stdio servers. See the [Getting Started guide](docs/01-getting-started.md) for the correct pattern
 15. **Tool audit link** — Extensions and integrations must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in their README. This ensures users are aware of tool surface area management as they add capabilities
+
+For ingestion contributions, human review will also check that the [Sensitive Data Redaction](primitives/sensitive-data-redaction/) primitive is declared and applied before embeddings/storage.
