@@ -872,33 +872,38 @@
 
     const stateMod = getStateModule();
     let record;
+    // Tracks whether we hand off the syncInFlight lock to the happy path
+    // below. Default false — any early-return path in the preflight block
+    // releases the lock in its finally. Only set true when we actually
+    // transition into mainLoop.
+    let handedOffToMainLoop = false;
     try {
-      record = await loadState();
+      try {
+        record = await loadState();
 
-      if (record.state !== stateMod.STATES.SYNCING && record.state !== stateMod.STATES.ENUMERATING) {
+        if (record.state !== stateMod.STATES.SYNCING && record.state !== stateMod.STATES.ENUMERATING) {
+          return;
+        }
+
+        const lastBeat = Number(record.lastHeartbeatAt) || 0;
+        const age = Date.now() - lastBeat;
+
+        if (!lastBeat || age > STALE_HEARTBEAT_MS) {
+          LOG(`stale state detected (age=${age}ms) — resetting to idle`);
+          await updateState((rec) => {
+            const fresh = stateMod.resetToIdle(rec);
+            fresh.lastError = 'interrupted by service worker restart';
+            return fresh;
+          });
+          return;
+        }
+      } catch (err) {
+        ERR('resumeIfInterrupted: pre-flight load failed:', err?.message || err);
         return;
       }
-
-      const lastBeat = Number(record.lastHeartbeatAt) || 0;
-      const age = Date.now() - lastBeat;
-
-      if (!lastBeat || age > STALE_HEARTBEAT_MS) {
-        LOG(`stale state detected (age=${age}ms) — resetting to idle`);
-        await updateState((rec) => {
-          const fresh = stateMod.resetToIdle(rec);
-          fresh.lastError = 'interrupted by service worker restart';
-          return fresh;
-        });
-        return;
-      }
-    } catch (err) {
-      ERR('resumeIfInterrupted: pre-flight load failed:', err?.message || err);
-      return;
+      handedOffToMainLoop = true;
     } finally {
-      // If we hit one of the early-return paths above, release the lock so
-      // public entry points can claim it. The happy-path below takes over
-      // its own finally to cover mainLoop completion.
-      if (!record || (record.state !== stateMod.STATES.SYNCING && record.state !== stateMod.STATES.ENUMERATING)) {
+      if (!handedOffToMainLoop) {
         syncInFlight = false;
       }
     }

@@ -414,23 +414,13 @@
     const turns = extractor.extractGeminiHistory({ responseBody });
     if (!Array.isArray(turns) || turns.length === 0) {
       LOG(`history extractor returned empty tab=${tabId} requestId=${requestId} — dropping`);
-      // Best-effort: resolve any sync waiter keyed off the tab's current
-      // conversation id so the orchestrator doesn't block for the full
-      // 15s capture timeout on an empty/malformed payload. We derive the
-      // id from the tab URL (sync navigates the tab to /app/<id>) rather
-      // than the request body, which we don't keep stashed.
-      try {
-        const tab = await chrome.tabs.get(tabId);
-        const tabUrl = typeof tab?.url === 'string' ? tab.url : '';
-        const m = tabUrl.match(/\/app\/([^/?#]+)/);
-        const idFromTab = m ? decodeURIComponent(m[1]) : '';
-        const sync = self.OBGeminiSync;
-        if (idFromTab && sync && typeof sync.notifyHistoryCaptured === 'function') {
-          sync.notifyHistoryCaptured(idFromTab, { captured: 0, skippedDup: 0, other: 0, total: 0 });
-        }
-      } catch (err) {
-        ERR(`empty-payload notify best-effort failed tab=${tabId}:`, err?.message || err);
-      }
+      // Let the orchestrator's 15s capture timeout fire naturally so the
+      // conversation lands in failedIds, not in everSyncedIds. Calling
+      // notifyHistoryCaptured with zero totals here would mark the
+      // conversation as completed-with-zero-turns and permanently skip
+      // it on future incremental syncs even when the payload was just a
+      // transient parse failure. A natural timeout lets the user retry
+      // via "Sync All" after we ship an extractor fix.
       return;
     }
 
