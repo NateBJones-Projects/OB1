@@ -24,29 +24,24 @@ This recipe ships two workflows:
   - A `public.upsert_thought(p_content text, p_payload jsonb)` function that inserts a new thought and returns `{thought_id}`
 - For the Gmail workflow only: thoughts previously imported with [`recipes/email-history-import`](../email-history-import/) so rows carry `source_type = 'gmail_export'` and the `[Email from X to Y | Subject: ... | date]` content prefix
 - An LLM provider — one of:
-  - OpenRouter API key (same one from your Open Brain setup) **recommended**
+  - OpenRouter API key (same one from your Open Brain setup) **recommended, default**
   - Anthropic API key (direct)
   - Local `claude` CLI on PATH (must be run from a standalone terminal, not inside a Claude Code session)
-  - Local `codex` CLI on PATH (safe to nest inside Claude Code)
 
-## Credential Tracker
+> [!WARNING]
+> The atomizer used to include a `codex` provider that ran `codex exec --dangerously-bypass-approvals-and-sandbox`. That path was **removed** before this PR. The atomizer feeds arbitrary user-controlled memory/email text into the LLM — running a sandbox-bypass agent on untrusted input is a prompt-injection → local-code-execution primitive. Use one of the three providers above; they only generate text. If you have an older checkout that still references `--provider=codex`, upgrade.
 
-Copy this block into a text editor and fill it in as you go.
+## Credentials You'll Need
 
-```text
-ATOMIZER -- CREDENTIAL TRACKER
---------------------------------------
+Collect these once. **Keep them only inside `recipes/atomizer/.env.local`** (already gitignored via the repo root `.gitignore`). Do not paste service-role keys into notes, a second text editor, chat, or screenshots — they grant full database read/write/delete access and should be treated like a password.
 
-FROM YOUR OPEN BRAIN SETUP
-  Supabase Project URL:   ____________
-  Supabase Service Key:   ____________
-  OpenRouter API Key:     ____________   (or Anthropic API Key)
-
-OPTIONAL
-  Your own email(s):      ____________   (comma-separated; skipped on edges)
-
---------------------------------------
-```
+| Variable | Source | Required? |
+|----------|--------|-----------|
+| `SUPABASE_URL` or `SUPABASE_PROJECT_REF` | Your Open Brain Supabase project | required |
+| `SUPABASE_SERVICE_ROLE_KEY` | Same project, "service_role" key | required |
+| `OPENROUTER_API_KEY` | Same one from your Open Brain setup | required for the default (openrouter) provider |
+| `ANTHROPIC_API_KEY` | Anthropic Console | required only with `--provider=anthropic` |
+| `SELF_EMAILS` | Optional, comma-separated list of your own addresses — skipped on edge pass | optional |
 
 ## Setup
 
@@ -75,7 +70,10 @@ OPENROUTER_API_KEY=sk-or-v1-your-key
 SELF_EMAILS=you@example.com
 ```
 
-You can alternatively set `SUPABASE_PROJECT_REF` instead of `SUPABASE_URL`. If you prefer the direct Anthropic API, set `ANTHROPIC_API_KEY` and pass `--provider=anthropic` to the scripts.
+You can alternatively set `SUPABASE_PROJECT_REF` instead of `SUPABASE_URL`. If you prefer the direct Anthropic API, set `ANTHROPIC_API_KEY` and pass `--provider=anthropic` to the scripts. A `.env.example` template ships alongside this recipe; copy it to `.env.local` and fill in real values.
+
+> [!IMPORTANT]
+> `.env.local` is loaded script-relative (via `import.meta.url` → `fileURLToPath`), so you can run the scripts from any working directory — `node recipes/atomizer/test-atomize.mjs`, `node test-atomize.mjs` from the recipe folder, etc. Keys are UPPER_SNAKE_CASE and single-line values only; `process.env` takes precedence over file values.
 
 ### 4. Run the sanity test
 
@@ -133,9 +131,11 @@ Iterates known sources: instagram, grok, x-twitter, claude, journals, gemini, go
 | `--source <name>` | Process one source |
 | `--all` | Process all known sources |
 | `--dry-run` | Detect compounds only; no writes |
-| `--concurrency <N>` | Parallel LLM calls (default 1, max 4) |
+| `--concurrency <N>` | Parallel LLM calls (default 1, clamps to 4 with a warning if higher) |
 | `--data-dir <path>` | Override the pack root (default `./data/atomic-memories`) |
-| `--provider <name>` | `claude-cli`, `codex`, `anthropic`, or `openrouter` |
+| `--provider <name>` | `openrouter` (default), `anthropic`, or `claude-cli` |
+
+Re-running `atomize-packs.mjs` on the same data is safe: children whose `memoryId` ends in `-split-N` or whose `metadata.atomization.parent_id` is set are skipped on subsequent runs (they are already atomic). By default, `atomization-errors.json` captures only a 60-char preview + fingerprint per failure; set `ATOMIZE_DEBUG_ERRORS=1` to persist full memory text for debugging.
 
 ## Workflow B — Gmail re-atomization and audit
 
@@ -185,6 +185,12 @@ node re-atomize-gmail-thought.mjs --all --limit=50 --provider=openrouter
 node re-atomize-gmail-thought.mjs --all --min-words=300 --provider=openrouter
 ```
 
+> [!NOTE]
+> Without `--limit`, `--all` processes up to 1000 rows in a single pass. If you have more whole-body gmail thoughts than that, the script prints a cap warning — just re-run until the warning stops.
+
+> [!CAUTION]
+> The re-atomize pipeline is **not wrapped in a single Postgres transaction**. A crash mid-run can leave partially migrated state (new atoms inserted, old row not yet deleted, edges not yet redirected). Recovery: new atoms carry `metadata.re_atomized_from = <old_id>`. Find half-migrated source rows with `select id from thoughts where id in (select (metadata->>'re_atomized_from')::int from thoughts where metadata ? 're_atomized_from')`, then re-run `--id=<old_id>` — the script is idempotent and will finish the migration. If you need strict transactionality, wrap `upsert_thought` + edge redirect + delete in a single RPC.
+
 ### 5. Backfill correspondents
 
 Useful after a one-off resolver bug or when you add new `SELF_EMAILS` entries.
@@ -233,8 +239,10 @@ After a Gmail re-atomization + audit cycle, an actual run over a 350-thought STA
 The Claude CLI refuses to run when it detects it's already inside a Claude Code session. Fix with one of:
 
 - Run the script from a separate terminal window (not via Claude Code's tool interface).
-- Use `--provider=codex` — the Codex CLI safely nests inside Claude Code and delegates to its own OpenAI backend.
-- Use `--provider=openrouter` or `--provider=anthropic` — pure HTTP, no CLI at all.
+- Use `--provider=openrouter` or `--provider=anthropic` — pure HTTP, no CLI at all. OpenRouter is the default.
+
+> [!NOTE]
+> Earlier versions of this recipe supported `--provider=codex` as the nested-Claude-Code workaround. That provider was removed after code review flagged it as a prompt-injection → local-code-execution primitive: the atomizer feeds arbitrary user-controlled email/memory text into a sandbox-bypassed agent. Use `openrouter` or `anthropic` instead.
 
 ### `no JSON array found in LLM response`
 
@@ -258,4 +266,14 @@ The re-atomization script requires a `public.upsert_thought(p_content text, p_pa
 
 ### Failure rate halted the run
 
-`atomize-packs.mjs` halts if more than 2% of the last 100 memories failed. Inspect `atomization-errors.json` in the affected source folder — typical causes are (a) your provider hit a rate cap, (b) the CLI binary path is wrong, or (c) the prompt is being blocked by a content filter on certain memory texts. Fix the root cause and rerun; the script is idempotent-ish (compound memories whose children are already in the pack will be re-detected as compound and re-split, so consider inspecting the pack before replaying).
+`atomize-packs.mjs` halts if more than 2% of the last 100 memories failed. Inspect `atomization-errors.json` in the affected source folder — typical causes are (a) your provider hit a rate cap, (b) the CLI binary path is wrong, or (c) the prompt is being blocked by a content filter on certain memory texts. Fix the root cause and rerun; the script is idempotent — memories whose `memoryId` already ends in `-split-N` or that carry `metadata.atomization.parent_id` are skipped on re-run, so re-splitting the same pack is safe.
+
+### Error log / response-body contains sensitive content
+
+Error-path logging now redacts sensitive payloads by default:
+
+- `atomize-text.mjs` truncates raw model output in thrown errors to a length + provider string (raw text available via `ATOMIZE_DEBUG=1`).
+- `atomization-errors.json` persists only a 60-char preview + fingerprint per failure (full memory text via `ATOMIZE_DEBUG_ERRORS=1`).
+- `entity-resolver.mjs` logs email domain only by default, strips query-string filter values from PostgREST error messages (full output via `ENTITY_RESOLVER_DEBUG=1`).
+
+Flip each flag on only when actively debugging, then clear it.
