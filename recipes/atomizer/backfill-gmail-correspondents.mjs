@@ -32,6 +32,8 @@
  *                                          addresses
  */
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   loadEnv,
   makeSbClient,
@@ -40,6 +42,7 @@ import {
 } from "./lib/entity-resolver.mjs";
 
 const BATCH_SIZE = 500;
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function parseArgs(argv) {
   const args = { dryRun: false, since: null, limit: 0, sleepMs: 0 };
@@ -53,7 +56,8 @@ function parseArgs(argv) {
 }
 
 async function main() {
-  const env = loadEnv(".env.local");
+  // Resolve .env.local relative to this script so the user can run from any cwd.
+  const env = loadEnv(path.join(__dirname, ".env.local"));
   const args = parseArgs(process.argv);
 
   if (!env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -170,17 +174,20 @@ async function main() {
         console.warn(`  [err] #${t.id}: ${err.message}`);
       }
 
+      // Progress log lives inside the per-thought loop so it actually fires
+      // every 2000 thoughts; previously it was outside, so at batch_size=500
+      // it only fired once every 4 batches by coincidence.
+      if (totalSeen % 2000 === 0) {
+        console.log(
+          `  progress: seen=${totalSeen} linked=${totalLinked} newEntities=${agg.newEntities} errors=${agg.errors}`,
+        );
+      }
+
       if (args.sleepMs) await new Promise((r) => setTimeout(r, args.sleepMs));
     }
 
     if (args.limit && totalSeen >= args.limit) break;
     if (batch.length < BATCH_SIZE) break; // drained
-
-    if (totalSeen % 2000 === 0) {
-      console.log(
-        `  progress: seen=${totalSeen} linked=${totalLinked} newEntities=${agg.newEntities} errors=${agg.errors}`,
-      );
-    }
   }
 
   console.log(`\n[backfill-correspondents] done${args.dryRun ? " (DRY-RUN)" : ""}`);

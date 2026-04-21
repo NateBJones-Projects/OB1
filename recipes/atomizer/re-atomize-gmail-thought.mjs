@@ -45,6 +45,8 @@
  *                                          addresses to skip on the edge pass
  */
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { atomizeText } from "./lib/atomize-text.mjs";
 import {
   loadEnv,
@@ -53,7 +55,11 @@ import {
 } from "./lib/entity-resolver.mjs";
 
 // ── env ──────────────────────────────────────────────────────────────────────
-const env = loadEnv(".env.local");
+// Resolve .env.local relative to this script so running the file from any cwd
+// still picks up credentials. Without this, `node recipes/atomizer/re-atomize-...`
+// from repo root silently reads only process.env.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const env = loadEnv(path.join(__dirname, ".env.local"));
 if (!env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("missing env var SUPABASE_SERVICE_ROLE_KEY");
 }
@@ -147,21 +153,32 @@ function buildAtomizeOpts() {
 const atomizeOpts = buildAtomizeOpts();
 
 // ── target loading ───────────────────────────────────────────────────────────
+const DEFAULT_CAP = 1000;
 async function loadTargets() {
   if (args.id) {
     return await sb.get(`thoughts?id=eq.${args.id}&select=*`);
   }
   // --all: whole-body gmail thoughts where word_count >= minWords
+  const effectiveCap = args.limit > 0 ? args.limit : DEFAULT_CAP;
   const rows = await sb.get(
     `thoughts?source_type=eq.gmail_export`
     + `&metadata->gmail->>atom_count=is.null`
     + `&select=*`
-    + (args.limit > 0 ? `&limit=${args.limit}` : `&limit=1000`),
+    + `&order=id.asc`
+    + `&limit=${effectiveCap}`,
   );
-  return rows.filter((r) => {
+  const filtered = rows.filter((r) => {
     const wc = r.metadata?.gmail?.word_count || wordCount(r.content);
     return wc >= args.minWords;
   });
+  if (!args.limit && rows.length >= DEFAULT_CAP) {
+    console.warn(
+      `[re-atomize] WARNING: hit default ${DEFAULT_CAP}-row cap. ` +
+      `More whole-body gmail thoughts likely exist. ` +
+      `Re-run after this batch completes, or pass --limit=N for a larger page.`,
+    );
+  }
+  return filtered;
 }
 
 // ── per-target re-atomize ────────────────────────────────────────────────────
@@ -284,19 +301,37 @@ async function processOne(old) {
 }
 
 // ── main ─────────────────────────────────────────────────────────────────────
-const targets = await loadTargets();
-console.log(`[re-atomize] ${args.dryRun ? "DRY-RUN " : ""}targets: ${targets.length}`);
-const stats = { ok: 0, dry_ok: 0, skipped: 0, failed: 0 };
-for (const t of targets) {
-  try {
-    const r = await processOne(t);
-    if (r.status === "ok") stats.ok++;
-    else if (r.status === "dry_ok") stats.dry_ok++;
-    else if (r.status.startsWith("skip")) stats.skipped++;
-    else stats.failed++;
-  } catch (err) {
-    console.log(`  [#${t.id}] FATAL: ${err.message}`);
-    stats.failed++;
+// NOTE on partial failures: this script performs multi-step work per thought
+// (insert N atoms → link correspondents → redirect replies_to edges → delete
+// original). Those steps are NOT wrapped in a Postgres transaction — a crash
+// mid-run can leave half-migrated state. Recovery:
+//   - New atoms carry `metadata.re_atomized_from = <old_id>`. Query those to
+//     find half-migrated sources.
+//   - If atoms exist but the original was not deleted, pass --id=<old_id>
+//     again; idempotent upserts skip duplicate atoms, and the final delete
+//     runs cleanly.
+//   - If atoms exist and edges weren't redirected, either re-run --id=<old_id>
+//     or hand-fix with a SQL patch pointing replies_to edges to atom_0.
+async function main() {
+  const targets = await loadTargets();
+  console.log(`[re-atomize] ${args.dryRun ? "DRY-RUN " : ""}targets: ${targets.length}`);
+  const stats = { ok: 0, dry_ok: 0, skipped: 0, failed: 0 };
+  for (const t of targets) {
+    try {
+      const r = await processOne(t);
+      if (r.status === "ok") stats.ok++;
+      else if (r.status === "dry_ok") stats.dry_ok++;
+      else if (r.status.startsWith("skip")) stats.skipped++;
+      else stats.failed++;
+    } catch (err) {
+      console.log(`  [#${t.id}] FATAL: ${err.message}`);
+      stats.failed++;
+    }
   }
+  console.log(`\n[re-atomize] done. ok=${stats.ok} dry=${stats.dry_ok} skipped=${stats.skipped} failed=${stats.failed}`);
 }
-console.log(`\n[re-atomize] done. ok=${stats.ok} dry=${stats.dry_ok} skipped=${stats.skipped} failed=${stats.failed}`);
+
+main().catch((err) => {
+  console.error(`[re-atomize] FATAL: ${err.message}`);
+  process.exit(1);
+});

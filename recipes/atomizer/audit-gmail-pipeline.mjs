@@ -22,9 +22,12 @@
  *   SUPABASE_SERVICE_ROLE_KEY
  */
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { loadEnv } from "./lib/entity-resolver.mjs";
 
-const env = loadEnv(".env.local");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const env = loadEnv(path.join(__dirname, ".env.local"));
 if (!env.SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("missing env var SUPABASE_SERVICE_ROLE_KEY");
 }
@@ -48,6 +51,11 @@ async function sbGet(pathQuery, extraHeaders = {}) {
 
 async function sbCount(pathQuery) {
   const res = await fetch(`${BASE}/${pathQuery}&limit=1`, { headers: { ...HEADERS, Prefer: "count=exact" } });
+  if (!res.ok) {
+    // Previously we silently returned 0 on any HTTP error, which made audits
+    // falsely report "zero missing data" when auth or the query was broken.
+    throw new Error(`COUNT ${pathQuery}: ${res.status} ${(await res.text()).slice(0, 200)}`);
+  }
   const cr = res.headers.get("content-range");
   const m = cr && cr.match(/\/(\d+|\*)$/);
   return m ? (m[1] === "*" ? 0 : parseInt(m[1], 10)) : 0;
@@ -63,13 +71,20 @@ const totalGmail = await sbCount(`thoughts?source_type=eq.gmail_export&select=id
 const atomized = await sbCount(`thoughts?source_type=eq.gmail_export&metadata->gmail->>atom_count=not.is.null&metadata->gmail->>atom_index=not.is.null&select=id`);
 const wholeBody = totalGmail - atomized;
 
-const threadCovRows = await sbGet(`thoughts?source_type=eq.gmail_export&select=metadata->gmail->>thread_id&limit=10000`);
-const uniqueThreads = new Set(threadCovRows.map((r) => r["?column?"] || r["metadata->gmail->>thread_id"] || r.thread_id).filter(Boolean));
+// PostgREST returns jsonb extractors under a version-dependent column name
+// unless we alias them explicitly. `thread_id:metadata->gmail->>thread_id`
+// guarantees the value ends up on `r.thread_id` across PostgREST versions.
+const threadCovRows = await sbGet(
+  `thoughts?source_type=eq.gmail_export&select=thread_id:metadata->gmail->>thread_id&limit=10000`,
+);
+const uniqueThreads = new Set(threadCovRows.map((r) => r.thread_id).filter(Boolean));
 
-const labelSample = await sbGet(`thoughts?source_type=eq.gmail_export&select=metadata->gmail->labels&limit=500`);
+const labelSample = await sbGet(
+  `thoughts?source_type=eq.gmail_export&select=labels:metadata->gmail->labels&limit=500`,
+);
 const labelCounts = {};
 for (const row of labelSample) {
-  const labels = row["metadata->gmail->labels"] || row["?column?"] || [];
+  const labels = row.labels || [];
   if (Array.isArray(labels)) {
     for (const l of labels) labelCounts[l] = (labelCounts[l] || 0) + 1;
   }
@@ -153,7 +168,12 @@ report.sections.classification = {
 const threadIdSample = Array.from(uniqueThreads).slice(0, 5);
 const threadGroups = {};
 for (const tid of threadIdSample) {
-  const rows = await sbGet(`thoughts?source_type=eq.gmail_export&metadata->gmail->>thread_id=eq.${encodeURIComponent(tid)}&select=id,metadata->gmail->>atom_index,metadata->gmail->>atom_count&limit=200`);
+  const rows = await sbGet(
+    `thoughts?source_type=eq.gmail_export`
+    + `&metadata->gmail->>thread_id=eq.${encodeURIComponent(tid)}`
+    + `&select=id,atom_index:metadata->gmail->>atom_index,atom_count:metadata->gmail->>atom_count`
+    + `&limit=200`,
+  );
   threadGroups[tid] = { msgs_in_db: rows.length, sample_ids: rows.slice(0, 5).map((r) => r.id) };
 }
 report.sections.threads_sample = threadGroups;
@@ -176,11 +196,16 @@ report.sections.top_correspondents = topAuthors.map(([id, count]) => ({
 }));
 
 // ── G. Atom quality sample ───────────────────────────────────────────────────
-const atomSampleRows = await sbGet(`thoughts?source_type=eq.gmail_export&metadata->gmail->>atom_count=gt.1&select=id,content,metadata->gmail->>atom_index,metadata->gmail->>atom_count&order=id.desc&limit=15`);
+const atomSampleRows = await sbGet(
+  `thoughts?source_type=eq.gmail_export`
+  + `&metadata->gmail->>atom_count=gt.1`
+  + `&select=id,content,atom_index:metadata->gmail->>atom_index,atom_count:metadata->gmail->>atom_count`
+  + `&order=id.desc&limit=15`,
+);
 report.sections.atom_samples = atomSampleRows.map((r) => ({
   id: r.id,
-  atom_index: r["metadata->gmail->>atom_index"],
-  atom_count: r["metadata->gmail->>atom_count"],
+  atom_index: r.atom_index,
+  atom_count: r.atom_count,
   content_preview: r.content ? r.content.slice(0, 240) + (r.content.length > 240 ? "..." : "") : null,
   word_count: r.content ? r.content.split(/\s+/).filter(Boolean).length : 0,
 }));
