@@ -10,6 +10,7 @@ Step-by-step builds that add a new capability to your Open Brain. Follow the ins
 | [Email History Import](email-history-import/) | Pull your Gmail archive into searchable thoughts |
 | [ChatGPT Conversation Import](chatgpt-conversation-import/) | Ingest your ChatGPT data export |
 | [Daily Digest](daily-digest/) | Automated summary of recent thoughts via email or Slack |
+| [Wiki Compiler](wiki-compiler/) | Compiles graph-backed entity pages and topic synthesis into a regenerable wiki layer you can run on demand or on a schedule |
 | [Work Operating Model Activation](work-operating-model-activation/) | Interview-driven workflow that stores how you actually work and generates agent-ready operating files |
 | [World Model Diagnostic Activation](world-model-diagnostic-activation/) | Lightweight activation path for a 20-minute world-model diagnostic that uses the base OB1 connector and a direct-paste fallback |
 | [Research-to-Decision Workflow](research-to-decision-workflow/) | Compose canonical skills into operator and investor paths for analysis, synthesis, meetings, and decision documents |
