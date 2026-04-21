@@ -41,8 +41,8 @@
 // No real email addresses, OAuth IDs, or service-account keys are embedded.
 // Everything is injected through env vars or CLI flags.
 
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync, appendFileSync, existsSync, chmodSync, renameSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer } from "node:http";
@@ -398,8 +398,20 @@ function loadToken() {
 }
 
 function saveToken(token) {
+  // Atomic write: tmp file + rename keeps token.json from ever being half-written
+  // under concurrent runs or crashes. Owner-only (0o600) prevents other local
+  // users/processes from reading the refresh token on POSIX. On Windows the
+  // mode bit is a best-effort hint — users who need hard isolation should put
+  // the token under a user-profile-restricted directory via GMAIL_TOKEN_PATH.
   mkdirSync(dirname(TOKEN_PATH), { recursive: true });
-  writeFileSync(TOKEN_PATH, JSON.stringify(token, null, 2));
+  const tmp = `${TOKEN_PATH}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(token, null, 2), { mode: 0o600 });
+  try {
+    chmodSync(tmp, 0o600);
+  } catch {
+    // Windows non-POSIX filesystems may reject chmod — ignore silently.
+  }
+  renameSync(tmp, TOKEN_PATH);
 }
 
 async function refreshAccessToken(creds, token) {
@@ -413,6 +425,13 @@ async function refreshAccessToken(creds, token) {
       grant_type: "refresh_token",
     }),
   });
+  // Check HTTP status before trying to parse JSON — proxy/5xx responses may
+  // not be valid JSON and should surface with useful status/body context.
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch { /* ignore */ }
+    throw new Error(`Token refresh failed: HTTP ${res.status} ${res.statusText} — ${body.slice(0, 300)}`);
+  }
   const data = await res.json();
   if (data.error) throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
   const updated = {
@@ -444,6 +463,13 @@ async function authorize(creds, loginHint = "") {
     return token.access_token;
   }
 
+  // CSRF protection: generate a random state value and reject any callback
+  // that doesn't echo it back. Without this, any local process (or a
+  // malicious tab that can reach the loopback port) can race the real
+  // browser redirect with an attacker-controlled `code` and bind the
+  // script to the wrong Google account.
+  const oauthState = randomBytes(16).toString("hex");
+
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", creds.client_id);
   authUrl.searchParams.set("redirect_uri", CALLBACK_URI);
@@ -451,25 +477,45 @@ async function authorize(creds, loginHint = "") {
   authUrl.searchParams.set("scope", SCOPES.join(" "));
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
+  authUrl.searchParams.set("state", oauthState);
   if (loginHint) authUrl.searchParams.set("login_hint", loginHint);
 
   console.log("\nOpening browser for Gmail authorization...");
   console.log("If the browser doesn't open, visit:\n  " + authUrl.toString() + "\n");
   openBrowser(authUrl.toString());
 
+  // Escape untrusted querystring values before reflecting into HTML.
+  const escapeHtml = (s) => String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
   const code = await new Promise((resolveCode, rejectCode) => {
     const server = createServer((req, res) => {
       const url = new URL(req.url, CALLBACK_URI);
       const authCode = url.searchParams.get("code");
+      const gotState = url.searchParams.get("state");
       const err = url.searchParams.get("error");
       if (err) {
         res.writeHead(400, { "Content-Type": "text/html" });
-        res.end(`<html><body><h2>Authorization failed</h2><p>${err}</p></body></html>`);
+        res.end(`<html><body><h2>Authorization failed</h2><p>${escapeHtml(err)}</p></body></html>`);
         server.close();
         rejectCode(new Error(`OAuth error: ${err}`));
         return;
       }
       if (authCode) {
+        // Reject callbacks whose state doesn't match the one we generated.
+        // Use a constant-time comparison? — not critical for a one-shot
+        // localhost callback, but we still want a hard match.
+        if (gotState !== oauthState) {
+          res.writeHead(400, { "Content-Type": "text/html" });
+          res.end("<html><body><h2>Authorization failed</h2><p>Invalid state.</p></body></html>");
+          setTimeout(() => server.close(), 200);
+          rejectCode(new Error("OAuth error: state mismatch (possible CSRF)"));
+          return;
+        }
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end(
           "<html><body><h2>Authorization complete</h2><p>You can close this tab and return to your terminal.</p></body></html>",
@@ -481,7 +527,10 @@ async function authorize(creds, loginHint = "") {
       res.writeHead(400);
       res.end("Waiting for auth...");
     });
-    server.listen(CALLBACK_PORT);
+    // Bind to loopback explicitly. Default listen() on some Node/OS combos
+    // binds to :: / 0.0.0.0, which would expose the callback to any
+    // network peer for a few seconds. 127.0.0.1 keeps it strictly local.
+    server.listen(CALLBACK_PORT, "127.0.0.1");
     server.on("error", rejectCode);
   });
 
@@ -496,6 +545,11 @@ async function authorize(creds, loginHint = "") {
       grant_type: "authorization_code",
     }),
   });
+  if (!tokenRes.ok) {
+    let body = "";
+    try { body = await tokenRes.text(); } catch { /* ignore */ }
+    throw new Error(`Token exchange failed: HTTP ${tokenRes.status} ${tokenRes.statusText} — ${body.slice(0, 300)}`);
+  }
   const tokenData = await tokenRes.json();
   if (tokenData.error) throw new Error(`Token exchange failed: ${tokenData.error_description || tokenData.error}`);
   const newToken = {
@@ -511,15 +565,44 @@ async function authorize(creds, loginHint = "") {
 
 // ─── Gmail API helpers ──────────────────────────────────────────────────────
 
+// Retryable status codes per Google API guidance: 429 (rate limit),
+// 500/502/503/504 (server errors). Other 4xx are permanent.
+const GMAIL_RETRY_STATUS = new Set([429, 500, 502, 503, 504]);
+const GMAIL_MAX_RETRIES = 5;
+
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
 async function gmailFetch(accessToken, path) {
-  const res = await fetch(`${GMAIL_API}${path}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Gmail API error ${res.status}: ${body}`);
+  let lastErr;
+  for (let attempt = 0; attempt <= GMAIL_MAX_RETRIES; attempt++) {
+    let res;
+    try {
+      res = await fetch(`${GMAIL_API}${path}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+    } catch (err) {
+      // Network-level failure (DNS, socket, abort). Retry with backoff.
+      lastErr = err;
+      if (attempt === GMAIL_MAX_RETRIES) throw new Error(`Gmail API network error after ${attempt + 1} attempts: ${err.message}`);
+      const backoff = Math.min(2000 * 2 ** attempt, 30_000) + Math.floor(Math.random() * 500);
+      console.warn(`   [gmail] network error on ${path}, retrying in ${backoff}ms (attempt ${attempt + 1}/${GMAIL_MAX_RETRIES})`);
+      await sleep(backoff);
+      continue;
+    }
+    if (res.ok) return res.json();
+    if (!GMAIL_RETRY_STATUS.has(res.status) || attempt === GMAIL_MAX_RETRIES) {
+      const body = await res.text().catch(() => "");
+      throw new Error(`Gmail API error ${res.status}: ${body.slice(0, 500)}`);
+    }
+    // Retryable. Respect Retry-After if present, else exponential backoff w/ jitter.
+    const retryAfter = parseInt(res.headers.get("retry-after") || "0", 10);
+    const backoff = retryAfter > 0
+      ? Math.min(retryAfter * 1000, 60_000)
+      : Math.min(2000 * 2 ** attempt, 30_000) + Math.floor(Math.random() * 500);
+    console.warn(`   [gmail] ${res.status} on ${path}, retrying in ${backoff}ms (attempt ${attempt + 1}/${GMAIL_MAX_RETRIES})`);
+    await sleep(backoff);
   }
-  return res.json();
+  throw lastErr || new Error("Gmail API: exhausted retries");
 }
 
 async function listLabels(accessToken) {
