@@ -140,13 +140,18 @@ function wordCount(s) {
 function buildAtomizeOpts() {
   const opts = { timeoutMs: 180_000, minAtoms: 1 };
   if (args.provider) opts.provider = args.provider;
-  if ((args.provider || "") === "anthropic") {
+  // Pre-load the HTTP provider's API key. atomize-text.mjs defaults to
+  // 'openrouter' when the caller doesn't set provider, so we need to load
+  // OPENROUTER_API_KEY for both --provider=openrouter AND the default path
+  // (otherwise `node re-atomize-gmail-thought.mjs --id=123` with no provider
+  // flag fails inside atomize-text.mjs with "requires opts.openrouterApiKey").
+  const effective = args.provider || "openrouter";
+  if (effective === "anthropic") {
     opts.anthropicApiKey = env.ANTHROPIC_API_KEY;
-    if (!opts.anthropicApiKey) throw new Error("--provider anthropic requires ANTHROPIC_API_KEY");
-  }
-  if ((args.provider || "") === "openrouter") {
+    if (!opts.anthropicApiKey) throw new Error("--provider anthropic requires ANTHROPIC_API_KEY in .env.local or process env");
+  } else if (effective === "openrouter") {
     opts.openrouterApiKey = env.OPENROUTER_API_KEY;
-    if (!opts.openrouterApiKey) throw new Error("--provider openrouter requires OPENROUTER_API_KEY");
+    if (!opts.openrouterApiKey) throw new Error("--provider openrouter (default) requires OPENROUTER_API_KEY in .env.local or process env");
   }
   return opts;
 }

@@ -8,7 +8,7 @@ The atomizer takes long, multi-topic text and breaks it into small, self-contain
 
 This recipe ships two workflows:
 
-1. **Generic pack atomizer (`atomize-packs.mjs`)** — walks local JSON "pack" files of memories from any capture source (Instagram, ChatGPT, X/Twitter, journals, etc.), detects compound memories using lightweight heuristics (sentence count, enumeration, semicolon clauses, conjunction density), and splits each compound into atomic children. Supports four LLM providers: Claude CLI, Codex, Anthropic API, and OpenRouter.
+1. **Generic pack atomizer (`atomize-packs.mjs`)** — walks local JSON "pack" files of memories from any capture source (Instagram, ChatGPT, X/Twitter, journals, etc.), detects compound memories using lightweight heuristics (sentence count, enumeration, semicolon clauses, conjunction density), and splits each compound into atomic children. Supports three LLM providers: OpenRouter (default), Anthropic API, and Claude CLI.
 2. **Gmail re-atomization + audit (`re-atomize-gmail-thought.mjs`, `audit-gmail-pipeline.mjs`, `backfill-gmail-correspondents.mjs`)** — heals an existing Gmail import where long messages were stored whole-body instead of atomized. Splits the body, inserts atoms via `upsert_thought`, redirects `replies_to` edges, re-links correspondents, and deletes the original row. Comes with an audit script that reports scale, metadata completeness, entity-graph integrity, and retrieval probes.
 
 ## Prerequisites

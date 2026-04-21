@@ -76,9 +76,15 @@ export function spawnClaudeCli(args, env, timeoutMs = 180_000, stdinData = null)
       clearTimeout(timer);
       if (killed) return;
       if (code !== 0) {
-        reject(new Error(
-          `Claude CLI exited with code ${code}.\nStderr: ${stderr.substring(0, 500)}\nStdout: ${stdout.substring(0, 200)}`,
-        ));
+        // Don't leak stdout/stderr into the error message by default — the
+        // Claude CLI often echoes the input prompt, which for this recipe
+        // contains arbitrary user memory / email text. Set ATOMIZE_DEBUG=1
+        // to include the raw snippets when actively debugging.
+        const debug = process.env.ATOMIZE_DEBUG === "1";
+        const detail = debug
+          ? `\nStderr: ${stderr.substring(0, 500)}\nStdout: ${stdout.substring(0, 200)}`
+          : ` (stderr ${stderr.length}B, stdout ${stdout.length}B — set ATOMIZE_DEBUG=1 to see)`;
+        reject(new Error(`Claude CLI exited with code ${code}.${detail}`));
       } else {
         resolve({ stdout, stderr });
       }
