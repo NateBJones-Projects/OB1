@@ -1,0 +1,19 @@
+{
+  "name": "Entity Extraction Schema",
+  "description": "Tables, trigger, and queue for automatic entity and relationship extraction from thoughts. Complements the manual ob-graph recipe.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true
+  },
+  "requires_primitives": ["rls"],
+  "tags": ["schema", "entity-extraction", "entities", "relationships", "knowledge-graph"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-06",
+  "updated": "2026-04-17"
+}
