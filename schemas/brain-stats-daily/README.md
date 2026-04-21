@@ -15,8 +15,20 @@ The RPCs read `source_type` and `sensitivity_tier` columns from the [enhanced-th
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md)) with the core `thoughts` table.
-- The [enhanced-thoughts](../enhanced-thoughts/) schema, which adds the `source_type` and `sensitivity_tier` columns these RPCs read. Install it first — the `CREATE FUNCTION` calls in this schema will error if those columns don't exist.
+- The [enhanced-thoughts](../enhanced-thoughts/) schema, which adds the `source_type` and `sensitivity_tier` columns these RPCs read. Install it first — if those columns are missing, the RPCs will error the first time you call them (PL/pgSQL validates column references at execution, not at `CREATE FUNCTION`).
 - **Optional:** the [open-brain-dashboard-next](../../dashboards/open-brain-dashboard-next/) dashboard if you want the `HeatmapSourceFilter` component wired up — see the snippet README at [`dashboard-snippets/README.md`](dashboard-snippets/README.md).
+
+## Security Model
+
+All four RPCs run as `SECURITY INVOKER`, so they respect whatever Row Level Security policies you've put on the `thoughts` table. Execute is granted to the `authenticated` and `service_role` roles only — **not `anon`**. If you want an unauthenticated public dashboard to read these aggregates, review your RLS policy first and then grant `anon` yourself, e.g.:
+
+```sql
+grant execute on function public.brain_stats_daily(integer, text, boolean) to anon;
+grant execute on function public.brain_stats_daily_jsonb(integer, text, boolean) to anon;
+-- (repeat for the _lifelog and _lifelog_jsonb variants if needed)
+```
+
+Leaving `anon` off is the safer default — even aggregate counts can leak activity patterns of a private brain.
 
 ## Credential Tracker
 
@@ -80,8 +92,8 @@ Solution: The migration ends with `NOTIFY pgrst, 'reload schema'` to reload the 
 **Issue: Multi-year heatmap is clipped to 1000 rows**
 Solution: You're calling the setof variant (`brain_stats_daily`). PostgREST caps setof responses at `db-max-rows=1000` by default. Switch to the JSONB variant (`brain_stats_daily_jsonb`) — it returns a single jsonb array so the cap doesn't apply. Unwrap the array on the client.
 
-**Issue: `ERROR: column t.source_type does not exist` (or `t.sensitivity_tier`) when running `schema.sql`**
-Solution: Install the [enhanced-thoughts schema](../enhanced-thoughts/) first. It adds the two columns these RPCs read. Then rerun this schema's SQL (idempotent — safe to re-run).
+**Issue: `ERROR: column t.source_type does not exist` (or `t.sensitivity_tier`) when calling an RPC**
+Solution: Install the [enhanced-thoughts schema](../enhanced-thoughts/) first. It adds the two columns these RPCs read. The error surfaces the first time you call the RPC (PL/pgSQL validates column references at execution time, not at `CREATE FUNCTION`), so a successful `schema.sql` run is not proof the columns exist. Then rerun this schema's SQL (idempotent — safe to re-run).
 
 **Issue: Lifelog variant returns zero rows even though I have imports**
 Solution: The lifelog variant filters by a fixed list of source types (`google_drive_import`, `limitless_import`, `chatgpt_import`, etc.). If your import source_type isn't in the list, add it to the `v_lifelog_sources` array at the top of both lifelog functions in `schema.sql` and rerun.

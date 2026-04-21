@@ -3,7 +3,7 @@
 -- Replaces client-side bucketing passes that only cover recent days at
 -- typical capture rates.
 --
--- Installs four RPC functions:
+-- Installs four RPC functions plus one internal helper:
 --   brain_stats_daily(p_days, p_source_type, p_exclude_restricted)
 --     → returns (date, count) over the last p_days by created_at.
 --   brain_stats_daily_lifelog(p_days, p_exclude_restricted)
@@ -12,21 +12,70 @@
 --   brain_stats_daily_jsonb(...)  · brain_stats_daily_lifelog_jsonb(...)
 --     → JSONB variants that bypass PostgREST's default 1000-row cap by
 --       returning a single jsonb array. Use these for 1+ year windows.
+--   _brain_stats_try_parse_iso_date(text)
+--     → internal helper: safely parses a YYYY-MM-DD prefix into a date,
+--       returning NULL on bad input so one bad row doesn't kill the RPC.
 --
 -- Safe to run multiple times (fully idempotent — CREATE OR REPLACE).
 -- Does NOT modify the core thoughts table.
+--
+-- Security model:
+--   All RPCs are SECURITY INVOKER, so they respect whatever RLS policies
+--   you have on the `thoughts` table. Execute is granted to authenticated
+--   and service_role by default (NOT anon) — if you want unauthenticated
+--   dashboards to read aggregate counts, explicitly add the anon grant
+--   yourself AFTER reviewing your RLS policy.
 --
 -- Prerequisites:
 --   - The core `thoughts` table from the Open Brain getting-started guide.
 --   - The `enhanced-thoughts` schema (adds `source_type` and
 --     `sensitivity_tier` columns used by these RPCs). Install that first.
 --
--- If the optional columns are missing the RPCs will error at CREATE time
--- — install enhanced-thoughts first and re-run this file.
+-- If the optional columns are missing the RPCs will error the first time
+-- you call them (PL/pgSQL parses SQL statements at first execution, not
+-- at CREATE FUNCTION time) — install enhanced-thoughts first.
+
+
+-- ============================================================
+-- 0. Internal helper: safe ISO-date prefix parser.
+--    Used by both lifelog variants so one bad metadata string
+--    doesn't abort the whole heatmap query.
+-- ============================================================
+
+create or replace function public._brain_stats_try_parse_iso_date(p_raw text)
+returns date
+language plpgsql
+immutable
+security invoker
+set search_path = public
+as $$
+begin
+  if p_raw is null then
+    return null;
+  end if;
+  -- Require a YYYY-MM-DD prefix before attempting the cast. This is a
+  -- cheap pre-filter; the BEGIN/EXCEPTION still catches any remaining
+  -- out-of-range values (e.g. '2026-99-99').
+  if p_raw !~ '^\d{4}-\d{2}-\d{2}' then
+    return null;
+  end if;
+  return substring(p_raw from 1 for 10)::date;
+exception
+  when others then
+    return null;
+end;
+$$;
+
+comment on function public._brain_stats_try_parse_iso_date(text) is
+  'Internal helper: safely parses a YYYY-MM-DD prefix to a date, returning NULL on invalid input so one bad metadata value does not abort the whole RPC.';
+
 
 -- ============================================================
 -- 1. brain_stats_daily — buckets by thoughts.created_at.
 --    Used by the dashboard heatmap for "capture activity".
+--
+--    Window semantics: "last p_days calendar days in UTC",
+--    inclusive of today. p_days=1 returns at most one row (today).
 -- ============================================================
 
 create or replace function public.brain_stats_daily(
@@ -37,31 +86,32 @@ create or replace function public.brain_stats_daily(
 returns table (date date, count bigint)
 language plpgsql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
 declare
   v_days integer := greatest(1, least(coalesce(p_days, 180), 3650));
-  v_since timestamptz := now() - (v_days || ' days')::interval;
+  v_today_utc date := (now() at time zone 'UTC')::date;
+  v_since_date date := v_today_utc - v_days + 1;
 begin
   return query
   select
     (t.created_at at time zone 'UTC')::date as date,
     count(*)::bigint as count
   from public.thoughts t
-  where t.created_at >= v_since
+  where (t.created_at at time zone 'UTC')::date >= v_since_date
     and (p_source_type is null or t.source_type = p_source_type)
-    and (not p_exclude_restricted or t.sensitivity_tier is distinct from 'restricted')
+    and (not p_exclude_restricted or lower(t.sensitivity_tier) is distinct from 'restricted')
   group by 1
   order by 1 asc;
 end;
 $$;
 
 grant execute on function public.brain_stats_daily(integer, text, boolean)
-  to authenticated, anon, service_role;
+  to authenticated, service_role;
 
 comment on function public.brain_stats_daily(integer, text, boolean) is
-  'Returns (date, count) buckets of thought captures over the last p_days by created_at. Used by dashboard heatmaps.';
+  'Returns (date, count) buckets of thought captures over the last p_days calendar days (UTC) by created_at. Used by dashboard heatmaps.';
 
 
 -- ============================================================
@@ -71,10 +121,14 @@ comment on function public.brain_stats_daily(integer, text, boolean) is
 --
 --    Date resolved via event_at → life_date → conversation_created_at
 --    → source_date → captured_at → original_date → date → created_at.
+--    Each candidate is parsed independently so a bad earlier field
+--    doesn't hide a valid later one.
 --    Restricted-tier thoughts excluded by default.
 --
 --    The source list covers common "happened on a real date" capture
 --    sources. Edit v_lifelog_sources below to extend it.
+--    NOTE: This list is duplicated in brain_stats_daily_lifelog_jsonb
+--    below — keep both copies in sync.
 -- ============================================================
 
 create or replace function public.brain_stats_daily_lifelog(
@@ -84,12 +138,12 @@ create or replace function public.brain_stats_daily_lifelog(
 returns table (date date, count bigint)
 language plpgsql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
 declare
   v_days integer := greatest(1, least(coalesce(p_days, 180), 3650));
-  v_since_date date := (current_date - v_days + 1);
+  v_since_date date := (now() at time zone 'UTC')::date - v_days + 1;
   v_lifelog_sources text[] := array[
     'google_drive_import',
     'limitless_import',
@@ -109,29 +163,21 @@ begin
   with resolved as (
     select
       coalesce(
-        nullif(t.metadata->>'event_at', ''),
-        nullif(t.metadata->>'life_date', ''),
-        nullif(t.metadata->>'conversation_created_at', ''),
-        nullif(t.metadata->>'source_date', ''),
-        nullif(t.metadata->>'captured_at', ''),
-        nullif(t.metadata->>'original_date', ''),
-        nullif(t.metadata->>'date', ''),
-        (t.created_at at time zone 'UTC')::text
-      ) as raw_date
+        public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'event_at', '')),
+        public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'life_date', '')),
+        public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'conversation_created_at', '')),
+        public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'source_date', '')),
+        public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'captured_at', '')),
+        public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'original_date', '')),
+        public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'date', '')),
+        (t.created_at at time zone 'UTC')::date
+      ) as d
     from public.thoughts t
     where t.source_type = any(v_lifelog_sources)
-      and (not p_exclude_restricted or t.sensitivity_tier is distinct from 'restricted')
-  ),
-  parsed as (
-    select
-      case
-        when raw_date ~ '^\d{4}-\d{2}-\d{2}' then substring(raw_date from 1 for 10)::date
-        else null
-      end as d
-    from resolved
+      and (not p_exclude_restricted or lower(t.sensitivity_tier) is distinct from 'restricted')
   )
   select d as date, count(*)::bigint as count
-  from parsed
+  from resolved
   where d is not null and d >= v_since_date
   group by 1
   order by 1 asc;
@@ -139,10 +185,10 @@ end;
 $$;
 
 grant execute on function public.brain_stats_daily_lifelog(integer, boolean)
-  to authenticated, anon, service_role;
+  to authenticated, service_role;
 
 comment on function public.brain_stats_daily_lifelog(integer, boolean) is
-  'Daily buckets of life-log thoughts across dated-event source_types. Date resolved via metadata fields with fallback to created_at. Restricted-tier thoughts excluded by default.';
+  'Daily buckets of life-log thoughts across dated-event source_types. Date resolved via metadata fields (each parsed independently) with fallback to created_at. Restricted-tier thoughts excluded by default.';
 
 
 -- ============================================================
@@ -159,12 +205,13 @@ create or replace function public.brain_stats_daily_jsonb(
 returns jsonb
 language plpgsql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
 declare
   v_days integer := greatest(1, least(coalesce(p_days, 180), 3650));
-  v_since timestamptz := now() - (v_days || ' days')::interval;
+  v_today_utc date := (now() at time zone 'UTC')::date;
+  v_since_date date := v_today_utc - v_days + 1;
   v_rows jsonb;
 begin
   select coalesce(
@@ -177,9 +224,9 @@ begin
       (t.created_at at time zone 'UTC')::date as date,
       count(*)::bigint as count
     from public.thoughts t
-    where t.created_at >= v_since
+    where (t.created_at at time zone 'UTC')::date >= v_since_date
       and (p_source_type is null or t.source_type = p_source_type)
-      and (not p_exclude_restricted or t.sensitivity_tier is distinct from 'restricted')
+      and (not p_exclude_restricted or lower(t.sensitivity_tier) is distinct from 'restricted')
     group by 1
   ) agg;
   return v_rows;
@@ -187,7 +234,7 @@ end;
 $$;
 
 grant execute on function public.brain_stats_daily_jsonb(integer, text, boolean)
-  to authenticated, anon, service_role;
+  to authenticated, service_role;
 
 comment on function public.brain_stats_daily_jsonb(integer, text, boolean) is
   'JSONB variant of brain_stats_daily — bypasses the PostgREST 1000-row cap by returning a single jsonb array. Use for 1+ year windows.';
@@ -195,6 +242,8 @@ comment on function public.brain_stats_daily_jsonb(integer, text, boolean) is
 
 -- ============================================================
 -- 4. brain_stats_daily_lifelog_jsonb — JSONB variant of #2.
+--    NOTE: v_lifelog_sources below is duplicated in
+--    brain_stats_daily_lifelog above — keep both copies in sync.
 -- ============================================================
 
 create or replace function public.brain_stats_daily_lifelog_jsonb(
@@ -204,12 +253,12 @@ create or replace function public.brain_stats_daily_lifelog_jsonb(
 returns jsonb
 language plpgsql
 stable
-security definer
+security invoker
 set search_path = public
 as $$
 declare
   v_days integer := greatest(1, least(coalesce(p_days, 180), 3650));
-  v_since_date date := (current_date - v_days + 1);
+  v_since_date date := (now() at time zone 'UTC')::date - v_days + 1;
   v_lifelog_sources text[] := array[
     'google_drive_import',
     'limitless_import',
@@ -235,29 +284,21 @@ begin
     with resolved as (
       select
         coalesce(
-          nullif(t.metadata->>'event_at', ''),
-          nullif(t.metadata->>'life_date', ''),
-          nullif(t.metadata->>'conversation_created_at', ''),
-          nullif(t.metadata->>'source_date', ''),
-          nullif(t.metadata->>'captured_at', ''),
-          nullif(t.metadata->>'original_date', ''),
-          nullif(t.metadata->>'date', ''),
-          (t.created_at at time zone 'UTC')::text
-        ) as raw_date
+          public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'event_at', '')),
+          public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'life_date', '')),
+          public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'conversation_created_at', '')),
+          public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'source_date', '')),
+          public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'captured_at', '')),
+          public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'original_date', '')),
+          public._brain_stats_try_parse_iso_date(nullif(t.metadata->>'date', '')),
+          (t.created_at at time zone 'UTC')::date
+        ) as d
       from public.thoughts t
       where t.source_type = any(v_lifelog_sources)
-        and (not p_exclude_restricted or t.sensitivity_tier is distinct from 'restricted')
-    ),
-    parsed as (
-      select
-        case
-          when raw_date ~ '^\d{4}-\d{2}-\d{2}' then substring(raw_date from 1 for 10)::date
-          else null
-        end as d
-      from resolved
+        and (not p_exclude_restricted or lower(t.sensitivity_tier) is distinct from 'restricted')
     )
     select d, count(*)::bigint as c
-    from parsed
+    from resolved
     where d is not null and d >= v_since_date
     group by 1
   ) agg;
@@ -266,7 +307,7 @@ end;
 $$;
 
 grant execute on function public.brain_stats_daily_lifelog_jsonb(integer, boolean)
-  to authenticated, anon, service_role;
+  to authenticated, service_role;
 
 comment on function public.brain_stats_daily_lifelog_jsonb(integer, boolean) is
   'JSONB variant of brain_stats_daily_lifelog — single-row response, no PostgREST row-cap clipping.';

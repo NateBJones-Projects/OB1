@@ -54,3 +54,7 @@ Edit `HEATMAP_SOURCE_OPTIONS` at the top of the file. Each entry maps a human la
 - Tailwind CSS
 - The `brain_stats_daily` or `brain_stats_daily_jsonb` RPC from this schema installed
 - The optional `source_type` column from the `enhanced-thoughts` schema (the filter is meaningless without it)
+
+### Auth note
+
+`schema.sql` grants execute on the RPCs to `authenticated` and `service_role` only — not `anon`. If your dashboard calls the RPC from a server component with the anon key (the default Supabase server-client pattern), you'll get `permission denied for function` until you either call it from a route that runs as `service_role` or explicitly grant `anon`. See the "Security Model" section in the schema's main [README](../README.md).
