@@ -113,7 +113,28 @@
     </div>
 
     <h2 class="sync-platform-header" style="margin-top:16px;">Gemini</h2>
-    <p class="hint" style="margin:4px 0 8px;">Google does not currently expose a conversation API for Gemini. Manual capture from an active tab is supported; bulk sync is not.</p>
+    <div class="sync-status-row">
+      <span class="overview-label">Last synced</span>
+      <span id="gemini-sync-last-time" class="pill">Never</span>
+    </div>
+    <div class="sync-actions">
+      <button id="gemini-sync-all-btn" class="btn btn-capture">Sync All History</button>
+      <button id="gemini-sync-incremental-btn" class="btn btn-secondary" style="margin-left:8px;">Sync New</button>
+      <button id="gemini-sync-cancel-btn" class="btn btn-secondary" style="margin-left:8px; display:none;">Cancel</button>
+    </div>
+    <div class="sync-auto-row">
+      <label class="toggle sync-toggle">
+        <input type="checkbox" id="gemini-sync-auto-toggle">
+        Auto-sync every 4 hours
+      </label>
+    </div>
+    <div id="gemini-sync-progress" class="sync-progress-area" style="display:none;">
+      <div class="sync-progress-bar-track">
+        <div id="gemini-sync-progress-bar" class="sync-progress-bar" style="width:0%"></div>
+      </div>
+      <p id="gemini-sync-progress-text" class="sync-progress-text">Preparing...</p>
+    </div>
+    <p class="hint" style="margin:4px 0 8px;">Walks your Gemini sidebar and backfills each conversation via the chrome.debugger-based history capture. Requires the one-time "Debugging this browser" banner to stay dismissed while syncing. Auto-sync runs incrementally — only new conversations since last run.</p>
 
     <div id="sync-progress-area" class="sync-progress-area" style="display:none;">
       <div class="sync-progress-bar-track">

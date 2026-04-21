@@ -41,6 +41,20 @@
   const chatgptSyncIncrementalBtn = document.getElementById('chatgpt-sync-incremental-btn');
   const chatgptSyncAutoToggle = document.getElementById('chatgpt-sync-auto-toggle');
 
+  // Sync tab elements (Gemini). Phase B/C backfills the full sidebar via
+  // chrome.debugger; distinct from Claude/ChatGPT which call internal REST
+  // APIs. The UI mirrors the other platforms but adds Cancel + Resume
+  // semantics because a Google bot challenge mid-run pauses the state machine.
+  const geminiSyncLastTime = document.getElementById('gemini-sync-last-time');
+  const geminiSyncAllBtn = document.getElementById('gemini-sync-all-btn');
+  const geminiSyncIncrementalBtn = document.getElementById('gemini-sync-incremental-btn');
+  const geminiSyncCancelBtn = document.getElementById('gemini-sync-cancel-btn');
+  const geminiSyncAutoToggle = document.getElementById('gemini-sync-auto-toggle');
+  const geminiSyncProgress = document.getElementById('gemini-sync-progress');
+  const geminiSyncProgressBar = document.getElementById('gemini-sync-progress-bar');
+  const geminiSyncProgressText = document.getElementById('gemini-sync-progress-text');
+  let geminiSyncPollHandle = null;
+
   function setStatusDot(connected, errored) {
     statusDot.className = 'status-dot';
     if (errored) {
@@ -332,6 +346,128 @@
     } catch (err) {
       console.error('[Open Brain Capture] Failed to load ChatGPT sync state', err);
     }
+    await refreshGeminiSyncUI();
+  }
+
+  // ── Gemini sync UI (Phase B/C) ──────────────────────────────────────────
+  //
+  // The Gemini sync state machine lives in the service worker (see
+  // background/gemini-sync.js). The popup polls GEMINI_SYNC_STATUS every 2s
+  // while a run is live, renders the progress bar, and surfaces the paused
+  // state (Google bot challenge) as a "Resume Sync" call to action.
+
+  function renderGeminiProgress(status) {
+    if (!geminiSyncAllBtn || !geminiSyncProgress) return;
+
+    const s = status && status.state;
+    const percent = Number(status && status.percent) || 0;
+    const pending = Number(status && status.pending) || 0;
+    const completed = Number(status && status.completed) || 0;
+    const failed = Number(status && status.failed) || 0;
+    const captured = Number(status && status.totals && status.totals.captured) || 0;
+    const skippedDup = Number(status && status.totals && status.totals.skippedDup) || 0;
+    const lastError = (status && status.lastError) || '';
+    const canceledReason = (status && status.canceledReason) || '';
+    const resumable = pending > 0 && (s === 'canceled' || s === 'failed');
+    const running = s === 'enumerating' || s === 'syncing';
+
+    if (running) {
+      geminiSyncProgress.style.display = 'block';
+      geminiSyncCancelBtn.style.display = 'inline-block';
+      geminiSyncAllBtn.disabled = true;
+      geminiSyncAllBtn.textContent = 'Sync All History';
+    } else {
+      geminiSyncCancelBtn.style.display = 'none';
+      geminiSyncAllBtn.disabled = false;
+      geminiSyncAllBtn.textContent = resumable ? 'Resume Sync' : 'Sync All History';
+    }
+
+    if (s === 'enumerating') {
+      geminiSyncProgressBar.style.width = '4%';
+      geminiSyncProgressText.textContent = 'Enumerating sidebar...';
+    } else if (s === 'syncing') {
+      geminiSyncProgressBar.style.width = `${Math.min(100, Math.max(4, percent))}%`;
+      geminiSyncProgressText.textContent =
+        `Syncing: ${completed + failed} / ${completed + failed + pending} · captured=${captured} dedup=${skippedDup}`;
+    } else if (s === 'done') {
+      geminiSyncProgress.style.display = 'block';
+      geminiSyncProgressBar.style.width = '100%';
+      geminiSyncProgressText.textContent =
+        `Done: ${completed} completed, ${failed} failed, captured=${captured} dedup=${skippedDup}`;
+    } else if (s === 'canceled') {
+      geminiSyncProgress.style.display = 'block';
+      if (resumable) {
+        geminiSyncProgressBar.style.width = `${Math.min(100, Math.max(4, percent))}%`;
+      } else {
+        geminiSyncProgressBar.style.width = '0%';
+      }
+      if (lastError) {
+        const hint = canceledReason.includes('challenge')
+          ? 'If there\'s still a CAPTCHA on the Gemini tab, solve it first, then click Resume.'
+          : '';
+        geminiSyncProgressText.textContent =
+          `Paused: ${lastError}${hint ? ' — ' + hint : ''}`;
+      } else {
+        geminiSyncProgressText.textContent = 'Canceled';
+      }
+    } else if (s === 'failed') {
+      geminiSyncProgress.style.display = 'block';
+      geminiSyncProgressText.textContent = `Failed: ${lastError || 'unknown error'}`;
+    } else {
+      geminiSyncProgress.style.display = 'none';
+    }
+
+    if (status && status.lastSyncAt) {
+      geminiSyncLastTime.textContent = formatSyncTime(status.lastSyncAt);
+    }
+  }
+
+  async function refreshGeminiSyncUI() {
+    if (!geminiSyncAllBtn) return;
+    try {
+      const response = await chrome.runtime.sendMessage({ type: 'GEMINI_SYNC_STATUS' });
+      if (response && response.ok && response.status) {
+        renderGeminiProgress(response.status);
+        if (geminiSyncAutoToggle) {
+          geminiSyncAutoToggle.checked = Boolean(response.status.autoSyncEnabled);
+        }
+        const s = response.status.state;
+        const running = s === 'enumerating' || s === 'syncing';
+        if (running && !geminiSyncPollHandle) {
+          startGeminiSyncPolling();
+        } else if (!running && geminiSyncPollHandle) {
+          stopGeminiSyncPolling();
+        }
+      }
+    } catch (err) {
+      console.error('[Open Brain Capture] Failed to load Gemini sync state', err);
+    }
+  }
+
+  function startGeminiSyncPolling() {
+    if (geminiSyncPollHandle) return;
+    geminiSyncPollHandle = setInterval(async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({ type: 'GEMINI_SYNC_STATUS' });
+        if (response && response.ok && response.status) {
+          renderGeminiProgress(response.status);
+          const s = response.status.state;
+          const running = s === 'enumerating' || s === 'syncing';
+          if (!running) {
+            stopGeminiSyncPolling();
+          }
+        }
+      } catch (err) {
+        console.error('[Open Brain Capture] Gemini sync poll failed', err);
+        stopGeminiSyncPolling();
+      }
+    }, 2000);
+  }
+
+  function stopGeminiSyncPolling() {
+    if (!geminiSyncPollHandle) return;
+    clearInterval(geminiSyncPollHandle);
+    geminiSyncPollHandle = null;
   }
 
   function addSyncLogEntry(message) {
@@ -443,6 +579,86 @@
       showSyncResult(err.message, 'error');
     }
   });
+
+  // Gemini sync events. Button toggles between "Sync All History" (fresh
+  // run) and "Resume Sync" (pick up a paused/canceled run with pendingIds).
+  // renderGeminiProgress() sets the label based on state; we read it here
+  // to decide which message to send.
+  if (geminiSyncAllBtn) {
+    geminiSyncAllBtn.addEventListener('click', () => {
+      const isResume = geminiSyncAllBtn.textContent === 'Resume Sync';
+      const messageType = isResume ? 'GEMINI_SYNC_RESUME' : 'GEMINI_SYNC_START';
+      geminiSyncAllBtn.disabled = true;
+      geminiSyncProgress.style.display = 'block';
+      geminiSyncProgressBar.style.width = '4%';
+      geminiSyncProgressText.textContent = isResume ? 'Resuming...' : 'Starting...';
+      // Fire-and-forget — the service worker's sync orchestrator runs until
+      // it completes or is canceled. Progress surfaces via GEMINI_SYNC_STATUS
+      // polling below.
+      chrome.runtime.sendMessage({ type: messageType }).catch((err) => {
+        console.error(`[Open Brain Capture] Gemini sync ${isResume ? 'resume' : 'start'} errored`, err);
+      });
+      startGeminiSyncPolling();
+      refreshGeminiSyncUI();
+    });
+  }
+
+  if (geminiSyncCancelBtn) {
+    geminiSyncCancelBtn.addEventListener('click', async () => {
+      geminiSyncCancelBtn.disabled = true;
+      try {
+        await chrome.runtime.sendMessage({ type: 'GEMINI_SYNC_CANCEL' });
+        await refreshGeminiSyncUI();
+      } catch (err) {
+        console.error('[Open Brain Capture] Gemini sync cancel failed', err);
+      } finally {
+        geminiSyncCancelBtn.disabled = false;
+      }
+    });
+  }
+
+  if (geminiSyncIncrementalBtn) {
+    geminiSyncIncrementalBtn.addEventListener('click', () => {
+      geminiSyncIncrementalBtn.disabled = true;
+      geminiSyncAllBtn.disabled = true;
+      geminiSyncProgress.style.display = 'block';
+      geminiSyncProgressBar.style.width = '4%';
+      geminiSyncProgressText.textContent = 'Starting incremental sync...';
+      chrome.runtime.sendMessage({ type: 'GEMINI_SYNC_INCREMENTAL' }).catch((err) => {
+        console.error('[Open Brain Capture] Gemini sync incremental errored', err);
+      });
+      startGeminiSyncPolling();
+      refreshGeminiSyncUI();
+      // Re-enable incremental after a brief delay so the click isn't spammable
+      // during the enumerate phase (the Sync All button remains disabled via
+      // polling-driven state until the run ends).
+      setTimeout(() => { geminiSyncIncrementalBtn.disabled = false; }, 1000);
+    });
+  }
+
+  // Auto-sync toggle — persists via SET_GEMINI_AUTO_SYNC; service worker
+  // manages the alarm lifecycle based on the returned state.
+  if (geminiSyncAutoToggle) {
+    geminiSyncAutoToggle.addEventListener('change', async () => {
+      const enabled = Boolean(geminiSyncAutoToggle.checked);
+      try {
+        await chrome.runtime.sendMessage({
+          type: 'SET_GEMINI_AUTO_SYNC',
+          enabled,
+          intervalMinutes: 240
+        });
+        showSyncResult(
+          enabled ? 'Gemini auto-sync enabled (every 4 hours)' : 'Gemini auto-sync disabled',
+          'success'
+        );
+      } catch (err) {
+        console.error('[Open Brain Capture] Gemini auto-sync toggle failed', err);
+        // Revert the checkbox on failure so the UI matches persisted state.
+        geminiSyncAutoToggle.checked = !enabled;
+        showSyncResult(err.message, 'error');
+      }
+    });
+  }
 
   refresh().catch((error) => {
     console.error('[Open Brain Capture] Popup init failed', error);
