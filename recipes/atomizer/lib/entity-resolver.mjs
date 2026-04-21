@@ -109,6 +109,82 @@ function bestCanonicalName(existingName, candidateDisplay, email) {
 }
 
 /**
+ * Adopt an orphan name-only entity (canonical_email IS NULL) by attaching this
+ * email, OR, if the orphan already lost the race to a concurrent worker, fall
+ * back to the disambiguated-insert path so we never link the wrong entity.
+ *
+ * Returns `{ id, created }` or `null` if the orphan's slot is now occupied
+ * by a different email (caller should emit its own insert).
+ */
+async function tryAdoptOrDisambiguate(sb, orphan, { email, seedName, normalizedName }) {
+  if (!orphan.canonical_email) {
+    // (b) adopt path. Conditional PATCH scoped to canonical_email=is.null so
+    // we can detect race loss via `Prefer: return=representation` — an empty
+    // response array means zero rows were updated.
+    const aliases = Array.isArray(orphan.aliases) ? [...orphan.aliases] : [];
+    let patched = null;
+    try {
+      patched = await sb.patch(
+        `entities?id=eq.${orphan.id}&canonical_email=is.null&select=id,canonical_email`,
+        { canonical_email: email, aliases, last_seen_at: new Date().toISOString() },
+        { Prefer: "return=representation" },
+      );
+    } catch (patchErr) {
+      // 23505 here means the unique (entity_type, canonical_email) index was
+      // already populated elsewhere with our email. Re-SELECT by email.
+      if (!/duplicate key|23505/.test(patchErr.message)) throw patchErr;
+    }
+    if (Array.isArray(patched) && patched.length > 0 && patched[0].canonical_email === email) {
+      return { id: orphan.id, created: false };
+    }
+    // Adoption did not take. Either another worker adopted this orphan first
+    // (different email), or our email now exists on some other row. Look up
+    // our email directly before giving up.
+    const byEmailAgain = await sb.get(
+      `entities?canonical_email=eq.${encodeURIComponent(email)}&select=id&limit=1`,
+    );
+    if (byEmailAgain && byEmailAgain.length > 0) {
+      return { id: byEmailAgain[0].id, created: false };
+    }
+    // Fall through to disambiguated insert (case c) so we create a fresh row
+    // instead of incorrectly linking to the other worker's adopted orphan.
+  }
+
+  // (c) same display name, different person. Insert with a disambiguated
+  // normalized_name keyed on the email local-part. Also used as the fallback
+  // path from case (b) when adoption lost the race.
+  const localPart = email.split("@")[0];
+  const disambig = `${normalizedName} (${localPart})`;
+  try {
+    const retry = await sb.post(
+      "entities?select=id",
+      {
+        entity_type: "person",
+        canonical_name: seedName,
+        normalized_name: disambig,
+        canonical_email: email,
+        aliases: [],
+        metadata: {
+          discovered_via: "email_header",
+          disambiguated_from: normalizedName,
+        },
+      },
+      { Prefer: "return=representation" },
+    );
+    const row = Array.isArray(retry) ? retry[0] : retry;
+    return { id: row.id, created: true };
+  } catch (err) {
+    // Another worker may have raced us to the same disambiguated slot. Re-SELECT.
+    if (!/duplicate key|23505/.test(err.message)) throw err;
+    const byEmail = await sb.get(
+      `entities?canonical_email=eq.${encodeURIComponent(email)}&select=id&limit=1`,
+    );
+    if (byEmail && byEmail.length > 0) return { id: byEmail[0].id, created: false };
+    throw err;
+  }
+}
+
+/**
  * Upsert a person entity keyed by canonical_email. Returns {id, created}.
  *
  * Race-safe: on duplicate-key we re-SELECT. Concurrent inserts converge.
@@ -196,62 +272,10 @@ export async function upsertPersonByEmail(sb, { canonicalEmail, displayName }) {
     );
     if (byName && byName.length > 0) {
       const orphan = byName[0];
-      if (!orphan.canonical_email) {
-        // (b) adopt: attach this email to the pre-existing name-only entity.
-        //
-        // Conditional PATCH — scope the WHERE to rows that still have a NULL
-        // canonical_email, so a concurrent worker that already adopted this
-        // orphan can't be silently overwritten. If the PATCH hits zero rows
-        // (Prefer: count=exact returns Content-Range …/0), re-SELECT by email
-        // — the race winner already set canonical_email to something.
-        const aliases = Array.isArray(orphan.aliases) ? [...orphan.aliases] : [];
-        try {
-          await sb.patch(
-            `entities?id=eq.${orphan.id}&canonical_email=is.null`,
-            { canonical_email: email, aliases, last_seen_at: new Date().toISOString() },
-          );
-        } catch (patchErr) {
-          // Zero rows affected looks like either a 204 (fine) or a 23505 if
-          // the winner's canonical_email collides with ours. Re-SELECT by
-          // email and trust the winner's row.
-          const winner = await sb.get(
-            `entities?canonical_email=eq.${encodeURIComponent(email)}&select=id&limit=1`,
-          );
-          if (winner && winner.length > 0) return { id: winner[0].id, created: false };
-          throw patchErr;
-        }
-        // Verify the adoption took. If a concurrent worker adopted between
-        // our SELECT and PATCH, the row now has a canonical_email different
-        // from ours; re-select by email to point at the winner.
-        const check = await sb.get(
-          `entities?id=eq.${orphan.id}&select=canonical_email&limit=1`,
-        );
-        if (check && check[0] && check[0].canonical_email !== email) {
-          const winner = await sb.get(
-            `entities?canonical_email=eq.${encodeURIComponent(email)}&select=id&limit=1`,
-          );
-          if (winner && winner.length > 0) return { id: winner[0].id, created: false };
-        }
-        return { id: orphan.id, created: false };
-      }
-      // (c) same display name, different person. Retry insert with a
-      // disambiguated normalized_name keyed on the email local-part.
-      const localPart = email.split("@")[0];
-      const disambig = `${normalizedName} (${localPart})`;
-      const retry = await sb.post(
-        "entities?select=id",
-        {
-          entity_type: "person",
-          canonical_name: seedName,
-          normalized_name: disambig,
-          canonical_email: email,
-          aliases: [],
-          metadata: { discovered_via: "email_header", disambiguated_from: normalizedName },
-        },
-        { Prefer: "return=representation" },
-      );
-      const row = Array.isArray(retry) ? retry[0] : retry;
-      return { id: row.id, created: true };
+      const result = await tryAdoptOrDisambiguate(sb, orphan, {
+        email, seedName, normalizedName,
+      });
+      if (result) return result;
     }
 
     // Fallback error without the email address — including it here leaks PII

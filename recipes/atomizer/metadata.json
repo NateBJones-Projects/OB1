@@ -1,6 +1,6 @@
 {
   "name": "Atomizer",
-  "description": "Split compound multi-topic thoughts into atomic single-topic thoughts via an LLM (OpenRouter, Anthropic, Claude CLI, or Codex), with additional Gmail re-atomization, correspondent backfill, and pipeline audit tooling.",
+  "description": "Split compound multi-topic thoughts into atomic single-topic thoughts via an LLM (OpenRouter by default, Anthropic, or Claude CLI), with additional Gmail re-atomization, correspondent backfill, and pipeline audit tooling.",
   "category": "recipes",
   "author": {
     "name": "Alan Shurafa",
