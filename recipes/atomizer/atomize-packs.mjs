@@ -11,8 +11,8 @@
  * WARNING: When using provider='claude-cli', this script must be run from a
  * STANDALONE terminal, NOT from within a Claude Code session. The claude
  * CLI fails with nested-detection / OAuth errors when called from inside
- * a Claude Code agent session. Workarounds: use provider='codex' (delegated
- * via `codex exec`) or provider='anthropic' / 'openrouter' (HTTP APIs).
+ * a Claude Code agent session. Workaround: pass --provider=openrouter or
+ * --provider=anthropic (pure HTTP APIs, nest safely anywhere).
  *
  * Usage:
  *   node atomize-packs.mjs --source <name>              Process one source
@@ -20,20 +20,27 @@
  *   node atomize-packs.mjs --source <name> --dry-run    Detect only
  *   node atomize-packs.mjs --concurrency 4              Parallel LLM calls
  *   node atomize-packs.mjs --data-dir <path>            Override pack root
- *   node atomize-packs.mjs --provider <name>            Override provider
+ *   node atomize-packs.mjs --provider <name>            Override provider (default: openrouter)
  *   node atomize-packs.mjs --help                       Show usage
  *
- * Env:
- *   OPENROUTER_API_KEY   Required when --provider openrouter
+ * Env (loaded from recipes/atomizer/.env.local or process.env):
+ *   OPENROUTER_API_KEY   Required when --provider openrouter (default)
  *   ANTHROPIC_API_KEY    Required when --provider anthropic
  *   CLAUDE_CLI_PATH      Optional path to `claude` binary
- *   CODEX_CLI_PATH       Optional path to `codex` binary
+ *   ATOMIZE_DEBUG_ERRORS Set to 1 to persist full memory text into atomization-errors.json
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { atomizeText } from "./lib/atomize-text.mjs";
+import { loadEnv } from "./lib/entity-resolver.mjs";
+
+// Load .env.local resolved relative to this script, not pwd. Lets users run
+// `node recipes/atomizer/atomize-packs.mjs ...` from any directory.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const env = loadEnv(path.join(__dirname, ".env.local"));
 
 // ── Paths & constants ───────────────────────────────────────────────────────
 
@@ -77,9 +84,14 @@ function parseArgs() {
       case "--dry-run":
         opts.dryRun = true;
         break;
-      case "--concurrency":
-        opts.concurrency = Math.min(Math.max(parseInt(args[++i], 10) || 1, 1), MAX_CONCURRENCY);
+      case "--concurrency": {
+        const raw = parseInt(args[++i], 10) || 1;
+        opts.concurrency = Math.min(Math.max(raw, 1), MAX_CONCURRENCY);
+        if (raw > MAX_CONCURRENCY) {
+          console.warn(`[warn] --concurrency ${raw} clamped to MAX_CONCURRENCY=${MAX_CONCURRENCY}`);
+        }
         break;
+      }
       case "--data-dir":
         opts.dataDir = args[++i];
         break;
@@ -221,7 +233,7 @@ async function processInBatches(items, batchSize, fn) {
 // ── Provider config ─────────────────────────────────────────────────────────
 
 function resolveProviderConfig(opts) {
-  // Explicit CLI flag wins; otherwise let atomize-text.mjs auto-detect.
+  // Explicit CLI flag wins; otherwise let atomize-text.mjs auto-detect (defaults to 'openrouter').
   const provider = opts.provider || null;
 
   const atomizeOpts = {
@@ -230,19 +242,27 @@ function resolveProviderConfig(opts) {
   };
   if (provider) atomizeOpts.provider = provider;
 
+  // Read credentials from .env.local-merged env, not just process.env. Without
+  // this, a user following the README to put keys in recipes/atomizer/.env.local
+  // and then run `node atomize-packs.mjs --provider=openrouter` hits a spurious
+  // "requires OPENROUTER_API_KEY in env" error.
   if (provider === "anthropic") {
-    atomizeOpts.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    atomizeOpts.anthropicApiKey = env.ANTHROPIC_API_KEY;
     if (!atomizeOpts.anthropicApiKey) {
-      throw new Error("--provider anthropic requires ANTHROPIC_API_KEY in env");
+      throw new Error("--provider anthropic requires ANTHROPIC_API_KEY in .env.local or process env");
     }
-  } else if (provider === "openrouter") {
-    atomizeOpts.openrouterApiKey = process.env.OPENROUTER_API_KEY;
-    if (!atomizeOpts.openrouterApiKey) {
-      throw new Error("--provider openrouter requires OPENROUTER_API_KEY in env");
+  } else if (provider === "openrouter" || provider === null) {
+    // OpenRouter is the default when provider is unset; pre-load the key so
+    // atomize-text.mjs doesn't have to re-discover it.
+    atomizeOpts.openrouterApiKey = env.OPENROUTER_API_KEY;
+    if (provider === "openrouter" && !atomizeOpts.openrouterApiKey) {
+      throw new Error("--provider openrouter requires OPENROUTER_API_KEY in .env.local or process env");
     }
   }
 
-  const effective = provider || (process.env.CODEX_THREAD_ID ? "codex" : "claude-cli");
+  // Display name for logs. Default (no --provider flag) resolves to 'openrouter'
+  // in atomize-text.mjs since the codex path was removed.
+  const effective = provider || "openrouter";
   return { atomizeOpts, providerName: effective };
 }
 
@@ -262,6 +282,7 @@ async function processSource(source, options, atomicDir) {
 
   // Phase 1: Scan all memories and detect compounds
   let totalMemories = 0;
+  let skippedAlreadyAtomic = 0;
   const compounds = [];
 
   for (const packFile of packFiles) {
@@ -270,10 +291,23 @@ async function processSource(source, options, atomicDir) {
     for (let i = 0; i < memories.length; i++) {
       totalMemories++;
       const mem = memories[i];
+      // Idempotency: never re-atomize a child produced by a previous run. Two
+      // signals: (a) memoryId matching /-split-\d+$/ (we name children that way),
+      // or (b) metadata.atomization.parent_id set (same structural mark).
+      const isAlreadyAtomic =
+        (typeof mem.memoryId === "string" && /-split-\d+$/.test(mem.memoryId)) ||
+        !!mem?.metadata?.atomization?.parent_id;
+      if (isAlreadyAtomic) {
+        skippedAlreadyAtomic++;
+        continue;
+      }
       if (isCompound(mem.text)) {
         compounds.push({ packFile, memoryIndex: i, memory: mem });
       }
     }
+  }
+  if (skippedAlreadyAtomic > 0) {
+    console.log(`[${source}] Skipped ${skippedAlreadyAtomic} already-atomic memories (re-run safe)`);
   }
 
   console.log(`[${source}] ${compounds.length}/${totalMemories} compound detected`);
@@ -336,9 +370,17 @@ async function processSource(source, options, atomicDir) {
       errorCount++;
       processed++;
       recentResults.push(false);
+      // Don't persist full memory text into atomization-errors.json by default
+      // — memories are often personal/autobiographical and the file ends up as
+      // an unprotected duplicate of sensitive data. Keep a 60-char preview +
+      // fingerprint; caller can rerun with ATOMIZE_DEBUG_ERRORS=1 for the full
+      // text when debugging a stuck pack.
+      const includeFullText = process.env.ATOMIZE_DEBUG_ERRORS === "1";
       errors.push({
         memoryId: memory.memoryId,
-        text: memory.text,
+        preview: (memory.text || "").slice(0, 60).replace(/\n/g, " ") + (memory.text && memory.text.length > 60 ? "..." : ""),
+        fingerprint: fingerprint(memory.text || ""),
+        ...(includeFullText ? { text: memory.text } : {}),
         error: err.message,
         packFile: path.basename(packFile),
       });
@@ -434,10 +476,9 @@ Usage:
   node atomize-packs.mjs --help                   Show this help
 
 Providers:
+  openrouter   OpenRouter API, default (requires OPENROUTER_API_KEY)
+  anthropic    Anthropic API direct (requires ANTHROPIC_API_KEY)
   claude-cli   Shell out to local \`claude\` binary (requires standalone terminal)
-  codex        Shell out to local \`codex\` binary (safe to nest inside Claude Code)
-  anthropic    Anthropic API (requires ANTHROPIC_API_KEY)
-  openrouter   OpenRouter API (requires OPENROUTER_API_KEY)
 
 Known sources: ${KNOWN_SOURCES.join(", ")}
 
