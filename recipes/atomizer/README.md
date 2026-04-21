@@ -188,6 +188,8 @@ node re-atomize-gmail-thought.mjs --all --min-words=300 --provider=openrouter
 > [!NOTE]
 > Without `--limit`, `--all` processes up to 1000 rows in a single pass. If you have more whole-body gmail thoughts than that, the script prints a cap warning — just re-run until the warning stops.
 
+**Partial-failure recovery.**
+
 > [!CAUTION]
 > The re-atomize pipeline is **not wrapped in a single Postgres transaction**. A crash mid-run can leave partially migrated state (new atoms inserted, old row not yet deleted, edges not yet redirected). Recovery: new atoms carry `metadata.re_atomized_from = <old_id>`. Find half-migrated source rows with `select id from thoughts where id in (select (metadata->>'re_atomized_from')::int from thoughts where metadata ? 're_atomized_from')`, then re-run `--id=<old_id>` — the script is idempotent and will finish the migration. If you need strict transactionality, wrap `upsert_thought` + edge redirect + delete in a single RPC.
 
