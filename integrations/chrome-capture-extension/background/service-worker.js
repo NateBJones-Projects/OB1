@@ -4,12 +4,17 @@ importScripts(
   '../lib/fingerprint.js',
   '../lib/sensitivity.js',
   '../lib/sync-claude.js',
-  '../lib/sync-chatgpt.js'
+  '../lib/sync-chatgpt.js',
+  '../lib/extractor-gemini-history.js',
+  '../lib/gemini-sync-state.js',
+  './gemini-debugger.js',
+  './gemini-sync.js'
 );
 
 const RETRY_ALARM_NAME = 'ob_capture_retry_queue';
 const SYNC_ALARM_NAME = 'ob_capture_sync';
 const CHATGPT_SYNC_ALARM_NAME = 'ob_capture_chatgpt_sync';
+const GEMINI_SYNC_ALARM_NAME = 'ob_capture_gemini_sync';
 const MAX_CAPTURE_LOG = 100;
 const MAX_RETRY_ATTEMPTS = 5;
 const MAX_SEEN_FINGERPRINTS = 100000;
@@ -184,6 +189,14 @@ async function queueRetry(item, errorMessage) {
     return { deadLettered: false, queueLength: queue.length };
   });
 }
+
+// Expose processCaptureRequest on the SW global so the Gemini debugger
+// module (background/gemini-debugger.js) can dispatch extracted history
+// turns through the same capture pipeline as manual capture and the
+// Claude/ChatGPT bulk-sync paths. Classic-script function declarations
+// are already global in the SW scope, but pinning the reference here
+// makes the cross-module contract explicit.
+self.processCaptureRequest = processCaptureRequest;
 
 function normalizeCaptureRequest(message) {
   const platform = String(message.platform || '').trim().toLowerCase();
@@ -537,6 +550,41 @@ async function ensureChatGPTSyncAlarm() {
   }
 }
 
+// ── Gemini bulk history sync (Phase B/C) ────────────────────────────────
+//
+// Phase C lives in background/gemini-sync.js (OBGeminiSync) and only loads
+// if gemini-sync-state.js loaded first. The service worker touches it only
+// through the OBGeminiSync.* API and the alarm lifecycle mirrors the Claude
+// and ChatGPT paths above.
+
+async function setGeminiAutoSync(enabled, intervalMinutes) {
+  if (!self.OBGeminiSync || typeof self.OBGeminiSync.setAutoSync !== 'function') {
+    return { ok: false, error: 'OBGeminiSync unavailable' };
+  }
+  const result = await self.OBGeminiSync.setAutoSync(enabled, intervalMinutes);
+  if (result && result.ok !== false) {
+    if (result.autoSyncEnabled) {
+      chrome.alarms.create(GEMINI_SYNC_ALARM_NAME, { periodInMinutes: result.autoSyncIntervalMinutes || 240 });
+    } else {
+      chrome.alarms.clear(GEMINI_SYNC_ALARM_NAME);
+    }
+  }
+  return result;
+}
+
+async function ensureGeminiSyncAlarm() {
+  if (!self.OBGeminiSync || typeof self.OBGeminiSync.getStatus !== 'function') return;
+  try {
+    const status = await self.OBGeminiSync.getStatus();
+    const s = status && status.status;
+    if (s && s.autoSyncEnabled) {
+      chrome.alarms.create(GEMINI_SYNC_ALARM_NAME, { periodInMinutes: s.autoSyncIntervalMinutes || 240 });
+    }
+  } catch (err) {
+    console.error('[Open Brain Capture] ensureGeminiSyncAlarm failed', err);
+  }
+}
+
 async function handleMessage(message) {
   switch (message.type) {
     case 'GET_STATUS':
@@ -599,6 +647,33 @@ async function handleMessage(message) {
       return getChatGPTSyncState();
     case 'SET_CHATGPT_AUTO_SYNC':
       return setChatGPTAutoSync(message.enabled, message.intervalMinutes);
+    case 'GEMINI_SYNC_START':
+      if (!self.OBGeminiSync || typeof self.OBGeminiSync.startSync !== 'function') {
+        return { ok: false, error: 'OBGeminiSync unavailable' };
+      }
+      return self.OBGeminiSync.startSync(message.options || {});
+    case 'GEMINI_SYNC_CANCEL':
+      if (!self.OBGeminiSync || typeof self.OBGeminiSync.cancelSync !== 'function') {
+        return { ok: false, error: 'OBGeminiSync unavailable' };
+      }
+      return self.OBGeminiSync.cancelSync();
+    case 'GEMINI_SYNC_RESUME':
+      if (!self.OBGeminiSync || typeof self.OBGeminiSync.resumeSync !== 'function') {
+        return { ok: false, error: 'OBGeminiSync unavailable' };
+      }
+      return self.OBGeminiSync.resumeSync();
+    case 'GEMINI_SYNC_INCREMENTAL':
+      if (!self.OBGeminiSync || typeof self.OBGeminiSync.syncIncremental !== 'function') {
+        return { ok: false, error: 'OBGeminiSync unavailable' };
+      }
+      return self.OBGeminiSync.syncIncremental({ trigger: 'manual' });
+    case 'SET_GEMINI_AUTO_SYNC':
+      return setGeminiAutoSync(message.enabled, message.intervalMinutes);
+    case 'GEMINI_SYNC_STATUS':
+      if (!self.OBGeminiSync || typeof self.OBGeminiSync.getStatus !== 'function') {
+        return { ok: false, error: 'OBGeminiSync unavailable' };
+      }
+      return self.OBGeminiSync.getStatus();
     default:
       return { ok: false, error: `Unknown message type: ${message.type}` };
   }
@@ -641,12 +716,25 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       console.error('[Open Brain Capture] ChatGPT auto-sync failed', error);
     });
   }
+  if (alarm.name === GEMINI_SYNC_ALARM_NAME) {
+    if (!self.OBGeminiSync || typeof self.OBGeminiSync.syncIncremental !== 'function') {
+      console.warn('[Open Brain Capture] Gemini auto-sync fired but OBGeminiSync is unavailable');
+      return;
+    }
+    self.OBGeminiSync.syncIncremental({ trigger: 'alarm' }).then((result) => {
+      console.log(`[Open Brain Capture] Gemini auto-sync complete:`,
+        result && (result.message || `captured=${result.totals?.captured || 0} completed=${result.completed || 0}`));
+    }).catch((error) => {
+      console.error('[Open Brain Capture] Gemini auto-sync failed', error);
+    });
+  }
 });
 
 chrome.runtime.onInstalled.addListener((details) => {
   chrome.alarms.create(RETRY_ALARM_NAME, { periodInMinutes: 5 });
   ensureSyncAlarm();
   ensureChatGPTSyncAlarm();
+  ensureGeminiSyncAlarm();
   refreshBadge();
 
   // Only auto-open the Configure tab on a fresh install. onInstalled also
@@ -666,6 +754,7 @@ chrome.runtime.onStartup.addListener(() => {
   chrome.alarms.create(RETRY_ALARM_NAME, { periodInMinutes: 5 });
   ensureSyncAlarm();
   ensureChatGPTSyncAlarm();
+  ensureGeminiSyncAlarm();
   sessionMetrics = {
     queued: 0,
     sent: 0,
