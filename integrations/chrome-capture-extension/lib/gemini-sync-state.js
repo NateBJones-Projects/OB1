@@ -202,19 +202,28 @@
 
     record.pendingIds = (record.pendingIds || []).filter((x) => x !== id);
     if (!Array.isArray(record.completedIds)) record.completedIds = [];
-    if (!record.completedIds.includes(id)) record.completedIds.push(id);
+
+    // Idempotence: if this id has already been recorded (duplicate notify
+    // from a retry, stale waiter resolving late, etc.), skip totals folding.
+    // Without this, a double-callback would inflate captured/dedup counts.
+    const alreadyCompleted = record.completedIds.includes(id);
+    if (!alreadyCompleted) {
+      record.completedIds.push(id);
+    }
 
     // Lifetime memory — survives resetToIdle. Incremental/auto-sync uses
     // this to skip already-captured conversations.
     if (!Array.isArray(record.everSyncedIds)) record.everSyncedIds = [];
     if (!record.everSyncedIds.includes(id)) record.everSyncedIds.push(id);
 
-    const safe = result && typeof result === 'object' ? result : {};
-    record.totals = record.totals || { captured: 0, skippedDup: 0, other: 0, turnsSeen: 0 };
-    record.totals.captured += Number(safe.captured) || 0;
-    record.totals.skippedDup += Number(safe.skippedDup) || 0;
-    record.totals.other += Number(safe.other) || 0;
-    record.totals.turnsSeen += Number(safe.total) || 0;
+    if (!alreadyCompleted) {
+      const safe = result && typeof result === 'object' ? result : {};
+      record.totals = record.totals || { captured: 0, skippedDup: 0, other: 0, turnsSeen: 0 };
+      record.totals.captured += Number(safe.captured) || 0;
+      record.totals.skippedDup += Number(safe.skippedDup) || 0;
+      record.totals.other += Number(safe.other) || 0;
+      record.totals.turnsSeen += Number(safe.total) || 0;
+    }
 
     record.currentId = null;
     return record;
@@ -314,7 +323,18 @@
       if (typeof handlers.resolve !== 'function' || typeof handlers.reject !== 'function') {
         throw new Error('register: handlers must have resolve and reject functions');
       }
-      // Replace any existing waiter for this id; the old one is abandoned.
+      // If a waiter already exists for this id (reentrant driveConversation
+      // or a stale entry that outlived its timeout), reject it before we
+      // overwrite. Otherwise the previous promise hangs until abortAll, and
+      // the old setTimeout fire path can abort the NEW waiter by id match.
+      const existing = waiters.get(id);
+      if (existing) {
+        try {
+          existing.reject(new Error('waiter replaced by new registration'));
+        } catch (_err) {
+          // Handlers must not throw; swallow defensively.
+        }
+      }
       waiters.set(id, handlers);
     }
 

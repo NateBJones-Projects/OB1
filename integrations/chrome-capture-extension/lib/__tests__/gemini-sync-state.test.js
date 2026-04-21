@@ -225,6 +225,19 @@ test('recordCompletion is idempotent for the same id', () => {
   assert.deepEqual(s.completedIds, ['dup']);
 });
 
+test('recordCompletion does NOT fold totals twice for a duplicate id', () => {
+  // Prevents a late/retried notifyHistoryCaptured from inflating the
+  // captured/dedup/turnsSeen counts after the id is already completed.
+  const s = stateMod.createInitialState();
+  s.pendingIds = ['dup'];
+  stateMod.recordCompletion(s, 'dup', { captured: 3, skippedDup: 1, other: 0, total: 4 });
+  stateMod.recordCompletion(s, 'dup', { captured: 10, skippedDup: 5, other: 2, total: 17 });
+  assert.equal(s.totals.captured, 3);
+  assert.equal(s.totals.skippedDup, 1);
+  assert.equal(s.totals.other, 0);
+  assert.equal(s.totals.turnsSeen, 4);
+});
+
 // ── summarizeProgress ───────────────────────────────────────────────────────
 
 test('summarizeProgress computes percent from completed + failed', () => {
@@ -323,6 +336,21 @@ test('register replaces an existing waiter for the same ID', () => {
   registry.register('slot', { resolve: () => {}, reject: () => {} });
   registry.register('slot', { resolve: () => {}, reject: () => {} });
   assert.equal(registry.size(), 1);
+});
+
+test('register rejects the previous waiter when replaced (no hanging promise)', async () => {
+  // A reentrant driveConversation or a stale slot outliving its timeout
+  // would otherwise leave the old promise unresolved forever.
+  const registry = stateMod.createWaiterRegistry();
+  const firstRejection = new Promise((resolve, reject) => {
+    registry.register('slot', {
+      resolve: (v) => resolve({ resolved: v }),
+      reject: (e) => resolve({ rejected: e.message })
+    });
+  });
+  registry.register('slot', { resolve: () => {}, reject: () => {} });
+  const outcome = await firstRejection;
+  assert.equal(outcome.rejected, 'waiter replaced by new registration');
 });
 
 test('register throws on invalid id', () => {
