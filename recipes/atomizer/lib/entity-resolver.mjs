@@ -198,12 +198,40 @@ export async function upsertPersonByEmail(sb, { canonicalEmail, displayName }) {
       const orphan = byName[0];
       if (!orphan.canonical_email) {
         // (b) adopt: attach this email to the pre-existing name-only entity.
+        //
+        // Conditional PATCH — scope the WHERE to rows that still have a NULL
+        // canonical_email, so a concurrent worker that already adopted this
+        // orphan can't be silently overwritten. If the PATCH hits zero rows
+        // (Prefer: count=exact returns Content-Range …/0), re-SELECT by email
+        // — the race winner already set canonical_email to something.
         const aliases = Array.isArray(orphan.aliases) ? [...orphan.aliases] : [];
-        await sb.patch(`entities?id=eq.${orphan.id}`, {
-          canonical_email: email,
-          aliases,
-          last_seen_at: new Date().toISOString(),
-        });
+        try {
+          await sb.patch(
+            `entities?id=eq.${orphan.id}&canonical_email=is.null`,
+            { canonical_email: email, aliases, last_seen_at: new Date().toISOString() },
+          );
+        } catch (patchErr) {
+          // Zero rows affected looks like either a 204 (fine) or a 23505 if
+          // the winner's canonical_email collides with ours. Re-SELECT by
+          // email and trust the winner's row.
+          const winner = await sb.get(
+            `entities?canonical_email=eq.${encodeURIComponent(email)}&select=id&limit=1`,
+          );
+          if (winner && winner.length > 0) return { id: winner[0].id, created: false };
+          throw patchErr;
+        }
+        // Verify the adoption took. If a concurrent worker adopted between
+        // our SELECT and PATCH, the row now has a canonical_email different
+        // from ours; re-select by email to point at the winner.
+        const check = await sb.get(
+          `entities?id=eq.${orphan.id}&select=canonical_email&limit=1`,
+        );
+        if (check && check[0] && check[0].canonical_email !== email) {
+          const winner = await sb.get(
+            `entities?canonical_email=eq.${encodeURIComponent(email)}&select=id&limit=1`,
+          );
+          if (winner && winner.length > 0) return { id: winner[0].id, created: false };
+        }
         return { id: orphan.id, created: false };
       }
       // (c) same display name, different person. Retry insert with a
@@ -226,7 +254,11 @@ export async function upsertPersonByEmail(sb, { canonicalEmail, displayName }) {
       return { id: row.id, created: true };
     }
 
-    throw new Error(`upsertPersonByEmail: 23505 but no match by email or name for ${email}`);
+    // Fallback error without the email address — including it here leaks PII
+    // into logs that get shared/pasted. Domain-only identification is enough
+    // to diagnose which upstream (gmail vs mailing list) caused the dup.
+    const domain = typeof email === "string" ? email.split("@")[1] || "unknown" : "unknown";
+    throw new Error(`upsertPersonByEmail: 23505 but no match by email or name (domain=${domain})`);
   }
 }
 
@@ -303,7 +335,13 @@ export async function resolveCorrespondents(
         stats[key]++;
       } catch (err) {
         stats.errors++;
-        console.warn(`[entity-resolver] #${thoughtId} ${role} ${canonicalEmail} failed: ${err.message}`);
+        // Log only the email domain by default, not the full address — the
+        // goal is to diagnose pipeline failures, not to leave a PII trail in
+        // shared/pasted run logs. Set ENTITY_RESOLVER_DEBUG=1 for full emails.
+        const logId = process.env.ENTITY_RESOLVER_DEBUG === "1"
+          ? canonicalEmail
+          : `@${(canonicalEmail || "").split("@")[1] || "unknown"}`;
+        console.warn(`[entity-resolver] #${thoughtId} ${role} ${logId} failed: ${err.message}`);
       }
     }
   }
@@ -334,7 +372,14 @@ export function makeSbClient({ projectRef, serviceRoleKey, supabaseUrl }) {
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`${method} ${relPath}: ${res.status} ${text.slice(0, 300)}`);
+      // Don't leak query-string filter values (emails, thread_ids, etc.)
+      // into error logs by default. Keep the table and the status; the
+      // response body from PostgREST typically does not echo the query.
+      const tableOnly = String(relPath).split("?")[0];
+      const debug = process.env.ENTITY_RESOLVER_DEBUG === "1";
+      throw new Error(
+        `${method} ${debug ? relPath : tableOnly}: ${res.status} ${text.slice(0, 300)}`,
+      );
     }
     const ct = res.headers.get("content-type") || "";
     return ct.includes("json") ? res.json() : null;
@@ -350,6 +395,15 @@ export function makeSbClient({ projectRef, serviceRoleKey, supabaseUrl }) {
 /**
  * Load .env.local into a plain object, merged with process.env.
  * Callers can pass the result straight into makeSbClient.
+ *
+ * Constraints (deliberate, to keep this dependency-free):
+ *   - Keys must be UPPER_SNAKE_CASE (A-Z / 0-9 / _). lowercase keys are silently ignored.
+ *   - Values must be single-line. Multiline values are NOT supported.
+ *   - process.env takes precedence — anything already in the ambient env wins.
+ *
+ * Callers should pass an absolute path. Script-relative resolution (via
+ * `import.meta.url` → `fileURLToPath`) is recommended so the loader works
+ * regardless of the user's current working directory.
  */
 export function loadEnv(envPath = ".env.local") {
   const env = { ...process.env };
