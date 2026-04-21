@@ -125,7 +125,7 @@ SYNTHESIZERS.autobiography = {
       "---",
       "title: Autobiography",
       "type: wiki-autobiography",
-      `subject: ${subjectName}`,
+      `subject: ${yamlString(subjectName)}`,
       `generated_at: ${new Date().toISOString()}`,
       `source_count: ${all.length}`,
       `year_count: ${years.length}`,
@@ -339,6 +339,16 @@ function readEnvLocal() {
     if (m) out[m[1]] = m[2].replace(/^["']|["']$/g, "");
   }
   return out;
+}
+
+function yamlString(v) {
+  const s = String(v ?? "");
+  // Quote if the value could be misread as another YAML type (bool,
+  // null, number, date) or contains YAML-reserved characters.
+  if (s === "" || /[:#\[\]{}&*!|>'"%@`,\n\r\t]/.test(s) || /^(true|false|null|yes|no|on|off|~|-?\d)/i.test(s)) {
+    return '"' + s.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+  }
+  return s;
 }
 
 function pickLifeDate(t) {

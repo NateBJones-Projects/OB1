@@ -37,7 +37,7 @@ Use this recipe when you want corpus-wide synthesis without depending on the ent
 **Email-thread mode:**
 
 - Email thoughts imported with `source_type='gmail_export'` and `metadata.gmail.thread_id` + `metadata.gmail.gmail_id` populated. The [`email-history-import`](../email-history-import/) recipe produces this shape.
-- A `public.thought_edges` table with columns `(from_thought_id, to_thought_id, relation, metadata jsonb)`. This ships in the Knowledge Graph schema (tracked in upstream PR [#5](https://github.com/NateBJones-Projects/OB1/pull/5) / merged variants). Without it, `derived_from` edge writes will fail and the script will log partial-edge errors per thread.
+- A `public.thought_edges` table with columns `(from_thought_id uuid, to_thought_id uuid, relation text, metadata jsonb)` plus a `UNIQUE (from_thought_id, to_thought_id, relation)` index so the `Prefer: resolution=ignore-duplicates` header this script sets on edge inserts works. This schema ships in OB1's Knowledge Graph work (tracked in upstream PR [#5](https://github.com/NateBJones-Projects/OB1/pull/5) and its merged variants). If you haven't applied that migration, `derived_from` edge writes will 404 or 409 and the script will log partial-edge errors per thread; the wiki thought itself still gets inserted.
 - Optional: an `upsert_thought(p_content text, p_payload jsonb)` RPC. If present, the email-thread script uses it for content-fingerprint-aware upserts; otherwise it falls back to a plain `POST /thoughts` insert.
 
 ## Credential Tracker
