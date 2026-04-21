@@ -280,7 +280,10 @@ async function synthesizeWiki(threadGroup, env) {
       ],
     }),
   });
-  if (!res.ok) throw new Error(`LLM API ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`LLM API ${res.status}: ${body.slice(0, 500)}`);
+  }
   const data = await res.json();
   const text = data?.choices?.[0]?.message?.content;
   if (!text || !text.trim()) throw new Error("LLM response had no text");
@@ -334,7 +337,7 @@ async function captureWikiThought(sb, threadGroup, wikiText, runId) {
     const ids = existing.map((r) => r.id);
     console.log(`  [replace] ${ids.length} existing wiki(s) for thread ${threadGroup.thread_id}: ${ids.join(", ")}`);
     for (const id of ids) {
-      await sb.delete(`thoughts?id=eq.${id}`);
+      await sb.delete(`thoughts?id=eq.${encodeURIComponent(String(id))}`);
     }
   }
 
@@ -357,8 +360,14 @@ async function captureWikiThought(sb, threadGroup, wikiText, runId) {
     // If RPC returned but no thought_id, fall through to plain insert.
   } catch (err) {
     const msg = String(err?.message || "");
-    // Only swallow the "function does not exist" error; re-throw others.
-    if (!/does not exist|not found|404/i.test(msg)) throw err;
+    // Only swallow the PostgREST "function not found" signal (HTTP 404
+    // from rpc/<name>). Any other error — 401 auth, 500 server, 403
+    // permission — should surface, not silently fall back to a direct
+    // insert that bypasses whatever the RPC was doing.
+    const isRpcMissing =
+      /\brpc\/upsert_thought\b/.test(msg) &&
+      /\b404\b/.test(msg);
+    if (!isRpcMissing) throw err;
   }
 
   // Plain insert fallback. PostgREST returns the inserted row when the
@@ -520,7 +529,16 @@ async function main() {
       console.log(`  ${allEdgesOk ? "ok" : "partial"} wiki #${wikiId} (${edgeStats.ok}/${g.thoughts.length} edges${allEdgesOk ? "" : ", partial"})`);
       ok++;
     } catch (err) {
-      const msg = err.message.slice(0, 300);
+      // Coerce defensively — non-Error throws (strings, POJOs) used to
+      // crash the catch block itself and skip the state-log append.
+      const raw = err instanceof Error
+        ? err.message
+        : typeof err === "string"
+          ? err
+          : (() => {
+              try { return JSON.stringify(err); } catch { return String(err); }
+            })();
+      const msg = String(raw ?? "").slice(0, 300);
       appendLog({
         thread_id: g.thread_id,
         status: "failed",
