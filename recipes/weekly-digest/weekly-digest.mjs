@@ -1,0 +1,707 @@
+#!/usr/bin/env node
+/**
+ * Weekly Digest for Open Brain
+ * -----------------------------
+ * Synthesizes the past N days of thoughts into an importance-ranked digest
+ * and delivers it to Telegram, stdout, or a local markdown file.
+ *
+ * This is a "consumption format" — a rhythmic way to read your brain back
+ * to yourself. Captures on their own are input; the digest is the loop that
+ * turns a pile of thoughts into something you actually revisit.
+ *
+ * Usage:
+ *   node weekly-digest.mjs                         # 7-day window → Telegram
+ *   node weekly-digest.mjs --output=stdout         # print to console only
+ *   node weekly-digest.mjs --output=file           # write to ./digests/YYYY-MM-DD.md
+ *   node weekly-digest.mjs --window=14             # last 14 days
+ *   node weekly-digest.mjs --include-personal      # include sensitivity_tier=personal
+ *   node weekly-digest.mjs --model=claude-haiku-4-5-20251001
+ *   node weekly-digest.mjs --min-importance=3      # lower threshold
+ *   node weekly-digest.mjs --dry-run               # synthesize + print, no delivery (implies --output=stdout)
+ *
+ * Env vars:
+ *   SUPABASE_URL              Your Supabase project URL (required; canonical)
+ *   SUPABASE_SERVICE_ROLE_KEY Supabase service role key (required; canonical)
+ *   OPEN_BRAIN_URL            Legacy alias for SUPABASE_URL (deprecated)
+ *   OPEN_BRAIN_SERVICE_KEY    Legacy alias for SUPABASE_SERVICE_ROLE_KEY (deprecated)
+ *   ANTHROPIC_API_KEY         Direct Anthropic key (preferred)
+ *   OPENROUTER_API_KEY        OpenRouter fallback (used if ANTHROPIC_API_KEY unset)
+ *   TELEGRAM_BOT_TOKEN        Required for --output=telegram
+ *   TELEGRAM_CHAT_ID          Required for --output=telegram
+ *   DIGEST_MODEL              Override default model (default: claude-opus-4-7)
+ */
+
+import fs from "node:fs";
+import path from "node:path";
+
+// ── Config ──────────────────────────────────────────────────────────────────
+
+const DEFAULT_MODEL = process.env.DIGEST_MODEL || "claude-opus-4-7";
+
+// Friendly aliases you can pass to --model.
+const MODEL_ALIASES = {
+  opus: "claude-opus-4-7",
+  sonnet: "claude-sonnet-4-6",
+  haiku: "claude-haiku-4-5-20251001",
+};
+
+// Telegram messages over this many chars get split across multiple sends.
+// Telegram's hard limit is 4096 for text messages.
+const TELEGRAM_CHUNK_LIMIT = 3800;
+
+// How many thoughts we send to the synthesizer. The script paginates the
+// full window above this cap, then ranks, then trims. Bigger = more context
+// + more tokens + more cost.
+const SYNTHESIZE_INPUT_CAP = 80;
+
+// Hard ceiling on total thoughts pulled from the brain per run, to protect
+// against someone with a huge window + heavy capture volume blowing past
+// what one LLM call can reasonably digest.
+const FETCH_HARD_CAP = 400;
+
+// Page size for PostgREST pagination.
+const PAGE_SIZE = 100;
+
+// ── Args ────────────────────────────────────────────────────────────────────
+
+function parseArgs(argv) {
+  const args = {
+    window: 7,
+    minImportance: 4,
+    model: DEFAULT_MODEL,
+    output: "telegram",
+    outputExplicit: false,
+    includePersonal: false,
+    dryRun: false,
+    noSensitivityFilter: false,
+  };
+  for (const raw of argv) {
+    if (raw === "--dry-run") {
+      args.dryRun = true;
+    } else if (raw === "--include-personal") {
+      args.includePersonal = true;
+    } else if (raw === "--no-sensitivity-filter") {
+      args.noSensitivityFilter = true;
+    } else if (raw.startsWith("--window=")) {
+      const n = Number(raw.slice("--window=".length));
+      if (!Number.isFinite(n) || n <= 0) {
+        throw new Error(`--window must be a positive number, got: ${raw}`);
+      }
+      args.window = n;
+    } else if (raw.startsWith("--min-importance=")) {
+      const n = Number(raw.slice("--min-importance=".length));
+      if (!Number.isFinite(n) || n < 0) {
+        throw new Error(`--min-importance must be >= 0, got: ${raw}`);
+      }
+      args.minImportance = n;
+    } else if (raw.startsWith("--model=")) {
+      const val = raw.slice("--model=".length).trim();
+      args.model = MODEL_ALIASES[val] ?? val;
+    } else if (raw.startsWith("--output=")) {
+      const val = raw.slice("--output=".length).trim();
+      if (!["telegram", "stdout", "file"].includes(val)) {
+        throw new Error(`--output must be telegram|stdout|file, got: ${val}`);
+      }
+      args.output = val;
+      args.outputExplicit = true;
+    } else if (raw === "--help" || raw === "-h") {
+      printHelp();
+      process.exit(0);
+    } else if (raw.startsWith("--")) {
+      throw new Error(`Unknown flag: ${raw}`);
+    }
+  }
+  // --dry-run implies --output=stdout unless the user explicitly chose
+  // another output. This keeps the smoke-test path friction-free: you can
+  // pass just `--dry-run` without also having to remember `--output=stdout`
+  // to avoid the Telegram credential check.
+  if (args.dryRun && !args.outputExplicit) {
+    args.output = "stdout";
+  }
+  return args;
+}
+
+function printHelp() {
+  console.log(
+    [
+      "Weekly Digest — importance-ranked synthesis of recent thoughts",
+      "",
+      "Usage: node weekly-digest.mjs [options]",
+      "",
+      "Options:",
+      "  --window=<days>           Lookback window in days (default: 7)",
+      "  --min-importance=<n>      Minimum importance threshold (default: 4)",
+      "  --model=<id|alias>        LLM model (default: claude-opus-4-7)",
+      "                            Aliases: opus, sonnet, haiku",
+      "  --output=<mode>           telegram | stdout | file (default: telegram)",
+      "  --include-personal        Include sensitivity_tier=personal thoughts",
+      "  --no-sensitivity-filter   UNSAFE: run without sensitivity_tier filter.",
+      "                            Use only when you accept that restricted/personal",
+      "                            thoughts will be sent to the LLM + delivery target.",
+      "  --dry-run                 Synthesize + print, deliver nothing",
+      "  -h, --help                Show this help",
+    ].join("\n"),
+  );
+}
+
+// ── Env validation ──────────────────────────────────────────────────────────
+
+function loadConfig(args) {
+  // Canonical env vars match the rest of the repo's recipes
+  // (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY). OPEN_BRAIN_* is accepted as
+  // a legacy alias so existing setups keep working; a one-time deprecation
+  // warning nudges users toward the shared `.env.local` pattern.
+  const supabaseUrlPrimary = process.env.SUPABASE_URL;
+  const supabaseKeyPrimary = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const legacyUrl = process.env.OPEN_BRAIN_URL;
+  const legacyKey = process.env.OPEN_BRAIN_SERVICE_KEY;
+  const openBrainUrl = supabaseUrlPrimary || legacyUrl;
+  const openBrainKey = supabaseKeyPrimary || legacyKey;
+  if (!openBrainUrl) {
+    throw new Error(
+      "Missing SUPABASE_URL env var (legacy alias: OPEN_BRAIN_URL)",
+    );
+  }
+  if (!openBrainKey) {
+    throw new Error(
+      "Missing SUPABASE_SERVICE_ROLE_KEY env var (legacy alias: OPEN_BRAIN_SERVICE_KEY)",
+    );
+  }
+  if (!supabaseUrlPrimary && legacyUrl) {
+    console.warn(
+      "[weekly-digest] DEPRECATION: OPEN_BRAIN_URL is a legacy alias. " +
+        "Set SUPABASE_URL instead to share one .env.local across recipes.",
+    );
+  }
+  if (!supabaseKeyPrimary && legacyKey) {
+    console.warn(
+      "[weekly-digest] DEPRECATION: OPEN_BRAIN_SERVICE_KEY is a legacy alias. " +
+        "Set SUPABASE_SERVICE_ROLE_KEY instead to share one .env.local across recipes.",
+    );
+  }
+
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  const openrouterKey = process.env.OPENROUTER_API_KEY;
+  if (!anthropicKey && !openrouterKey) {
+    throw new Error(
+      "Missing LLM credentials: set ANTHROPIC_API_KEY or OPENROUTER_API_KEY",
+    );
+  }
+
+  const llmProvider = anthropicKey ? "anthropic" : "openrouter";
+  const llmKey = anthropicKey || openrouterKey;
+
+  let telegramBotToken = null;
+  let telegramChatId = null;
+  // Only require Telegram credentials when we will actually send to Telegram.
+  // A --dry-run never ships anywhere, even if --output=telegram is passed,
+  // so it shouldn't demand tokens the user hasn't configured.
+  const willDeliverTelegram = args.output === "telegram" && !args.dryRun;
+  if (willDeliverTelegram) {
+    telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+    telegramChatId = process.env.TELEGRAM_CHAT_ID;
+    if (!telegramBotToken || !telegramChatId) {
+      throw new Error(
+        "--output=telegram requires TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars. " +
+          "Use --output=stdout or --output=file if you don't have Telegram configured, " +
+          "or pass --dry-run to synthesize without delivery.",
+      );
+    }
+  }
+
+  // Normalize the base URL: strip trailing slashes so we can concat cleanly.
+  const baseUrl = openBrainUrl.replace(/\/+$/, "");
+
+  return {
+    baseUrl,
+    serviceKey: openBrainKey,
+    llmProvider,
+    llmKey,
+    telegramBotToken,
+    telegramChatId,
+  };
+}
+
+// ── Thoughts fetch via PostgREST ────────────────────────────────────────────
+
+/**
+ * Fetches thoughts from public.thoughts for the last `windowDays` days,
+ * excluding restricted (always) and personal (unless --include-personal).
+ *
+ * Why PostgREST direct vs. an edge function: the core Open Brain install
+ * ships public.thoughts as a PostgREST-reachable table. Going direct keeps
+ * this recipe runnable on a stock Open Brain without requiring a custom
+ * REST gateway edge function.
+ */
+async function fetchThoughts(cfg, { windowDays, includePersonal, noSensitivityFilter }) {
+  const sinceIso = new Date(Date.now() - windowDays * 86_400_000).toISOString();
+
+  // Build the sensitivity exclusion list. sensitivity_tier is a TEXT column
+  // added by the sensitivity-tiers primitive; if a given Open Brain install
+  // doesn't have it, PostgREST will 400 and we FAIL CLOSED by default to
+  // protect the privacy boundary the README promises ("restricted never
+  // leaves the database"). The user can opt out with --no-sensitivity-filter
+  // if they accept the leakage risk and explicitly want to run unfiltered.
+  const excluded = includePersonal ? ["restricted"] : ["restricted", "personal"];
+  // When --no-sensitivity-filter is set, skip the filter entirely so a missing
+  // column won't trip the 400. Otherwise, apply the exclusion filter.
+  //
+  // NOTE on importance: stock OB1 `public.thoughts` does NOT have an
+  // `importance` column, but enhanced-schema installs DO. We optimistically
+  // include `importance` in the select and, if PostgREST 400s with "column
+  // does not exist", transparently retry without it and memoize the result
+  // on the cfg object so subsequent pages skip the probe. This lets
+  // `thoughtImportance()` honor a real native column when present and fall
+  // back to `metadata.importance` on stock OB1. See the column-probe block
+  // in the fetch loop for the retry logic.
+  const buildSelect = (withImportance) =>
+    withImportance
+      ? (noSensitivityFilter
+          ? "id,content,created_at,metadata,importance"
+          : "id,content,created_at,metadata,sensitivity_tier,importance")
+      : (noSensitivityFilter
+          ? "id,content,created_at,metadata"
+          : "id,content,created_at,metadata,sensitivity_tier");
+  // PostgREST OR filter: include rows with NULL sensitivity_tier AND rows
+  // whose tier is not in the excluded set. A bare `not.in.(...)` follows
+  // Postgres NOT IN semantics, which silently drops NULL rows — that would
+  // hide every untagged thought on installs that added the column without
+  // backfilling old rows to 'standard'. The README promises NULL/standard
+  // is included, so we union the two branches here. Values inside the
+  // `in.(...)` list are not quoted in PostgREST's compact filter syntax;
+  // keep `excluded` as bare lowercase identifiers that need no escaping.
+  const excludeFilter = noSensitivityFilter
+    ? ""
+    : `&or=(sensitivity_tier.is.null,sensitivity_tier.not.in.(${excluded.join(",")}))`;
+
+  if (noSensitivityFilter) {
+    console.warn(
+      "[weekly-digest] WARNING: --no-sensitivity-filter is set. " +
+        "ALL thoughts (including any that would be tagged restricted/personal) " +
+        "will be sent to the LLM and delivery target. You have accepted the " +
+        "data-leakage risk. Do NOT use this flag on a brain that contains " +
+        "secrets, health data, or other material you don't want exfiltrated.",
+    );
+  }
+
+  const headers = {
+    apikey: cfg.serviceKey,
+    Authorization: `Bearer ${cfg.serviceKey}`,
+  };
+
+  const all = [];
+  // Memoize native `importance` column presence across pages. Start by
+  // assuming it exists (optimistic), flip to false on the first 400 that
+  // names the column, and cache on cfg so every subsequent page — and any
+  // future run that reuses this cfg — skips the probe.
+  let withImportance = cfg.hasNativeImportance !== false;
+
+  for (let offset = 0; offset < FETCH_HARD_CAP; offset += PAGE_SIZE) {
+    const limit = Math.min(PAGE_SIZE, FETCH_HARD_CAP - offset);
+
+    const doFetch = (useImportance) => {
+      const url =
+        `${cfg.baseUrl}/rest/v1/thoughts` +
+        `?select=${buildSelect(useImportance)}` +
+        `&created_at=gte.${sinceIso}` +
+        `&order=created_at.desc` +
+        `&limit=${limit}&offset=${offset}` +
+        excludeFilter;
+      return fetch(url, { headers });
+    };
+
+    let res = await doFetch(withImportance);
+
+    // Error path: consume the body ONCE and branch on its content. We can't
+    // read .text() twice on the same Response, so we inspect it here and
+    // route to the importance-probe retry, the sensitivity fail-closed exit,
+    // or a generic throw. On success this block is skipped entirely.
+    if (!res.ok) {
+      const text = await res.text();
+
+      // Optimistic importance probe: if this install lacks a native
+      // `importance` column, drop it from the select, memoize the result,
+      // and retry once. We match both the column name and "column... does
+      // not exist" wording to avoid mis-reacting to unrelated 400s.
+      if (
+        withImportance &&
+        res.status === 400 &&
+        /\bimportance\b/.test(text) &&
+        /column|does not exist/i.test(text)
+      ) {
+        withImportance = false;
+        cfg.hasNativeImportance = false;
+        res = await doFetch(false);
+        if (!res.ok) {
+          throw new Error(`thoughts fetch failed: ${res.status} ${await res.text()}`);
+        }
+      } else if (
+        !noSensitivityFilter &&
+        res.status === 400 &&
+        /sensitivity_tier/.test(text)
+      ) {
+        // Sensitivity column missing on this install. FAIL CLOSED: do not
+        // retry unfiltered, because that would silently leak restricted/
+        // personal thoughts on a brain that relies on the primitive's
+        // promise. Print a clear error and instruct the user how to proceed.
+        console.error(
+          "[weekly-digest] FATAL: sensitivity_tier column not found on public.thoughts.\n" +
+            "\n" +
+            "This recipe refuses to run unfiltered because the README promises\n" +
+            "that restricted thoughts never leave the database. Running without\n" +
+            "the column would silently send every row — including anything you\n" +
+            "would have tagged restricted/personal — to the LLM and delivery target.\n" +
+            "\n" +
+            "You have two options:\n" +
+            "  1. (Recommended) Install a sensitivity-tiers migration that adds the\n" +
+            "     `sensitivity_tier TEXT` column to public.thoughts, then re-run.\n" +
+            "  2. Pass --no-sensitivity-filter to explicitly accept that ALL thoughts\n" +
+            "     in the window will be exfiltrated. Do NOT do this on a brain that\n" +
+            "     holds secrets, credentials, health data, or private correspondence.\n" +
+            "\n" +
+            "PostgREST error detail: " + text,
+        );
+        process.exit(1);
+      } else {
+        throw new Error(`thoughts fetch failed: ${res.status} ${text}`);
+      }
+    }
+
+    const batch = await res.json();
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    all.push(...batch);
+    if (batch.length < limit) break;
+  }
+
+  // Cache for any helpers that peek at cfg later. Default to true when we
+  // never had to flip the flag (the column was there, or the table was
+  // empty so we never got a 400 to prove otherwise).
+  if (cfg.hasNativeImportance === undefined) {
+    cfg.hasNativeImportance = withImportance;
+  }
+
+  return all;
+}
+
+/**
+ * Read the importance score for a thought. Enhanced-schema installs expose
+ * a native `importance` column on public.thoughts; stock OB1 does not.
+ * `fetchThoughts` optimistically selects the column, retries without it on
+ * the "column does not exist" 400, and memoizes the result. This helper
+ * prefers the native top-level value when present (via COALESCE-style
+ * logic), then falls back to `metadata.importance`, then 0 — so both
+ * schemas produce correct rankings without any caller-side flag.
+ *
+ * Accepts number or numeric string in either location (JSON round-trip
+ * safety, since metadata comes back as parsed JSON but some capture
+ * pipelines stringify the field).
+ */
+function thoughtImportance(t) {
+  const native = t?.importance;
+  if (typeof native === "number" && Number.isFinite(native)) return native;
+  if (typeof native === "string") {
+    const n = Number(native);
+    if (Number.isFinite(n)) return n;
+  }
+  const m = t?.metadata?.importance;
+  if (typeof m === "number" && Number.isFinite(m)) return m;
+  if (typeof m === "string") {
+    const n = Number(m);
+    if (Number.isFinite(n)) return n;
+  }
+  return 0;
+}
+
+/**
+ * Ranks the fetched pool by importance, falling back to recency when
+ * importance ties or is missing. If there aren't enough thoughts at or above
+ * the minImportance threshold we widen the pool so the digest doesn't come
+ * out thin — a week with few high-importance thoughts should still produce
+ * something worth reading.
+ */
+function rankAndTrim(thoughts, minImportance) {
+  const sorted = [...thoughts].sort((a, b) => {
+    const ai = thoughtImportance(a);
+    const bi = thoughtImportance(b);
+    if (bi !== ai) return bi - ai;
+    return String(b.created_at).localeCompare(String(a.created_at));
+  });
+
+  const highImportance = sorted.filter((t) => thoughtImportance(t) >= minImportance);
+  if (highImportance.length < 10) {
+    console.warn(
+      `[weekly-digest] only ${highImportance.length} thought(s) at or above ` +
+        `--min-importance=${minImportance}; widening pool to top 60 by importance+recency. ` +
+        `If your brain doesn't score importance (stock OB1 has no importance column ` +
+        `and this recipe reads metadata.importance), pass --min-importance=0.`,
+    );
+  }
+  const pool = highImportance.length >= 10 ? highImportance : sorted.slice(0, 60);
+  return pool.slice(0, 200);
+}
+
+// ── LLM synthesis ───────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT =
+  "You write tight weekly digests for a personal second brain. " +
+  "Output plain text formatted for a Telegram chat (NOT markdown). " +
+  "Use section headers with emoji, short bullets. Max 1500 characters total. " +
+  "Sections: Wins, Key decisions, Open loops, Themes. " +
+  "Be specific — name projects and tasks. Skip filler.";
+
+function buildUserPrompt(thoughts, startDate, endDate) {
+  const fmt = (d) =>
+    d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+  const rows = thoughts.slice(0, SYNTHESIZE_INPUT_CAP).map((t) => ({
+    id: t.id,
+    date: String(t.created_at || "").slice(0, 10),
+    type: t.metadata?.type ?? null,
+    importance: thoughtImportance(t) || null,
+    content: String(t.content || "").slice(0, 280),
+    topics: (t.metadata?.topics ?? []).slice(0, 5),
+    tags: (t.metadata?.tags ?? []).slice(0, 5),
+  }));
+
+  return (
+    `Weekly digest for ${fmt(startDate)} – ${fmt(endDate)}.\n` +
+    `Source: ${rows.length} high-signal thoughts.\n\n` +
+    `INPUT:\n${JSON.stringify(rows)}\n\n` +
+    `Produce the digest now.`
+  );
+}
+
+async function synthesizeAnthropic(cfg, model, systemPrompt, userPrompt) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": cfg.llmKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Anthropic call failed: ${res.status} ${await res.text()}`);
+  }
+  const body = await res.json();
+  return body?.content?.[0]?.text?.trim() || "";
+}
+
+async function synthesizeOpenRouter(cfg, model, systemPrompt, userPrompt) {
+  // OpenRouter uses the OpenAI chat/completions shape. For Claude models we
+  // prefix "anthropic/" unless the caller already passed a slash-namespaced
+  // model id (e.g. "anthropic/claude-opus-4-7" or "openai/gpt-4o").
+  const namespacedModel = model.includes("/") ? model : `anthropic/${model}`;
+
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${cfg.llmKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: namespacedModel,
+      max_tokens: 1024,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`OpenRouter call failed: ${res.status} ${await res.text()}`);
+  }
+  const body = await res.json();
+  return body?.choices?.[0]?.message?.content?.trim() || "";
+}
+
+async function synthesize(cfg, thoughts, windowDays, model) {
+  const endDate = new Date();
+  // Match the fetch window exactly: fetchThoughts computes `sinceIso` as
+  // `now - windowDays * 86_400_000` (e.g., --window=7 ⇒ 7×24h lookback).
+  // The printed digest header must reflect that same span, otherwise
+  // "Apr 11 – Apr 17" misrepresents a 7-day fetch as a 6-day span.
+  const startDate = new Date(Date.now() - windowDays * 86_400_000);
+  const userPrompt = buildUserPrompt(thoughts, startDate, endDate);
+
+  const text =
+    cfg.llmProvider === "anthropic"
+      ? await synthesizeAnthropic(cfg, model, SYSTEM_PROMPT, userPrompt)
+      : await synthesizeOpenRouter(cfg, model, SYSTEM_PROMPT, userPrompt);
+
+  if (!text) throw new Error("LLM returned empty digest");
+  return { text, startDate, endDate };
+}
+
+// ── Delivery ────────────────────────────────────────────────────────────────
+
+/**
+ * Telegram text messages cap at 4096 chars. If the digest goes over, split
+ * cleanly: prefer a paragraph break (double newline), then a single newline,
+ * then a word boundary (space), then — only as a last resort — a hard cut.
+ *
+ * The tiered fallback matters when a single paragraph is itself longer than
+ * the chunk limit: without the word-boundary step we'd hard-cut mid-word
+ * and produce ugly output. The `< limit * 0.5` guard avoids making a tiny
+ * chunk when the best boundary is near the start of the window.
+ */
+function chunkForTelegram(text, limit = TELEGRAM_CHUNK_LIMIT) {
+  if (text.length <= limit) return [text];
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > limit) {
+    // 1. Paragraph boundary (preferred).
+    let cut = remaining.lastIndexOf("\n\n", limit);
+    // 2. Single-newline boundary.
+    if (cut < limit * 0.5) cut = remaining.lastIndexOf("\n", limit);
+    // 3. Word boundary — catches the "one long paragraph" edge case where the
+    //    LLM emits a wall of prose with no \n inside the chunk limit.
+    if (cut < limit * 0.5) cut = remaining.lastIndexOf(" ", limit);
+    // 4. Hard cut — last resort, only if nothing useful was found.
+    if (cut < limit * 0.5) cut = limit;
+    chunks.push(remaining.slice(0, cut).trimEnd());
+    remaining = remaining.slice(cut).trimStart();
+  }
+  if (remaining.length > 0) chunks.push(remaining);
+  return chunks;
+}
+
+async function deliverTelegram(cfg, text) {
+  const url = `https://api.telegram.org/bot${cfg.telegramBotToken}/sendMessage`;
+  const messageIds = [];
+  for (const chunk of chunkForTelegram(text)) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        chat_id: cfg.telegramChatId,
+        text: chunk,
+        disable_web_page_preview: true,
+      }),
+    });
+    if (!res.ok) {
+      throw new Error(
+        `Telegram sendMessage failed: ${res.status} ${await res.text()}`,
+      );
+    }
+    const body = await res.json();
+    if (body?.result?.message_id) messageIds.push(body.result.message_id);
+  }
+  return messageIds;
+}
+
+function deliverFile(text, startDate, endDate, model, counts) {
+  const dir = path.resolve(process.cwd(), "digests");
+  fs.mkdirSync(dir, { recursive: true });
+  const filename = `${endDate.toISOString().slice(0, 10)}.md`;
+  const filepath = path.join(dir, filename);
+
+  // We record two distinct counts so the saved metadata is honest about
+  // what influenced the digest:
+  //   - source_thought_count_used: how many rows were actually serialized
+  //     into the LLM prompt (capped at SYNTHESIZE_INPUT_CAP).
+  //   - source_pool_size: the full ranked pool before the prompt cap.
+  // If pool_size > count_used, the LLM only saw the top `count_used` by
+  // importance+recency; the rest were ranked but truncated before send.
+  const frontmatter = [
+    "---",
+    `title: Weekly Digest ${endDate.toISOString().slice(0, 10)}`,
+    "type: weekly-digest",
+    `period_start: ${startDate.toISOString().slice(0, 10)}`,
+    `period_end: ${endDate.toISOString().slice(0, 10)}`,
+    `generated_at: ${new Date().toISOString()}`,
+    `generated_by_model: ${model}`,
+    `source_thought_count_used: ${counts.used}`,
+    `source_pool_size: ${counts.poolSize}`,
+    "tags: [weekly-digest, synthesis]",
+    "---",
+    "",
+  ].join("\n");
+
+  fs.writeFileSync(filepath, frontmatter + text + "\n", "utf8");
+  return filepath;
+}
+
+// ── Main ────────────────────────────────────────────────────────────────────
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const cfg = loadConfig(args);
+
+  console.log(
+    `[weekly-digest] window=${args.window}d min_importance=${args.minImportance} ` +
+      `model=${args.model} output=${args.output} include_personal=${args.includePersonal}`,
+  );
+
+  const pool = await fetchThoughts(cfg, {
+    windowDays: args.window,
+    includePersonal: args.includePersonal,
+    noSensitivityFilter: args.noSensitivityFilter,
+  });
+  console.log(`[weekly-digest] fetched ${pool.length} thoughts from window`);
+
+  if (pool.length === 0) {
+    console.log("[weekly-digest] no thoughts in window; nothing to digest");
+    return;
+  }
+
+  const ranked = rankAndTrim(pool, args.minImportance);
+  console.log(`[weekly-digest] ranked pool: ${ranked.length} thoughts`);
+
+  const { text: digest, startDate, endDate } = await synthesize(
+    cfg,
+    ranked,
+    args.window,
+    args.model,
+  );
+  console.log(`[weekly-digest] synthesized ${digest.length} chars`);
+  console.log("───── DIGEST ─────");
+  console.log(digest);
+  console.log("───── END ─────");
+
+  if (args.dryRun) {
+    console.log("[weekly-digest] --dry-run set; skipping delivery");
+    return;
+  }
+
+  if (args.output === "stdout") {
+    // Digest already printed above; nothing more to do.
+    return;
+  }
+
+  if (args.output === "file") {
+    // `used` reflects only what was serialized into the prompt (top
+    // SYNTHESIZE_INPUT_CAP by importance+recency); `poolSize` is the full
+    // ranked pool before the cap. Once the pool exceeds the cap, these
+    // differ and both are recorded for auditability.
+    const used = Math.min(ranked.length, SYNTHESIZE_INPUT_CAP);
+    const filepath = deliverFile(
+      digest,
+      startDate,
+      endDate,
+      args.model,
+      { used, poolSize: ranked.length },
+    );
+    console.log(`[weekly-digest] wrote ${filepath}`);
+    return;
+  }
+
+  if (args.output === "telegram") {
+    const ids = await deliverTelegram(cfg, digest);
+    console.log(
+      `[weekly-digest] posted to Telegram (${ids.length} message${ids.length === 1 ? "" : "s"}): ${ids.join(", ")}`,
+    );
+    return;
+  }
+}
+
+main().catch((err) => {
+  console.error("[weekly-digest] FAILED:", err?.message || err);
+  process.exit(1);
+});
