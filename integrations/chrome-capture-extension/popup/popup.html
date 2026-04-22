@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Brain Capture</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Open Brain Capture</h1>
+      <p class="subtitle">Capture Claude / ChatGPT / Gemini</p>
+    </div>
+    <div id="status-dot" class="status-dot disconnected" title="Not connected"></div>
+  </header>
+
+  <!-- First-run / missing-config state. Hidden once the user has a working
+       API URL + key; surfaced whenever isConfigured() returns false. -->
+  <section id="config-missing" class="config-missing" hidden>
+    <h2>Configure Open Brain</h2>
+    <p>The extension has no API URL or key yet.</p>
+    <button id="open-config-btn" class="btn btn-capture">Open Configure screen</button>
+  </section>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="overview">Overview</button>
+    <button class="tab" data-tab="sync">Sync</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </nav>
+
+  <section id="tab-overview" class="tab-panel active">
+    <div class="capture-action">
+      <button id="capture-current" class="btn btn-capture">Capture Current Response</button>
+      <p class="hint">Open a Claude, ChatGPT, or Gemini conversation tab and click Capture to send the latest user + assistant exchange to Open Brain.</p>
+      <div id="capture-result" class="result"></div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">Sent This Session</span>
+        <span id="sent-count" class="stat-value">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Queued Retries</span>
+        <span id="queued-count" class="stat-value">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Skipped</span>
+        <span id="skipped-count" class="stat-value">0</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">Failures</span>
+        <span id="failed-count" class="stat-value">0</span>
+      </div>
+    </div>
+
+    <div class="overview-row">
+      <span class="overview-label">Platforms</span>
+      <span id="platform-summary" class="platform-summary">ChatGPT, Claude, Gemini</span>
+    </div>
+    <div class="overview-row">
+      <span class="overview-label">API endpoint</span>
+      <span id="endpoint-summary" class="endpoint-summary">(not configured)</span>
+    </div>
+
+    <div class="actions">
+      <button id="test-connection" class="btn">Test Connection</button>
+      <button id="flush-retry" class="btn btn-secondary">Flush Retry Queue</button>
+    </div>
+    <div id="test-result" class="result"></div>
+
+    <div class="log-header">
+      <h2>Activity</h2>
+      <button id="clear-history" class="text-button">Clear</button>
+    </div>
+    <div id="capture-log" class="capture-log">
+      <p class="empty-state">No extension activity yet.</p>
+    </div>
+  </section>
+
+  <section id="tab-sync" class="tab-panel">
+    <h2 class="sync-platform-header">Claude</h2>
+    <div class="sync-status-row">
+      <span class="overview-label">Last synced</span>
+      <span id="sync-last-time" class="pill">Never</span>
+    </div>
+    <div class="sync-actions">
+      <button id="sync-all-btn" class="btn btn-capture">Sync All</button>
+      <button id="sync-incremental-btn" class="btn btn-secondary" style="margin-left:8px;">Sync New</button>
+    </div>
+    <div class="sync-auto-row">
+      <label class="toggle sync-toggle">
+        <input type="checkbox" id="sync-auto-toggle">
+        Auto-sync every 15 min
+      </label>
+    </div>
+
+    <h2 class="sync-platform-header" style="margin-top:16px;">ChatGPT</h2>
+    <div class="sync-status-row">
+      <span class="overview-label">Last synced</span>
+      <span id="chatgpt-sync-last-time" class="pill">Never</span>
+    </div>
+    <div class="sync-actions">
+      <button id="chatgpt-sync-all-btn" class="btn btn-capture">Sync All</button>
+      <button id="chatgpt-sync-incremental-btn" class="btn btn-secondary" style="margin-left:8px;">Sync New</button>
+    </div>
+    <div class="sync-auto-row">
+      <label class="toggle sync-toggle">
+        <input type="checkbox" id="chatgpt-sync-auto-toggle">
+        Auto-sync every 15 min
+      </label>
+    </div>
+
+    <h2 class="sync-platform-header" style="margin-top:16px;">Gemini</h2>
+    <p class="hint" style="margin:4px 0 8px;">Google does not currently expose a conversation API for Gemini. Manual capture from an active tab is supported; bulk sync is not.</p>
+
+    <div id="sync-progress-area" class="sync-progress-area" style="display:none;">
+      <div class="sync-progress-bar-track">
+        <div id="sync-progress-bar" class="sync-progress-bar" style="width:0%"></div>
+      </div>
+      <p id="sync-progress-text" class="sync-progress-text">Preparing...</p>
+    </div>
+    <div id="sync-result" class="result"></div>
+
+    <div class="log-header"><h2>Sync Log</h2></div>
+    <div id="sync-log" class="capture-log">
+      <p class="empty-state">No sync activity yet.</p>
+    </div>
+  </section>
+
+  <section id="tab-settings" class="tab-panel">
+    <div class="form-group">
+      <button id="reconfigure-btn" class="btn btn-secondary" style="width:100%;">Reconfigure API URL & Key</button>
+      <p class="hint" style="margin-top:6px;">Opens the first-run Configure screen where you can change the Open Brain REST API URL and API key. Values are stored in chrome.storage.local on this device.</p>
+    </div>
+
+    <div class="form-group">
+      <label>Platforms</label>
+      <div class="toggle-grid">
+        <label class="toggle"><input type="checkbox" id="enabled-chatgpt"> ChatGPT</label>
+        <label class="toggle"><input type="checkbox" id="enabled-claude"> Claude</label>
+        <label class="toggle"><input type="checkbox" id="enabled-gemini"> Gemini</label>
+      </div>
+    </div>
+
+    <div class="hint">
+      Client-side sensitivity filtering runs before any payload leaves the browser. The API key stays in device-local extension storage (chrome.storage.local) and is never synced across Chrome profiles.
+    </div>
+
+    <div class="settings-footer">
+      Settings save automatically.
+    </div>
+  </section>
+
+  <script src="../lib/config.js"></script>
+  <script src="../lib/api-client.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

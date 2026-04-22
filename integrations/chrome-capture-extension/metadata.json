@@ -1,0 +1,21 @@
+{
+  "name": "Chrome Capture Extension",
+  "description": "Chrome MV3 extension that captures Claude, ChatGPT, and Gemini conversations into Open Brain via the REST API",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["REST API gateway (PR #201)"],
+    "tools": ["Chrome 120+ or Chromium-based browser"]
+  },
+  "_todo": "TODO(#201): replace 'REST API gateway (PR #201)' with the rest-api slug once that PR merges. Until then this dependency string is informational only — the README links out to ../rest-api/ which will resolve once the sibling contribution lands.",
+  "tags": ["chrome-extension", "capture", "claude", "chatgpt", "gemini", "client-side"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}
