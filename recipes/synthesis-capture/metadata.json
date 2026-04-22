@@ -1,0 +1,26 @@
+{
+  "name": "Synthesis Capture",
+  "description": "Adds a capture_synthesis MCP tool and POST /synthesis REST endpoint so an LLM can save its own synthesis of 3+ source thoughts as a new derived thought with full provenance back to the sources (the Query-as-Ingest pattern). Enforces anti-loop, primary-parent, and minimum-source-count safety rules.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Deno (Supabase Edge Functions)"]
+  },
+  "tags": [
+    "synthesis",
+    "provenance",
+    "mcp",
+    "rest-api",
+    "compound-knowledge"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}
