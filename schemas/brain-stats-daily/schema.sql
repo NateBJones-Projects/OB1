@@ -175,6 +175,19 @@ begin
     from public.thoughts t
     where t.source_type = any(v_lifelog_sources)
       and (not p_exclude_restricted or lower(t.sensitivity_tier) is distinct from 'restricted')
+      -- Cheap candidate prefilter before running the safe date parser on
+      -- every historical lifelog row. Final correctness still comes from
+      -- the resolved-date filter below.
+      and (
+        (t.created_at at time zone 'UTC')::date >= v_since_date
+        or left(coalesce(t.metadata->>'event_at', ''), 10) >= v_since_date::text
+        or left(coalesce(t.metadata->>'life_date', ''), 10) >= v_since_date::text
+        or left(coalesce(t.metadata->>'conversation_created_at', ''), 10) >= v_since_date::text
+        or left(coalesce(t.metadata->>'source_date', ''), 10) >= v_since_date::text
+        or left(coalesce(t.metadata->>'captured_at', ''), 10) >= v_since_date::text
+        or left(coalesce(t.metadata->>'original_date', ''), 10) >= v_since_date::text
+        or left(coalesce(t.metadata->>'date', ''), 10) >= v_since_date::text
+      )
   )
   select d as date, count(*)::bigint as count
   from resolved
@@ -296,6 +309,19 @@ begin
       from public.thoughts t
       where t.source_type = any(v_lifelog_sources)
         and (not p_exclude_restricted or lower(t.sensitivity_tier) is distinct from 'restricted')
+        -- Cheap candidate prefilter before running the safe date parser on
+        -- every historical lifelog row. Final correctness still comes from
+        -- the resolved-date filter below.
+        and (
+          (t.created_at at time zone 'UTC')::date >= v_since_date
+          or left(coalesce(t.metadata->>'event_at', ''), 10) >= v_since_date::text
+          or left(coalesce(t.metadata->>'life_date', ''), 10) >= v_since_date::text
+          or left(coalesce(t.metadata->>'conversation_created_at', ''), 10) >= v_since_date::text
+          or left(coalesce(t.metadata->>'source_date', ''), 10) >= v_since_date::text
+          or left(coalesce(t.metadata->>'captured_at', ''), 10) >= v_since_date::text
+          or left(coalesce(t.metadata->>'original_date', ''), 10) >= v_since_date::text
+          or left(coalesce(t.metadata->>'date', ''), 10) >= v_since_date::text
+        )
     )
     select d, count(*)::bigint as c
     from resolved

@@ -97,3 +97,6 @@ Solution: Install the [enhanced-thoughts schema](../enhanced-thoughts/) first. I
 
 **Issue: Lifelog variant returns zero rows even though I have imports**
 Solution: The lifelog variant filters by a fixed list of source types (`google_drive_import`, `limitless_import`, `chatgpt_import`, etc.). If your import source_type isn't in the list, add it to the `v_lifelog_sources` array at the top of both lifelog functions in `schema.sql` and rerun.
+
+**Issue: Lifelog variant times out on a large historical brain**
+Solution: Rerun the latest `schema.sql`. The lifelog functions include a cheap candidate prefilter before parsing metadata dates, so short windows do not need to parse every historical lifelog row.
