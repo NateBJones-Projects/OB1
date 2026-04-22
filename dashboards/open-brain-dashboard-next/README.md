@@ -188,6 +188,8 @@ Agent Memory pages also call these endpoints on `agent-memory-api`:
 > [!NOTE]
 > If your Open Brain instance doesn't have all these endpoints (e.g., no smart-ingest or duplicates), those pages will show errors but the core pages (dashboard, browse, search, detail) will still work.
 
+<!-- -->
+
 > [!IMPORTANT]
 > OB1's real `thoughts.id` values are UUID strings. The dashboard treats thought IDs as strings end to end so detail links, workflow updates, audit deletes, and duplicate resolution work against production Supabase rows.
 

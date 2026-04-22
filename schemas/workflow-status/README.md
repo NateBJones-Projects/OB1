@@ -68,19 +68,19 @@ supabase db push
 
 1. Verify the columns exist:
 
-```sql
-SELECT column_name, data_type, is_nullable
-FROM information_schema.columns
-WHERE table_name = 'thoughts' AND column_name IN ('status', 'status_updated_at');
-```
+   ```sql
+   SELECT column_name, data_type, is_nullable
+   FROM information_schema.columns
+   WHERE table_name = 'thoughts' AND column_name IN ('status', 'status_updated_at');
+   ```
 
-1. Verify the backfill worked:
+2. Verify the backfill worked:
 
-```sql
-SELECT status, count(*) FROM thoughts
-WHERE type IN ('task', 'idea')
-GROUP BY status;
-```
+   ```sql
+   SELECT status, count(*) FROM thoughts
+   WHERE type IN ('task', 'idea')
+   GROUP BY status;
+   ```
 
 ## Expected Outcome
 
