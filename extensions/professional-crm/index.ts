@@ -6,6 +6,8 @@
  * - Interaction logging with auto-updating last_contacted
  * - Opportunity/pipeline tracking
  * - Follow-up reminders
+ * - Meeting prep context aggregation
+ * - Stale relationship detection
  * - Cross-extension integration with core Open Brain thoughts
  */
 
@@ -19,8 +21,6 @@ const app = new Hono();
 
 // POST /mcp - Main MCP endpoint
 app.post("*", async (c) => {
-  // Keep the transport compatible with MCP content negotiation. Some connectors omit
-  // text/event-stream, but @hono/mcp expects POST requests to accept both response types.
   if (!c.req.header("accept")?.includes("text/event-stream")) {
     const headers = new Headers(c.req.raw.headers);
     headers.set("Accept", "application/json, text/event-stream");
@@ -34,15 +34,12 @@ app.post("*", async (c) => {
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
-
-  // Auth check
   const key = c.req.query("key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_ACCESS_KEY");
   if (!key || key !== expected) {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
-  // Initialize Supabase client
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -59,11 +56,10 @@ app.post("*", async (c) => {
     return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
   }
 
-  const server = new McpServer({ name: "professional-crm", version: "1.0.0" });
+  const server = new McpServer({ name: "professional-crm", version: "1.1.0" });
 
-  // Tool 1: add_professional_contact
   server.tool(
-    "add_professional_contact",
+    "crm_add_contact",
     "Add a new professional contact to your network",
     {
       name: z.string().describe("Contact's full name"),
@@ -95,7 +91,7 @@ app.post("*", async (c) => {
         .single();
 
       if (error) {
-        throw new Error(`Failed to add professional contact: ${error.message}`);
+        throw new Error(`Failed to add contact: ${error.message}`);
       }
 
       return {
@@ -104,7 +100,7 @@ app.post("*", async (c) => {
             type: "text",
             text: JSON.stringify({
               success: true,
-              message: `Added professional contact: ${name}`,
+              message: `Added contact: ${name}`,
               contact: data,
             }, null, 2),
           },
@@ -113,31 +109,92 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 2: search_contacts
   server.tool(
-    "search_contacts",
-    "Search professional contacts by name, company, or tags",
+    "crm_search_contacts",
+    "Search professional contacts using full-text search across name, company, title, notes, and how_we_met. Also supports tag filtering",
     {
-      query: z.string().optional().describe("Search term (searches name, company, title, notes)"),
+      query: z.string().optional().describe("Search term — uses PostgreSQL full-text search for ranked results"),
       tags: z.array(z.string()).optional().describe("Filter by specific tags"),
+      limit: z.number().optional().describe("Max results to return (default: 20)"),
     },
-    async ({ query, tags }) => {
+    async ({ query, tags, limit }) => {
+      const maxResults = limit || 20;
+
+      if (query) {
+        const tsQuery = query.trim().split(/\s+/).join(" & ");
+
+        const { data, error } = await supabase
+          .rpc("crm_search_contacts_fts", {
+            search_query: tsQuery,
+            search_user_id: userId,
+            search_tags: tags || null,
+            max_results: maxResults,
+          });
+
+        if (error) {
+          let queryBuilder = supabase
+            .from("professional_contacts")
+            .select("*")
+            .eq("user_id", userId);
+
+          queryBuilder = queryBuilder.or(
+            `name.ilike.%${query}%,company.ilike.%${query}%,title.ilike.%${query}%,notes.ilike.%${query}%`
+          );
+
+          if (tags && tags.length > 0) {
+            queryBuilder = queryBuilder.contains("tags", tags);
+          }
+
+          const { data: fallbackData, error: fallbackError } = await queryBuilder
+            .order("name", { ascending: true })
+            .limit(maxResults);
+
+          if (fallbackError) {
+            throw new Error(`Failed to search contacts: ${fallbackError.message}`);
+          }
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  success: true,
+                  count: fallbackData.length,
+                  search_mode: "ilike_fallback",
+                  contacts: fallbackData,
+                }, null, 2),
+              },
+            ],
+          };
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({
+                success: true,
+                count: data.length,
+                search_mode: "fts",
+                contacts: data,
+              }, null, 2),
+            },
+          ],
+        };
+      }
+
       let queryBuilder = supabase
         .from("professional_contacts")
         .select("*")
         .eq("user_id", userId);
 
-      if (query) {
-        queryBuilder = queryBuilder.or(
-          `name.ilike.%${query}%,company.ilike.%${query}%,title.ilike.%${query}%,notes.ilike.%${query}%`
-        );
-      }
-
       if (tags && tags.length > 0) {
         queryBuilder = queryBuilder.contains("tags", tags);
       }
 
-      const { data, error } = await queryBuilder.order("name", { ascending: true });
+      const { data, error } = await queryBuilder
+        .order("name", { ascending: true })
+        .limit(maxResults);
 
       if (error) {
         throw new Error(`Failed to search contacts: ${error.message}`);
@@ -158,10 +215,9 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 3: log_interaction
   server.tool(
-    "log_interaction",
-    "Log an interaction with a contact (automatically updates last_contacted)",
+    "crm_log_interaction",
+    "Log an interaction with a contact (automatically updates last_contacted via trigger)",
     {
       contact_id: z.string().describe("Contact ID (UUID)"),
       interaction_type: z.enum(["meeting", "email", "call", "coffee", "event", "linkedin", "other"]).describe("Type of interaction"),
@@ -189,8 +245,6 @@ app.post("*", async (c) => {
         throw new Error(`Failed to log interaction: ${error.message}`);
       }
 
-      // Note: last_contacted is automatically updated by database trigger
-
       return {
         content: [
           {
@@ -206,15 +260,13 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 4: get_contact_history
   server.tool(
-    "get_contact_history",
-    "Get a contact's full profile and all interactions, ordered by date",
+    "crm_get_contact_history",
+    "Get a contact's full profile, all interactions, and linked opportunities",
     {
       contact_id: z.string().describe("Contact ID (UUID)"),
     },
     async ({ contact_id }) => {
-      // Get contact details
       const { data: contact, error: contactError } = await supabase
         .from("professional_contacts")
         .select("*")
@@ -226,7 +278,6 @@ app.post("*", async (c) => {
         throw new Error(`Failed to get contact: ${contactError.message}`);
       }
 
-      // Get all interactions
       const { data: interactions, error: interactionsError } = await supabase
         .from("contact_interactions")
         .select("*")
@@ -238,7 +289,6 @@ app.post("*", async (c) => {
         throw new Error(`Failed to get interactions: ${interactionsError.message}`);
       }
 
-      // Get related opportunities
       const { data: opportunities, error: opportunitiesError } = await supabase
         .from("opportunities")
         .select("*")
@@ -267,9 +317,8 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 5: create_opportunity
   server.tool(
-    "create_opportunity",
+    "crm_create_opportunity",
     "Create a new opportunity/deal, optionally linked to a contact",
     {
       contact_id: z.string().optional().describe("Contact ID (UUID) - optional"),
@@ -315,20 +364,19 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 6: get_follow_ups_due
   server.tool(
-    "get_follow_ups_due",
-    "List contacts with follow-ups due in the past or next N days",
+    "crm_get_follow_ups",
+    "List contacts with follow-ups due (overdue or upcoming within N days)",
     {
       days_ahead: z.number().optional().describe("Number of days to look ahead (default: 7)"),
     },
     async ({ days_ahead }) => {
       const daysToCheck = days_ahead || 7;
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split("T")[0];
       const futureDate = new Date();
       futureDate.setDate(futureDate.getDate() + daysToCheck);
-      const futureDateStr = futureDate.toISOString().split('T')[0];
+      const futureDateStr = futureDate.toISOString().split("T")[0];
 
       const { data, error } = await supabase
         .from("professional_contacts")
@@ -342,9 +390,8 @@ app.post("*", async (c) => {
         throw new Error(`Failed to get follow-ups: ${error.message}`);
       }
 
-      // Separate overdue and upcoming
-      const overdue = data.filter(c => c.follow_up_date! < today);
-      const upcoming = data.filter(c => c.follow_up_date! >= today);
+      const overdue = data.filter((c) => c.follow_up_date! < today);
+      const upcoming = data.filter((c) => c.follow_up_date! >= today);
 
       return {
         content: [
@@ -363,10 +410,9 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 7: update_professional_contact
   server.tool(
-    "update_professional_contact",
-    "Update an existing professional contact's details (name, title, company, email, etc.)",
+    "crm_update_contact",
+    "Update an existing contact's details — only the fields you provide are changed",
     {
       contact_id: z.string().describe("Contact ID (UUID)"),
       name: z.string().optional().describe("Updated full name"),
@@ -378,7 +424,7 @@ app.post("*", async (c) => {
       how_we_met: z.string().optional().describe("Updated context for how you met"),
       tags: z.array(z.string()).optional().describe("Replace tags (e.g., ['ai', 'consulting'])"),
       notes: z.string().optional().describe("Replace notes with new content"),
-      follow_up_date: z.string().nullable().optional().describe("Set or update follow-up date (YYYY-MM-DD), or null/empty string to clear"),
+      follow_up_date: z.string().nullable().optional().describe("Set follow-up date (YYYY-MM-DD), or null to clear"),
     },
     async ({ contact_id, ...fields }) => {
       const updates: Record<string, unknown> = {};
@@ -421,16 +467,14 @@ app.post("*", async (c) => {
     },
   );
 
-  // Tool 8: link_thought_to_contact (CROSS-EXTENSION BRIDGE)
   server.tool(
-    "link_thought_to_contact",
+    "crm_link_thought",
     "CROSS-EXTENSION: Link a thought from your core Open Brain to a professional contact",
     {
       thought_id: z.string().describe("Thought ID (UUID) from core Open Brain thoughts table"),
       contact_id: z.string().describe("Contact ID (UUID)"),
     },
     async ({ thought_id, contact_id }) => {
-      // Retrieve the thought from core Open Brain
       const { data: thought, error: thoughtError } = await supabase
         .from("thoughts")
         .select("*")
@@ -445,7 +489,6 @@ app.post("*", async (c) => {
         throw new Error("Thought not found or access denied");
       }
 
-      // Get the contact
       const { data: contact, error: contactError } = await supabase
         .from("professional_contacts")
         .select("*")
@@ -457,8 +500,7 @@ app.post("*", async (c) => {
         throw new Error(`Failed to retrieve contact: ${contactError.message}`);
       }
 
-      // Append the thought to the contact's notes
-      const linkNote = `\n\n[Linked Thought ${new Date().toISOString().split('T')[0]}]: ${thought.content}`;
+      const linkNote = `\n\n[Linked Thought ${new Date().toISOString().split("T")[0]}]: ${thought.content}`;
       const updatedNotes = (contact.notes || "") + linkNote;
 
       const { data: updatedContact, error: updateError } = await supabase
@@ -489,7 +531,161 @@ app.post("*", async (c) => {
     },
   );
 
-  // Use the SDK's JSON response mode to avoid SSE reconnect churn on stateless edge functions.
+  server.tool(
+    "crm_prep_context",
+    "Meeting prep: aggregates a contact's full profile, recent interactions, open opportunities, pending follow-ups, and linked thoughts into a single briefing",
+    {
+      contact_id: z.string().describe("Contact ID (UUID)"),
+      interaction_limit: z.number().optional().describe("Max interactions to include (default: 10)"),
+    },
+    async ({ contact_id, interaction_limit }) => {
+      const maxInteractions = interaction_limit || 10;
+
+      const [contactRes, interactionsRes, opportunitiesRes] = await Promise.all([
+        supabase
+          .from("professional_contacts")
+          .select("*")
+          .eq("id", contact_id)
+          .eq("user_id", userId)
+          .single(),
+        supabase
+          .from("contact_interactions")
+          .select("*")
+          .eq("contact_id", contact_id)
+          .eq("user_id", userId)
+          .order("occurred_at", { ascending: false })
+          .limit(maxInteractions),
+        supabase
+          .from("opportunities")
+          .select("*")
+          .eq("contact_id", contact_id)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (contactRes.error) {
+        throw new Error(`Contact not found: ${contactRes.error.message}`);
+      }
+
+      const contact = contactRes.data;
+      const interactions = interactionsRes.data || [];
+      const opportunities = opportunitiesRes.data || [];
+
+      const pendingFollowUps = interactions.filter((i) => i.follow_up_needed && i.follow_up_notes);
+
+      const daysSinceContact = contact.last_contacted
+        ? Math.floor((Date.now() - new Date(contact.last_contacted).getTime()) / 86400000)
+        : null;
+
+      const activeOpportunities = opportunities.filter(
+        (o) => !["won", "lost"].includes(o.stage)
+      );
+
+      const totalPipelineValue = activeOpportunities.reduce(
+        (sum, o) => sum + (parseFloat(o.value) || 0),
+        0
+      );
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              briefing: {
+                contact: {
+                  name: contact.name,
+                  company: contact.company,
+                  title: contact.title,
+                  email: contact.email,
+                  linkedin_url: contact.linkedin_url,
+                  how_we_met: contact.how_we_met,
+                  tags: contact.tags,
+                  notes: contact.notes,
+                },
+                relationship: {
+                  days_since_last_contact: daysSinceContact,
+                  last_contacted: contact.last_contacted,
+                  follow_up_date: contact.follow_up_date,
+                  total_interactions: interactions.length,
+                },
+                recent_interactions: interactions.map((i) => ({
+                  type: i.interaction_type,
+                  date: i.occurred_at,
+                  summary: i.summary,
+                })),
+                pending_follow_ups: pendingFollowUps.map((i) => ({
+                  from_interaction: i.occurred_at,
+                  notes: i.follow_up_notes,
+                })),
+                opportunities: {
+                  active_count: activeOpportunities.length,
+                  total_pipeline_value: totalPipelineValue,
+                  items: opportunities.map((o) => ({
+                    title: o.title,
+                    stage: o.stage,
+                    value: o.value,
+                    expected_close: o.expected_close_date,
+                  })),
+                },
+              },
+            }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
+  server.tool(
+    "crm_stale_contacts",
+    "Find contacts going cold — no interaction logged in the past N days, ordered by staleness",
+    {
+      days_threshold: z.number().optional().describe("Days without contact to consider stale (default: 30)"),
+      limit: z.number().optional().describe("Max results (default: 20)"),
+    },
+    async ({ days_threshold, limit }) => {
+      const threshold = days_threshold || 30;
+      const maxResults = limit || 20;
+
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - threshold);
+      const cutoffStr = cutoffDate.toISOString();
+
+      const { data, error } = await supabase
+        .from("professional_contacts")
+        .select("id, name, company, title, tags, last_contacted, follow_up_date")
+        .eq("user_id", userId)
+        .or(`last_contacted.lt.${cutoffStr},last_contacted.is.null`)
+        .order("last_contacted", { ascending: true, nullsFirst: true })
+        .limit(maxResults);
+
+      if (error) {
+        throw new Error(`Failed to find stale contacts: ${error.message}`);
+      }
+
+      const contacts = (data || []).map((c) => ({
+        ...c,
+        days_since_contact: c.last_contacted
+          ? Math.floor((Date.now() - new Date(c.last_contacted).getTime()) / 86400000)
+          : null,
+      }));
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              success: true,
+              threshold_days: threshold,
+              count: contacts.length,
+              stale_contacts: contacts,
+            }, null, 2),
+          },
+        ],
+      };
+    },
+  );
+
   const transport = new StreamableHTTPTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
@@ -498,7 +694,6 @@ app.post("*", async (c) => {
   return transport.handleRequest(c);
 });
 
-// GET / - Health check
-app.get("*", (c) => c.json({ status: "ok", service: "Professional CRM", version: "1.0.0" }));
+app.get("*", (c) => c.json({ status: "ok", service: "Professional CRM", version: "1.1.0" }));
 
 Deno.serve(app.fetch);

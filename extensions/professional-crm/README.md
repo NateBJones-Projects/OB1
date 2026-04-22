@@ -154,24 +154,31 @@ If you build Extension 6, the `link_contact_to_professional_crm` tool works in r
 
 ## Available Tools
 
-1. **`add_professional_contact`** — Add a contact (name, company, title, email, phone, linkedin_url, how_we_met, tags, notes)
-2. **`search_contacts`** — Search by name, company, or tags with ILIKE
-3. **`log_interaction`** — Log a touchpoint (contact_id, interaction_type, summary, follow_up_needed, follow_up_notes). Auto-updates contact's last_contacted timestamp.
-4. **`get_contact_history`** — Get a contact's full profile + all interactions ordered by date
-5. **`create_opportunity`** — Create an opportunity/deal linked to a contact (title, description, stage, value, expected_close_date)
-6. **`get_follow_ups_due`** — List contacts with follow_up_date in the past or next N days
-7. **`update_professional_contact`** — Update only the fields you provide on an existing contact, including setting or clearing `follow_up_date`
-8. **`link_thought_to_contact`** — **CROSS-EXTENSION BRIDGE** — Takes a thought_id and contact_id, retrieves the thought from your core Open Brain, and links it to the contact record
+All tools use the `crm_` prefix for clear namespace separation from other extensions.
+
+1. **`crm_add_contact`** — Add a contact (name, company, title, email, phone, linkedin_url, how_we_met, tags, notes)
+2. **`crm_search_contacts`** — Full-text search across name, company, title, notes, and how_we_met using PostgreSQL FTS with GIN indexes. Falls back to ILIKE if the FTS function hasn't been created yet. Supports tag filtering and result limits
+3. **`crm_log_interaction`** — Log a touchpoint (contact_id, interaction_type, summary, follow_up_needed, follow_up_notes). Auto-updates contact's last_contacted timestamp via trigger
+4. **`crm_get_contact_history`** — Get a contact's full profile + all interactions + linked opportunities ordered by date
+5. **`crm_create_opportunity`** — Create an opportunity/deal linked to a contact (title, description, stage, value, expected_close_date)
+6. **`crm_get_follow_ups`** — List contacts with follow_up_date in the past or next N days, split into overdue vs upcoming
+7. **`crm_update_contact`** — Update only the fields you provide on an existing contact, including setting or clearing `follow_up_date`
+8. **`crm_link_thought`** — **CROSS-EXTENSION BRIDGE** — Takes a thought_id and contact_id, retrieves the thought from your core Open Brain, and links it to the contact record
+9. **`crm_prep_context`** — **MEETING PREP** — Aggregates a contact's full profile, recent interactions, open opportunities, pending follow-ups, and relationship health metrics into a single briefing. The power tool — ask "prep me for my meeting with Sarah" and get everything in one call
+10. **`crm_stale_contacts`** — Find relationships going cold — contacts with no interaction logged in the past N days, ordered by staleness. Helps you maintain your network proactively
 
 ## Expected Outcome
 
 After completing this extension, you should be able to:
 
 1. Maintain a professional contact database with rich context
-2. Log every interaction with timestamps and follow-up tracking
-3. Track opportunities through a pipeline (identified → in_conversation → proposal → negotiation → won/lost)
-4. Connect thoughts from your Open Brain to specific contacts
-5. Get proactive follow-up reminders before relationships go cold
+2. Search contacts instantly with full-text search (ranked results, not just substring matching)
+3. Log every interaction with timestamps and follow-up tracking
+4. Track opportunities through a pipeline (identified → in_conversation → proposal → negotiation → won/lost)
+5. Connect thoughts from your Open Brain to specific contacts
+6. Get proactive follow-up reminders before relationships go cold
+7. Prep for any meeting with a single command that pulls full context
+8. Detect stale relationships before they go cold
 
 Your agent will be able to answer questions like:
 - "Who do I need to follow up with this week?"
@@ -179,6 +186,8 @@ Your agent will be able to answer questions like:
 - "What opportunities are in the proposal stage?"
 - "Find contacts I met at conferences who work in AI"
 - "Which thoughts have I captured about John's project?"
+- "Prep me for my meeting with Sarah" (aggregated briefing)
+- "Which relationships are going cold?" (stale contact detection)
 
 ## Troubleshooting
 
