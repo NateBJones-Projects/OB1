@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-bg-primary: #0a0a0f;
+  --color-bg-surface: #111118;
+  --color-bg-elevated: #1a1a24;
+  --color-bg-hover: #222230;
+  --color-border: #2a2a3a;
+  --color-border-subtle: #1e1e2e;
+  --color-text-primary: #e8e8ef;
+  --color-text-secondary: #9090a8;
+  --color-text-muted: #606078;
+  --color-violet: #8b5cf6;
+  --color-violet-dim: #7c3aed;
+  --color-violet-glow: rgba(139, 92, 246, 0.15);
+  --color-violet-surface: rgba(139, 92, 246, 0.08);
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #60a5fa;
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
+body {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
+
+/* Selection */
+::selection {
+  background: var(--color-violet-glow);
+  color: var(--color-text-primary);
+}
