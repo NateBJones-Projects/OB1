@@ -41,9 +41,11 @@ Return a JSON object with exactly these fields:
 ## Notes on the prompt
 
 **`{types}`** — OB1's canonical types are:
+
 ```
 ["idea", "task", "person_note", "reference", "decision", "lesson", "meeting", "journal"]
 ```
+
 Use this list as-is or remove types you don't use. Do not add types that don't exist in your
 `thoughts` table schema — the classifier will hallucinate values outside this list if the
 prompt doesn't constrain it.
