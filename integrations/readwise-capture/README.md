@@ -114,7 +114,7 @@ Copy the Edge Function URL from the output — it looks like `https://YOUR_REF.s
 
 ## Step 4: Register the Webhook in Readwise
 
-1. Go to [readwise.io/integrations](https://readwise.io/integrations) and find the **Webhooks** section (or the [Readwise webhooks docs](https://docs.readwise.io/readwise/docs/webhooks) for the latest UI)
+1. Go to [readwise.io/webhook](https://readwise.io/webhook) (the webhook creation page — see the [Readwise webhooks docs](https://docs.readwise.io/readwise/docs/webhooks) for full reference)
 2. Click **Add Webhook**
 3. Fill in:
    - **URL**: your Edge Function URL from Step 3
