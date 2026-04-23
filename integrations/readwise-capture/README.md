@@ -1,0 +1,187 @@
+# Readwise Capture Integration
+
+## What It Does
+
+Receives Readwise highlight webhooks and stores each highlight as a thought in your Open Brain — automatically embedded, classified as a reference, and tagged with book title, author, and location. Works for highlights made anywhere Readwise aggregates from: Kindle, Apple Books, Reader, Instapaper, Hypothesis, Airr/Snipd podcasts, and physical books via the Readwise OCR app.
+
+## Prerequisites
+
+- A working Open Brain setup (follow the [Getting Started guide](../../docs/01-getting-started.md) through Step 7 — you need the Supabase database, OpenRouter API key, and Supabase CLI installed)
+- The [readwise-books schema](../../schemas/readwise-books/) applied to your Supabase project
+- Recommended: the [enhanced-thoughts schema](../../schemas/enhanced-thoughts/) applied, so highlights carry the top-level `source_type = 'readwise'` column that the `get_book_highlights` RPC filters on
+- A Readwise account with webhooks enabled (any paid plan; Readwise Free doesn't expose webhooks)
+
+## Cost
+
+Readwise webhooks are free with any paid plan. The Edge Function uses the same OpenRouter credits from your main Open Brain setup — embeddings cost ~$0.02 per million tokens, so a typical highlight (~30 tokens) is a fraction of a cent. For 20 new highlights a day, expect roughly $0.01–0.05/month in API costs.
+
+For one-shot backfill of your existing library (everything you've ever highlighted), use the [readwise-import recipe](../../recipes/readwise-import/) — the webhook only fires on highlights created after it's registered.
+
+---
+
+## Credential Tracker
+
+Copy this block into a text editor and fill it in as you go.
+
+```text
+READWISE CAPTURE -- CREDENTIAL TRACKER
+--------------------------------------
+
+FROM YOUR OPEN BRAIN SETUP
+  OpenRouter API key:    ____________
+  Supabase project ref:  ____________
+
+READWISE
+  Access token:          ____________ (from readwise.io/access_token)
+  Webhook secret:        ____________ (generate your own random string)
+
+GENERATED DURING SETUP
+  Edge Function URL:     https://____________.supabase.co/functions/v1/readwise-capture
+  Webhook ID:            ____________ (from Readwise webhooks UI)
+
+--------------------------------------
+```
+
+---
+
+## Step 1: Get Your Readwise Access Token
+
+1. Go to [readwise.io/access_token](https://readwise.io/access_token) while signed in
+2. Copy the token — save it as the Access Token in the tracker above
+
+This is a long-lived personal token. It's used only for book-metadata lookups (one call per new book, not per highlight). If you rotate it later, update the `READWISE_ACCESS_TOKEN` Supabase secret.
+
+---
+
+## Step 2: Generate a Webhook Secret
+
+Readwise authenticates webhooks by echoing back a secret you choose. Generate a random string — anything hard to guess will do. On macOS or Linux:
+
+```bash
+openssl rand -base64 32
+```
+
+Save the output as the Webhook Secret in the tracker. You'll paste the same value into both the Readwise webhook config and your Supabase secrets.
+
+---
+
+## Step 3: Deploy the Edge Function
+
+### Verify Supabase CLI
+
+```bash
+supabase --version
+```
+
+If that fails, go back to the [Getting Started guide](../../docs/01-getting-started.md) Step 7 and install the CLI first.
+
+### Log In and Link (if not already done)
+
+```bash
+supabase login
+supabase link --project-ref YOUR_PROJECT_REF
+```
+
+Replace `YOUR_PROJECT_REF` with the value from your Supabase dashboard URL: `supabase.com/dashboard/project/THIS_PART`.
+
+### Create the Function
+
+```bash
+supabase functions new readwise-capture
+```
+
+Open `supabase/functions/readwise-capture/index.ts` and replace its entire contents with the contents of [index.ts](./index.ts) from this folder.
+
+### Set Your Secrets
+
+```bash
+supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
+supabase secrets set READWISE_ACCESS_TOKEN=your-readwise-access-token
+supabase secrets set READWISE_WEBHOOK_SECRET=the-secret-you-generated-in-step-2
+```
+
+> `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+
+### Deploy
+
+```bash
+supabase functions deploy readwise-capture --no-verify-jwt
+```
+
+Copy the Edge Function URL from the output — it looks like `https://YOUR_REF.supabase.co/functions/v1/readwise-capture`. Save it in the tracker for Step 4.
+
+---
+
+## Step 4: Register the Webhook in Readwise
+
+1. Go to [readwise.io/integrations](https://readwise.io/integrations) and find the **Webhooks** section (or the [Readwise webhooks docs](https://docs.readwise.io/readwise/docs/webhooks) for the latest UI)
+2. Click **Add Webhook**
+3. Fill in:
+   - **URL**: your Edge Function URL from Step 3
+   - **Secret**: the webhook secret you generated in Step 2 (must exactly match `READWISE_WEBHOOK_SECRET`)
+   - **Events**: select only `readwise.highlight.created`
+4. Save the webhook
+
+> **Subscribe to `readwise.highlight.created` only.** The Edge Function will ignore other event types with a 200 "ignored" response, but subscribing to everything wastes Readwise's webhook budget and costs you nothing in return. The only events currently handled are highlight-created events; Reader document events are deliberately out of scope (see the [design discussion](../../recipes/readwise-import/README.md#what-this-captures-and-what-it-doesnt) in the sister recipe).
+
+---
+
+## Step 5: Test It
+
+Make a new highlight in any Readwise-connected app — highlight a sentence in Kindle, shortlist an article in Reader and highlight a line, whatever's handy.
+
+Within 10–30 seconds (Readwise batches some sources), open Supabase Dashboard → Table Editor → `thoughts`. You should see one new row with:
+
+- `content` = the highlight text
+- `source_type = 'readwise'`
+- `type = 'reference'`
+- `metadata` containing `readwise_highlight_id`, `readwise_book_id`, `book_title`, `book_author`, and the full set of Readwise fields
+
+Check the `readwise_books` table too — the book should appear there with title, author, category, and `num_highlights` incremented.
+
+---
+
+## Expected Outcome
+
+Every new highlight you make across every Readwise-connected source automatically lands in your Open Brain as an embedded, searchable thought — joined to a book record with title, author, and cover image that any MCP-connected AI can query.
+
+---
+
+## Troubleshooting
+
+### Readwise shows the webhook as failing
+
+Check the Edge Function logs: Supabase Dashboard → Edge Functions → `readwise-capture` → Logs. The most common causes:
+
+- `401 unauthorized` — the `secret` in the webhook payload doesn't match `READWISE_WEBHOOK_SECRET`. Rotate one to match the other and redeploy.
+- `500 error` — an OpenRouter or Supabase call failed. Check the log for the specific error.
+
+### Highlights are being captured but without book title/author
+
+`book_title` / `book_author` land as `null` when the Readwise book-lookup call fails. Most common cause is the access token: verify `READWISE_ACCESS_TOKEN` matches the value at [readwise.io/access_token](https://readwise.io/access_token) and that the token hasn't been rotated.
+
+You can fix existing rows by calling `GET /api/v2/books/{book_id}/` manually and backfilling the metadata — or just let the next highlight from that book re-trigger the lookup (the write-through cache will upsert the book row, but existing thought rows with null book_title won't be updated).
+
+### Duplicate highlights in the database
+
+The Edge Function deduplicates on `metadata->>readwise_highlight_id` before inserting. If you see duplicates, confirm you're on the latest version of `index.ts` and have redeployed. Also check that your Readwise webhook isn't configured twice pointing at the same URL.
+
+### `increment_book_highlight_count` RPC not found
+
+You haven't applied the [readwise-books schema](../../schemas/readwise-books/) yet, or the PostgREST schema cache hasn't reloaded. Run the schema's `NOTIFY pgrst, 'reload schema'` statement manually, or wait a minute and retry.
+
+### Highlights are arriving out of order
+
+That's expected for the webhook path — Readwise batches highlights in some sources (Kindle sync runs periodically, podcasts on finish, etc.). If you want guaranteed-complete history, run the [readwise-import recipe](../../recipes/readwise-import/) — it pages through the full export endpoint and is idempotent, so it's safe to run on a schedule alongside the webhook.
+
+---
+
+## What You Just Built
+
+A live feed from every Readwise-connected source directly into your Open Brain. The moment you highlight a line in Kindle, shortlist-and-annotate in Reader, or snip a podcast moment in Airr, that highlight is in your vector store — joined to a book record, tagged with location, and searchable by any AI tool connected to your MCP server.
+
+The webhook only catches new highlights. For everything you've ever highlighted before setting this up, pair it with the [readwise-import recipe](../../recipes/readwise-import/).
+
+---
+
+*Built by Mark Lavercombe — part of the [Open Brain project](https://github.com/NateBJones-Projects/OB1)*
