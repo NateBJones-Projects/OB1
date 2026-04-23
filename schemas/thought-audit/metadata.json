@@ -1,0 +1,20 @@
+{
+  "name": "Thought Audit",
+  "description": "Append-only audit table capturing every capture / update / delete on the thoughts table, plus an author_session_id metadata convention for multi-participant attribution.",
+  "category": "schemas",
+  "author": {
+    "name": "Scott Hutchinson",
+    "github": "txcfi-scott"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": []
+  },
+  "tags": ["audit", "attribution", "multi-writer", "provenance", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-23",
+  "updated": "2026-04-23"
+}
