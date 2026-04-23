@@ -1,0 +1,20 @@
+{
+  "name": "Update Thought MCP",
+  "description": "Standalone MCP Edge Function that adds an update_thought tool with optional if_unchanged_since optimistic concurrency for multi-writer setups.",
+  "category": "integrations",
+  "author": {
+    "name": "Scott Hutchinson",
+    "github": "txcfi-scott"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "OpenRouter"],
+    "tools": ["Supabase CLI", "Deno"]
+  },
+  "tags": ["mcp", "update", "concurrency", "multi-writer", "edge-function"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-23",
+  "updated": "2026-04-23"
+}
