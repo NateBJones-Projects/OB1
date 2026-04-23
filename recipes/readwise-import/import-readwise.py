@@ -150,23 +150,30 @@ def embed_batch(api_key: str, texts: list[str]) -> list[list[float]]:
 # -- Supabase ----------------------------------------------------------------
 
 
-def upsert_book(supabase, book: dict) -> None:
-    """Insert or update the readwise_books row for a book."""
-    supabase.table("readwise_books").upsert(
-        {
-            "book_id": book["user_book_id"],
-            "title": book["title"],
-            "author": book.get("author"),
-            "category": book.get("category"),
-            "source": book.get("source"),
-            "source_url": book.get("source_url"),
-            "cover_image_url": book.get("cover_image_url"),
-            "num_highlights": book.get("num_highlights", 0),
-            "last_highlight_at": book.get("last_highlight_at"),
-            "tags": book.get("book_tags", []),
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-    ).execute()
+def upsert_book(supabase, book: dict, set_highlight_count: bool) -> None:
+    """Insert or update the readwise_books row for a book.
+
+    /api/v2/export/ doesn't populate book["num_highlights"], so count the
+    inline highlights array instead. On full backfills (no --updated-after)
+    that's the authoritative total. On --updated-after runs the inline array
+    is a subset -- we omit num_highlights from the payload so ON CONFLICT
+    DO UPDATE preserves whatever was there from a previous full run.
+    """
+    row = {
+        "book_id": book["user_book_id"],
+        "title": book["title"],
+        "author": book.get("author"),
+        "category": book.get("category"),
+        "source": book.get("source"),
+        "source_url": book.get("source_url"),
+        "cover_image_url": book.get("cover_image_url"),
+        "last_highlight_at": book.get("last_highlight_at"),
+        "tags": book.get("book_tags", []),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    if set_highlight_count:
+        row["num_highlights"] = len(book.get("highlights", []))
+    supabase.table("readwise_books").upsert(row).execute()
 
 
 def already_imported(supabase, highlight_ids: list[int]) -> set[int]:
@@ -420,7 +427,11 @@ def main() -> None:
             total_books_matched += 1
 
             if not args.dry_run:
-                upsert_book(supabase, book)
+                upsert_book(
+                    supabase,
+                    book,
+                    set_highlight_count=not args.updated_after,
+                )
 
             raw_highlights = book.get("highlights", [])
             filtered_highlights = [
