@@ -14,8 +14,13 @@ webhook catches everything new.
 
 Usage:
   python import-readwise.py
-  python import-readwise.py --updated-after 2025-01-01
   python import-readwise.py --dry-run --limit 10 --verbose
+  python import-readwise.py --updated-after 2025-01-01
+  python import-readwise.py --highlighted-after 2024-06-01 --highlighted-before 2024-12-31
+  python import-readwise.py --source kindle --source instapaper
+  python import-readwise.py --book-id 8237 --book-id 9102
+  python import-readwise.py --category books --category articles
+  python import-readwise.py --list-books
 
 Requires environment variables (or a .env file loaded by your shell):
   READWISE_ACCESS_TOKEN       -- https://readwise.io/access_token
@@ -54,6 +59,36 @@ EMBEDDING_MODEL = "openai/text-embedding-3-small"
 EMBEDDING_BATCH_SIZE = 100           # OpenAI accepts up to 2048; 100 balances latency and throughput
 READWISE_PAGE_SIZE = 1000            # Export endpoint max
 PROGRESS_EVERY = 500                 # Print a heartbeat every N highlights
+
+
+# -- Date parsing ------------------------------------------------------------
+
+
+def parse_iso(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO-8601 string into a tz-aware UTC datetime. Accepts 'Z'."""
+    if not value:
+        return None
+    s = value.strip()
+    # Python 3.10's fromisoformat can't handle the 'Z' suffix; normalise.
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def parse_cli_date(value: str) -> datetime:
+    """Parse a user-supplied date/datetime string for filter flags."""
+    dt = parse_iso(value)
+    if dt is None:
+        raise argparse.ArgumentTypeError(
+            f"Invalid date: {value!r} (use YYYY-MM-DD or a full ISO-8601 string)"
+        )
+    return dt
 
 
 # -- Readwise ----------------------------------------------------------------
@@ -131,9 +166,6 @@ def already_imported(supabase, highlight_ids: list[int]) -> set[int]:
     """Return the subset of highlight IDs already present in `thoughts`."""
     if not highlight_ids:
         return set()
-    # Query each book's highlights in one round-trip. We filter on
-    # source_type first so the query uses the source_type index
-    # (from enhanced-thoughts) before the jsonb field extraction.
     resp = (
         supabase.table("thoughts")
         .select("metadata")
@@ -179,6 +211,75 @@ def build_thought(highlight: dict, book: dict) -> dict:
     }
 
 
+# -- Filtering ---------------------------------------------------------------
+
+
+def book_matches(book: dict, args) -> bool:
+    """Apply book-level filters (--book-id, --source, --category)."""
+    if args.book_id and book.get("user_book_id") not in args.book_id:
+        return False
+    if args.source and (book.get("source") or "").lower() not in {
+        s.lower() for s in args.source
+    }:
+        return False
+    if args.category and (book.get("category") or "").lower() not in {
+        c.lower() for c in args.category
+    }:
+        return False
+    return True
+
+
+def highlight_matches(highlight: dict, args) -> bool:
+    """Apply highlight-level filters (date ranges)."""
+    if args.highlighted_after or args.highlighted_before:
+        hat = parse_iso(highlight.get("highlighted_at"))
+        if hat is None:
+            # Nullable field (tweets, some podcasts). Exclude when a date
+            # filter is set -- if we can't place it in time, it can't match.
+            return False
+        if args.highlighted_after and hat < args.highlighted_after:
+            return False
+        if args.highlighted_before and hat > args.highlighted_before:
+            return False
+    if args.updated_before:
+        # Export endpoint returns the per-highlight update timestamp as
+        # either `updated` or `updated_at` depending on API version.
+        u = parse_iso(highlight.get("updated") or highlight.get("updated_at"))
+        if u and u > args.updated_before:
+            return False
+    return True
+
+
+# -- List-books mode ---------------------------------------------------------
+
+
+def list_books(token: str, updated_after: Optional[str]) -> None:
+    """Print a TSV-ish line per book and exit. Discovery helper for --book-id."""
+    cursor: Optional[str] = None
+    total = 0
+    print("book_id\tnum_highlights\tsource\tcategory\ttitle")
+    while True:
+        page = fetch_export_page(token, updated_after, cursor)
+        for book in page.get("results", []):
+            print(
+                "\t".join(
+                    str(x)
+                    for x in (
+                        book.get("user_book_id", ""),
+                        book.get("num_highlights", 0),
+                        book.get("source") or "",
+                        book.get("category") or "",
+                        (book.get("title") or "").replace("\t", " "),
+                    )
+                )
+            )
+            total += 1
+        cursor = page.get("nextPageCursor")
+        if not cursor:
+            break
+    print(f"\n{total} books total", file=sys.stderr)
+
+
 # -- Main --------------------------------------------------------------------
 
 
@@ -188,10 +289,51 @@ def main() -> None:
     )
     p.add_argument(
         "--updated-after",
-        help="ISO date (e.g. 2025-01-01); only import highlights updated after this",
+        help="ISO date/datetime; only fetch highlights updated after this (Readwise-side filter)",
     )
     p.add_argument(
-        "--dry-run", action="store_true", help="Parse and report, but do not write"
+        "--updated-before",
+        type=parse_cli_date,
+        help="ISO date/datetime; only keep highlights updated before this (client-side filter)",
+    )
+    p.add_argument(
+        "--highlighted-after",
+        type=parse_cli_date,
+        help="ISO date/datetime; only import highlights made after this",
+    )
+    p.add_argument(
+        "--highlighted-before",
+        type=parse_cli_date,
+        help="ISO date/datetime; only import highlights made before this",
+    )
+    p.add_argument(
+        "--book-id",
+        type=int,
+        action="append",
+        default=[],
+        help="Only import highlights from this Readwise book_id. Repeatable.",
+    )
+    p.add_argument(
+        "--source",
+        action="append",
+        default=[],
+        help="Only books from this source (kindle, reader, instapaper, apple_books, hypothesis, ...). Repeatable.",
+    )
+    p.add_argument(
+        "--category",
+        action="append",
+        default=[],
+        help="Only books from this category (books, articles, podcasts, tweets, supplementals). Repeatable.",
+    )
+    p.add_argument(
+        "--list-books",
+        action="store_true",
+        help="Print one TSV row per book (book_id, count, source, category, title) and exit",
+    )
+    p.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Parse and report, but do not write",
     )
     p.add_argument(
         "--limit",
@@ -205,8 +347,18 @@ def main() -> None:
     )
     args = p.parse_args()
 
+    # --list-books only needs the Readwise token.
     try:
         token = os.environ["READWISE_ACCESS_TOKEN"]
+    except KeyError:
+        print("Missing required env var: READWISE_ACCESS_TOKEN")
+        sys.exit(1)
+
+    if args.list_books:
+        list_books(token, args.updated_after)
+        return
+
+    try:
         supabase_url = os.environ["SUPABASE_URL"]
         service_key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
         openrouter_key = os.environ["OPENROUTER_API_KEY"]
@@ -223,8 +375,10 @@ def main() -> None:
     cursor: Optional[str] = None
     total_highlights = 0
     total_inserted = 0
-    total_skipped = 0
-    total_books = 0
+    total_skipped_existing = 0
+    total_filtered_out = 0
+    total_books_seen = 0
+    total_books_matched = 0
     last_progress = 0
     started = time.monotonic()
 
@@ -233,24 +387,54 @@ def main() -> None:
         results = page.get("results", [])
 
         for book in results:
-            total_books += 1
+            total_books_seen += 1
+
+            if not book_matches(book, args):
+                if args.verbose:
+                    print(
+                        f"[{(book.get('title') or '')[:50]}] "
+                        f"skipped by book filter"
+                    )
+                continue
+
+            total_books_matched += 1
+
             if not args.dry_run:
                 upsert_book(supabase, book)
 
-            highlights = book.get("highlights", [])
-            if not highlights:
+            raw_highlights = book.get("highlights", [])
+            filtered_highlights = [
+                h for h in raw_highlights if highlight_matches(h, args)
+            ]
+            filtered_count = len(raw_highlights) - len(filtered_highlights)
+            total_filtered_out += filtered_count
+
+            if not filtered_highlights:
                 if args.verbose:
-                    print(f"[{book['title'][:50]}] no highlights")
+                    print(
+                        f"[{(book.get('title') or '')[:50]}] "
+                        f"no highlights match filters ({filtered_count} filtered)"
+                    )
                 continue
 
-            existing = already_imported(supabase, [h["id"] for h in highlights])
-            new_highlights = [h for h in highlights if h["id"] not in existing]
-            total_skipped += len(existing)
+            existing = already_imported(
+                supabase, [h["id"] for h in filtered_highlights]
+            )
+            new_highlights = [
+                h for h in filtered_highlights if h["id"] not in existing
+            ]
+            total_skipped_existing += len(existing)
 
             if args.verbose:
+                parts = [
+                    f"{len(new_highlights)} new",
+                    f"{len(existing)} already present",
+                ]
+                if filtered_count:
+                    parts.append(f"{filtered_count} filtered out")
                 print(
-                    f"[{book['title'][:50]}] "
-                    f"{len(new_highlights)} new, {len(existing)} skipped"
+                    f"[{(book.get('title') or '')[:50]}] "
+                    + ", ".join(parts)
                 )
 
             for i in range(0, len(new_highlights), EMBEDDING_BATCH_SIZE):
@@ -267,35 +451,57 @@ def main() -> None:
                 total_inserted += len(batch)
                 total_highlights += len(batch)
 
-                # Heartbeat so long runs don't look hung
                 if total_highlights - last_progress >= PROGRESS_EVERY:
                     elapsed = time.monotonic() - started
                     rate = total_highlights / elapsed if elapsed > 0 else 0
                     print(
                         f"  ... {total_highlights} highlights processed "
-                        f"({rate:.0f}/s, {total_books} books)",
+                        f"({rate:.0f}/s, {total_books_matched} matched books)",
                         flush=True,
                     )
                     last_progress = total_highlights
 
                 if args.limit and total_highlights >= args.limit:
                     print(f"\nReached --limit {args.limit}; stopping.")
-                    _summary(total_books, total_inserted, total_skipped, args.dry_run)
+                    _summary(
+                        total_books_seen,
+                        total_books_matched,
+                        total_inserted,
+                        total_skipped_existing,
+                        total_filtered_out,
+                        args.dry_run,
+                    )
                     return
 
         cursor = page.get("nextPageCursor")
         if not cursor:
             break
 
-    _summary(total_books, total_inserted, total_skipped, args.dry_run)
+    _summary(
+        total_books_seen,
+        total_books_matched,
+        total_inserted,
+        total_skipped_existing,
+        total_filtered_out,
+        args.dry_run,
+    )
 
 
-def _summary(books: int, inserted: int, skipped: int, dry_run: bool) -> None:
+def _summary(
+    books_seen: int,
+    books_matched: int,
+    inserted: int,
+    skipped_existing: int,
+    filtered_out: int,
+    dry_run: bool,
+) -> None:
     prefix = "[DRY RUN] Would have" if dry_run else ""
     print()
-    print(f"{prefix} processed {books} books")
+    print(f"{prefix} seen {books_seen} books ({books_matched} matched filters)")
     print(f"{prefix} inserted {inserted} highlights")
-    print(f"{prefix} skipped {skipped} highlights (already present)")
+    print(f"{prefix} skipped {skipped_existing} already-present highlights")
+    if filtered_out:
+        print(f"{prefix} filtered out {filtered_out} highlights by date range")
 
 
 if __name__ == "__main__":

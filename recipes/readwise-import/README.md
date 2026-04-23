@@ -138,6 +138,57 @@ This belt-and-braces complement to the webhook is handy if you want periodic rec
 
 ---
 
+## Selective backfill
+
+You don't have to import everything at once. The script accepts several filters so you can run targeted backfills — useful for testing a schema change against one book first, or to gradually ingest a large library by source.
+
+### Filter reference
+
+| Flag | What it does | Filter point |
+|---|---|---|
+| `--updated-after DATE` | Only fetch highlights updated after this ISO date | Readwise API side (cheapest) |
+| `--updated-before DATE` | Only keep highlights updated before this | client-side |
+| `--highlighted-after DATE` | Only keep highlights made after this | client-side |
+| `--highlighted-before DATE` | Only keep highlights made before this | client-side |
+| `--book-id ID` (repeatable) | Only this Readwise `user_book_id`. Pass multiple to import several books. | client-side |
+| `--source NAME` (repeatable) | Only books from this source (`kindle`, `reader`, `instapaper`, `apple_books`, `hypothesis`, ...) | client-side |
+| `--category NAME` (repeatable) | Only books from this category (`books`, `articles`, `podcasts`, `tweets`, `supplementals`) | client-side |
+| `--list-books` | Print one TSV row per book (`book_id`, `num_highlights`, `source`, `category`, `title`) and exit | discovery |
+
+Filters AND together. `--source kindle --category books --highlighted-after 2024-01-01` imports Kindle book highlights made from 2024 onwards.
+
+### `highlighted_at` vs `updated`
+
+`--highlighted-after` / `--highlighted-before` filter on when you actually highlighted something. `--updated-before` filters on when Readwise last modified the highlight record (which includes edits to your note months after the fact). The highlight-date pair is the usual mental model; the update-based pair is for reconciliation.
+
+Highlights with `highlighted_at = null` (tweets, some podcast snippets) are excluded when a `--highlighted-*` filter is set — if we can't place them in time, we can't match a date range.
+
+### Examples
+
+```bash
+# Discovery: list all books so you can find the IDs you want
+python import-readwise.py --list-books | head
+
+# Just this year's highlights
+python import-readwise.py --highlighted-after 2026-01-01 --verbose
+
+# Only Kindle highlights (skip Reader, Instapaper, tweets)
+python import-readwise.py --source kindle --verbose
+
+# Only books and articles (skip podcasts, tweets, supplementals)
+python import-readwise.py --category books --category articles --verbose
+
+# Re-import one specific book after a schema change
+python import-readwise.py --book-id 8237 --verbose
+
+# Backfill the first half of 2024, from Kindle only, dry-run first
+python import-readwise.py --source kindle \
+  --highlighted-after 2024-01-01 --highlighted-before 2024-07-01 \
+  --dry-run --verbose
+```
+
+---
+
 ## Expected Outcome
 
 After a successful run:
