@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+"""
+import-readwise.py -- Backfill your Readwise highlight history into Open Brain.
+
+Pages through /api/v2/export/ (the incremental export endpoint),
+upserts each book into readwise_books, batch-embeds highlight text,
+and inserts into `thoughts` with source_type='readwise'. Idempotent
+on re-run: already-imported highlights are skipped by their
+readwise_highlight_id.
+
+Pair with the readwise-capture integration to keep things live after
+the one-shot backfill. This script catches everything historical; the
+webhook catches everything new.
+
+Usage:
+  python import-readwise.py
+  python import-readwise.py --updated-after 2025-01-01
+  python import-readwise.py --dry-run --limit 10 --verbose
+
+Requires environment variables (or a .env file loaded by your shell):
+  READWISE_ACCESS_TOKEN       -- https://readwise.io/access_token
+  SUPABASE_URL                -- your Supabase project URL
+  SUPABASE_SERVICE_ROLE_KEY   -- service role key (bypasses RLS)
+  OPENROUTER_API_KEY          -- for embeddings
+"""
+
+import argparse
+import os
+import sys
+import time
+from datetime import datetime, timezone
+from typing import Optional
+
+try:
+    import requests
+except ImportError:
+    print("Missing dependency: requests")
+    print("Run: pip install -r requirements.txt")
+    sys.exit(1)
+
+try:
+    from supabase import create_client
+except ImportError:
+    print("Missing dependency: supabase")
+    print("Run: pip install -r requirements.txt")
+    sys.exit(1)
+
+
+# -- Config ------------------------------------------------------------------
+
+READWISE_BASE = "https://readwise.io/api/v2"
+OPENROUTER_BASE = "https://openrouter.ai/api/v1"
+EMBEDDING_MODEL = "openai/text-embedding-3-small"
+EMBEDDING_BATCH_SIZE = 100           # OpenAI accepts up to 2048; 100 balances latency and throughput
+READWISE_PAGE_SIZE = 1000            # Export endpoint max
+PROGRESS_EVERY = 500                 # Print a heartbeat every N highlights
+
+
+# -- Readwise ----------------------------------------------------------------
+
+
+def fetch_export_page(
+    token: str, updated_after: Optional[str], cursor: Optional[str]
+) -> dict:
+    """Fetch a single page from /api/v2/export/, retrying on 429 rate limits."""
+    params = {"pageSize": READWISE_PAGE_SIZE}
+    if updated_after:
+        params["updatedAfter"] = updated_after
+    if cursor:
+        params["pageCursor"] = cursor
+
+    for attempt in range(5):
+        r = requests.get(
+            f"{READWISE_BASE}/export/",
+            params=params,
+            headers={"Authorization": f"Token {token}"},
+            timeout=60,
+        )
+        if r.status_code == 429:
+            wait = int(r.headers.get("Retry-After", 60))
+            print(f"Rate limited by Readwise; sleeping {wait}s...", flush=True)
+            time.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r.json()
+
+    raise RuntimeError("Readwise export: too many retries")
+
+
+# -- Embeddings --------------------------------------------------------------
+
+
+def embed_batch(api_key: str, texts: list[str]) -> list[list[float]]:
+    """Embed up to 2048 strings in a single OpenRouter call."""
+    r = requests.post(
+        f"{OPENROUTER_BASE}/embeddings",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={"model": EMBEDDING_MODEL, "input": texts},
+        timeout=120,
+    )
+    r.raise_for_status()
+    return [item["embedding"] for item in r.json()["data"]]
+
+
+# -- Supabase ----------------------------------------------------------------
+
+
+def upsert_book(supabase, book: dict) -> None:
+    """Insert or update the readwise_books row for a book."""
+    supabase.table("readwise_books").upsert(
+        {
+            "book_id": book["user_book_id"],
+            "title": book["title"],
+            "author": book.get("author"),
+            "category": book.get("category"),
+            "source": book.get("source"),
+            "source_url": book.get("source_url"),
+            "cover_image_url": book.get("cover_image_url"),
+            "num_highlights": book.get("num_highlights", 0),
+            "last_highlight_at": book.get("last_highlight_at"),
+            "tags": book.get("book_tags", []),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).execute()
+
+
+def already_imported(supabase, highlight_ids: list[int]) -> set[int]:
+    """Return the subset of highlight IDs already present in `thoughts`."""
+    if not highlight_ids:
+        return set()
+    # Query each book's highlights in one round-trip. We filter on
+    # source_type first so the query uses the source_type index
+    # (from enhanced-thoughts) before the jsonb field extraction.
+    resp = (
+        supabase.table("thoughts")
+        .select("metadata")
+        .eq("source_type", "readwise")
+        .in_(
+            "metadata->>readwise_highlight_id",
+            [str(hid) for hid in highlight_ids],
+        )
+        .execute()
+    )
+    return {
+        int(row["metadata"]["readwise_highlight_id"])
+        for row in resp.data
+        if row.get("metadata", {}).get("readwise_highlight_id") is not None
+    }
+
+
+def build_thought(highlight: dict, book: dict) -> dict:
+    """Build the `thoughts` row for a single highlight."""
+    text = highlight["text"]
+    note = highlight.get("note") or ""
+    content = f"{text}\n\n— {note}" if note else text
+
+    return {
+        "content": content,
+        "source_type": "readwise",
+        "type": "reference",
+        "metadata": {
+            "source": "readwise",
+            "readwise_highlight_id": highlight["id"],
+            "readwise_book_id": book["user_book_id"],
+            "book_title": book["title"],
+            "book_author": book.get("author"),
+            "book_category": book.get("category"),
+            "highlighted_at": highlight.get("highlighted_at"),
+            "note": note,
+            "location": highlight.get("location"),
+            "location_type": highlight.get("location_type"),
+            "color": highlight.get("color"),
+            "url": highlight.get("url"),
+            "tags": [t["name"] for t in highlight.get("tags", [])],
+        },
+    }
+
+
+# -- Main --------------------------------------------------------------------
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--updated-after",
+        help="ISO date (e.g. 2025-01-01); only import highlights updated after this",
+    )
+    p.add_argument(
+        "--dry-run", action="store_true", help="Parse and report, but do not write"
+    )
+    p.add_argument(
+        "--limit",
+        type=int,
+        help="Stop after this many highlights (useful for first-run sanity checks)",
+    )
+    p.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Print a line per book in addition to the periodic heartbeat",
+    )
+    args = p.parse_args()
+
+    try:
+        token = os.environ["READWISE_ACCESS_TOKEN"]
+        supabase_url = os.environ["SUPABASE_URL"]
+        service_key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+        openrouter_key = os.environ["OPENROUTER_API_KEY"]
+    except KeyError as e:
+        print(f"Missing required env var: {e.args[0]}")
+        print(
+            "Set READWISE_ACCESS_TOKEN, SUPABASE_URL, "
+            "SUPABASE_SERVICE_ROLE_KEY, and OPENROUTER_API_KEY."
+        )
+        sys.exit(1)
+
+    supabase = create_client(supabase_url, service_key)
+
+    cursor: Optional[str] = None
+    total_highlights = 0
+    total_inserted = 0
+    total_skipped = 0
+    total_books = 0
+    last_progress = 0
+    started = time.monotonic()
+
+    while True:
+        page = fetch_export_page(token, args.updated_after, cursor)
+        results = page.get("results", [])
+
+        for book in results:
+            total_books += 1
+            if not args.dry_run:
+                upsert_book(supabase, book)
+
+            highlights = book.get("highlights", [])
+            if not highlights:
+                if args.verbose:
+                    print(f"[{book['title'][:50]}] no highlights")
+                continue
+
+            existing = already_imported(supabase, [h["id"] for h in highlights])
+            new_highlights = [h for h in highlights if h["id"] not in existing]
+            total_skipped += len(existing)
+
+            if args.verbose:
+                print(
+                    f"[{book['title'][:50]}] "
+                    f"{len(new_highlights)} new, {len(existing)} skipped"
+                )
+
+            for i in range(0, len(new_highlights), EMBEDDING_BATCH_SIZE):
+                batch = new_highlights[i : i + EMBEDDING_BATCH_SIZE]
+                thoughts = [build_thought(h, book) for h in batch]
+                texts = [t["content"] for t in thoughts]
+
+                if not args.dry_run:
+                    embeddings = embed_batch(openrouter_key, texts)
+                    for thought, emb in zip(thoughts, embeddings):
+                        thought["embedding"] = emb
+                    supabase.table("thoughts").insert(thoughts).execute()
+
+                total_inserted += len(batch)
+                total_highlights += len(batch)
+
+                # Heartbeat so long runs don't look hung
+                if total_highlights - last_progress >= PROGRESS_EVERY:
+                    elapsed = time.monotonic() - started
+                    rate = total_highlights / elapsed if elapsed > 0 else 0
+                    print(
+                        f"  ... {total_highlights} highlights processed "
+                        f"({rate:.0f}/s, {total_books} books)",
+                        flush=True,
+                    )
+                    last_progress = total_highlights
+
+                if args.limit and total_highlights >= args.limit:
+                    print(f"\nReached --limit {args.limit}; stopping.")
+                    _summary(total_books, total_inserted, total_skipped, args.dry_run)
+                    return
+
+        cursor = page.get("nextPageCursor")
+        if not cursor:
+            break
+
+    _summary(total_books, total_inserted, total_skipped, args.dry_run)
+
+
+def _summary(books: int, inserted: int, skipped: int, dry_run: bool) -> None:
+    prefix = "[DRY RUN] Would have" if dry_run else ""
+    print()
+    print(f"{prefix} processed {books} books")
+    print(f"{prefix} inserted {inserted} highlights")
+    print(f"{prefix} skipped {skipped} highlights (already present)")
+
+
+if __name__ == "__main__":
+    main()
