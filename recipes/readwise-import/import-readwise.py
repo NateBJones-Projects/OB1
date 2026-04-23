@@ -52,6 +52,7 @@ except ImportError:
 
 try:
     from supabase import create_client
+    from postgrest.exceptions import APIError
 except ImportError:
     print("Missing dependency: supabase")
     print("Run: pip install -r requirements.txt")
@@ -63,9 +64,11 @@ except ImportError:
 READWISE_BASE = "https://readwise.io/api/v2"
 OPENROUTER_BASE = "https://openrouter.ai/api/v1"
 EMBEDDING_MODEL = "openai/text-embedding-3-small"
-EMBEDDING_BATCH_SIZE = 100           # OpenAI accepts up to 2048; 100 balances latency and throughput
+EMBEDDING_BATCH_SIZE = 100           # OpenRouter API calls; throughput-bound, safe to be large
+INSERT_BATCH_SIZE = 25               # Supabase inserts; bound by pgvector index maintenance cost
 READWISE_PAGE_SIZE = 1000            # Export endpoint max
 PROGRESS_EVERY = 500                 # Print a heartbeat every N highlights
+STATEMENT_TIMEOUT_CODE = "57014"     # Postgres: canceling statement due to statement timeout
 
 
 # -- Date parsing ------------------------------------------------------------
@@ -174,6 +177,28 @@ def upsert_book(supabase, book: dict, set_highlight_count: bool) -> None:
     if set_highlight_count:
         row["num_highlights"] = len(book.get("highlights", []))
     supabase.table("readwise_books").upsert(row).execute()
+
+
+def insert_thoughts(supabase, thoughts: list[dict]) -> None:
+    """Insert thoughts, splitting the batch recursively on statement timeout.
+
+    Supabase's default statement_timeout for the authenticated role is ~8s.
+    Inserting many 1536-dim vectors at once occasionally triggers pgvector
+    index maintenance that blows past that. Splitting the batch in half on
+    timeout and retrying is almost always enough to get under the limit.
+    """
+    if not thoughts:
+        return
+    try:
+        supabase.table("thoughts").insert(thoughts).execute()
+    except APIError as e:
+        code = getattr(e, "code", None)
+        if code == STATEMENT_TIMEOUT_CODE and len(thoughts) > 1:
+            mid = len(thoughts) // 2
+            insert_thoughts(supabase, thoughts[:mid])
+            insert_thoughts(supabase, thoughts[mid:])
+            return
+        raise
 
 
 def already_imported(supabase, highlight_ids: list[int]) -> set[int]:
@@ -477,7 +502,12 @@ def main() -> None:
                     embeddings = embed_batch(openrouter_key, texts)
                     for thought, emb in zip(thoughts, embeddings):
                         thought["embedding"] = emb
-                    supabase.table("thoughts").insert(thoughts).execute()
+                    # Split into smaller insert batches so each Supabase
+                    # request stays comfortably under statement_timeout.
+                    for j in range(0, len(thoughts), INSERT_BATCH_SIZE):
+                        insert_thoughts(
+                            supabase, thoughts[j : j + INSERT_BATCH_SIZE]
+                        )
 
                 total_inserted += len(batch)
                 total_highlights += len(batch)
