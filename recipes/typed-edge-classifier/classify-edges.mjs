@@ -37,7 +37,9 @@
  * REQUIRED ENV VARS
  *   OPEN_BRAIN_URL            e.g. https://YOUR-PROJECT.supabase.co
  *   OPEN_BRAIN_SERVICE_KEY    service_role key (server-side only!)
- *   ANTHROPIC_API_KEY         sk-ant-...
+ *   EITHER:
+ *     - ANTHROPIC_API_KEY         sk-ant-... (direct Anthropic)
+ *     - LLM_BASE_URL + LLM_API_KEY (OpenAI-compatible, e.g. OpenRouter)
  *
  * USAGE
  *   node classify-edges.mjs --dry-run
@@ -69,8 +71,12 @@ const TYPED_RELATIONS = new Set([
 const PRICING = {
   "claude-haiku-4-5-20251001": { in: 1.0, out: 5.0 },
   "claude-haiku-4-5": { in: 1.0, out: 5.0 },
+  // OpenAI-compatible (OpenRouter) model IDs
+  "anthropic/claude-haiku-4-5": { in: 1.0, out: 5.0 },
   "claude-opus-4-7": { in: 15.0, out: 75.0 },
   "claude-opus-4-6": { in: 15.0, out: 75.0 },
+  "anthropic/claude-opus-4-7": { in: 15.0, out: 75.0 },
+  "anthropic/claude-opus-4-6": { in: 15.0, out: 75.0 },
 };
 
 // Tracks which unknown models we've already warned about so the log
@@ -241,8 +247,13 @@ function printHelp() {
 function loadEnv() {
   const env = process.env;
   const missing = [];
-  for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY", "ANTHROPIC_API_KEY"]) {
+  for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY"]) {
     if (!env[k]) missing.push(k);
+  }
+  const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
+  const hasOpenAICompat = Boolean(env.LLM_BASE_URL && env.LLM_API_KEY);
+  if (!hasAnthropic && !hasOpenAICompat) {
+    missing.push("ANTHROPIC_API_KEY (or LLM_BASE_URL + LLM_API_KEY)");
   }
   if (missing.length > 0) {
     throw new Error(`Missing env vars: ${missing.join(", ")}`);
@@ -254,7 +265,10 @@ function loadEnv() {
   return {
     OPEN_BRAIN_URL: base,
     OPEN_BRAIN_SERVICE_KEY: env.OPEN_BRAIN_SERVICE_KEY,
-    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+    // Prefer OpenAI-compatible when configured; keep Anthropic as fallback.
+    LLM_BASE_URL: env.LLM_BASE_URL ? String(env.LLM_BASE_URL).replace(/\/+$/, "") : null,
+    LLM_API_KEY: env.LLM_API_KEY || null,
+    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY || null,
   };
 }
 
@@ -401,17 +415,17 @@ async function fetchThoughts(sb, ids) {
   );
 }
 
-// ── Anthropic calls ────────────────────────────────────────────────────────
+// ── LLM calls (OpenAI-compatible OR Anthropic) ─────────────────────────────
 
-// Retry policy for Anthropic API calls. We retry on 429 (rate limit)
-// and 5xx (transient server errors). Exponential backoff with jitter:
+// Retry policy. We retry on 429 (rate limit) and 5xx (transient server
+// errors). Exponential backoff with jitter:
 // base 1s, doubles each attempt, capped at 60s, 5 retries total.
 // Other errors (400, 401, 403, 404 etc.) are real and surfaced immediately.
 const ANTHROPIC_RETRY_MAX = 5;
 const ANTHROPIC_RETRY_BASE_MS = 1000;
 const ANTHROPIC_RETRY_CAP_MS = 60_000;
 
-function shouldRetryAnthropicStatus(status) {
+function shouldRetryHttpStatus(status) {
   return status === 429 || (status >= 500 && status < 600);
 }
 
@@ -442,7 +456,7 @@ async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
     const body = await res.text();
     const err = new Error(`Anthropic ${model}: ${res.status} ${body.slice(0, 400)}`);
     err.status = res.status;
-    err.retryable = shouldRetryAnthropicStatus(res.status);
+    err.retryable = shouldRetryHttpStatus(res.status);
     throw err;
   }
   const body = await res.json();
@@ -476,6 +490,70 @@ async function callAnthropic(env, model, system, userMsg, maxTokens) {
   throw lastErr;
 }
 
+async function callOpenAICompatOnce(env, model, system, userMsg, maxTokens) {
+  const base = String(env.LLM_BASE_URL || "").replace(/\/+$/, "");
+  const url = `${base}/chat/completions`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.LLM_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      max_tokens: maxTokens,
+      // Many OpenAI-compatible providers (including OpenRouter) accept this
+      // and it significantly improves strict-JSON adherence.
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    const err = new Error(`LLM ${model}: ${res.status} ${body.slice(0, 400)}`);
+    err.status = res.status;
+    err.retryable = shouldRetryHttpStatus(res.status);
+    throw err;
+  }
+  const body = await res.json();
+  const raw = body?.choices?.[0]?.message?.content?.trim?.() ?? "";
+  const usage = body?.usage || {};
+  return {
+    raw,
+    inTokens: usage.prompt_tokens || usage.input_tokens || 0,
+    outTokens: usage.completion_tokens || usage.output_tokens || 0,
+  };
+}
+
+async function callOpenAICompat(env, model, system, userMsg, maxTokens) {
+  let lastErr;
+  for (let attempt = 0; attempt <= ANTHROPIC_RETRY_MAX; attempt++) {
+    try {
+      return await callOpenAICompatOnce(env, model, system, userMsg, maxTokens);
+    } catch (e) {
+      lastErr = e;
+      if (!e.retryable || attempt === ANTHROPIC_RETRY_MAX) throw e;
+      const delay = backoffDelayMs(attempt);
+      console.warn(
+        `[classify-edges] LLM ${model} ${e.status || "network"}: retry ${attempt + 1}/${ANTHROPIC_RETRY_MAX} in ${delay}ms`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
+async function callLLM(env, model, system, userMsg, maxTokens) {
+  if (env.LLM_BASE_URL && env.LLM_API_KEY) {
+    return await callOpenAICompat(env, model, system, userMsg, maxTokens);
+  }
+  return await callAnthropic(env, model, system, userMsg, maxTokens);
+}
+
 function parseJsonStrict(raw) {
   const cleaned = raw.replace(/^```(?:json)?/m, "").replace(/```$/m, "").trim();
   try {
@@ -500,7 +578,7 @@ async function filterCandidate(env, model, thoughtA, thoughtB) {
     `Thought B (${thoughtB.id}, ${String(thoughtB.created_at || "").slice(0, 10)}):\n` +
     `${String(thoughtB.content || "").slice(0, 400)}\n\n` +
     `Is there a meaningful relation? Return strict JSON.`;
-  const { raw, inTokens, outTokens } = await callAnthropic(env, model, system, user, 128);
+  const { raw, inTokens, outTokens } = await callLLM(env, model, system, user, 128);
   const parsed = parseJsonStrict(raw);
   return {
     worthClassifying: Boolean(parsed.worth_classifying),
@@ -553,7 +631,7 @@ async function classifyPair(env, model, thoughtA, thoughtB) {
     `${String(thoughtB.content || "").slice(0, 800)}\n\n` +
     `Classify the relationship.`;
 
-  const { raw, inTokens, outTokens } = await callAnthropic(env, model, system, user, 512);
+  const { raw, inTokens, outTokens } = await callLLM(env, model, system, user, 512);
   const parsed = parseJsonStrict(raw);
   return { ...parsed, inTokens, outTokens };
 }
