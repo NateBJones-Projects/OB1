@@ -179,7 +179,7 @@ function formatCommand(args) {
 }
 
 function spawnNode(scriptPath, scriptArgs, envOverrides = {}) {
-  const childEnv = { ...process.env, ...envOverrides };
+  const childEnv = { ...loadEnv(), ...envOverrides };
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [scriptPath, ...scriptArgs], {
       cwd: REPO_ROOT,
