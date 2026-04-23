@@ -1,3 +1,5 @@
+<!-- MYBCAT guidelines inherited from /repos/.claude/CLAUDE.md — do not duplicate here -->
+
 # CLAUDE.md — Agent Instructions for Open Brain
 
 This file helps AI coding tools (Claude Code, Codex, Cursor, etc.) work effectively in this repo.

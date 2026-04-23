@@ -23,7 +23,7 @@ Two kids, two parents, overlapping schedules. Soccer practice conflicts with the
 - Nullable foreign keys (activities can belong to one person or the whole family)
 - Querying across date ranges
 
-> **Note:** This extension doesn't use Row Level Security. RLS is introduced in Extension 4 (Meal Planning), where shared household access makes it necessary. Extensions 1-3 are single-user systems.
+> **Note:** This extension enables Row Level Security (RLS) on all three tables, with a user-scoped policy (`auth.uid() = user_id`) plus a `service_role` bypass. Family-calendar data is personal enough that tenant isolation is worth having from the start — even though the learning path doesn't strictly require RLS until Extension 4 (Meal Planning).
 
 ## What It Does
 
