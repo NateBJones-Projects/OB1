@@ -115,7 +115,26 @@ async function resolveBook(bookId: number): Promise<ReadwiseBook | null> {
 
 Deno.serve(async (req: Request): Promise<Response> => {
   try {
-    const body = await req.json();
+    // Readwise's "Test Webhook" button hits the URL with an empty body
+    // (and some infra health checks probe with GET). Respond 200 so the
+    // webhook setup flow can pass without us pretending to process
+    // missing data.
+    if (req.method === "GET") {
+      return new Response("readwise-capture is live", { status: 200 });
+    }
+
+    const bodyText = await req.text();
+    if (!bodyText) {
+      return new Response("ok (empty body)", { status: 200 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(bodyText);
+    } catch {
+      console.error("Invalid JSON body:", bodyText.slice(0, 500));
+      return new Response("invalid json", { status: 400 });
+    }
 
     // Readwise echoes the webhook secret in the payload; reject anything
     // that doesn't match our configured value.
