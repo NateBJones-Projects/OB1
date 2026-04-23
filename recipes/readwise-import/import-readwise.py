@@ -31,10 +31,17 @@ Requires environment variables (or a .env file loaded by your shell):
 
 import argparse
 import os
+import signal
 import sys
 import time
 from datetime import datetime, timezone
 from typing import Optional
+
+# Restore default SIGPIPE handling on Unix so piping into `head` or similar
+# exits cleanly instead of raising BrokenPipeError mid-print. No-op on
+# platforms without SIGPIPE (e.g. Windows).
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 try:
     import requests
@@ -254,30 +261,43 @@ def highlight_matches(highlight: dict, args) -> bool:
 
 
 def list_books(token: str, updated_after: Optional[str]) -> None:
-    """Print a TSV-ish line per book and exit. Discovery helper for --book-id."""
+    """Print a TSV-ish line per book and exit. Discovery helper for --book-id.
+
+    The count column reflects highlights present in /export/ for this call:
+    with no --updated-after, it's the book's total; with --updated-after,
+    it's the number updated since that date. The export endpoint does not
+    populate a separate `num_highlights` field, so we count inline.
+    """
     cursor: Optional[str] = None
-    total = 0
-    print("book_id\tnum_highlights\tsource\tcategory\ttitle")
+    total_books = 0
+    total_highlights = 0
+    print("book_id\thighlights\tsource\tcategory\ttitle")
     while True:
         page = fetch_export_page(token, updated_after, cursor)
         for book in page.get("results", []):
+            count = len(book.get("highlights", []))
+            total_highlights += count
             print(
                 "\t".join(
                     str(x)
                     for x in (
                         book.get("user_book_id", ""),
-                        book.get("num_highlights", 0),
+                        count,
                         book.get("source") or "",
                         book.get("category") or "",
                         (book.get("title") or "").replace("\t", " "),
                     )
                 )
             )
-            total += 1
+            total_books += 1
         cursor = page.get("nextPageCursor")
         if not cursor:
             break
-    print(f"\n{total} books total", file=sys.stderr)
+    suffix = " (since --updated-after)" if updated_after else ""
+    print(
+        f"\n{total_books} books, {total_highlights} highlights{suffix}",
+        file=sys.stderr,
+    )
 
 
 # -- Main --------------------------------------------------------------------
