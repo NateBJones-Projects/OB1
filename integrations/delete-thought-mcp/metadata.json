@@ -1,0 +1,20 @@
+{
+  "name": "Delete Thought MCP",
+  "description": "Standalone MCP Edge Function that adds a delete_thought tool — hard-deletes a thought by UUID with a pre-flight fetch and a clear confirmation response.",
+  "category": "integrations",
+  "author": {
+    "name": "Scott Hutchinson",
+    "github": "txcfi-scott"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Supabase CLI", "Deno"]
+  },
+  "tags": ["mcp", "delete", "cleanup", "edge-function"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-04-23",
+  "updated": "2026-04-23"
+}
