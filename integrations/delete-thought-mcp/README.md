@@ -84,10 +84,12 @@ Use a distinct connector name (e.g. `Open Brain — Delete`) so the tool is easy
 
 Ask Claude: `Call the delete_thought tool with id = "<some-uuid>".`
 
-- For a real UUID: you should see `Deleted thought <id> (prior content length: N chars).`
-- For a bogus UUID: `Thought not found: <id>` with `isError: true`.
+Run through this short verification sequence:
 
-Double-check the row is gone in the Supabase Table Editor.
+1. Capture a throwaway thought and copy its id from the response.
+2. Call `delete_thought` with that id — you should see `Deleted thought <id> (prior content length: N chars).`
+3. Call `delete_thought` with the same id again — you should see `Thought not found: <id>` with `isError: true`.
+4. Confirm in the Supabase Table Editor that the row is gone (reload the Table Editor if it still appears cached).
 
 ## Expected Outcome
 
