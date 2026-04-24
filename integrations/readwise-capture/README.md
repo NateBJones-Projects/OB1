@@ -9,11 +9,11 @@ Receives Readwise highlight webhooks and stores each highlight as a thought in y
 - A working Open Brain setup (follow the [Getting Started guide](../../docs/01-getting-started.md) through Step 7 — you need the Supabase database, OpenRouter API key, and Supabase CLI installed)
 - The [readwise-books schema](../../schemas/readwise-books/) applied to your Supabase project
 - Recommended: the [enhanced-thoughts schema](../../schemas/enhanced-thoughts/) applied, so highlights carry the top-level `source_type = 'readwise'` column that the `get_book_highlights` RPC filters on
-- A Readwise account with webhooks enabled (any paid plan; Readwise Free doesn't expose webhooks)
+- A Readwise account (verified working on Free and paid plans — both expose webhook creation at [readwise.io/webhook](https://readwise.io/webhook))
 
 ## Cost
 
-Readwise webhooks are free with any paid plan. The Edge Function uses the same OpenRouter credits from your main Open Brain setup — embeddings cost ~$0.02 per million tokens, so a typical highlight (~30 tokens) is a fraction of a cent. For 20 new highlights a day, expect roughly $0.01–0.05/month in API costs.
+Readwise webhooks are free (verified on their Free tier). The Edge Function uses the same OpenRouter credits from your main Open Brain setup — embeddings cost ~$0.02 per million tokens, so a typical highlight (~30 tokens) is a fraction of a cent. For 20 new highlights a day, expect roughly $0.01–0.05/month in API costs.
 
 For one-shot backfill of your existing library (everything you've ever highlighted), use the [readwise-import recipe](../../recipes/readwise-import/) — the webhook only fires on highlights created after it's registered.
 
