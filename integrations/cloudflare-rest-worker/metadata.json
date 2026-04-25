@@ -1,0 +1,17 @@
+{
+  "name": "Open Brain REST Gateway (Cloudflare Worker)",
+  "description": "REST API gateway that backs dashboards/open-brain-dashboard-next. Implements the endpoints the dashboard's lib/api.ts expects (thoughts CRUD, search, stats, capture) on top of the existing Supabase schema and RPCs. Deploys as a Cloudflare Worker.",
+  "category": "integrations",
+  "author": { "name": "Travis Swicegood", "github": "tswicegood" },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Cloudflare Workers", "Supabase"],
+    "tools": ["wrangler", "Node.js 20+"]
+  },
+  "tags": ["rest", "dashboard", "cloudflare", "worker", "gateway"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-04-25",
+  "updated": "2026-04-25"
+}

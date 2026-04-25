@@ -34,6 +34,8 @@ Provides 9 pages for managing your thoughts:
 - **Node.js 18+** installed
 - A **Vercel account** (free tier works) or any Node.js hosting
 
+> **Need a backend?** [`integrations/cloudflare-rest-worker/`](../../integrations/cloudflare-rest-worker/) implements the `open-brain-rest` REST API this dashboard expects. Deploy it as a Cloudflare Worker, set `NEXT_PUBLIC_API_URL` to the Worker URL, and the four core pages (Dashboard, Browse, Detail, Search) work end-to-end. See that integration's README for setup + known limitations.
+
 ### Credential Tracker
 
 | Credential | Where to get it | Where it goes |

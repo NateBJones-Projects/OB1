@@ -1,0 +1,22 @@
+# Copy to wrangler.toml. The plain unprefixed config below is the default
+# environment — `wrangler deploy` will use it directly. To run more than one
+# instance (e.g. staging vs. production, or one Worker per Open Brain instance),
+# add [env.<name>] blocks and deploy with `wrangler deploy --env <name>`.
+
+name = "ob-rest"
+main = "src/index.ts"
+compatibility_date = "2026-04-25"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets are set via `wrangler secret put` — never commit them. See README
+# step "Set secrets" for the four values this Worker needs:
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   MCP_ACCESS_KEY
+#   OPENROUTER_API_KEY
+
+# Example: a second Worker for a separate Open Brain instance. Uncomment and
+# rename to deploy a parallel gateway.
+#
+# [env.staging]
+# name = "ob-rest-staging"
