@@ -93,6 +93,8 @@ The script will:
 
 Progress prints to the console with ETA as it runs. A sync log (`chatgpt-sync-log.json`) tracks which conversations have been imported, so you can safely re-run the script after future exports without duplicating data. Conversations with new messages since the last import are automatically re-processed.
 
+On Windows, the importer reads export JSON files as UTF-8 explicitly, so conversations containing non-ASCII characters won't depend on your system code page. The sync log is written next to [`import-chatgpt.py`](./import-chatgpt.py), not into whatever directory you launched the command from.
+
 ### 7. Verify in your database
 
 Open your Supabase dashboard → Table Editor → `thoughts`. You should see new rows with:
@@ -335,7 +337,7 @@ Solution: This is normal occasionally — the LLM sometimes returns malformed JS
 Solution: Conversations with fewer than 2 messages (single-turn) are always filtered. Untitled conversations with 5 or fewer messages are also filtered. Conversations with 10+ messages are always processed regardless of content. Run with `--dry-run --verbose` to see what's being filtered and why.
 
 **Issue: Want to re-import after a new ChatGPT export**
-Solution: Just run the script again pointing at your new export. The sync log (`chatgpt-sync-log.json`) tracks which conversations have been processed and their `update_time`. Only new conversations and conversations with new messages will be re-processed. If you want to start fresh, delete `chatgpt-sync-log.json`.
+Solution: Just run the script again pointing at your new export. The sync log (`chatgpt-sync-log.json`) next to `import-chatgpt.py` tracks which conversations have been processed and their `update_time`. Only new conversations and conversations with new messages will be re-processed. If you want to start fresh, delete that file.
 
 **Issue: `Failed to generate embedding` errors**
 Solution: Check that your OpenRouter API key is valid and has credits. Go to openrouter.ai/credits to verify your balance. The embedding model (text-embedding-3-small) costs $0.02 per million tokens — even a large import costs pennies.

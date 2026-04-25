@@ -168,7 +168,7 @@ claude mcp add --transport http open-brain \
 npm run set-telegram-webhook
 ```
 
-6. Send a message to your bot — it should reply with a classification
+1. Send a message to your bot — it should reply with a classification
 
 ### 10. Add CLI capture (optional)
 

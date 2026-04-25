@@ -66,7 +66,7 @@ supabase db push
 
 ![Step 2](https://img.shields.io/badge/Step_2-Verify-1E88E5?style=for-the-badge)
 
-3. Verify the columns exist:
+1. Verify the columns exist:
 
 ```sql
 SELECT column_name, data_type, is_nullable
@@ -74,7 +74,7 @@ FROM information_schema.columns
 WHERE table_name = 'thoughts' AND column_name IN ('status', 'status_updated_at');
 ```
 
-4. Verify the backfill worked:
+1. Verify the backfill worked:
 
 ```sql
 SELECT status, count(*) FROM thoughts

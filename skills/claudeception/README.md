@@ -1,4 +1,4 @@
-# Claudeception
+# Aiception (Formerly Claudeception)
 
 <div align="center">
 
@@ -10,9 +10,13 @@
 
 *Standalone skill pack for extracting reusable lessons from work sessions and turning them into new skills.*
 
+The repo keeps the historical `claudeception` folder name for continuity, but the installable
+skill should now be named `aiception`. Anthropic reserves skill names containing `claude`
+or `anthropic` in skill frontmatter, so `aiception` is the compatible replacement name.
+
 ## What It Does
 
-Claudeception watches for hard-won knowledge during real work: debugging breakthroughs, misleading errors, undocumented behavior, and repeatable workflow shortcuts. When the knowledge is specific, verified, and reusable, it helps turn that discovery into a new skill and records it back into Open Brain.
+Aiception watches for hard-won knowledge during real work: debugging breakthroughs, misleading errors, undocumented behavior, and repeatable workflow shortcuts. When the knowledge is specific, verified, and reusable, it helps turn that discovery into a new skill and records it back into Open Brain.
 
 ## Supported Clients
 
@@ -30,7 +34,7 @@ Claudeception watches for hard-won knowledge during real work: debugging breakth
 ## Installation
 
 1. Copy [`SKILL.md`](./SKILL.md) into your client's skill/rules directory.
-2. For Claude Code, place it at `~/.claude/skills/claudeception/SKILL.md`.
+2. For Claude Code, place it at `~/.claude/skills/aiception/SKILL.md`.
 3. Restart or reload your AI client so the skill becomes available.
 4. If your client does not support native skill files, adapt the contents into that client's reusable project rules or system prompt.
 

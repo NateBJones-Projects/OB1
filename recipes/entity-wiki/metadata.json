@@ -1,0 +1,20 @@
+{
+  "name": "Entity Wiki Pages",
+  "description": "Auto-generate per-entity markdown wiki pages from linked thoughts",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter or any Chat-Completions-compatible LLM API"],
+    "tools": ["Node.js 18+"]
+  },
+  "tags": ["knowledge-graph", "entities", "wiki", "synthesis", "dossier"],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}

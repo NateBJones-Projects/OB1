@@ -47,3 +47,12 @@ Every contribution lives in its own subfolder under the right category and must 
 - `.github/metadata.schema.json` — JSON schema for metadata.json validation
 - `.github/PULL_REQUEST_TEMPLATE.md` — PR description template
 - `LICENSE.md` — FSL-1.1-MIT terms
+
+## Local GSD Execution Layer
+
+This repo also has a maintainer-local GSD layer in `.planning/`.
+
+- If `.planning/` exists, use it for local brownfield planning and phased execution.
+- Start with `.planning/STATE.md`, then read `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and the relevant `.planning/codebase/*.md` documents.
+- Keep `.planning/` local. It is gitignored intentionally and is not part of the public contribution contract or upstream PR scope.
+- Public contributor rules still come from `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, and the committed repo files.

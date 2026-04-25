@@ -112,7 +112,7 @@ A fully self-contained approach using a Supabase Edge Function, pg_cron trigger,
 
 ### Prerequisites (planned)
 
-- Supabase CLI installed (`npm i -g supabase`)
+- Supabase CLI available ([Homebrew/Scoop/standalone binary or `npx supabase`](https://supabase.com/docs/guides/local-development/cli/getting-started); `npm i -g supabase` is not supported)
 - OpenRouter API key (for generating the summary)
 - Email service: Resend or SendGrid (free tier)
 

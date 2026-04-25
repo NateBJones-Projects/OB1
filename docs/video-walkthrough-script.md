@@ -1,6 +1,6 @@
 # Open Brain Setup — Video Walkthrough Script
 
-**Format:** Screen recording with voiceover. Mac only. Claude Desktop demo.
+**Format:** Screen recording with voiceover. Mac only. Official Anthropic Claude Desktop app demo.
 **Tone:** Casual, confident, unhurried. You've done this before and you're showing a friend.
 **Note:** Real credentials shown on screen — delete the demo Supabase project before publishing.
 

@@ -9,8 +9,12 @@ A self-improving, time-aware personal assistant that runs in the background via 
 > [!IMPORTANT]
 > **This recipe requires [Claude Code](https://claude.ai/download).** It uses Claude Code-specific features — skills, the `/loop` command, and MCP server connections — that aren't available in other AI coding tools. If you're using a different agent, this one isn't for you (yet).
 
+<!-- -->
+
 > [!TIP]
 > **You don't have to set this up manually.** This guide is detailed enough that Claude Code can do most of the setup for you. If you'd rather not walk through every step yourself, skip to [Quick Setup with Claude Code](#quick-setup-with-claude-code) — paste one prompt and Claude handles the plugin install, skill file creation, schema setup, and permissions configuration. Come back to the step-by-step sections if you want to understand what it built or customize further.
+
+<!-- -->
 
 > [!NOTE]
 > **This will not be perfect on day one.** That's by design. Life Engine is built to iterate — your first morning briefing will be rough, your tenth will be dialed in, and by week four the system is suggesting its own improvements based on what you actually use. The value comes from the feedback loop between you and the agent, powered by the structured context your Open Brain provides. Treat the first run as a starting point, not a finished product.
@@ -227,10 +231,13 @@ claude --channels plugin:telegram@claude-plugins-official
 1. DM your bot on Telegram — send it any message (e.g., "hello")
 2. The bot replies with a **6-character pairing code**
 3. Back in Claude Code, approve the pairing:
+
    ```
    /telegram:access pair <code>
    ```
+
 4. Lock down access so only your account can reach the session:
+
    ```
    /telegram:access policy allowlist
    ```
@@ -280,6 +287,7 @@ claude --channels plugin:discord@claude-plugins-official
 1. DM your bot on Discord — if it doesn't respond, make sure Claude Code is running with `--channels` from the previous step
 2. The bot replies with a **pairing code**
 3. Back in Claude Code:
+
    ```
    /discord:access pair <code>
    /discord:access policy allowlist
@@ -652,11 +660,13 @@ That's it. Claude will now check in every 30 minutes and decide if you need anyt
 This is where Life Engine becomes unique to you. Here's the progression:
 
 ### Week 1: Calendar + Telegram (Start Here)
+
 - Morning briefing with today's events
 - Pre-meeting prep from Open Brain
 - That's it. Keep it simple.
 
 ### Week 2: Add Habits
+
 Tell Claude:
 > "Add a morning jog habit to my Life Engine. Remind me at 7am and ask me to confirm when I'm done."
 
@@ -666,6 +676,7 @@ Claude will:
 3. Log completions when you reply
 
 ### Week 3: Add Check-ins
+
 Tell Claude:
 > "Add a midday mood check-in. Just ask me how I'm feeling and log it."
 
@@ -675,6 +686,7 @@ Claude will:
 3. Include mood trends in evening summaries
 
 ### Week 4: First Self-Improvement Cycle
+
 After 7 days of data, Claude reviews its own performance:
 - Which messages did you respond to?
 - Which ones did you ignore?
@@ -683,6 +695,7 @@ After 7 days of data, Claude reviews its own performance:
 It sends you a suggestion via your messaging channel. You approve or reject. The skill evolves.
 
 ### Beyond: It's Yours
+
 Over weeks and months, your Life Engine accumulates:
 - A log of every briefing it sent
 - Your habit completion streaks
@@ -714,15 +727,19 @@ No two Life Engines look the same. Yours adapts to your schedule, your habits, y
 ## Going Further
 
 ### Video Briefings with Remotion
+
 Instead of text, render a short video summary using [Remotion](https://www.remotion.dev/). Claude can generate a Remotion composition from the briefing data and send the rendered video via the Telegram channel's `reply` tool (which supports file attachments up to 50MB).
 
 ### Multi-Person Households
+
 Combine with the [Family Calendar Extension](../../extensions/family-calendar/) to track multiple family members' schedules and send briefings relevant to the whole household.
 
 ### Professional CRM Integration
+
 Combine with the [Professional CRM Extension](../../extensions/professional-crm/) to automatically pull contact history and opportunity status into pre-meeting briefings.
 
 ### Voice Briefings
+
 Use ElevenLabs or another TTS API to convert briefings to audio. Send voice messages via Telegram instead of text — perfect for when you're driving.
 
 ---

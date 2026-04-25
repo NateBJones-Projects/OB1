@@ -1,0 +1,20 @@
+{
+  "name": "Typed Reasoning Edges",
+  "description": "thought_edges table with supports/contradicts/supersedes/evolved_into/depends_on relations + temporal validity columns for edge decay",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["knowledge-graph", "reasoning", "edges", "temporal", "decay"],
+  "difficulty": "advanced",
+  "estimated_time": "30 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}
