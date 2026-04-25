@@ -13,6 +13,8 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { health } from "./routes/health";
 import { thoughts } from "./routes/thoughts";
+import { search } from "./routes/search";
+import { stats } from "./routes/stats";
 import { requireApiKey } from "./lib/auth";
 import type { Env } from "./lib/types";
 
@@ -42,10 +44,10 @@ app.route("/", health);
 app.use("*", requireApiKey);
 
 app.route("/", thoughts);
+app.route("/", search);
+app.route("/", stats);
 
 // Additional routes mounted in subsequent commits:
-//   app.route("/", search);
-//   app.route("/", stats);
 //   app.route("/", capture);
 //   app.route("/", ingestionJobs);
 
