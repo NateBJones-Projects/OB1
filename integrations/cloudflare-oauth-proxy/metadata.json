@@ -1,0 +1,17 @@
+{
+  "name": "Cloudflare OAuth Proxy",
+  "description": "Thin Cloudflare Worker that gives Supabase-hosted MCP servers a path-less origin URL so the MCP TypeScript SDK's OAuth discovery works in Claude Desktop and mcp-remote.",
+  "category": "integrations",
+  "author": { "name": "Travis Swicegood", "github": "tswicegood" },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Cloudflare Workers"],
+    "tools": ["wrangler", "Node.js 20+"]
+  },
+  "tags": ["oauth", "cloudflare", "worker", "proxy", "mcp", "claude-desktop"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}
