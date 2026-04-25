@@ -15,6 +15,8 @@ import { health } from "./routes/health";
 import { thoughts } from "./routes/thoughts";
 import { search } from "./routes/search";
 import { stats } from "./routes/stats";
+import { capture } from "./routes/capture";
+import { ingestionJobs } from "./routes/ingestion-jobs";
 import { requireApiKey } from "./lib/auth";
 import type { Env } from "./lib/types";
 
@@ -46,10 +48,8 @@ app.use("*", requireApiKey);
 app.route("/", thoughts);
 app.route("/", search);
 app.route("/", stats);
-
-// Additional routes mounted in subsequent commits:
-//   app.route("/", capture);
-//   app.route("/", ingestionJobs);
+app.route("/", capture);
+app.route("/", ingestionJobs);
 
 // Catch-all: anything unmatched returns 404. Hono's default is 200 with an
 // empty body, which is more confusing than a clear miss.
