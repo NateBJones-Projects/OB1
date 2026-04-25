@@ -813,6 +813,94 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 ✅ **Done when:** You can start a conversation in your AI client and it has access to Open Brain tools (search_thoughts, list_thoughts, thought_stats, capture_thought).
 
+> [!TIP]
+> **Worried about the `?key=` in your URL?** The access key lands in proxy logs, browser history, and `Referer` headers — one leak is forever. For a token-based alternative that keeps Claude Desktop working, see [`integrations/cloudflare-oauth-proxy/`](../integrations/cloudflare-oauth-proxy/). Both paths stay supported; you can pick per client.
+
+---
+
+![Step 7b](https://img.shields.io/badge/Step_7b-OAuth_(Optional)-5C6BC0?style=for-the-badge)
+
+> [!NOTE]
+> This step is **optional**. Your setup from Steps 1–7 already works. OAuth is for users who want to remove the `?key=` URL parameter (which leaks in proxy logs, browser history, and Referer headers) and use short-lived bearer tokens instead. Legacy `x-brain-key` header and `?key=` auth keep working when OAuth is enabled — this is strictly additive.
+
+<details>
+<summary>🔐 <strong>Why enable OAuth?</strong></summary>
+
+- **Kill the URL-param leak.** `?key=<your-brain-key>` shows up in server access logs, browser history, shell history, and every `Referer` header sent to sites you visit from Supabase dashboards. One leak = permanent credential compromise.
+- **Short-lived tokens.** Access tokens expire after 1 hour; you stay signed in via a refresh token (30 days). A stolen access token is only useful for an hour.
+- **Panic button.** Rotate `OAUTH_JWT_SECRET` and every outstanding token is invalidated instantly.
+- **Standard MCP auth.** Clients that speak OAuth (Claude Desktop, `mcp-remote`) will use it automatically — no `?key=` to paste.
+
+</details>
+
+### 7b.1 — Generate the secrets
+
+Run locally:
+
+```bash
+# Password you'll type in your browser during sign-in. Keep it in a password manager.
+export OAUTH_PASSWORD="$(openssl rand -base64 24)"
+
+# JWT signing secret — never type this anywhere, only server reads it.
+export OAUTH_JWT_SECRET="$(openssl rand -hex 32)"
+
+# Set both as Supabase secrets.
+supabase secrets set OAUTH_PASSWORD="$OAUTH_PASSWORD" OAUTH_JWT_SECRET="$OAUTH_JWT_SECRET" --project-ref YOUR_PROJECT_REF
+```
+
+Write `OAUTH_PASSWORD` down (or save it in your password manager) — you'll type it once per client during the OAuth sign-in. `OAUTH_JWT_SECRET` never leaves the server; you don't need to save it anywhere except Supabase secrets.
+
+### 7b.2 — Redeploy
+
+```bash
+supabase functions deploy open-brain-mcp --no-verify-jwt --project-ref YOUR_PROJECT_REF
+```
+
+Once the deploy finishes, OAuth endpoints are live:
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /.well-known/oauth-authorization-server` | Discovery — clients fetch this automatically |
+| `POST /register` | Dynamic client registration |
+| `GET /authorize` | Password prompt (browser) |
+| `POST /token` | Code/refresh exchange |
+
+### 7b.3 — Connect clients without `?key=`
+
+For path-aware MCP clients (Cursor with OAuth, custom curl-based tools, anything that respects the explicit `authorization_endpoint`/`token_endpoint` URLs from the discovery document): use your **MCP Server URL** (the one **without** `?key=`):
+
+```
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
+```
+
+The client will trigger OAuth discovery → open your browser to the `/authorize` page → you type `OAUTH_PASSWORD` → client receives a bearer token. No URL param, no header pasted by hand.
+
+> [!IMPORTANT]
+> **Claude Desktop and `mcp-remote` require one more step** — they're built on the MCP TypeScript SDK, which strips the URL path during OAuth discovery. Since Supabase Edge Functions live under `/functions/v1/<name>/`, the SDK can't reach the OAuth endpoints directly and connection fails with "Couldn't reach the MCP server". See **Step 7b.5** below for the fix.
+
+### 7b.4 — OAuth proxy for Claude Desktop and `mcp-remote`
+
+The fix is a tiny Cloudflare Worker that gives each MCP server a clean, path-less origin URL. The Worker proxies every request to your Supabase Edge Function with `/functions/v1/<name>/` prepended; the MCP client sees no path and OAuth resolves correctly.
+
+Full setup (~15 min): [`integrations/cloudflare-oauth-proxy/`](../integrations/cloudflare-oauth-proxy/).
+
+After setup, your Claude Desktop connector URL becomes `https://ob-<name>.<your-cf-subdomain>.workers.dev` (no `?key=`, no `/functions/v1/` path). Your original Supabase URL still works unchanged for any path-aware client or legacy `?key=`/`x-brain-key` flows — the Worker is additive.
+
+### 7b.5 — If something goes wrong: the panic button
+
+If you suspect an access token has leaked or a client has gone rogue, rotate the JWT signing key:
+
+```bash
+supabase secrets set OAUTH_JWT_SECRET="$(openssl rand -hex 32)" --project-ref YOUR_PROJECT_REF
+```
+
+Every outstanding access and refresh token is invalidated. Every client will need to re-authorize (sign in again with the password). `OAUTH_PASSWORD` itself stays the same.
+
+> [!TIP]
+> **Rotating the password:** Changing `OAUTH_PASSWORD` prevents new sign-ins but does NOT invalidate existing refresh tokens until they expire (30 days). If you need an immediate cutover, rotate `OAUTH_JWT_SECRET` at the same time.
+
+✅ **Done when:** Your client connected with an OAuth URL (no `?key=`) and tools work. The old `?key=` URL and `x-brain-key` header still work too — you can migrate clients one at a time.
+
 ---
 
 ![Step 8](https://img.shields.io/badge/Step_8-Use_It-8E24AA?style=for-the-badge)
@@ -870,6 +958,13 @@ First, confirm Developer Mode is enabled (Settings → Apps & Connectors → Adv
 **❌ "Permission denied for table thoughts"**
 
 Your `service_role` doesn't have table-level permissions. This happens on newer Supabase projects where CRUD grants are no longer automatic. Go back to Step 2.5 and run the `GRANT` SQL, then retry.
+
+**❌ Claude Desktop JSON config: "Couldn't reach the MCP server"**
+
+If you're using `claude_desktop_config.json` with `mcp-remote`, switch to `supergateway --streamableHttp` instead. `mcp-remote` performs OAuth discovery against the Supabase domain (`/.well-known/oauth-authorization-server`), which returns a 404 that stalls the connection past Claude Desktop's startup timeout. `supergateway` connects directly with no OAuth handshake. See Step 7.1 for the config. (This does not affect Codex, which has a configurable `startup_timeout_sec` that gives `mcp-remote` enough time to fall back.)
+
+> [!TIP]
+> If you've completed **Step 7b (OAuth)**, discovery returns a real metadata document instead of a 404 and `mcp-remote` works fine — no need to switch to `supergateway`.
 
 **❌ Getting 401 errors**
 
