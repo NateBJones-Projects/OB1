@@ -12,6 +12,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { health } from "./routes/health";
+import { thoughts } from "./routes/thoughts";
 import { requireApiKey } from "./lib/auth";
 import type { Env } from "./lib/types";
 
@@ -40,8 +41,9 @@ app.route("/", health);
 // Everything below this point requires a valid x-brain-key.
 app.use("*", requireApiKey);
 
-// Authed routes will be mounted here in subsequent commits:
-//   app.route("/", thoughts);
+app.route("/", thoughts);
+
+// Additional routes mounted in subsequent commits:
 //   app.route("/", search);
 //   app.route("/", stats);
 //   app.route("/", capture);
