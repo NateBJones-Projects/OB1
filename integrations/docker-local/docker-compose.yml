@@ -1,0 +1,53 @@
+services:
+  db:
+    image: ankane/pgvector:v0.5.1
+    container_name: openbrain-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-openbrain}
+    ports:
+      # Bind to localhost only. Change to "5432:5432" only if you intentionally want LAN access.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # Persistent local database files. This survives container rebuilds/restarts.
+      - ./data/postgres:/var/lib/postgresql/data
+      # Runs only the first time the database directory is initialized.
+      - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-openbrain}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  mcp:
+    build:
+      context: ./mcp-server
+    container_name: openbrain-mcp
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-openbrain}
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      MCP_ACCESS_KEY: ${MCP_ACCESS_KEY:?MCP_ACCESS_KEY is required}
+      PORT: 8000
+
+      # OpenAI-compatible embedding endpoint.
+      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE:-https://api.openai.com/v1}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:?EMBEDDING_API_KEY is required}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+
+      # OpenAI-compatible chat endpoint used only for metadata extraction.
+      # Leave equal to embedding provider if your provider supports /chat/completions.
+      CHAT_API_BASE: ${CHAT_API_BASE:-https://api.openai.com/v1}
+      CHAT_API_KEY: ${CHAT_API_KEY:-${EMBEDDING_API_KEY}}
+      CHAT_MODEL: ${CHAT_MODEL:-gpt-4o-mini}
+    ports:
+      # Bind to localhost only for safer first testing.
+      - "127.0.0.1:8000:8000"

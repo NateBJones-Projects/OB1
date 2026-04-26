@@ -1,0 +1,341 @@
+/**
+ * OpenBrain MCP Server - Docker Compose local version.
+ * Adapted from the OB1 Kubernetes self-hosted version.
+ *
+ * Environment variables:
+ * DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+ * EMBEDDING_API_BASE, EMBEDDING_API_KEY, EMBEDDING_MODEL
+ * CHAT_API_BASE, CHAT_API_KEY, CHAT_MODEL
+ * MCP_ACCESS_KEY
+ */
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPTransport } from "@hono/mcp";
+import { Hono } from "hono";
+import { z } from "zod";
+import { Pool } from "postgres";
+
+const DB_HOST = Deno.env.get("DB_HOST") || "db";
+const DB_PORT = parseInt(Deno.env.get("DB_PORT") || "5432", 10);
+const DB_NAME = Deno.env.get("DB_NAME") || "openbrain";
+const DB_USER = Deno.env.get("DB_USER") || "postgres";
+const DB_PASSWORD = Deno.env.get("DB_PASSWORD") || "";
+
+const EMBEDDING_API_BASE = Deno.env.get("EMBEDDING_API_BASE") || "https://api.openai.com/v1";
+const EMBEDDING_API_KEY = Deno.env.get("EMBEDDING_API_KEY") || "";
+const EMBEDDING_MODEL = Deno.env.get("EMBEDDING_MODEL") || "text-embedding-3-small";
+
+const CHAT_API_BASE = Deno.env.get("CHAT_API_BASE") || EMBEDDING_API_BASE;
+const CHAT_API_KEY = Deno.env.get("CHAT_API_KEY") || EMBEDDING_API_KEY;
+const CHAT_MODEL = Deno.env.get("CHAT_MODEL") || "gpt-4o-mini";
+
+const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY") || "";
+
+if (!DB_PASSWORD) throw new Error("DB_PASSWORD is required");
+if (!MCP_ACCESS_KEY) throw new Error("MCP_ACCESS_KEY is required");
+if (!EMBEDDING_API_KEY) throw new Error("EMBEDDING_API_KEY is required");
+
+const pool = new Pool(
+  {
+    hostname: DB_HOST,
+    port: DB_PORT,
+    database: DB_NAME,
+    user: DB_USER,
+    password: DB_PASSWORD,
+  },
+  20,
+);
+
+type Metadata = Record<string, unknown>;
+
+async function getEmbedding(text: string): Promise<number[]> {
+  const r = await fetch(`${EMBEDDING_API_BASE}/embeddings`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${EMBEDDING_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
+  });
+
+  if (!r.ok) {
+    const msg = await r.text().catch(() => "");
+    throw new Error(`Embedding API failed: ${r.status} ${msg}`);
+  }
+
+  const d = await r.json();
+  return d.data[0].embedding;
+}
+
+async function extractMetadata(text: string): Promise<Metadata> {
+  const r = await fetch(`${CHAT_API_BASE}/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${CHAT_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: CHAT_MODEL,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content:
+            `Extract metadata from the user's captured thought.
+Return JSON with:
+- "people": array of people mentioned (empty if none)
+- "action_items": array of implied to-dos (empty if none)
+- "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
+- "topics": array of 1-3 short topic tags (always at least one)
+- "type": one of "observation", "task", "idea", "reference", "person_note"
+Only extract what's explicitly there.`,
+        },
+        { role: "user", content: text },
+      ],
+    }),
+  });
+
+  if (!r.ok) {
+    const msg = await r.text().catch(() => "");
+    throw new Error(`Chat metadata API failed: ${r.status} ${msg}`);
+  }
+
+  const d = await r.json();
+  try {
+    return JSON.parse(d.choices[0].message.content);
+  } catch {
+    return { topics: ["uncategorized"], type: "observation" };
+  }
+}
+
+const server = new McpServer({ name: "open-brain", version: "1.0.0" });
+
+server.registerTool(
+  "search_thoughts",
+  {
+    title: "Search Thoughts",
+    description: "Search captured thoughts by meaning.",
+    inputSchema: {
+      query: z.string().describe("What to search for"),
+      limit: z.number().optional().default(10),
+      threshold: z.number().optional().default(0.5),
+    },
+  },
+  async ({ query, limit, threshold }) => {
+    try {
+      const qEmb = await getEmbedding(query);
+      const embStr = `[${qEmb.join(",")}]`;
+      const client = await pool.connect();
+      try {
+        const result = await client.queryObject<{
+          content: string;
+          metadata: Metadata;
+          similarity: number;
+          created_at: string;
+        }>(
+          `SELECT content, metadata, created_at,
+                  1 - (embedding <=> $1::vector) AS similarity
+             FROM thoughts
+            WHERE 1 - (embedding <=> $1::vector) >= $2
+            ORDER BY embedding <=> $1::vector
+            LIMIT $3`,
+          [embStr, threshold, limit],
+        );
+
+        if (!result.rows.length) {
+          return { content: [{ type: "text" as const, text: `No thoughts found matching "${query}".` }] };
+        }
+
+        const results = result.rows.map((t, i) => {
+          const m = t.metadata || {};
+          const parts = [
+            `--- Result ${i + 1} (${(t.similarity * 100).toFixed(1)}% match) ---`,
+            `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
+            `Type: ${String(m.type || "unknown")}`,
+          ];
+          if (Array.isArray(m.topics) && m.topics.length) parts.push(`Topics: ${m.topics.join(", ")}`);
+          if (Array.isArray(m.people) && m.people.length) parts.push(`People: ${m.people.join(", ")}`);
+          if (Array.isArray(m.action_items) && m.action_items.length) parts.push(`Actions: ${m.action_items.join("; ")}`);
+          parts.push(`\n${t.content}`);
+          return parts.join("\n");
+        });
+
+        return { content: [{ type: "text" as const, text: `Found ${result.rows.length} thought(s):\n\n${results.join("\n\n")}` }] };
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      return { content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.registerTool(
+  "list_thoughts",
+  {
+    title: "List Recent Thoughts",
+    description: "List recently captured thoughts with optional filters by type, topic, person, or time range.",
+    inputSchema: {
+      limit: z.number().optional().default(10),
+      type: z.string().optional().describe("Filter by type"),
+      topic: z.string().optional().describe("Filter by topic tag"),
+      person: z.string().optional().describe("Filter by person mentioned"),
+      days: z.number().optional().describe("Only thoughts from the last N days"),
+    },
+  },
+  async ({ limit, type, topic, person, days }) => {
+    try {
+      const conditions: string[] = [];
+      const params: unknown[] = [];
+      let paramIdx = 1;
+
+      if (type) {
+        conditions.push(`metadata->>'type' = $${paramIdx}`);
+        params.push(type);
+        paramIdx++;
+      }
+      if (topic) {
+        conditions.push(`metadata->'topics' ? $${paramIdx}`);
+        params.push(topic);
+        paramIdx++;
+      }
+      if (person) {
+        conditions.push(`metadata->'people' ? $${paramIdx}`);
+        params.push(person);
+        paramIdx++;
+      }
+      if (days) {
+        conditions.push(`created_at >= NOW() - ($${paramIdx} * INTERVAL '1 day')`);
+        params.push(Math.floor(Number(days)));
+        paramIdx++;
+      }
+
+      const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+      const client = await pool.connect();
+      try {
+        const result = await client.queryObject<{ content: string; metadata: Metadata; created_at: string }>(
+          `SELECT content, metadata, created_at
+             FROM thoughts
+             ${whereClause}
+            ORDER BY created_at DESC
+            LIMIT $${paramIdx}`,
+          [...params, limit],
+        );
+
+        if (!result.rows.length) return { content: [{ type: "text" as const, text: "No thoughts found." }] };
+
+        const results = result.rows.map((t, i) => {
+          const m = t.metadata || {};
+          const tags = Array.isArray(m.topics) ? m.topics.join(", ") : "";
+          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${String(m.type || "??")}${tags ? " - " + tags : ""})\n ${t.content}`;
+        });
+
+        return { content: [{ type: "text" as const, text: `${result.rows.length} recent thought(s):\n\n${results.join("\n\n")}` }] };
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      return { content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.registerTool(
+  "thought_stats",
+  {
+    title: "Thought Statistics",
+    description: "Get a summary of all captured thoughts: totals, types, top topics, and people.",
+    inputSchema: {},
+  },
+  async () => {
+    try {
+      const client = await pool.connect();
+      try {
+        const countResult = await client.queryObject<{ count: number }>("SELECT COUNT(*)::int AS count FROM thoughts");
+        const dataResult = await client.queryObject<{ metadata: Metadata; created_at: string }>("SELECT metadata, created_at FROM thoughts ORDER BY created_at DESC");
+        const count = countResult.rows[0]?.count || 0;
+        const data = dataResult.rows;
+        const types: Record<string, number> = {};
+        const topics: Record<string, number> = {};
+        const people: Record<string, number> = {};
+
+        for (const r of data) {
+          const m = r.metadata || {};
+          if (m.type) types[String(m.type)] = (types[String(m.type)] || 0) + 1;
+          if (Array.isArray(m.topics)) for (const t of m.topics) topics[String(t)] = (topics[String(t)] || 0) + 1;
+          if (Array.isArray(m.people)) for (const p of m.people) people[String(p)] = (people[String(p)] || 0) + 1;
+        }
+
+        const sort = (o: Record<string, number>) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 10);
+        const lines = [
+          `Total thoughts: ${count}`,
+          `Date range: ${data.length ? new Date(data[data.length - 1].created_at).toLocaleDateString() + " -> " + new Date(data[0].created_at).toLocaleDateString() : "N/A"}`,
+          "",
+          "Types:",
+          ...sort(types).map(([k, v]) => ` ${k}: ${v}`),
+        ];
+
+        if (Object.keys(topics).length) lines.push("", "Top topics:", ...sort(topics).map(([k, v]) => ` ${k}: ${v}`));
+        if (Object.keys(people).length) lines.push("", "People mentioned:", ...sort(people).map(([k, v]) => ` ${k}: ${v}`));
+
+        return { content: [{ type: "text" as const, text: lines.join("\n") }] };
+      } finally {
+        client.release();
+      }
+    } catch (err) {
+      return { content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }], isError: true };
+    }
+  },
+);
+
+server.registerTool(
+  "capture_thought",
+  {
+    title: "Capture Thought",
+    description: "Save a new thought to OpenBrain. Generates an embedding and extracts metadata automatically.",
+    inputSchema: { content: z.string().describe("The thought to capture") },
+  },
+  async ({ content }) => {
+    try {
+      const [embedding, metadata] = await Promise.all([getEmbedding(content), extractMetadata(content)]);
+      const embStr = `[${embedding.join(",")}]`;
+      const meta = { ...metadata, source: "mcp" };
+      const client = await pool.connect();
+      try {
+        const upsertResult = await client.queryObject<{ id: bigint }>(
+          "SELECT upsert_thought($1, $2::jsonb) AS id",
+          [content, JSON.stringify(meta)],
+        );
+        const id = upsertResult.rows[0]?.id;
+        if (id !== undefined) {
+          await client.queryObject(
+            "UPDATE thoughts SET embedding = $1::vector WHERE id = $2",
+            [embStr, id],
+          );
+        }
+      } finally {
+        client.release();
+      }
+
+      let confirmation = `Captured as ${String(meta.type || "thought")}`;
+      if (Array.isArray(meta.topics) && meta.topics.length) confirmation += ` -- ${meta.topics.join(", ")}`;
+      if (Array.isArray(meta.people) && meta.people.length) confirmation += ` | People: ${meta.people.join(", ")}`;
+      if (Array.isArray(meta.action_items) && meta.action_items.length) confirmation += ` | Actions: ${meta.action_items.join("; ")}`;
+      return { content: [{ type: "text" as const, text: confirmation }] };
+    } catch (err) {
+      return { content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }], isError: true };
+    }
+  },
+);
+
+const app = new Hono();
+
+app.all("*", async (c) => {
+  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
+  if (!provided || provided !== MCP_ACCESS_KEY) return c.json({ error: "Invalid or missing access key" }, 401);
+
+  const transport = new StreamableHTTPTransport();
+  await server.connect(transport);
+  return transport.handleRequest(c);
+});
+
+Deno.serve({ port: parseInt(Deno.env.get("PORT") || "8000", 10) }, app.fetch);
