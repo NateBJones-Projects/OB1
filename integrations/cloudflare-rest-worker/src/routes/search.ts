@@ -21,7 +21,11 @@ const RESTRICTED_TIER = "restricted";
 // "10% restricted" data; users with very high restricted ratios may see fewer
 // results than `limit` — not incorrect, just lossy. Acceptable for v1.
 const SEMANTIC_OVERFETCH = 3;
-const MATCH_THRESHOLD = 0.5;
+// text-embedding-3-small produces cosine similarities in the ~0.2–0.5 range
+// for clearly related content; only near-paraphrases climb above 0.5. A 0.2
+// default is conservative enough to drop unrelated noise without starving
+// real queries. Callers can override via body.threshold.
+const DEFAULT_MATCH_THRESHOLD = 0.2;
 
 interface SearchBody {
   query?: string;
@@ -29,6 +33,7 @@ interface SearchBody {
   limit?: number;
   page?: number;
   exclude_restricted?: boolean;
+  threshold?: number;
 }
 
 export const search = new Hono<{ Bindings: Env }>();
@@ -88,9 +93,13 @@ search.post("/search", async (c) => {
 
     // Semantic mode: embed → match_thoughts → fetch full rows → stitch.
     const embedding = await generateEmbedding(c.env, query);
+    const threshold =
+      typeof body.threshold === "number" && body.threshold >= 0 && body.threshold <= 1
+        ? body.threshold
+        : DEFAULT_MATCH_THRESHOLD;
     const { data: matches, error: matchErr } = await sb.rpc("match_thoughts", {
       query_embedding: embedding,
-      match_threshold: MATCH_THRESHOLD,
+      match_threshold: threshold,
       match_count: limit * SEMANTIC_OVERFETCH,
       filter: {},
     });

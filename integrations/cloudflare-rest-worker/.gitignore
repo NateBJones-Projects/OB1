@@ -1,5 +1,6 @@
 node_modules/
 .wrangler/
 wrangler.toml
+package-lock.json
 *.log
 .DS_Store
