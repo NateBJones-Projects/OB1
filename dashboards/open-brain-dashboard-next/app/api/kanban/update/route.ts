@@ -25,9 +25,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { thoughtId, status, importance, content, type } = body;
 
-    if (!thoughtId || typeof thoughtId !== "number") {
+    if (!thoughtId || typeof thoughtId !== "string") {
       return NextResponse.json(
-        { error: "thoughtId (number) is required" },
+        { error: "thoughtId (string) is required" },
         { status: 400 }
       );
     }

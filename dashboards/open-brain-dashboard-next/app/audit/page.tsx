@@ -8,7 +8,7 @@ import type { Thought, BrowseResponse } from "@/lib/types";
 
 export default function AuditPage() {
   const [data, setData] = useState<BrowseResponse | null>(null);
-  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showDelete, setShowDelete] = useState(false);
@@ -33,7 +33,7 @@ export default function AuditPage() {
     load();
   }, [load]);
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
