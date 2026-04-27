@@ -166,27 +166,34 @@ login page, paste your `MCP_ACCESS_KEY` — the dashboard validates it against
 this Worker's `/health`, then encrypts it into an HTTP-only session cookie
 for the rest of the session.
 
-## Deploying the Dashboard to Cloudflare Pages
+## Deploying the Dashboard to Cloudflare
 
-The dashboard is a Next.js app and runs on Cloudflare Pages with the
-`@cloudflare/next-on-pages` adapter:
+The dashboard is a Next.js app. Cloudflare's current path for Next.js 15+ is
+the [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter,
+which deploys the app as a Cloudflare Worker (with static assets attached).
+The older `@cloudflare/next-on-pages` adapter caps at Next 15.5.x and won't
+work with this dashboard's Next 16.x.
 
 ```bash
 cd dashboards/open-brain-dashboard-next
 npm install
-npm install -D @cloudflare/next-on-pages
-npx @cloudflare/next-on-pages
+npm install -D @opennextjs/cloudflare wrangler
 
-# First-time deploy:
-wrangler pages deploy .vercel/output/static --project-name=ob-dashboard
+# Scaffold open-next.config.ts and wrangler.jsonc — the dashboard's
+# README has the templates and walks through the deploy.
+
+npx opennextjs-cloudflare build
+npx opennextjs-cloudflare deploy
+wrangler secret put SESSION_SECRET --name <your-worker-name>
 ```
 
-Or wire the GitHub repo to a Pages project via the Cloudflare dashboard for
-push-based auto-deploys. Set `NEXT_PUBLIC_API_URL` and `SESSION_SECRET` in
-the Pages project's environment variables.
+`NEXT_PUBLIC_API_URL` is read from the dashboard's `.env` at *build* time and
+baked into the bundle, so set it before running `build`. `SESSION_SECRET` is
+a *runtime* secret set on the Worker after first deploy.
 
 The dashboard ends up at
-`https://ob-dashboard.<your-cf-subdomain>.pages.dev`. Custom domain optional.
+`https://<your-worker-name>.<your-cf-subdomain>.workers.dev`. Custom domain
+optional.
 
 ## Known Limitations (v1)
 
