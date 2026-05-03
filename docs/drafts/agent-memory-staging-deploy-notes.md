@@ -56,6 +56,9 @@ This pass should verify:
 - 2026-05-03: Runtime inspect listed all seven `openbrain_*` tools, but the model could not call them until the profile's `tools.allow` list explicitly included each `openbrain_*` tool.
 - 2026-05-03: Native OpenClaw smoke test called `openbrain_list_review_queue` successfully from an agent turn with zero plugin failures.
 - 2026-05-03: Full native OpenClaw plugin smoke passed using only `openbrain_*` tools: write-back, recall, usage reporting, review action, memory inspect, and recall-trace lookup all succeeded.
+- 2026-05-03: Added repeatable smoke harnesses for direct API validation and native OpenClaw plugin validation.
+- 2026-05-03: Direct API harness passed against OB1 staging with health, write-back, conservative recall gate, include-unconfirmed recall, usage report, review action, inspector, recall trace, and unsafe write-back blocking.
+- 2026-05-03: Native OpenClaw harness passed on Spark; transcript parsing observed all seven `openbrain_*` tool calls, zero non-OB1 tool calls, zero tool errors, and an evidence-only review result.
 
 ## Verified Smoke Tests
 
@@ -76,9 +79,10 @@ This pass should verify:
 | OpenClaw plugin runtime inspect | Passed |
 | OpenClaw native tool exposure | Passed |
 | OpenClaw native full plugin loop | Passed |
+| Repeatable API smoke harness | Passed |
+| Repeatable native OpenClaw smoke harness | Passed |
 
 ## Open Items
 
 - `supabase migration list --linked` had one transient CLI auth failure after the migration push, while schema dump still succeeded. Recheck with newer Supabase CLI before turning this into public docs.
-- Add a repeatable native OpenClaw smoke harness so future plugin checks do not depend on hand-written agent prompts.
 - The staging `MCP_ACCESS_KEY` has been rotated once for Spark testing. Rotate it again before any broader shared test if access scope changes.

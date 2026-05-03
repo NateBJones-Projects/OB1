@@ -80,6 +80,7 @@ openclaw plugins install clawhub:@openbrain/openclaw-agent-memory
 - The profile config includes explicit `tools.allow` entries for all seven `openbrain_*` tools.
 - Direct API smoke test can call `GET /health` on the OB1 Agent Memory API.
 - Native OpenClaw smoke test calls `openbrain_list_review_queue` from an agent turn without shell/file tools.
+- Repeatable native harness passes with `npm run smoke:native` from [plugin](plugin/).
 - `openbrain_recall` returns policy-labeled memories.
 - `openbrain_writeback` blocks unsafe payloads.
 - `openbrain_report_usage` updates a recall trace.

@@ -68,3 +68,14 @@ Install the paired skill from ClawHub or use the bundled plugin skill so agents 
 Local validation target: `openclaw --profile ob1-agent-memory plugins inspect openbrain-agent-memory --runtime --json` should list all seven `openbrain_*` tools and no diagnostics.
 
 Native smoke target: run an OpenClaw agent turn that calls `openbrain_list_review_queue` with no shell/file tools. The result should show an `openbrain_list_review_queue` tool call and zero failures.
+
+For the repeatable full loop harness:
+
+```bash
+OPENCLAW_BIN="/home/lej/.local/bin/openclaw" \
+OPENCLAW_PROFILE="personal" \
+OPENCLAW_AGENT="jonathan" \
+npm run smoke:native
+```
+
+The harness enables the plugin, verifies runtime registration for all seven `openbrain_*` tools, runs a native agent turn that calls every OB1 tool, parses the session transcript for non-OB1 tool calls and tool errors, and disables the plugin again by default.

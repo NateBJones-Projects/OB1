@@ -102,6 +102,20 @@ The API accepts the runtime-neutral core schema versions and the OpenClaw launch
 
 An agent runtime can recall relevant context, write back compact memories, and leave a trace that explains what happened. Unsafe write-backs are blocked before durable storage.
 
+## Smoke Harness
+
+Use the live smoke harness after deploying the Edge Function or rotating secrets:
+
+```bash
+OB1_AGENT_MEMORY_ENDPOINT="https://YOUR_PROJECT_REF.supabase.co/functions/v1/agent-memory-api" \
+OB1_AGENT_MEMORY_KEY="YOUR_MCP_ACCESS_KEY" \
+OB1_AGENT_MEMORY_WORKSPACE_ID="ob1-staging" \
+OB1_AGENT_MEMORY_PROJECT_ID="agent-memory-api-smoke" \
+node integrations/agent-memory-api/smoke/live-smoke.mjs
+```
+
+The harness checks health, write-back policy defaults, conservative recall gating, include-unconfirmed recall, usage reporting, review action, memory inspection, recall trace, and unsafe write-back blocking. It prints a JSON summary and never prints the access key.
+
 ## Troubleshooting
 
 **Issue: `Invalid or missing access key`**

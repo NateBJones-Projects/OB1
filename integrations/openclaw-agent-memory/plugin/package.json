@@ -8,10 +8,14 @@
     "README.md",
     "openclaw.plugin.json",
     "src",
-    "skills"
+    "skills",
+    "smoke"
   ],
   "exports": {
     ".": "./src/index.ts"
+  },
+  "scripts": {
+    "smoke:native": "bash smoke/native-openclaw-smoke.sh"
   },
   "dependencies": {
     "typebox": "^1.1.37"
