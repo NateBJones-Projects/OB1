@@ -1,7 +1,6 @@
 # Entity Wiki Pages
 
 > ⚠️ **Requires the entity-extraction companion PRs — not yet merged into OB1 `main`.** This recipe reads `public.entities`, `public.thought_entities`, and `public.edges`. Those tables are introduced by the in-flight entity-extraction schema + worker PRs (tracking: [#197](https://github.com/NateBJones-Projects/OB1/pull/197) schema, [#199](https://github.com/NateBJones-Projects/OB1/pull/199) worker). On the current `main` branch those tables do not exist and every query in `generate-wiki.mjs` will fail with `relation "public.entities" does not exist`. Do not try to install this recipe until both companion PRs are merged. See [Prerequisites](#prerequisites) for details.
-
 > Auto-generate per-entity markdown wiki pages by aggregating every thought linked to a person, project, topic, organization, tool, or place — then synthesizing a structured narrative with an LLM.
 
 ## What It Does

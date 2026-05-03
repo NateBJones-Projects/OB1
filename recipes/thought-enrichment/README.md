@@ -27,25 +27,25 @@ Retroactively classify and enrich your existing thoughts with structured metadat
 
 Classifies each thought using an LLM and writes structured metadata back to Supabase.
 
-3. Preview what the enrichment will do (no writes):
+1. Preview what the enrichment will do (no writes):
 
    ```bash
    node enrich-thoughts.mjs --dry-run --limit 10
    ```
 
-4. Run enrichment for real:
+2. Run enrichment for real:
 
    ```bash
    node enrich-thoughts.mjs --apply --concurrency 5
    ```
 
-5. Check progress at any time:
+3. Check progress at any time:
 
    ```bash
    node enrich-thoughts.mjs --status
    ```
 
-6. Retry any previously failed thoughts:
+4. Retry any previously failed thoughts:
 
    ```bash
    node enrich-thoughts.mjs --apply --retry-failed
@@ -57,13 +57,13 @@ Classifies each thought using an LLM and writes structured metadata back to Supa
 
 Fixes thoughts where the top-level `type` column is still `reference` but `metadata.type` contains a valid different type.
 
-7. Preview:
+1. Preview:
 
    ```bash
    node backfill-type.mjs --dry-run
    ```
 
-8. Apply:
+2. Apply:
 
    ```bash
    node backfill-type.mjs
@@ -73,13 +73,13 @@ Fixes thoughts where the top-level `type` column is still `reference` but `metad
 
 Scans thought content for patterns matching SSNs, credit cards, API keys, passwords, medications, health data, and financial details. Upgrades `sensitivity_tier` from `standard` to `personal` or `restricted` as appropriate.
 
-9. Preview:
+1. Preview:
 
    ```bash
    node backfill-sensitivity.mjs --dry-run
    ```
 
-10. Apply:
+2. Apply:
 
     ```bash
     node backfill-sensitivity.mjs --apply
@@ -87,10 +87,10 @@ Scans thought content for patterns matching SSNs, credit cards, API keys, passwo
 
 ## Recommended execution order
 
-11. Run `backfill-type.mjs` first to fix any type mismatches from prior imports.
-12. Run `backfill-sensitivity.mjs` to tag sensitive content before enrichment.
-13. Run `enrich-thoughts.mjs --dry-run --limit 20` to preview LLM classifications.
-14. Run `enrich-thoughts.mjs --apply` to enrich all remaining thoughts.
+1. Run `backfill-type.mjs` first to fix any type mismatches from prior imports.
+2. Run `backfill-sensitivity.mjs` to tag sensitive content before enrichment.
+3. Run `enrich-thoughts.mjs --dry-run --limit 20` to preview LLM classifications.
+4. Run `enrich-thoughts.mjs --apply` to enrich all remaining thoughts.
 
 ## Cost expectations
 
