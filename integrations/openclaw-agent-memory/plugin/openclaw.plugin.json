@@ -1,0 +1,44 @@
+{
+  "id": "openbrain-agent-memory",
+  "name": "OpenBrain Agent Memory",
+  "description": "Typed OpenClaw tools for OB1 Agent Memory recall, write-back, review, inspection, and traces.",
+  "skills": ["./skills/openclaw-agent-memory"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["endpoint", "workspaceId"],
+    "properties": {
+      "endpoint": {
+        "type": "string",
+        "description": "Base URL for the OB1 Agent Memory API, without a trailing slash."
+      },
+      "accessKey": {
+        "type": "string",
+        "description": "Optional direct OB1 access key. Prefer accessKeyEnv for shared configs."
+      },
+      "accessKeyEnv": {
+        "type": "string",
+        "description": "Environment variable containing the OB1 access key.",
+        "default": "OB1_AGENT_MEMORY_KEY"
+      },
+      "workspaceId": {
+        "type": "string",
+        "description": "Default OB1 workspace ID."
+      },
+      "projectId": {
+        "type": "string",
+        "description": "Default OB1 project ID."
+      },
+      "requireReviewByDefault": {
+        "type": "boolean",
+        "description": "Keep agent-written memory pending review by default.",
+        "default": true
+      },
+      "includeUnconfirmedRecall": {
+        "type": "boolean",
+        "description": "Allow unconfirmed memories in recall responses.",
+        "default": false
+      }
+    }
+  }
+}

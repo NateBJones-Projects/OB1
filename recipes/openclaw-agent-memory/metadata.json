@@ -1,0 +1,21 @@
+{
+  "name": "OpenClaw Agent Memory for OB1",
+  "description": "Canonical recipe for using runtime-neutral OB1 Agent Memory from OpenClaw workflows with governed recall, write-back, provenance, and review.",
+  "category": "recipes",
+  "author": {
+    "name": "OB1 Team",
+    "github": "NateBJones-Projects"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "OpenRouter"],
+    "tools": ["OpenClaw", "Deno", "Node.js 20+"]
+  },
+  "requires_skills": ["openclaw-agent-memory"],
+  "tags": ["openclaw", "agent-memory", "workflow", "provenance"],
+  "difficulty": "advanced",
+  "estimated_time": "45 minutes",
+  "created": "2026-05-03",
+  "updated": "2026-05-03"
+}

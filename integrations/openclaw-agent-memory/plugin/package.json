@@ -1,0 +1,40 @@
+{
+  "name": "@openbrain/openclaw-agent-memory",
+  "version": "0.1.0",
+  "description": "OpenClaw tools for OB1 Agent Memory recall, write-back, review, inspection, and trace.",
+  "type": "module",
+  "license": "MIT-0",
+  "files": [
+    "README.md",
+    "openclaw.plugin.json",
+    "src",
+    "skills"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.41"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24-beta.2"
+  },
+  "openclaw": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2",
+      "pluginSdkVersion": "2026.3.24-beta.2"
+    },
+    "install": {
+      "npmSpec": "@openbrain/openclaw-agent-memory",
+      "defaultChoice": "npm",
+      "minHostVersion": ">=2026.3.24-beta.2"
+    }
+  }
+}

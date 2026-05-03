@@ -1,0 +1,21 @@
+{
+  "name": "OpenClaw TaskFlow Work Log",
+  "description": "Companion OB1 Agent Memory workflow for durable OpenClaw TaskFlow handoffs across models, agents, and channels.",
+  "category": "recipes",
+  "author": {
+    "name": "OB1 Team",
+    "github": "NateBJones-Projects"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "OpenRouter"],
+    "tools": ["OpenClaw", "OB1 Agent Memory API"]
+  },
+  "requires_skills": ["openclaw-agent-memory"],
+  "tags": ["openclaw", "taskflow", "handoff", "agent-memory"],
+  "difficulty": "advanced",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-03",
+  "updated": "2026-05-03"
+}
