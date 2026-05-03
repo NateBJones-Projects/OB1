@@ -73,7 +73,7 @@ export async function fetchThoughts(
 
 export async function fetchThought(
   apiKey: string,
-  id: number,
+  id: string,
   excludeRestricted: boolean = true
 ): Promise<Thought> {
   const qs = excludeRestricted ? "" : "?exclude_restricted=false";
@@ -82,10 +82,10 @@ export async function fetchThought(
 
 export async function updateThought(
   apiKey: string,
-  id: number,
+  id: string,
   data: { content?: string; type?: string; importance?: number; status?: string | null }
-): Promise<{ id: number; action: string; message: string }> {
-  return apiFetch<{ id: number; action: string; message: string }>(
+): Promise<{ id: string; action: string; message: string }> {
+  return apiFetch<{ id: string; action: string; message: string }>(
     apiKey,
     `/thought/${id}`,
     {
@@ -136,7 +136,7 @@ export async function fetchDuplicates(
 
 export async function deleteThought(
   apiKey: string,
-  id: number
+  id: string
 ): Promise<void> {
   const url = `${API_URL}/thought/${id}`;
   const res = await fetch(url, {
@@ -186,7 +186,7 @@ export async function fetchStats(
 }
 
 export interface CaptureResult {
-  thought_id: number;
+  thought_id: string;
   action: string;
   type: string;
   sensitivity_tier: string;
@@ -206,7 +206,7 @@ export async function captureThought(
 
 export async function fetchReflections(
   apiKey: string,
-  thoughtId: number
+  thoughtId: string
 ): Promise<Reflection[]> {
   const data = await apiFetch<{ reflections: Reflection[] }>(
     apiKey,
