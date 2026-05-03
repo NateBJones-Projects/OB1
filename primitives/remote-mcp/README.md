@@ -28,6 +28,8 @@ Start a new conversation and enable the connector via the "+" button at the bott
 
 Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu). Works on the web at chatgpt.com — not available on mobile.
 
+> ChatGPT custom MCP support is still beta, plan-sensitive, and sometimes model-sensitive. As of May 2026, OpenAI's docs list Developer Mode for Plus, Pro, Business, Enterprise, and Edu, while workspace app publishing and action controls are documented mainly for Business, Enterprise, and Edu. Mark read-only tools with the MCP `readOnlyHint` annotation, and expose exact `search`/`fetch` read tools when you want compatibility with restricted ChatGPT or company-knowledge style surfaces.
+
 **Enable Developer Mode (one-time setup):**
 
 1. Go to chatgpt.com → click your profile icon → **Settings**
@@ -46,6 +48,8 @@ Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu). Works on
 6. Click **Create**
 
 **Using it:** Start a new conversation and make sure the connector is enabled in the tools/apps panel. ChatGPT sometimes needs explicit tool references: "Use the search_household_items tool to find my paint colors."
+
+If ChatGPT says a tool is unavailable and your server logs show zero requests, the request never reached your MCP server. Refresh or recreate the ChatGPT app so it pulls the latest tool metadata, start a fresh chat, select the app in Developer Mode, and try a thinking model. On restricted Pro sessions, exact `search`/`fetch` read tools are more likely to appear than write tools.
 
 ## Claude Code
 
@@ -111,6 +115,7 @@ Every MCP client handles remote servers slightly differently. Your extension acc
 - Confirm Developer Mode is enabled (Settings → Apps & Connectors → Advanced settings)
 - Check that the connector is active for your current conversation in the tools/apps panel
 - Be explicit: "Use the [tool_name] tool to [do thing]." ChatGPT often needs direct tool references the first few times.
+- If server logs show zero requests, refresh or recreate the ChatGPT app and try a thinking model; the tool may not be exposed to that chat session.
 
 **Getting 401 errors**
 - The access key doesn't match what's stored in Supabase secrets

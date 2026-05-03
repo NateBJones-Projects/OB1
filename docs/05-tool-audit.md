@@ -24,6 +24,8 @@ Every MCP tool you expose sends its full definition — name, description, param
 
 The bottom line: fewer, smarter tools beat many narrow ones.
 
+**ChatGPT-specific gotcha:** mark every retrieval/reporting tool with `annotations: { readOnlyHint: true }` and every write tool with `annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: false }` unless the tool really can touch arbitrary external resources or destroy data. ChatGPT uses these hints to classify tools. If you omit them, ChatGPT can treat the tool as a write action, which makes Pro/read-only MCP sessions more likely to hide it entirely. For restricted ChatGPT surfaces, exact `search` and `fetch` read tools are safer than only exposing custom names like `search_thoughts`.
+
 ---
 
 ## 1. Auditing Your Tools
