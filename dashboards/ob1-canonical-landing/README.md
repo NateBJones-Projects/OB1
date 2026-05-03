@@ -59,20 +59,9 @@ jobs:
         id: deployment
 ```
 
-### Step 3 — Accept the domain donation
+### Step 3 — Verify DNS
 
-The `openbrain.fyi` domain is currently registered to the contribution author and is being donated to the project. Before enabling Pages, coordinate the registration transfer:
-
-1. Contact `@snapsynapse` (open an issue or DM) to initiate the registrar transfer
-2. The donor will unlock the domain and provide an EPP/auth code
-3. Initiate an inbound transfer at your registrar of choice using that code, OR have the donor push the domain directly within the same registrar (faster — no 5-day ICANN wait)
-4. Once the registration sits in the project's account, all DNS changes from Step 4 onward are made by the maintainer
-
-Until the transfer completes, the donor will keep DNS pointing at the project's Pages host so the site stays live during handover. After the transfer, you (the new registrant) own renewals, WHOIS, and DNS.
-
-### Step 4 — Configure DNS at the registrar
-
-At your domain registrar, add five records for `openbrain.fyi`. The four `A` records point the apex (`@`) at GitHub Pages anycast; the `CNAME` makes `www.openbrain.fyi` resolve to the org's Pages host so GitHub can redirect it to the apex.
+DNS for `openbrain.fyi` is already pointing at this org's GitHub Pages — the records below are documented here for reference and for future changes (registrar moves, additional subdomains, etc.).
 
 | Type | Host | Value | TTL |
 |------|------|-------|-----|
@@ -82,21 +71,21 @@ At your domain registrar, add five records for `openbrain.fyi`. The four `A` rec
 | A | @ | `185.199.111.153` | Automatic |
 | CNAME | www | `natebjones-projects.github.io.` | Automatic |
 
-Wait for propagation before moving on. Verify with:
+Verify resolution:
 
 ```bash
 dig @8.8.8.8 +short openbrain.fyi A
 dig @8.8.8.8 +short www.openbrain.fyi CNAME
 ```
 
-Expect the four GitHub IPs and `natebjones-projects.github.io.` respectively. Propagation usually completes in under an hour.
+Expect the four GitHub IPs and `natebjones-projects.github.io.` respectively.
 
-### Step 5 — Enable GitHub Pages with the custom domain
+### Step 4 — Enable GitHub Pages with the custom domain
 
 1. Go to **Settings → Pages**
 2. Under **Build and deployment → Source**, select **GitHub Actions**
 3. Under **Custom domain**, enter `openbrain.fyi` and click **Save**
-   - GitHub runs a DNS check; with Step 4 complete, it shows a green check
+   - GitHub runs a DNS check; with Step 3 verified, it shows a green check
    - This also validates the `CNAME` file already in the repo (`dashboards/ob1-canonical-landing/CNAME`)
 4. Wait 5–30 minutes for **Enforce HTTPS** to become available, then check the box
    - Behind the scenes GitHub provisions a Let's Encrypt certificate; the box stays greyed out until issuance succeeds
@@ -106,7 +95,7 @@ The site is live once the workflow's `deploy` job succeeds and the cert is issue
 
 #### Optional: org-level domain verification
 
-If `NateBJones-Projects` has [verified domains](https://docs.github.com/en/organizations/managing-organization-settings/verifying-or-approving-a-domain-for-your-organization) enforcement enabled, add the TXT record GitHub provides under **Org Settings → Pages → Add a domain** before Step 5. This prevents domain takeover if Pages is ever disabled. Skip if your org doesn't enforce this.
+If `NateBJones-Projects` has [verified domains](https://docs.github.com/en/organizations/managing-organization-settings/verifying-or-approving-a-domain-for-your-organization) enforcement enabled, add the TXT record GitHub provides under **Org Settings → Pages → Add a domain** before Step 4. This prevents domain takeover if Pages is ever disabled. Skip if your org doesn't enforce this.
 
 ## Expected outcome
 
