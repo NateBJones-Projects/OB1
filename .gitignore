@@ -23,3 +23,7 @@ sync-log.json
 
 # Build artifacts
 deno.lock
+/ankit114.json
+recipes/email-history-import/token*.json
+recipes/email-history-import/sync-log*.json
+recipes/email-history-import/credentials.json

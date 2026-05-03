@@ -42,6 +42,26 @@ CREATE TABLE important_dates (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Row Level Security
+ALTER TABLE family_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE activities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE important_dates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access" ON family_members FOR ALL TO public
+  USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+CREATE POLICY "family_members_user_policy" ON family_members FOR ALL TO public
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Service role full access" ON activities FOR ALL TO public
+  USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+CREATE POLICY "activities_user_policy" ON activities FOR ALL TO public
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Service role full access" ON important_dates FOR ALL TO public
+  USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+CREATE POLICY "important_dates_user_policy" ON important_dates FOR ALL TO public
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
 -- Indexes for common queries
 CREATE INDEX idx_activities_user_dow ON activities(user_id, day_of_week);
 CREATE INDEX idx_activities_family_member ON activities(family_member_id);
