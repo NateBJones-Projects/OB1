@@ -174,6 +174,7 @@ This recipe ships with a **`--mirror-supersedes`** flag that is **OFF by default
 - **Best-effort, no preflight.** Mirror is best-effort. If the column doesn't exist (e.g. `schemas/provenance-chains/` hasn't been applied), the edge still writes successfully and a `[warn] Mirror to thoughts.supersedes failed ...` line is logged. There is no startup preflight — PostgREST [does not expose `information_schema` over REST](https://docs.postgrest.org/en/latest/references/api/schemas.html), so a REST-based column probe is not available on standard Supabase deployments. Check logs for mirror warnings.
 - **Failure mode:** if the PATCH fails mid-run (column missing, network, 5xx, RLS), the edge is written but `thoughts.supersedes` is NOT updated. The run logs the warning and continues. Downstream readers that hit the edge table will see the relation; readers that hit `thoughts.supersedes` directly will not.
 - **Reconciliation (NOT automatic):** reruns will NOT retry a failed mirror PATCH. Once the `supersedes` edge exists in `thought_edges`, `processPair` short-circuits via `skip_already_classified` before reaching the mirror write, so `thought_edges_upsert` is never called and the PATCH is never re-issued. If the PATCH fails once, `thoughts.supersedes` stays stale until an operator runs the manual repair below. A one-off query to find all drifted rows:
+
   ```sql
   -- Supersedes edges whose mirror is missing or wrong.
   -- Contract: newer.supersedes = older (provenance-chains).
