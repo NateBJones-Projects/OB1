@@ -25,8 +25,29 @@
         "description": "Base URL for the OB1 Agent Memory API, without a trailing slash."
       },
       "accessKey": {
-        "type": "string",
-        "description": "OB1 Agent Memory access key. Prefer OpenClaw config env substitution such as ${OB1_AGENT_MEMORY_KEY}; plugin code does not read process.env."
+        "description": "OB1 Agent Memory access key. Prefer an OpenClaw SecretRef so the key does not live in plaintext config.",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "provider", "id"],
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": ["env", "file", "exec"]
+              },
+              "provider": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
       },
       "workspaceId": {
         "type": "string",

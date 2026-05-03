@@ -50,6 +50,12 @@ This pass should verify:
 - 2026-05-03: Review action `evidence_only` moved one memory out of the pending queue without making it instruction-grade.
 - 2026-05-03: Conservative recall then returned the evidence-only memory while keeping `can_use_as_instruction=false`.
 - 2026-05-03: Unsafe write-back containing an `api_key` placeholder was blocked with HTTP `422`.
+- 2026-05-03: Rotated the staging `MCP_ACCESS_KEY` for OpenClaw live testing and stored it only as a Supabase function secret plus a Spark OpenClaw SecretRef-backed file. Do not commit or paste the value.
+- 2026-05-03: Linked the OpenClaw plugin into Jonathan's personal Spark profile against the OB1 staging function endpoint.
+- 2026-05-03: Plugin schema initially rejected SecretRef-shaped `accessKey`; patched the manifest and plugin runtime to resolve OpenClaw SecretRefs at tool execution time.
+- 2026-05-03: Runtime inspect listed all seven `openbrain_*` tools, but the model could not call them until the profile's `tools.allow` list explicitly included each `openbrain_*` tool.
+- 2026-05-03: Native OpenClaw smoke test called `openbrain_list_review_queue` successfully from an agent turn with zero plugin failures.
+- 2026-05-03: Full native OpenClaw plugin smoke passed using only `openbrain_*` tools: write-back, recall, usage reporting, review action, memory inspect, and recall-trace lookup all succeeded.
 
 ## Verified Smoke Tests
 
@@ -67,9 +73,12 @@ This pass should verify:
 | Usage reporting | Passed |
 | Review action | Passed |
 | Unsafe write-back blocking | Passed |
+| OpenClaw plugin runtime inspect | Passed |
+| OpenClaw native tool exposure | Passed |
+| OpenClaw native full plugin loop | Passed |
 
 ## Open Items
 
 - `supabase migration list --linked` had one transient CLI auth failure after the migration push, while schema dump still succeeded. Recheck with newer Supabase CLI before turning this into public docs.
-- `openclaw` is not installed/on PATH in this environment, so live plugin loader testing is still pending.
-- The generated staging `MCP_ACCESS_KEY` exists only in the temp deploy workdir and should be rotated if this staging project becomes shared.
+- Add a repeatable native OpenClaw smoke harness so future plugin checks do not depend on hand-written agent prompts.
+- The staging `MCP_ACCESS_KEY` has been rotated once for Spark testing. Rotate it again before any broader shared test if access scope changes.

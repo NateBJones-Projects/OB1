@@ -1,8 +1,9 @@
 import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import { resolveConfiguredSecretInputString } from "openclaw/plugin-sdk/secret-input-runtime";
 import { AgentMemoryClient, type AgentMemoryConfig } from "./client.js";
 
-function clientFromApi(api: { pluginConfig?: unknown }) {
+async function clientFromApi(api: { pluginConfig?: unknown; config?: unknown }) {
   const raw = (api.pluginConfig || {}) as Record<string, unknown>;
   if (typeof raw.endpoint !== "string" || raw.endpoint.length === 0) {
     throw new Error("OpenBrain Agent Memory plugin requires config.endpoint");
@@ -10,12 +11,23 @@ function clientFromApi(api: { pluginConfig?: unknown }) {
   if (typeof raw.workspaceId !== "string" || raw.workspaceId.length === 0) {
     throw new Error("OpenBrain Agent Memory plugin requires config.workspaceId");
   }
-  if (typeof raw.accessKey !== "string" || raw.accessKey.length === 0) {
-    throw new Error("OpenBrain Agent Memory plugin requires config.accessKey. Use OpenClaw config env substitution for environment-backed secrets.");
+
+  const accessKey = await resolveConfiguredSecretInputString({
+    config: (api.config || {}) as any,
+    env: process.env,
+    value: raw.accessKey,
+    path: "plugins.entries.openbrain-agent-memory.config.accessKey",
+    unresolvedReasonStyle: "detailed",
+  });
+
+  if (!accessKey.value) {
+    const reason = accessKey.unresolvedRefReason ? ` ${accessKey.unresolvedRefReason}` : "";
+    throw new Error(`OpenBrain Agent Memory plugin requires config.accessKey.${reason}`);
   }
+
   const config: AgentMemoryConfig = {
     endpoint: raw.endpoint,
-    accessKey: raw.accessKey,
+    accessKey: accessKey.value,
     workspaceId: raw.workspaceId,
     projectId: typeof raw.projectId === "string" ? raw.projectId : undefined,
     requireReviewByDefault: typeof raw.requireReviewByDefault === "boolean" ? raw.requireReviewByDefault : true,
@@ -43,7 +55,7 @@ function registerTool(api: any, tool: { name: string; label: string; description
     description: tool.description,
     parameters: tool.parameters,
     async execute(_id: string, params: unknown) {
-      const result = await tool.run(clientFromApi(api), params);
+      const result = await tool.run(await clientFromApi(api), params);
       return toolResult(result);
     },
   });

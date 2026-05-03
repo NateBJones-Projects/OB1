@@ -81,10 +81,13 @@ OpenClaw workflows can retrieve governed OB1 memory before work starts and write
 ## Troubleshooting
 
 **Issue: Plugin loads but tools fail auth**
-Solution: Confirm the plugin config has the correct `endpoint` and `accessKey`. Prefer OpenClaw config env substitution, for example `accessKey: "${OB1_AGENT_MEMORY_KEY}"`, so the plugin never reads environment variables directly.
+Solution: Confirm the plugin config has the correct `endpoint` and `accessKey`. Prefer an OpenClaw SecretRef backed by a file, env, or exec provider so the access key does not live in plaintext config.
 
 **Issue: Plugin loads but lists no tools**
 Solution: Confirm [`plugin/openclaw.plugin.json`](./plugin/openclaw.plugin.json) declares `contracts.tools` for every registered tool. Current OpenClaw builds reject tool registration without that manifest contract.
+
+**Issue: Plugin inspect shows tools, but the agent cannot call `openbrain_*`**
+Solution: Add every `openbrain_*` tool to the OpenClaw profile's `tools.allow` list. Runtime inspect validates plugin registration; a native agent smoke test validates model tool exposure.
 
 **Issue: Linked plugin reports missing dependencies**
 Solution: Run `npm install --ignore-scripts --omit=peer` inside [`plugin`](./plugin/) before `openclaw plugins install --link`. Linked plugins resolve package dependencies from the plugin directory, while OpenClaw itself remains a host-provided peer.
