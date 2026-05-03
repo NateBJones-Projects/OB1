@@ -3,10 +3,22 @@
   "name": "OpenBrain Agent Memory",
   "description": "Typed OpenClaw tools for OB1 Agent Memory recall, write-back, review, inspection, and traces.",
   "skills": ["./skills/openclaw-agent-memory"],
+  "kind": "memory",
+  "contracts": {
+    "tools": [
+      "openbrain_recall",
+      "openbrain_writeback",
+      "openbrain_report_usage",
+      "openbrain_inspect_memory",
+      "openbrain_list_review_queue",
+      "openbrain_review_memory",
+      "openbrain_get_recall_trace"
+    ]
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "required": ["endpoint", "workspaceId"],
+    "required": [],
     "properties": {
       "endpoint": {
         "type": "string",
@@ -14,12 +26,7 @@
       },
       "accessKey": {
         "type": "string",
-        "description": "Optional direct OB1 access key. Prefer accessKeyEnv for shared configs."
-      },
-      "accessKeyEnv": {
-        "type": "string",
-        "description": "Environment variable containing the OB1 access key.",
-        "default": "OB1_AGENT_MEMORY_KEY"
+        "description": "OB1 Agent Memory access key. Prefer OpenClaw config env substitution such as ${OB1_AGENT_MEMORY_KEY}; plugin code does not read process.env."
       },
       "workspaceId": {
         "type": "string",

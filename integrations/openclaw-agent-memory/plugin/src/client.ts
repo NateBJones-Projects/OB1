@@ -1,7 +1,6 @@
 export type AgentMemoryConfig = {
   endpoint: string;
-  accessKey?: string;
-  accessKeyEnv?: string;
+  accessKey: string;
   workspaceId: string;
   projectId?: string;
   requireReviewByDefault?: boolean;
@@ -19,10 +18,9 @@ export class AgentMemoryClient {
 
   constructor(private config: AgentMemoryConfig) {
     this.endpoint = config.endpoint.replace(/\/$/, "");
-    const envKey = config.accessKeyEnv || "OB1_AGENT_MEMORY_KEY";
-    this.accessKey = config.accessKey || process.env[envKey] || "";
+    this.accessKey = config.accessKey;
     if (!this.accessKey) {
-      throw new Error(`OB1 Agent Memory access key missing. Set accessKey or ${envKey}.`);
+      throw new Error("OB1 Agent Memory access key missing. Configure plugins.entries.openbrain-agent-memory.config.accessKey.");
     }
   }
 

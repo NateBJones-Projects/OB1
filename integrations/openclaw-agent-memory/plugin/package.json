@@ -14,7 +14,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@sinclair/typebox": "^0.34.41"
+    "typebox": "^1.1.37"
   },
   "peerDependencies": {
     "openclaw": ">=2026.3.24-beta.2"

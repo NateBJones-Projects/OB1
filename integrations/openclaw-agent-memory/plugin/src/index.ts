@@ -1,4 +1,4 @@
-import { Type } from "@sinclair/typebox";
+import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { AgentMemoryClient, type AgentMemoryConfig } from "./client.js";
 
@@ -10,10 +10,12 @@ function clientFromApi(api: { pluginConfig?: unknown }) {
   if (typeof raw.workspaceId !== "string" || raw.workspaceId.length === 0) {
     throw new Error("OpenBrain Agent Memory plugin requires config.workspaceId");
   }
+  if (typeof raw.accessKey !== "string" || raw.accessKey.length === 0) {
+    throw new Error("OpenBrain Agent Memory plugin requires config.accessKey. Use OpenClaw config env substitution for environment-backed secrets.");
+  }
   const config: AgentMemoryConfig = {
     endpoint: raw.endpoint,
-    accessKey: typeof raw.accessKey === "string" ? raw.accessKey : undefined,
-    accessKeyEnv: typeof raw.accessKeyEnv === "string" ? raw.accessKeyEnv : "OB1_AGENT_MEMORY_KEY",
+    accessKey: raw.accessKey,
     workspaceId: raw.workspaceId,
     projectId: typeof raw.projectId === "string" ? raw.projectId : undefined,
     requireReviewByDefault: typeof raw.requireReviewByDefault === "boolean" ? raw.requireReviewByDefault : true,
@@ -30,12 +32,14 @@ function toolResult(value: unknown) {
         text: JSON.stringify(value, null, 2),
       },
     ],
+    details: value,
   };
 }
 
-function registerTool(api: any, tool: { name: string; description: string; parameters: unknown; run: (client: AgentMemoryClient, input: any) => Promise<unknown> }) {
+function registerTool(api: any, tool: { name: string; label: string; description: string; parameters: unknown; run: (client: AgentMemoryClient, input: any) => Promise<unknown> }) {
   api.registerTool({
     name: tool.name,
+    label: tool.label,
     description: tool.description,
     parameters: tool.parameters,
     async execute(_id: string, params: unknown) {
@@ -53,6 +57,7 @@ export default definePluginEntry({
   register(api) {
     registerTool(api, {
       name: "openbrain_recall",
+      label: "OpenBrain recall",
       description: "Recall scoped OB1 Agent Memory before meaningful work begins.",
       parameters: Type.Record(Type.String(), Type.Any()),
       run: (client, input) => client.recall(input),
@@ -60,6 +65,7 @@ export default definePluginEntry({
 
     registerTool(api, {
       name: "openbrain_writeback",
+      label: "OpenBrain write-back",
       description: "Write compact, provenance-labeled OB1 Agent Memory after work finishes.",
       parameters: Type.Record(Type.String(), Type.Any()),
       run: (client, input) => client.writeback(input),
@@ -67,6 +73,7 @@ export default definePluginEntry({
 
     registerTool(api, {
       name: "openbrain_report_usage",
+      label: "OpenBrain report usage",
       description: "Report which recalled memories were used or ignored.",
       parameters: Type.Object({
         request_id: Type.String(),
@@ -84,6 +91,7 @@ export default definePluginEntry({
 
     registerTool(api, {
       name: "openbrain_inspect_memory",
+      label: "OpenBrain inspect memory",
       description: "Inspect one OB1 Agent Memory record, including provenance and source references.",
       parameters: Type.Object({ memory_id: Type.String() }),
       run: (client, input) => client.inspectMemory(input.memory_id),
@@ -91,6 +99,7 @@ export default definePluginEntry({
 
     registerTool(api, {
       name: "openbrain_list_review_queue",
+      label: "OpenBrain review queue",
       description: "List agent-written memories pending human review.",
       parameters: Type.Object({
         workspace_id: Type.Optional(Type.String()),
@@ -101,6 +110,7 @@ export default definePluginEntry({
 
     registerTool(api, {
       name: "openbrain_review_memory",
+      label: "OpenBrain review memory",
       description: "Confirm, edit, evidence-only, restrict, stale, dispute, supersede, or reject a memory.",
       parameters: Type.Object({
         memory_id: Type.String(),
@@ -131,6 +141,7 @@ export default definePluginEntry({
 
     registerTool(api, {
       name: "openbrain_get_recall_trace",
+      label: "OpenBrain recall trace",
       description: "Fetch a recall trace to debug which memories were returned and used.",
       parameters: Type.Object({ request_id: Type.String() }),
       run: (client, input) => client.getRecallTrace(input.request_id),

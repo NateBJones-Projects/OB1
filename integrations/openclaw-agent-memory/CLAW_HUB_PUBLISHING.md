@@ -72,9 +72,12 @@ openclaw plugins install clawhub:@openbrain/openclaw-agent-memory
 ## Dry-Run Checklist
 
 - Plugin manifest validates.
-- Plugin config accepts `endpoint`, `workspaceId`, and access-key configuration.
-- Tool entry uses `definePluginEntry`, TypeBox `parameters`, and `execute(_id, params)`.
-- Local install can call `GET /health` on the OB1 Agent Memory API.
+- Plugin manifest declares `contracts.tools` for every `openbrain_*` tool. OpenClaw rejects tool registration without the manifest contract.
+- Plugin config accepts `endpoint`, `workspaceId`, and `accessKey`. Prefer OpenClaw config env substitution such as `${OB1_AGENT_MEMORY_KEY}` instead of reading environment variables inside plugin code.
+- Tool entry uses `definePluginEntry`, `typebox` parameters, `label`, `execute(_id, params)`, and returns `details`.
+- Local linked install is tested in an isolated profile with `openclaw --profile ob1-agent-memory plugins install integrations/openclaw-agent-memory/plugin --link`.
+- Runtime inspect lists all seven `openbrain_*` tools and no diagnostics.
+- Direct API smoke test can call `GET /health` on the OB1 Agent Memory API.
 - `openbrain_recall` returns policy-labeled memories.
 - `openbrain_writeback` blocks unsafe payloads.
 - `openbrain_report_usage` updates a recall trace.
