@@ -4,9 +4,16 @@ This draft captures the first real Supabase staging deploy for OB1 Agent Memory.
 
 ## Project
 
-- Supabase project: OB1 staging
+- Supabase project: Jonathan's personal OB1 database, used as the OB1 staging/test target during this launch work
 - Project ref: tracked in Linear `NAT-833`; avoid committing staging project refs into public docs.
-- Purpose: fresh, disposable test project for base OB1 plus Agent Memory
+- Purpose: personal Open Brain database plus isolated Agent Memory smoke/test scopes
+
+## Personal Database Boundary
+
+- Treat this database as Jonathan's personal Open Brain database.
+- Keep launch tests under explicit smoke/test project IDs such as `agent-memory-api-smoke` and `agent-memory-openclaw-smoke`.
+- Do not delete or bulk mutate non-test personal memories.
+- Use the Agent Memory cleanup harness in dry-run mode first; `--apply` marks matching smoke/test memories as rejected rather than deleting rows.
 
 ## Scope
 
@@ -59,6 +66,8 @@ This pass should verify:
 - 2026-05-03: Added repeatable smoke harnesses for direct API validation and native OpenClaw plugin validation.
 - 2026-05-03: Direct API harness passed against OB1 staging with health, write-back, conservative recall gate, include-unconfirmed recall, usage report, review action, inspector, recall trace, and unsafe write-back blocking.
 - 2026-05-03: Native OpenClaw harness passed on Spark; transcript parsing observed all seven `openbrain_*` tool calls, zero non-OB1 tool calls, zero tool errors, and an evidence-only review result.
+- 2026-05-03: Added an Agent Memory list endpoint and dashboard governance foundation for review queue, memory inspector, and recall trace lookup.
+- 2026-05-03: Added a cleanup harness that refuses non-test project IDs and marks matching active smoke/test memories as rejected only when `--apply` is passed.
 
 ## Verified Smoke Tests
 
@@ -81,6 +90,8 @@ This pass should verify:
 | OpenClaw native full plugin loop | Passed |
 | Repeatable API smoke harness | Passed |
 | Repeatable native OpenClaw smoke harness | Passed |
+| Personal DB test cleanup harness | Added |
+| Dashboard review/inspector/trace foundation | Added |
 
 ## Open Items
 

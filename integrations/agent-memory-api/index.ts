@@ -591,6 +591,37 @@ app.get("/memories/review", async (c) => {
   return c.json({ memories: (data || []).map(responseMemory) }, 200, corsHeaders);
 });
 
+app.get("/memories", async (c) => {
+  const workspace_id = c.req.query("workspace_id");
+  if (!workspace_id) return c.json({ error: "workspace_id is required" }, 400, corsHeaders);
+
+  const limit = Math.min(Math.max(parseInt(c.req.query("limit") || "50", 10), 1), 200);
+  let q = supabase
+    .from("agent_memories")
+    .select("*")
+    .eq("workspace_id", workspace_id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const project_id = c.req.query("project_id");
+  const review_status = c.req.query("review_status");
+  const lifecycle_status = c.req.query("lifecycle_status");
+  const runtime_name = c.req.query("runtime_name");
+  const memory_type = c.req.query("memory_type");
+  const task_id_prefix = c.req.query("task_id_prefix");
+
+  if (project_id) q = q.eq("project_id", project_id);
+  if (review_status) q = q.eq("review_status", review_status);
+  if (lifecycle_status) q = q.eq("lifecycle_status", lifecycle_status);
+  if (runtime_name) q = q.eq("runtime_name", runtime_name);
+  if (memory_type) q = q.eq("memory_type", memory_type);
+  if (task_id_prefix) q = q.like("task_id", `${task_id_prefix}%`);
+
+  const { data, error } = await q;
+  if (error) return c.json({ error: error.message }, 500, corsHeaders);
+  return c.json({ memories: (data || []).map(responseMemory), count: data?.length || 0 }, 200, corsHeaders);
+});
+
 app.get("/memories/:id", async (c) => {
   const id = c.req.param("id");
   const { data, error } = await supabase.from("agent_memories").select("*, agent_memory_source_refs(*), agent_memory_artifacts(*)").eq("id", id).single();

@@ -84,7 +84,20 @@ Steps:
   "retention": {"stale_after_days": 30},
   "visibility": {"workspace": "private", "project": "project", "channel": "cli"}
 }
-3. Call openbrain_recall with include_unconfirmed true and query: "OpenClaw native smoke harness ${RUN_ID} OB1 Agent Memory tools.allow SecretRef".
+3. Call openbrain_recall with:
+{
+  "schema_version": "openbrain.openclaw.recall.v1",
+  "task_id": "openclaw-native-harness-${RUN_ID}",
+  "task_type": "smoke",
+  "channel": {"kind": "cli", "id": "spark", "thread_id": "openclaw-native-harness"},
+  "runtime": {"name": "openclaw", "version": "2026.5.2"},
+  "model_intent": {"provider": "openai-codex", "model": "gpt-5.5"},
+  "query": "OpenClaw native smoke harness ${RUN_ID} OB1 Agent Memory tools.allow SecretRef",
+  "entities": {"topics": ["OB1 Agent Memory", "OpenClaw", "native smoke harness"], "repos": ["OB1"]},
+  "scope": {"visibility": "project", "project_only": true, "include_unconfirmed": true, "include_stale": false},
+  "limits": {"max_items": 10, "max_tokens": 4000, "recency_days": 7},
+  "sensitivity": {"contains_code": false, "contains_customer_data": false, "contains_private_meeting_data": false}
+}
 4. Call openbrain_report_usage for the first recalled memory.
 5. Call openbrain_review_memory on the first memory returned from writeback with action evidence_only.
 6. Call openbrain_inspect_memory for that reviewed memory.

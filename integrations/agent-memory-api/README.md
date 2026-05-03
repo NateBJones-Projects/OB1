@@ -93,6 +93,7 @@ The API accepts the runtime-neutral core schema versions and the OpenClaw launch
 | `/recall` | POST | Retrieve scoped memories before work starts |
 | `/writeback` | POST | Save compact operational memory after work finishes |
 | `/recall/:request_id/usage` | POST | Report which recalled memories were used or ignored |
+| `/memories` | GET | List memories by workspace, project, status, runtime, type, or task prefix |
 | `/memories/review` | GET | List pending agent-written memories |
 | `/memories/:id` | GET | Inspect one memory with source/artifact details |
 | `/memories/:id/review` | PATCH | Confirm, edit, reject, restrict, stale, dispute, or supersede |
@@ -115,6 +116,18 @@ node integrations/agent-memory-api/smoke/live-smoke.mjs
 ```
 
 The harness checks health, write-back policy defaults, conservative recall gating, include-unconfirmed recall, usage reporting, review action, memory inspection, recall trace, and unsafe write-back blocking. It prints a JSON summary and never prints the access key.
+
+For personal databases, use the cleanup harness to find or reject smoke/test memories without deleting rows:
+
+```bash
+OB1_AGENT_MEMORY_ENDPOINT="https://YOUR_PROJECT_REF.supabase.co/functions/v1/agent-memory-api" \
+OB1_AGENT_MEMORY_KEY="YOUR_MCP_ACCESS_KEY" \
+OB1_AGENT_MEMORY_WORKSPACE_ID="ob1-staging" \
+OB1_AGENT_MEMORY_TEST_PROJECT_IDS="agent-memory-api-smoke,agent-memory-openclaw-smoke" \
+node integrations/agent-memory-api/smoke/cleanup-test-memory.mjs
+```
+
+The default mode is dry-run. Add `--apply` to mark matching active test memories as `rejected`. The harness refuses project IDs that do not look like smoke/test/sandbox scopes.
 
 ## Troubleshooting
 

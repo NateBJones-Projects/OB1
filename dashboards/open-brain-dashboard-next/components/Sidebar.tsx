@@ -8,6 +8,7 @@ const nav = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
   { href: "/kanban", label: "Workflow", icon: KanbanIcon },
+  { href: "/agent-memory", label: "Agent Memory", icon: MemoryIcon },
   { href: "/search", label: "Search", icon: SearchIcon },
   { href: "/audit", label: "Audit", icon: AuditIcon },
   { href: "/duplicates", label: "Duplicates", icon: DuplicatesIcon },
@@ -130,6 +131,15 @@ function KanbanIcon({ active }: { active: boolean }) {
       <rect x="1" y="2" width="4" height="14" rx="1" stroke="currentColor" strokeWidth="1.5" />
       <rect x="7" y="2" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
       <rect x="13" y="2" width="4" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function MemoryIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M9 2.25c3.3 0 6 1.2 6 2.7v8.1c0 1.5-2.7 2.7-6 2.7s-6-1.2-6-2.7v-8.1c0-1.5 2.7-2.7 6-2.7Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M15 5c0 1.5-2.7 2.7-6 2.7S3 6.5 3 5M15 9c0 1.5-2.7 2.7-6 2.7S3 10.5 3 9" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }

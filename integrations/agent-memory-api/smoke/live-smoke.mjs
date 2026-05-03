@@ -35,6 +35,15 @@ async function main() {
   assert(writeback.memories.every((memory) => memory.use_policy?.requires_user_confirmation === true), "generated writeback did not require review");
   summary.checks.writeback = { status: "passed", memory_count: writtenIds.length };
 
+  const listed = await request(`/memories?${new URLSearchParams({
+    workspace_id: workspaceId,
+    project_id: projectId,
+    task_id_prefix: taskId,
+    limit: "20",
+  })}`);
+  assert(listed.count >= writtenIds.length, "memory list endpoint did not return newly written smoke memories");
+  summary.checks.memory_list = { status: "passed", returned_count: listed.count };
+
   const conservativeRecall = await request("/recall", {
     method: "POST",
     body: recallPayload(false),

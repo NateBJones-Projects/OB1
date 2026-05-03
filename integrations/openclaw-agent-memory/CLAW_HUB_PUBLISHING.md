@@ -27,6 +27,15 @@ This is the publishing checklist for the OpenClaw launch surface. The OB1 core s
 | Bundled plugin skill | [plugin/skills/openclaw-agent-memory](plugin/skills/openclaw-agent-memory/) | Same behavior shipped inside the plugin package for plugin-installed users |
 | Recipe | [../../recipes/openclaw-agent-memory](../../recipes/openclaw-agent-memory/) | OB1 setup path and contract examples |
 
+## Registration Path
+
+This launch needs both distribution surfaces:
+
+- Register/publish the plugin package so OpenClaw can install the typed `openbrain_*` tools.
+- Register/publish the skill so agents get memory hygiene rules even when teams install skills separately from plugins.
+
+Do not treat a passing local linked plugin test as published distribution. ClawHub/package dry-run and skill metadata validation are required before handing this to Nate's team or tutorial users.
+
 ## Commands
 
 Plugin package dry run:
