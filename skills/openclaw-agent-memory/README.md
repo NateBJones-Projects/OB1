@@ -15,9 +15,21 @@ Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workfl
 
 ## Install
 
-Copy [SKILL.md](SKILL.md) into the OpenClaw skill location or package it through the ClawHub publishing flow documented in [CLAW_HUB_PUBLISHING.md](../../integrations/openclaw-agent-memory/CLAW_HUB_PUBLISHING.md).
+Install the live ClawHub skill:
 
-Target ClawHub slug: `nbj-ob1-agent-memory-openclaw`.
+```bash
+openclaw skills install nbj-ob1-agent-memory-openclaw
+```
+
+ClawHub listing: [NBJ OB1 Agent Memory for OpenClaw][skill-listing].
+
+Local/manual path: copy [SKILL.md](SKILL.md) into the OpenClaw skill
+location or package it through the ClawHub publishing flow documented in
+[CLAW_HUB_PUBLISHING.md](../../integrations/openclaw-agent-memory/CLAW_HUB_PUBLISHING.md).
+
+License note: the OB1 repository is licensed under `FSL-1.1-MIT`; the ClawHub
+skill files are published under `MIT-0` as a ClawHub-specific distribution
+carveout because ClawHub requires MIT-0 for public skills.
 
 ## What It Enforces
 
@@ -34,3 +46,5 @@ Target ClawHub slug: `nbj-ob1-agent-memory-openclaw`.
 - [NBJ OB1 Agent Memory for OpenClaw](../../recipes/openclaw-agent-memory/)
 - [OpenClaw Code Review Memory](../../recipes/openclaw-code-review-memory/)
 - [OpenClaw TaskFlow Work Log](../../recipes/openclaw-taskflow-work-log/)
+
+[skill-listing]: https://clawhub.ai/natebjones/nbj-ob1-agent-memory-openclaw

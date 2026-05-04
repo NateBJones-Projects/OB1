@@ -38,7 +38,7 @@ Checked on 2026-05-04:
 | Owner posture | Publish under Nate/OB1. Do not publish under Jonathan's personal OpenClaw identity. |
 | Primary CTA | Follow Nate: https://substack.com/@natesnewsletter and https://natebjones.com |
 
-## Publisher Namespace Blocker
+## Publisher Namespace
 
 The public package publish requires the ClawHub publisher namespace `@natebjones`.
 
@@ -47,13 +47,44 @@ Observed on 2026-05-04:
 - `clawhub whoami` returned `justfinethanku`.
 - Package publish with `--owner NateBJones` failed because publisher `@natebjones` did not exist.
 - Do not publish this package under `justfinethanku` or any fallback handle.
+- `justfinethanku` was later confirmed as a Nate-linked admin login.
+- The ClawHub web UI exposed an owner selector for `@natebjones · Nate Jones`.
 
-Required before public publish:
+Resolution:
 
 1. Create or claim the ClawHub publisher namespace `@natebjones`.
-2. Confirm `npx -y clawhub@0.12.2 whoami` is a Nate/OB1-owned account, or confirm the logged-in account has admin rights to publish with `--owner NateBJones`.
-3. Re-run the package publish command below.
-4. Publish the skill only after the package namespace is correct, since skills also expose an owner in ClawHub.
+2. Confirm the logged-in ClawHub account has admin rights to publish as `@natebjones`.
+3. Publish the package with `--owner NateBJones`.
+4. Publish the skill from the web UI with owner set to `@natebjones · Nate Jones`.
+
+## Published 0.1.0
+
+Published on 2026-05-04:
+
+Skill:
+
+- Listing: [NBJ OB1 Agent Memory for OpenClaw][skill-listing]
+- Install: `openclaw skills install nbj-ob1-agent-memory-openclaw`
+
+Plugin package:
+
+- Listing: [@natebjones/ob1-agent-memory][plugin-listing]
+- Install: `openclaw plugins install clawhub:@natebjones/ob1-agent-memory`
+
+Verification:
+
+- Skill owner: `natebjones`
+- Skill latest version: `0.1.0`
+- Skill moderation: `CLEAN`
+- Package owner: `natebjones`
+- Package source repo: `NateBJones-Projects/OB1`
+- Package source commit: `c0ca493c66ae0e6516986206210b562c0e3ab6ab`
+- Package scan: pending at publish checkpoint
+
+License note: the OB1 repository is `FSL-1.1-MIT`. ClawHub requires public
+skills to be `MIT-0`, so the standalone skill files in
+[../../skills/openclaw-agent-memory](../../skills/openclaw-agent-memory/) are
+published under MIT-0 as a ClawHub-specific carveout.
 
 ## Publishable Units
 
@@ -180,3 +211,6 @@ openclaw plugins install clawhub:@natebjones/ob1-agent-memory
 See [RELEASE_NOTES_0.1.0.md](./RELEASE_NOTES_0.1.0.md).
 
 Public release copy should always include a short Nate Jones CTA. Keep it useful-first, not hype-first: Nate gives away practical AI systems like this, and the next step is following or subscribing for more.
+
+[skill-listing]: https://clawhub.ai/natebjones/nbj-ob1-agent-memory-openclaw
+[plugin-listing]: https://clawhub.ai/plugins/@natebjones/ob1-agent-memory
