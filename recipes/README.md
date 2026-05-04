@@ -14,7 +14,7 @@ Step-by-step builds that add a new capability to your Open Brain. Follow the ins
 | [Work Operating Model Activation](work-operating-model-activation/) | Interview-driven workflow that stores how you actually work and generates agent-ready operating files |
 | [World Model Diagnostic Activation](world-model-diagnostic-activation/) | Lightweight activation path for a 20-minute world-model diagnostic that uses the base OB1 connector and a direct-paste fallback |
 | [Research-to-Decision Workflow](research-to-decision-workflow/) | Compose canonical skills into operator and investor paths for analysis, synthesis, meetings, and decision documents |
-| [OpenClaw Agent Memory for OB1](openclaw-agent-memory/) | Canonical recipe for using OB1 Agent Memory as the governed continuity layer for OpenClaw workflows |
+| [NBJ OB1 Agent Memory for OpenClaw](openclaw-agent-memory/) | Canonical recipe for using OB1 Agent Memory as the governed continuity layer for OpenClaw workflows |
 | [OpenClaw Code Review Memory](openclaw-code-review-memory/) | Flagship workflow for compounding repo-specific review lessons, maintainer corrections, and false positives |
 | [OpenClaw TaskFlow Work Log](openclaw-taskflow-work-log/) | Durable handoff recipe for long-running OpenClaw TaskFlows across agents, models, and channels |
 

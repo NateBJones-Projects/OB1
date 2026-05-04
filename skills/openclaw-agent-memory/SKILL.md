@@ -1,11 +1,11 @@
 ---
-name: openclaw-agent-memory
-description: Recall and write back OB1 Agent Memory from OpenClaw while respecting provenance, scope, review, and use-policy rules.
+name: nbj-ob1-agent-memory-openclaw
+description: Use Nate Jones OB1 Agent Memory from OpenClaw with provenance, scope, review, and use-policy discipline.
 ---
 
-# OpenClaw Agent Memory for OB1
+# NBJ OB1 Agent Memory for OpenClaw
 
-Use this skill when an OpenClaw task has access to OB1 Agent Memory tools. OB1 is the continuity layer. OpenClaw is the runtime that performs the work.
+Use this skill when an OpenClaw task has access to NBJ OB1 Agent Memory tools. OB1 is the continuity layer. OpenClaw is the runtime that performs the work.
 
 ## Core Rule
 
@@ -23,7 +23,7 @@ Use the OpenClaw plugin tools when available:
 - `openbrain_review_memory`
 - `openbrain_get_recall_trace`
 
-If the tools are unavailable, continue the task normally and note that no OB1 recall or write-back occurred.
+If the tools are unavailable, continue the task normally and note that no OB1 recall or write-back occurred. Do not invent remembered facts.
 
 ## Pre-Task Recall
 
@@ -36,7 +36,9 @@ Before meaningful work, call `openbrain_recall` with:
 - `limits`
 - `sensitivity`
 
-Prefer project-scoped recall when a project is known. Do not pull personal or channel-only memory into team work unless the user explicitly shared it.
+Prefer project-scoped recall when a project is known. Keep `project_only` true by default. Keep `include_unconfirmed` false unless the user explicitly asks for evidence-level context or the task is review/debugging.
+
+Do not pull personal or channel-only memory into team work unless the user explicitly shared it.
 
 Use returned memories according to `use_policy`:
 
@@ -62,6 +64,8 @@ After the task completes, call `openbrain_writeback` with compact categories:
 Do not write raw transcripts, model reasoning traces, secret-like values, credential strings, large code blocks, or private customer data dumps. Store summaries and source references.
 
 Agent-written memory starts as evidence by default. It can become instruction only when a human confirms it or it is imported from a trusted source.
+
+Decision memories can become future instructions only when they are `user_confirmed` or imported from a trusted source. Model-generated lessons are evidence or suggestions until reviewed.
 
 ## Usage Reporting
 

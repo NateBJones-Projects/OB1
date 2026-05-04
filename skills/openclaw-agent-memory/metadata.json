@@ -1,9 +1,9 @@
 {
-  "name": "OpenClaw Agent Memory Skill Pack",
-  "description": "Skill rules for using OB1 Agent Memory from OpenClaw without turning inferred or generated memory into hidden instruction.",
+  "name": "NBJ OB1 Agent Memory for OpenClaw Skill",
+  "description": "Skill rules for using Nate Jones OB1 Agent Memory from OpenClaw without turning inferred or generated memory into hidden instruction.",
   "category": "skills",
   "author": {
-    "name": "OB1 Team",
+    "name": "Nate B. Jones / OB1",
     "github": "NateBJones-Projects"
   },
   "version": "0.1.0",
@@ -16,5 +16,5 @@
   "difficulty": "intermediate",
   "estimated_time": "10 minutes",
   "created": "2026-05-03",
-  "updated": "2026-05-03"
+  "updated": "2026-05-04"
 }

@@ -1,11 +1,13 @@
-# OpenBrain Agent Memory for OpenClaw
+# NBJ OB1 Agent Memory for OpenClaw
 
-OpenClaw tool plugin for OB1 Agent Memory recall, write-back, usage reporting, memory inspection, review actions, and recall-trace debugging.
+Governed Nate Jones OB1 memory for OpenClaw: recall before the task, write back after, inspect everything.
+
+Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workflows, and implementation notes: [Substack](https://substack.com/@natesnewsletter) and [natebjones.com](https://natebjones.com).
 
 ## Install
 
 ```bash
-openclaw plugins install clawhub:@openbrain/openclaw-agent-memory
+openclaw plugins install clawhub:@natebjones/ob1-agent-memory
 ```
 
 For local linked development:
@@ -42,7 +44,7 @@ openclaw --profile ob1-agent-memory plugins install . --link
   },
   plugins: {
     entries: {
-      "openbrain-agent-memory": {
+      "nbj-ob1-agent-memory": {
         config: {
           endpoint: "https://YOUR_PROJECT_REF.supabase.co/functions/v1/agent-memory-api",
           accessKey: {
@@ -65,7 +67,7 @@ Current OpenClaw builds also require explicit `tools.allow` entries before plugi
 
 Install the paired skill from ClawHub or use the bundled plugin skill so agents respect OB1 provenance, review, and use-policy rules.
 
-Local validation target: `openclaw --profile ob1-agent-memory plugins inspect openbrain-agent-memory --runtime --json` should list all seven `openbrain_*` tools and no diagnostics.
+Local validation target: `openclaw --profile ob1-agent-memory plugins inspect nbj-ob1-agent-memory --runtime --json` should list all seven `openbrain_*` tools and no diagnostics.
 
 Native smoke target: run an OpenClaw agent turn that calls `openbrain_list_review_queue` with no shell/file tools. The result should show an `openbrain_list_review_queue` tool call and zero failures.
 

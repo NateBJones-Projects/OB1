@@ -2,11 +2,12 @@
 
 ```mermaid
 flowchart LR
-  Plugin["OpenClaw plugin package"] --> Local["Local install dry run"]
-  Skill["OB1 Agent Memory skill"] --> Local
-  Local --> Manifest["Validate plugin and skill metadata"]
-  Manifest --> ClawHub["Publish to ClawHub"]
-  ClawHub --> Docs["Link from OB1 recipe docs"]
+  Plugin["Plugin package<br/>@natebjones/ob1-agent-memory"] --> DryRun["ClawHub package dry run"]
+  Skill["Skill<br/>nbj-ob1-agent-memory-openclaw"] --> Validate["Skill metadata validation"]
+  DryRun --> Approval["Jonathan/Nate approval"]
+  Validate --> Approval
+  Approval --> Publish["Public ClawHub publish"]
+  Publish --> Docs["Recipe docs + tutorial assets"]
 ```
 
 This is the publishing checklist for the OpenClaw launch surface. The OB1 core stays runtime-neutral; ClawHub is the distribution path for the OpenClaw plugin and skill.
@@ -17,6 +18,25 @@ This is the publishing checklist for the OpenClaw launch surface. The OB1 core s
 - [ClawHub](https://raw.githubusercontent.com/openclaw/openclaw/main/docs/tools/clawhub.md)
 - [Plugin SDK setup](https://docs.openclaw.ai/plugins/sdk-setup)
 - [Building plugins](https://docs.openclaw.ai/plugins/building-plugins)
+
+Checked on 2026-05-04:
+
+- Local `clawhub` is `0.7.0`, which is too old for package publishing.
+- `npx -y clawhub@0.12.2` exposes `package publish` and `skill publish`.
+- `package publish` supports `--dry-run` and `--json`.
+- `skill publish` does not expose a dry-run flag in `0.12.2`, so skill publication needs manual approval before running.
+
+## Publishing Identity
+
+| Field | Value |
+| ----- | ----- |
+| Package name | `@natebjones/ob1-agent-memory` |
+| Plugin id | `nbj-ob1-agent-memory` |
+| Skill slug | `nbj-ob1-agent-memory-openclaw` |
+| Display name | `NBJ OB1 Agent Memory for OpenClaw` |
+| Tagline | Governed Nate Jones memory for agent work: recall before the task, write back after, inspect everything. |
+| Owner posture | Publish under Nate/OB1. Do not publish under Jonathan's personal OpenClaw identity. |
+| Primary CTA | Follow Nate: https://substack.com/@natesnewsletter and https://natebjones.com |
 
 ## Publishable Units
 
@@ -36,46 +56,84 @@ This launch needs both distribution surfaces:
 
 Do not treat a passing local linked plugin test as published distribution. ClawHub/package dry-run and skill metadata validation are required before handing this to Nate's team or tutorial users.
 
-## Commands
+## Dry-Run Commands
 
 Plugin package dry run:
 
 ```bash
 npx -y clawhub@0.12.2 package publish integrations/openclaw-agent-memory/plugin \
   --family code-plugin \
-  --name @openbrain/openclaw-agent-memory \
-  --display-name "OpenBrain Agent Memory" \
+  --name @natebjones/ob1-agent-memory \
+  --display-name "NBJ OB1 Agent Memory for OpenClaw" \
   --version 0.1.0 \
-  --tags agent-memory,openbrain,openclaw \
+  --changelog "Initial NBJ OB1 Agent Memory tools for OpenClaw recall, write-back, review, inspection, and recall-trace debugging." \
+  --tags nbj,nate-jones,ob1,openbrain,agent-memory,openclaw,provenance \
+  --source-repo NateBJones-Projects/OB1 \
+  --source-commit "$(git rev-parse HEAD)" \
+  --source-ref "$(git rev-parse --abbrev-ref HEAD)" \
+  --source-path integrations/openclaw-agent-memory/plugin \
   --dry-run \
   --json
 ```
 
+Package archive dry run:
+
+```bash
+cd integrations/openclaw-agent-memory/plugin
+npm pack --dry-run
+```
+
+Skill metadata help check:
+
+```bash
+npx -y clawhub@0.12.2 skill publish --help
+```
+
+There is no skill dry-run flag in `clawhub@0.12.2`. Do not run the skill publish command below until Jonathan confirms the Nate/OB1 account context is correct and public publishing is approved.
+
+## Publish Commands
+
 Plugin package publish:
 
 ```bash
-clawhub package publish integrations/openclaw-agent-memory/plugin \
+npx -y clawhub@0.12.2 package publish integrations/openclaw-agent-memory/plugin \
   --family code-plugin \
-  --name @openbrain/openclaw-agent-memory \
-  --display-name "OpenBrain Agent Memory" \
+  --name @natebjones/ob1-agent-memory \
+  --display-name "NBJ OB1 Agent Memory for OpenClaw" \
   --version 0.1.0 \
-  --tags agent-memory,openbrain,openclaw
+  --changelog "Initial NBJ OB1 Agent Memory tools for OpenClaw recall, write-back, review, inspection, and recall-trace debugging." \
+  --tags nbj,nate-jones,ob1,openbrain,agent-memory,openclaw,provenance \
+  --source-repo NateBJones-Projects/OB1 \
+  --source-commit "$(git rev-parse HEAD)" \
+  --source-ref "$(git rev-parse --abbrev-ref HEAD)" \
+  --source-path integrations/openclaw-agent-memory/plugin
 ```
 
-Note: local `clawhub` must be `0.12.2` or newer for `package publish`. Older `0.7.x` builds only expose skill publishing.
-
-Skill search and install flow:
+Skill publish:
 
 ```bash
-openclaw skills search "agent memory"
-openclaw skills install openclaw-agent-memory
+npx -y clawhub@0.12.2 skill publish skills/openclaw-agent-memory \
+  --slug nbj-ob1-agent-memory-openclaw \
+  --name "NBJ OB1 Agent Memory for OpenClaw" \
+  --version 0.1.0 \
+  --changelog "Initial NBJ OB1 Agent Memory skill for governed OpenClaw recall and write-back behavior." \
+  --tags nbj,nate-jones,ob1,openbrain,agent-memory,openclaw,provenance
+```
+
+## User Install Flow
+
+Skill install flow:
+
+```bash
+openclaw skills search "NBJ OB1 Agent Memory"
+openclaw skills install nbj-ob1-agent-memory-openclaw
 ```
 
 Plugin install flow:
 
 ```bash
-openclaw plugins search "agent memory"
-openclaw plugins install clawhub:@openbrain/openclaw-agent-memory
+openclaw plugins search "NBJ OB1 Agent Memory"
+openclaw plugins install clawhub:@natebjones/ob1-agent-memory
 ```
 
 ## Dry-Run Checklist
@@ -95,11 +153,10 @@ openclaw plugins install clawhub:@openbrain/openclaw-agent-memory
 - `openbrain_report_usage` updates a recall trace.
 - Skill text has AgentSkills-compatible frontmatter and tells agents not to store transcripts, reasoning traces, secrets, or unconfirmed inferred claims as instructions.
 - Recipe links to diagrams and copy-paste payloads.
+- Public publish is held until the Nate/OB1 ClawHub owner context is confirmed.
 
-## Release Notes Template
+## Release Notes
 
-```markdown
-OB1 Agent Memory for OpenClaw adds governed recall and write-back tools for OpenClaw tasks. It lets OpenClaw agents retrieve scoped OB1 memory before work, write compact operational memory after work, preserve provenance, and keep inferred memory evidence-only until reviewed.
+See [RELEASE_NOTES_0.1.0.md](./RELEASE_NOTES_0.1.0.md).
 
-Install the plugin, add the OB1 Agent Memory skill, and start with the Code Review Memory or TaskFlow Work Log recipe.
-```
+Public release copy should always include a short Nate Jones CTA. Keep it useful-first, not hype-first: Nate gives away practical AI systems like this, and the next step is following or subscribing for more.

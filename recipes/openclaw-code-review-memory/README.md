@@ -14,7 +14,7 @@ This is the flagship Agent Memory workflow. A stateless reviewer catches a bug o
 
 ## Quick Path
 
-1. Complete [OpenClaw Agent Memory for OB1](../openclaw-agent-memory/).
+1. Complete [NBJ OB1 Agent Memory for OpenClaw](../openclaw-agent-memory/).
 2. Configure the OpenClaw plugin with the target OB1 workspace and project.
 3. Add the [OpenClaw Agent Memory skill](../../skills/openclaw-agent-memory/SKILL.md) to the review agent.
 4. Call recall before reviewing a PR.

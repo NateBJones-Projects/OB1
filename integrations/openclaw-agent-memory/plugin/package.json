@@ -1,9 +1,26 @@
 {
-  "name": "@openbrain/openclaw-agent-memory",
+  "name": "@natebjones/ob1-agent-memory",
   "version": "0.1.0",
-  "description": "OpenClaw tools for OB1 Agent Memory recall, write-back, review, inspection, and trace.",
+  "description": "Governed NBJ OB1 Agent Memory tools for OpenClaw: recall before work, write back after, inspect everything.",
   "type": "module",
   "license": "MIT-0",
+  "author": "Nate B. Jones / OB1",
+  "homepage": "https://github.com/NateBJones-Projects/OB1/tree/main/integrations/openclaw-agent-memory",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NateBJones-Projects/OB1.git",
+    "directory": "integrations/openclaw-agent-memory/plugin"
+  },
+  "keywords": [
+    "ob1",
+    "nbj",
+    "nate-jones",
+    "openbrain",
+    "openclaw",
+    "agent-memory",
+    "provenance",
+    "clawhub"
+  ],
   "files": [
     "README.md",
     "openclaw.plugin.json",
@@ -36,7 +53,7 @@
       "pluginSdkVersion": "2026.3.24-beta.2"
     },
     "install": {
-      "npmSpec": "@openbrain/openclaw-agent-memory",
+      "npmSpec": "@natebjones/ob1-agent-memory",
       "defaultChoice": "npm",
       "minHostVersion": ">=2026.3.24-beta.2"
     }

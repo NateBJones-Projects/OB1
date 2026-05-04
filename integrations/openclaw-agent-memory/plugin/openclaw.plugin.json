@@ -1,7 +1,7 @@
 {
-  "id": "openbrain-agent-memory",
-  "name": "OpenBrain Agent Memory",
-  "description": "Typed OpenClaw tools for OB1 Agent Memory recall, write-back, review, inspection, and traces.",
+  "id": "nbj-ob1-agent-memory",
+  "name": "NBJ OB1 Agent Memory for OpenClaw",
+  "description": "Typed OpenClaw tools for governed Nate Jones OB1 memory recall, write-back, review, inspection, and trace debugging.",
   "skills": ["./skills/openclaw-agent-memory"],
   "kind": "memory",
   "contracts": {

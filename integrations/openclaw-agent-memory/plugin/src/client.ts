@@ -20,7 +20,7 @@ export class AgentMemoryClient {
     this.endpoint = config.endpoint.replace(/\/$/, "");
     this.accessKey = config.accessKey;
     if (!this.accessKey) {
-      throw new Error("OB1 Agent Memory access key missing. Configure plugins.entries.openbrain-agent-memory.config.accessKey.");
+      throw new Error("OB1 Agent Memory access key missing. Configure plugins.entries.nbj-ob1-agent-memory.config.accessKey.");
     }
   }
 

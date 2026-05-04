@@ -17,7 +17,7 @@ This workflow makes OpenClaw TaskFlows durable across agents and model choices. 
 
 ## Quick Path
 
-1. Complete [OpenClaw Agent Memory for OB1](../openclaw-agent-memory/).
+1. Complete [NBJ OB1 Agent Memory for OpenClaw](../openclaw-agent-memory/).
 2. Add the [OpenClaw Agent Memory skill](../../skills/openclaw-agent-memory/SKILL.md) to TaskFlow workers.
 3. Require recall at TaskFlow start and step resume.
 4. Require write-back at step completion, pause, or failure.

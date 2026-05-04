@@ -1,5 +1,5 @@
 {
-  "name": "OpenClaw Agent Memory for OB1",
+  "name": "NBJ OB1 Agent Memory for OpenClaw",
   "description": "Canonical recipe for using runtime-neutral OB1 Agent Memory from OpenClaw workflows with governed recall, write-back, provenance, and review.",
   "category": "recipes",
   "author": {

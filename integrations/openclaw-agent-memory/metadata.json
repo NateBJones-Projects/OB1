@@ -1,10 +1,10 @@
 {
-  "name": "OpenClaw Agent Memory for OB1",
-  "description": "OpenClaw plugin package scaffold that exposes OB1 Agent Memory recall, write-back, review, inspection, and trace tools.",
+  "name": "NBJ OB1 Agent Memory for OpenClaw",
+  "description": "OpenClaw plugin package for governed Nate Jones OB1 Agent Memory recall, write-back, review, inspection, and trace tools.",
   "category": "integrations",
   "author": {
-    "name": "Nate Jones Team",
-    "github": "NateBJones"
+    "name": "Nate B. Jones / OB1",
+    "github": "NateBJones-Projects"
   },
   "version": "0.1.0",
   "requires": {
@@ -16,5 +16,5 @@
   "difficulty": "advanced",
   "estimated_time": "30 minutes",
   "created": "2026-05-03",
-  "updated": "2026-05-03"
+  "updated": "2026-05-04"
 }

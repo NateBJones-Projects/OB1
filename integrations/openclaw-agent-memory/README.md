@@ -1,4 +1,4 @@
-# OpenClaw Agent Memory for OB1
+# NBJ OB1 Agent Memory for OpenClaw
 
 > OpenClaw plugin package for the runtime-neutral OB1 Agent Memory API.
 
@@ -16,7 +16,9 @@ flowchart LR
 
 ## What It Does
 
-This integration gives OpenClaw typed tools for OB1 Agent Memory. The plugin handles mechanics; the paired [OpenClaw Agent Memory skill](../../skills/openclaw-agent-memory/) handles judgment and memory hygiene.
+This integration gives OpenClaw typed tools for Nate Jones's OB1 Agent Memory. The plugin handles mechanics; the paired [NBJ OB1 Agent Memory skill](../../skills/openclaw-agent-memory/) handles judgment and memory hygiene.
+
+Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workflows, and implementation notes: [Substack](https://substack.com/@natesnewsletter) and [natebjones.com](https://natebjones.com).
 
 ## Prerequisites
 
@@ -66,7 +68,7 @@ openclaw --profile ob1-agent-memory plugins install integrations/openclaw-agent-
 
 For public distribution, publish through ClawHub using the package publishing path documented in [`CLAW_HUB_PUBLISHING.md`](./CLAW_HUB_PUBLISHING.md).
 
-**Done when:** `openclaw --profile ob1-agent-memory plugins inspect openbrain-agent-memory --runtime --json` shows a loaded plugin with all seven `openbrain_*` tools and no diagnostics.
+**Done when:** `openclaw --profile ob1-agent-memory plugins inspect nbj-ob1-agent-memory --runtime --json` shows a loaded plugin with all seven `openbrain_*` tools and no diagnostics.
 
 ![Step 3](https://img.shields.io/badge/Step_3-Install_the_Skill-1E88E5?style=for-the-badge)
 

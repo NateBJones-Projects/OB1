@@ -1,4 +1,4 @@
-# OpenClaw Agent Memory for OB1
+# NBJ OB1 Agent Memory for OpenClaw
 
 ```mermaid
 flowchart TD
@@ -11,6 +11,8 @@ flowchart TD
 ```
 
 This recipe makes OB1 the continuity layer for OpenClaw workflows. OpenClaw performs the work; OB1 stores the durable operational memory that future agents can inspect, trust, reject, or reuse.
+
+Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workflows, and implementation notes: [Substack](https://substack.com/@natesnewsletter) and [natebjones.com](https://natebjones.com).
 
 ## Quick Path
 
