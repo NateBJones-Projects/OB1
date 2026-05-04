@@ -27,15 +27,15 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen w-56 bg-bg-surface border-r border-border flex flex-col z-50
+      className={`ob1-glass-panel fixed left-0 top-0 h-screen w-56 border-y-0 border-l-0 flex flex-col z-50
         hidden md:flex
         ${isOpen ? "!flex" : ""}
       `}
     >
       <div className="px-5 py-6 border-b border-border">
         <Link href="/" className="flex items-center gap-2.5" onClick={onClose}>
-          <div className="w-8 h-8 rounded-lg bg-violet flex items-center justify-center">
-            <span className="text-white text-sm font-bold">OB</span>
+          <div className="flex h-8 w-8 items-center justify-center border border-violet/35 bg-violet-surface">
+            <span className="text-violet text-sm font-bold">OB</span>
           </div>
           <span className="text-text-primary font-semibold text-lg tracking-tight">
             Open Brain
@@ -54,8 +54,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? "bg-violet-surface text-violet border border-violet/20"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+                  ? "border border-violet/25 bg-violet-surface text-violet"
+                  : "border border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               }`}
             >
               <Icon active={active} />

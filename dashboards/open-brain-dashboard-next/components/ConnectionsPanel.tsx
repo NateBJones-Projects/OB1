@@ -26,23 +26,32 @@ export function ConnectionsPanel({
   thoughtId: number;
   hasMetadata: boolean;
 }) {
-  const [connections, setConnections] = useState<Connection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [connections, setConnections] = useState<Connection[] | null>(
+    hasMetadata ? null : []
+  );
 
   useEffect(() => {
-    if (!hasMetadata) {
-      setLoading(false);
-      return;
-    }
+    if (!hasMetadata) return;
 
+    let cancelled = false;
     fetch(`/api/thoughts/${thoughtId}/connections`)
       .then((res) => res.json())
-      .then((data) => setConnections(data.connections ?? []))
-      .catch(() => setConnections([]))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) setConnections(data.connections ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setConnections([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [thoughtId, hasMetadata]);
 
-  if (!hasMetadata || (!loading && connections.length === 0)) return null;
+  const loading = hasMetadata && connections === null;
+  const items = connections ?? [];
+
+  if (!hasMetadata || (!loading && items.length === 0)) return null;
 
   return (
     <div className="bg-bg-surface border border-border rounded-lg p-5">
@@ -53,7 +62,7 @@ export function ConnectionsPanel({
         <p className="text-xs text-text-muted">Loading connections...</p>
       ) : (
         <div className="space-y-2">
-          {connections.map((c) => (
+          {items.map((c) => (
             <Link
               key={c.id}
               href={`/thoughts/${c.id}`}

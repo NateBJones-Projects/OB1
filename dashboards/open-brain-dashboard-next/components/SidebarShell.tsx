@@ -9,7 +9,7 @@ export function SidebarShell() {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-bg-surface border-b border-border flex items-center px-4 gap-3">
+      <div className="ob1-glass-panel md:hidden fixed top-0 left-0 right-0 z-50 h-12 border-x-0 border-t-0 flex items-center px-4 gap-3">
         <button
           type="button"
           onClick={() => setIsOpen(true)}

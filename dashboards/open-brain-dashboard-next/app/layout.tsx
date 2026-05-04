@@ -29,10 +29,10 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-screen flex bg-bg-primary text-text-primary">
+      <body className="ob1-graphite-bg min-h-screen flex bg-bg-primary text-text-primary">
         <SidebarShell />
         <main className="flex-1 md:ml-56 min-h-screen pt-12 md:pt-0">
-          <div className="max-w-6xl mx-auto px-4 py-4 md:px-8 md:py-8">
+          <div className="mx-auto max-w-7xl px-4 py-4 md:px-8 md:py-8">
             {children}
           </div>
         </main>

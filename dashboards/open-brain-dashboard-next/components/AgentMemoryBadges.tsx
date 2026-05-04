@@ -19,7 +19,7 @@ export function StatusBadge({ value }: { value: string }) {
           : "border-border bg-bg-elevated text-text-secondary";
 
   return (
-    <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium border ${tone}`}>
+    <span className={`inline-flex items-center border px-2 py-0.5 text-xs font-medium ${tone}`}>
       {value}
     </span>
   );
@@ -27,7 +27,7 @@ export function StatusBadge({ value }: { value: string }) {
 
 export function ProvenanceBadge({ value }: { value: string }) {
   return (
-    <span className="inline-flex items-center rounded px-2 py-0.5 text-xs font-medium border border-info/30 bg-info/10 text-info">
+    <span className="inline-flex items-center border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info">
       {value}
     </span>
   );
@@ -37,22 +37,22 @@ export function PolicyBadges({ policy }: { policy: PolicyLike }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {policy.can_use_as_instruction && (
-        <span className="rounded bg-success/10 px-2 py-0.5 text-xs text-success">
+        <span className="border border-success/20 bg-success/10 px-2 py-0.5 text-xs text-success">
           instruction
         </span>
       )}
       {policy.can_use_as_evidence && (
-        <span className="rounded bg-info/10 px-2 py-0.5 text-xs text-info">
+        <span className="border border-info/20 bg-info/10 px-2 py-0.5 text-xs text-info">
           evidence
         </span>
       )}
       {policy.requires_user_confirmation && (
-        <span className="rounded bg-warning/10 px-2 py-0.5 text-xs text-warning">
+        <span className="border border-warning/20 bg-warning/10 px-2 py-0.5 text-xs text-warning">
           needs review
         </span>
       )}
       {!policy.can_use_as_instruction && !policy.can_use_as_evidence && (
-        <span className="rounded bg-danger/10 px-2 py-0.5 text-xs text-danger">
+        <span className="border border-danger/20 bg-danger/10 px-2 py-0.5 text-xs text-danger">
           blocked
         </span>
       )}

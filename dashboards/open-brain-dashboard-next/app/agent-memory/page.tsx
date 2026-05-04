@@ -17,6 +17,14 @@ import type { AgentMemoryReviewAction } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 const STATUSES = ["pending", "evidence_only", "confirmed", "rejected", "stale"] as const;
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  evidence_only: "Evidence",
+  confirmed: "Confirmed",
+  rejected: "Rejected",
+  stale: "Stale",
+  all: "All",
+};
 
 export default async function AgentMemoryPage({
   searchParams,
@@ -66,71 +74,61 @@ export default async function AgentMemoryPage({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold mb-1">Agent Memory</h1>
-          <p className="text-text-secondary text-sm">
-            Review what agents saved before it becomes reusable context.
-          </p>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-wrap items-center gap-2">
+          {STATUSES.map((item) => (
+            <Link
+              key={item}
+              href={statusUrl(item)}
+              className={`border px-3 py-1.5 text-sm transition-colors ${
+                status === item
+                  ? "border-violet/30 bg-violet-surface text-violet"
+                  : "border-border bg-bg-surface text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+              }`}
+            >
+              {STATUS_LABELS[item]}
+            </Link>
+          ))}
+          <Link
+            href={statusUrl("all")}
+            className={`border px-3 py-1.5 text-sm transition-colors ${
+              status === "all"
+                ? "border-violet/30 bg-violet-surface text-violet"
+                : "border-border bg-bg-surface text-text-secondary hover:bg-bg-hover hover:text-text-primary"
+            }`}
+          >
+            All
+          </Link>
         </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="font-mono text-xs text-text-muted">
+            {workspaceId}
+            <span className="mx-2 text-text-muted/60">/</span>
+            {projectId || "all-projects"}
+          </p>
         <Link
           href="/agent-memory/traces"
-          className="inline-flex items-center justify-center rounded-lg border border-border bg-bg-elevated px-3 py-2 text-sm text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-colors"
+          className="ob1-command-button h-9 px-3 text-sm"
         >
           Recall traces
         </Link>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {STATUSES.map((item) => (
-          <Link
-            key={item}
-            href={statusUrl(item)}
-            className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-              status === item
-                ? "border-violet/30 bg-violet-surface text-violet"
-                : "border-border bg-bg-surface text-text-secondary hover:bg-bg-hover"
-            }`}
-          >
-            {item}
-          </Link>
-        ))}
-        <Link
-          href={statusUrl("all")}
-          className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-            status === "all"
-              ? "border-violet/30 bg-violet-surface text-violet"
-              : "border-border bg-bg-surface text-text-secondary hover:bg-bg-hover"
-          }`}
-        >
-          all
-        </Link>
-      </div>
-
-      <div className="grid gap-3 text-xs text-text-muted md:grid-cols-3">
-        <div className="rounded-lg border border-border bg-bg-surface p-3">
-          Workspace <span className="font-mono text-text-secondary">{workspaceId}</span>
-        </div>
-        <div className="rounded-lg border border-border bg-bg-surface p-3">
-          Project{" "}
-          <span className="font-mono text-text-secondary">
-            {projectId || "all projects"}
-          </span>
-        </div>
-        <div className="rounded-lg border border-border bg-bg-surface p-3">
-          Showing <span className="font-mono text-text-secondary">{data.count}</span>{" "}
-          memories
         </div>
       </div>
 
       {error && <p className="text-danger text-sm">{error}</p>}
 
-      <div className="overflow-hidden rounded-lg border border-border bg-bg-surface">
+      <div className="ob1-glass-panel overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wider text-text-muted">
-              <th className="px-4 py-3 text-left font-medium">Memory</th>
+              <th className="px-4 py-3 text-left font-medium">
+                Memories:{" "}
+                <span className="font-mono tracking-normal text-text-secondary">
+                  {data.count}/{limit}
+                </span>
+              </th>
               <th className="px-4 py-3 text-left font-medium w-48">Trust</th>
               <th className="px-4 py-3 text-left font-medium w-44">Policy</th>
               <th className="px-4 py-3 text-left font-medium w-40">Created</th>
@@ -146,7 +144,7 @@ export default async function AgentMemoryPage({
               </tr>
             ) : (
               data.memories.map((memory) => (
-                <tr key={memory.memory_id} className="align-top hover:bg-bg-hover transition-colors">
+                <tr key={memory.memory_id} className="ob1-memory-row align-top">
                   <td className="px-4 py-3">
                     <Link
                       href={`/agent-memory/${memory.memory_id}`}
@@ -191,21 +189,21 @@ export default async function AgentMemoryPage({
                       <form action={reviewAction}>
                         <input type="hidden" name="memory_id" value={memory.memory_id} />
                         <input type="hidden" name="action" value="evidence_only" />
-                        <button className="rounded border border-border px-2 py-1 text-xs text-text-secondary hover:bg-bg-hover">
+                        <button className="border border-border px-2 py-1 text-xs text-text-secondary hover:bg-bg-hover hover:text-text-primary">
                           Evidence
                         </button>
                       </form>
                       <form action={reviewAction}>
                         <input type="hidden" name="memory_id" value={memory.memory_id} />
                         <input type="hidden" name="action" value="confirm" />
-                        <button className="rounded border border-success/30 px-2 py-1 text-xs text-success hover:bg-success/10">
+                        <button className="border border-success/30 px-2 py-1 text-xs text-success hover:bg-success/10">
                           Confirm
                         </button>
                       </form>
                       <form action={reviewAction}>
                         <input type="hidden" name="memory_id" value={memory.memory_id} />
                         <input type="hidden" name="action" value="reject" />
-                        <button className="rounded border border-danger/30 px-2 py-1 text-xs text-danger hover:bg-danger/10">
+                        <button className="border border-danger/30 px-2 py-1 text-xs text-danger hover:bg-danger/10">
                           Reject
                         </button>
                       </form>

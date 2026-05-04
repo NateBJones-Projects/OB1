@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { Thought, KanbanStatus } from "@/lib/types";
@@ -35,13 +35,10 @@ export function KanbanColumn({
   onPriorityChange,
   onArchive,
 }: KanbanColumnProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
-  // Load collapse state from localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem(collapseKey(status));
-    if (stored === "true") setIsCollapsed(true);
-  }, [status]);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(collapseKey(status)) === "true";
+  });
 
   function toggleCollapse() {
     const nextState = !isCollapsed;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Thought, KanbanStatus } from "@/lib/types";
 import { KANBAN_STATUSES, KANBAN_LABELS, PRIORITY_LEVELS, getPriorityLevel, THOUGHT_TYPES, KANBAN_TYPES } from "@/lib/types";
@@ -27,20 +27,23 @@ export function KanbanCardModal({
   const [status, setStatus] = useState(thought.status ?? "new");
   const [importance, setImportance] = useState(thought.importance);
   const [type, setType] = useState(thought.type);
-  const [hasChanges, setHasChanges] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const backdropRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const hasChanges =
+    content !== thought.content ||
+    status !== (thought.status ?? "new") ||
+    importance !== thought.importance ||
+    type !== thought.type;
 
-  useEffect(() => {
-    const isChanged =
-      content !== thought.content ||
-      status !== (thought.status ?? "new") ||
-      importance !== thought.importance ||
-      type !== thought.type;
-    setHasChanges(isChanged);
-  }, [content, status, importance, type, thought]);
+  const tryClose = useCallback(() => {
+    if (hasChanges) {
+      setShowDiscardConfirm(true);
+    } else {
+      onClose();
+    }
+  }, [hasChanges, onClose]);
 
   useEffect(() => {
     function handleEscape(e: KeyboardEvent) {
@@ -50,7 +53,7 @@ export function KanbanCardModal({
     }
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [hasChanges]);
+  }, [tryClose]);
 
   // Lock body scroll
   useEffect(() => {
@@ -69,14 +72,6 @@ export function KanbanCardModal({
       textareaRef.current.style.height = textareaRef.current.scrollHeight + "px";
     }
   }, [content]);
-
-  function tryClose() {
-    if (hasChanges) {
-      setShowDiscardConfirm(true);
-    } else {
-      onClose();
-    }
-  }
 
   function handleBackdropClick(e: React.MouseEvent) {
     if (e.target === backdropRef.current) {

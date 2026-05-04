@@ -26,16 +26,19 @@ export default async function RecallTracePage({
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
         <Link
           href="/agent-memory"
           className="text-sm text-text-muted hover:text-violet transition-colors"
         >
           Back to Agent Memory
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold">Recall Trace</h1>
-        <p className="mt-1 text-sm text-text-secondary">
+        <p className="ob1-section-label mt-4">Retrieval Debugging</p>
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Recall Trace</h1>
+        </div>
+        <p className="max-w-md text-sm text-text-secondary md:text-right">
           Debug what an agent asked for, what OB1 returned, and what the agent used.
         </p>
       </div>
@@ -45,9 +48,9 @@ export default async function RecallTracePage({
           name="request_id"
           defaultValue={requestId}
           placeholder="Recall request id"
-          className="min-w-0 flex-1 rounded-lg border border-border bg-bg-surface px-3 py-2 text-sm text-text-primary outline-none focus:border-violet"
+          className="ob1-glass-panel min-w-0 flex-1 px-3 py-2 text-sm text-text-primary outline-none focus:border-violet"
         />
-        <button className="rounded-lg bg-violet px-4 py-2 text-sm font-medium text-white hover:bg-violet-dim transition-colors">
+        <button className="border border-violet/35 bg-violet-surface px-4 py-2 text-sm font-medium text-violet hover:bg-violet/15 transition-colors">
           Load trace
         </button>
       </form>
@@ -55,14 +58,14 @@ export default async function RecallTracePage({
       {error && <p className="text-danger text-sm">{error}</p>}
 
       {!requestId && (
-        <div className="rounded-lg border border-border bg-bg-surface p-6 text-sm text-text-secondary">
+        <div className="ob1-glass-panel p-6 text-sm text-text-secondary">
           Waiting for a recall request id from an OpenClaw run, API smoke harness, or Agent Memory API response.
         </div>
       )}
 
       {data && (
         <div className="space-y-4">
-          <section className="rounded-lg border border-border bg-bg-surface p-5">
+          <section className="ob1-frost-panel p-5">
             <div className="mb-3 flex flex-wrap gap-2 text-xs text-text-muted">
               <span className="font-mono">{data.trace.request_id}</span>
               {data.trace.runtime_name && <span>{data.trace.runtime_name}</span>}
@@ -74,7 +77,7 @@ export default async function RecallTracePage({
             <h2 className="text-lg font-medium">{data.trace.query}</h2>
           </section>
 
-          <div className="overflow-hidden rounded-lg border border-border bg-bg-surface">
+          <div className="ob1-glass-panel overflow-hidden">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-wider text-text-muted">
@@ -87,7 +90,7 @@ export default async function RecallTracePage({
               </thead>
               <tbody className="divide-y divide-border-subtle">
                 {data.items.map((item) => (
-                  <tr key={item.id} className="align-top hover:bg-bg-hover transition-colors">
+                  <tr key={item.id} className="ob1-memory-row align-top">
                     <td className="px-4 py-3 font-mono text-xs text-text-muted">
                       {item.rank}
                     </td>
@@ -144,9 +147,9 @@ export default async function RecallTracePage({
             </table>
           </div>
 
-          <section className="rounded-lg border border-border bg-bg-surface p-5">
-            <h2 className="mb-3 text-sm font-medium">Request Payload</h2>
-            <pre className="max-h-[360px] overflow-auto rounded bg-bg-primary p-3 text-xs leading-5 text-text-secondary">
+          <section className="ob1-glass-panel p-5">
+            <h2 className="ob1-section-label mb-3">Request Payload</h2>
+            <pre className="max-h-[360px] overflow-auto border border-border-subtle bg-black/20 p-3 text-xs leading-5 text-text-secondary">
               {JSON.stringify(data.trace.request_payload, null, 2)}
             </pre>
           </section>
