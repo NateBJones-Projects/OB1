@@ -38,6 +38,23 @@ Checked on 2026-05-04:
 | Owner posture | Publish under Nate/OB1. Do not publish under Jonathan's personal OpenClaw identity. |
 | Primary CTA | Follow Nate: https://substack.com/@natesnewsletter and https://natebjones.com |
 
+## Publisher Namespace Blocker
+
+The public package publish requires the ClawHub publisher namespace `@natebjones`.
+
+Observed on 2026-05-04:
+
+- `clawhub whoami` returned `justfinethanku`.
+- Package publish with `--owner NateBJones` failed because publisher `@natebjones` did not exist.
+- Do not publish this package under `justfinethanku` or any fallback handle.
+
+Required before public publish:
+
+1. Create or claim the ClawHub publisher namespace `@natebjones`.
+2. Confirm `npx -y clawhub@0.12.2 whoami` is a Nate/OB1-owned account, or confirm the logged-in account has admin rights to publish with `--owner NateBJones`.
+3. Re-run the package publish command below.
+4. Publish the skill only after the package namespace is correct, since skills also expose an owner in ClawHub.
+
 ## Publishable Units
 
 | Unit | Path | Purpose |
