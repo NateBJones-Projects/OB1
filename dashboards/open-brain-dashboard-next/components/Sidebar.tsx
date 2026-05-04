@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RestrictedToggle } from "@/components/RestrictedToggle";
@@ -33,13 +34,23 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       `}
     >
       <div className="px-5 py-6 border-b border-border">
-        <Link href="/" className="flex items-center gap-2.5" onClick={onClose}>
-          <div className="flex h-8 w-8 items-center justify-center border border-violet/35 bg-violet-surface">
-            <span className="text-violet text-sm font-bold">OB</span>
+        <Link href="/" className="flex items-center gap-3" onClick={onClose}>
+          <div className="flex h-9 w-9 items-center justify-center border border-violet/35 bg-violet-surface p-1.5">
+            <Image
+              src="/brand/ob1-logo.png"
+              alt=""
+              width={28}
+              height={28}
+              unoptimized
+              className="h-full w-full object-contain opacity-95"
+            />
           </div>
-          <span className="text-text-primary font-semibold text-lg tracking-tight">
-            Open Brain
-          </span>
+          <div className="min-w-0">
+            <span className="block text-text-primary font-semibold text-lg tracking-tight">
+              Open Brain
+            </span>
+            <span className="ob1-brand-kicker">Nate B. Jones</span>
+          </div>
         </Link>
       </div>
 
@@ -66,6 +77,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       </nav>
 
       <div className="px-3 py-3 border-t border-border space-y-2">
+        <div className="px-3 pb-2">
+          <p className="ob1-brand-stamp">NBJ / OB1</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-text-muted/70">
+            Personal continuity layer
+          </p>
+        </div>
         <RestrictedToggle />
         <form action="/api/logout" method="POST">
           <button

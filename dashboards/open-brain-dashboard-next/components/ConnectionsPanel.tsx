@@ -6,7 +6,7 @@ import { TypeBadge } from "./ThoughtCard";
 import { FormattedDate } from "./FormattedDate";
 
 interface Connection {
-  id: number;
+  id: string;
   type: string;
   importance: number;
   preview: string;
@@ -23,7 +23,7 @@ export function ConnectionsPanel({
   thoughtId,
   hasMetadata,
 }: {
-  thoughtId: number;
+  thoughtId: string;
   hasMetadata: boolean;
 }) {
   const [connections, setConnections] = useState<Connection[] | null>(

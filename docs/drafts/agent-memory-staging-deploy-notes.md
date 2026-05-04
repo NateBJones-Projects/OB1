@@ -37,6 +37,8 @@ This pass should verify:
 - Whether example payloads should use UUID-looking placeholders instead of readable strings.
 - Whether guide copy should clarify that publishable Supabase keys are not enough for server-side Agent Memory writes.
 - Supabase Edge Functions preserved the function slug in the request path. Hono routes needed path normalization for `/agent-memory-api/*`.
+- Whether starter OB1 Agent Memory databases should ship with a source-backed seed pack for the OB1 repo, Nate's public channels, and Agent Memory operating rules.
+- Whether dashboard and tutorial surfaces should make Nate B. Jones / OB1 provenance visible through micro-branding, screenshot watermarks, and logo marks.
 
 ## Staging Run Log
 
@@ -68,6 +70,23 @@ This pass should verify:
 - 2026-05-03: Native OpenClaw harness passed on Spark; transcript parsing observed all seven `openbrain_*` tool calls, zero non-OB1 tool calls, zero tool errors, and an evidence-only review result.
 - 2026-05-03: Added an Agent Memory list endpoint and dashboard governance foundation for review queue, memory inspector, and recall trace lookup.
 - 2026-05-03: Added a cleanup harness that refuses non-test project IDs and marks matching active smoke/test memories as rejected only when `--apply` is passed.
+- 2026-05-03: Added Nate B. Jones / OB1 micro-branding to the dashboard shell, login surface, page metadata, and Agent Memory review context.
+- 2026-05-03: Added `seed-nate-continuity-demo.mjs` to create source-backed Nate continuity demo data across pending, evidence, confirmed, rejected, stale, and trace views.
+- 2026-05-03: Seeded `nate-jones-personal-ob1` / `continuity-os` with 26 demo memories and captured desktop plus in-app screenshots for tutorial planning.
+- 2026-05-03: Fixed local dashboard preview auth cookies so `next start` over `http://localhost` can keep a session without requiring HTTPS-only cookies.
+- 2026-05-03: Fixed broken dashboard logo serving by allowing `/brand/*` through middleware and using unoptimized static brand images for the shell mark.
+- 2026-05-03: Generated a beanie/glasses OB1 app mark with `gpt-image-2`, converted it into transparent product assets, preserved the original source outline, and regenerated screenshot assets.
+- 2026-05-03: Added a local dashboard walkthrough REST shim with seeded data for Dashboard, Thoughts, Workflow, Duplicates, Audit, Agent Memory, and Recall Trace surfaces.
+- 2026-05-03: Added a gated `OB1_DEMO_AUTH_BYPASS` mode for local capture so screenshots can run without putting real API keys into browser automation.
+- 2026-05-03: Captured full 1920x1080 dashboard walkthrough screenshots across all major tabs.
+- 2026-05-03: Generated the first OB1 Agent Dashboard PDF walkthrough guide from the screenshot frames.
+- 2026-05-03: Generated ElevenLabs voiceover audio and a Remotion/ffmpeg-verified MP4 walkthrough for the dashboard.
+- 2026-05-03: Added and deployed `open-brain-rest` as the production/staging REST gateway for Dashboard, Thoughts, Workflow, Duplicates, Audit, Search, and Add to Brain.
+- 2026-05-03: Applied enhanced-thoughts and workflow-status migrations to the OB1 staging/personal project so dashboard columns exist on `thoughts`.
+- 2026-05-03: Updated dashboard thought IDs from numeric assumptions to UUID/string IDs end to end.
+- 2026-05-03: Added repeatable `open-brain-rest` smoke harness and dashboard demo seed harness.
+- 2026-05-03: Patched enhanced `upsert_thought` so future metadata-backed writes mirror into dashboard columns.
+- 2026-05-03: Live `open-brain-rest` smoke passed against OB1 staging and cleaned its three temporary rows.
 
 ## Verified Smoke Tests
 
@@ -92,6 +111,18 @@ This pass should verify:
 | Repeatable native OpenClaw smoke harness | Passed |
 | Personal DB test cleanup harness | Added |
 | Dashboard review/inspector/trace foundation | Added |
+| Nate continuity demo seed | Added |
+| Dashboard NBJ/OB1 branding pass | Added |
+| Desktop tutorial screenshots | Captured |
+| Beanie/glasses OB1 brand pack | Added |
+| Full dashboard walkthrough seed shim | Added |
+| Full dashboard walkthrough screenshots | Captured |
+| PDF dashboard walkthrough guide | Generated |
+| Remotion dashboard walkthrough video | Generated |
+| Open Brain REST gateway deploy | Passed |
+| Enhanced thoughts/dashboard migrations | Applied |
+| Dashboard UUID thought ID contract | Passed |
+| Repeatable Open Brain REST smoke harness | Passed |
 
 ## Open Items
 

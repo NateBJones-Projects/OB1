@@ -1,5 +1,5 @@
 export interface Thought {
-  id: number;
+  id: string;
   uuid?: string;
   content: string;
   type: string;
@@ -64,8 +64,8 @@ export function getPriorityLevel(importance: number) {
 }
 
 export interface Reflection {
-  id: number;
-  thought_id: number;
+  id: string | number;
+  thought_id: string;
   trigger_context: string;
   options: unknown[];
   factors: unknown[];
@@ -104,8 +104,8 @@ export interface StatsResponse {
 }
 
 export interface DuplicatePair {
-  thought_id_a: number;
-  thought_id_b: number;
+  thought_id_a: string;
+  thought_id_b: string;
   similarity: number;
   content_a: string;
   content_b: string;
@@ -142,7 +142,7 @@ export interface ReflectionInput {
 }
 
 export interface IngestionItem {
-  id: number;
+  id: number | string;
   job_id: number;
   content: string;
   type: string;
@@ -163,7 +163,7 @@ export type AddToBrainMode = "auto" | "single" | "extract";
 
 export interface AddToBrainResult {
   path: "single" | "extract";
-  thought_id?: number;
+  thought_id?: string;
   job_id?: number;
   type?: string;
   status?: string;

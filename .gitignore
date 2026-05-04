@@ -23,3 +23,7 @@ sync-log.json
 
 # Build artifacts
 deno.lock
+docs/walkthroughs/*/public/
+docs/assets/agent-memory/promotional/generated-backgrounds/**/result.json
+docs/assets/agent-memory/screenshots/**/.chrome-*/
+integrations/openclaw-agent-memory/dist/

@@ -103,6 +103,7 @@ export default async function AgentMemoryPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <span className="ob1-brand-kicker">Nate Jones Personal OB1</span>
           <p className="font-mono text-xs text-text-muted">
             {workspaceId}
             <span className="mx-2 text-text-muted/60">/</span>
@@ -119,8 +120,8 @@ export default async function AgentMemoryPage({
 
       {error && <p className="text-danger text-sm">{error}</p>}
 
-      <div className="ob1-glass-panel overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="ob1-glass-panel overflow-x-auto">
+        <table className="w-full min-w-[980px] text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wider text-text-muted">
               <th className="px-4 py-3 text-left font-medium">

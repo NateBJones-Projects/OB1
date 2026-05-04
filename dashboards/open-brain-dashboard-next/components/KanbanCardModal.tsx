@@ -8,11 +8,11 @@ import { KANBAN_STATUSES, KANBAN_LABELS, PRIORITY_LEVELS, getPriorityLevel, THOU
 interface KanbanCardModalProps {
   thought: Thought;
   onSave: (
-    thoughtId: number,
+    thoughtId: string,
     updates: { content?: string; status?: string; importance?: number; type?: string }
   ) => void;
-  onArchive: (thoughtId: number) => void;
-  onDelete: (thoughtId: number) => void;
+  onArchive: (thoughtId: string) => void;
+  onDelete: (thoughtId: string) => void;
   onClose: () => void;
 }
 

@@ -4,7 +4,7 @@
 
 ## What It Does
 
-This schema extension adds six new columns to the `thoughts` table (`type`, `sensitivity_tier`, `importance`, `quality_score`, `source_type`, `enriched`) so thoughts can be classified, filtered, and ranked without parsing the metadata JSONB every time. It also installs three RPC functions:
+This schema extension adds six new columns to the `thoughts` table (`type`, `sensitivity_tier`, `importance`, `quality_score`, `source_type`, `enriched`) so thoughts can be classified, filtered, and ranked without parsing the metadata JSONB every time. It also upgrades `upsert_thought` so metadata-backed writes keep those structured columns in sync. It installs three utility RPC functions:
 
 - **`search_thoughts_text`** -- Full-text search with boolean operators, ILIKE fallback, pagination, and result counts.
 - **`brain_stats_aggregate`** -- Returns total thought count, top types, and top topics as a single JSONB payload.
@@ -37,15 +37,17 @@ SUPABASE (from your Open Brain setup)
 3. Click **Run** to execute the migration
 4. Open **Table Editor** and select the `thoughts` table to confirm the new columns appear: `type`, `sensitivity_tier`, `importance`, `quality_score`, `source_type`, `enriched`
 5. Navigate to **Database > Functions** and verify three new functions exist: `search_thoughts_text`, `brain_stats_aggregate`, `get_thought_connections`
-6. If you have existing thoughts with `type` or `source` values stored in the metadata JSONB, the backfill statements at the bottom of the script will have populated the new columns automatically
+6. Verify `upsert_thought` still exists. The enhanced version mirrors `metadata.type`, `metadata.source`, `metadata.importance`, `metadata.quality_score`, `metadata.sensitivity_tier`, and task/idea status into top-level columns.
+7. If you have existing thoughts with `type` or `source` values stored in the metadata JSONB, the backfill statements at the bottom of the script will have populated the new columns automatically
 
 ## Expected Outcome
 
 After running the migration:
 
-- The `thoughts` table has six new columns with sensible defaults (importance=5, quality_score=0.50, sensitivity_tier='normal', enriched=false).
+- The `thoughts` table has six new columns with dashboard-friendly defaults.
 - New indexes on `type`, `importance`, `source_type`, and a GIN tsvector index on `content` for fast full-text search.
 - Three new RPC functions callable via the Supabase client or REST API.
+- `upsert_thought` remains the canonical write path, but now keeps structured dashboard columns synchronized with metadata payloads.
 - Any existing thoughts with `type` or `source` in their metadata JSONB will have those values copied into the new top-level columns.
 
 ## Troubleshooting

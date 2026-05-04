@@ -31,7 +31,7 @@ Provides 9 pages for managing your thoughts:
 
 ## Prerequisites
 
-- A working Open Brain setup with the **REST API gateway** (`open-brain-rest`) deployed
+- A working Open Brain setup with the **REST API gateway** (`open-brain-rest`) deployed from [integrations/open-brain-rest](../../integrations/open-brain-rest/)
 - **Node.js 18+** installed
 - A **Vercel account** (free tier works) or any Node.js hosting
 
@@ -44,6 +44,9 @@ Provides 9 pages for managing your thoughts:
 | `AGENT_MEMORY_WORKSPACE_ID` | Optional. Default workspace for Agent Memory governance views | `.env` or hosting env vars |
 | `AGENT_MEMORY_PROJECT_ID` | Optional. Default project filter for Agent Memory governance views | `.env` or hosting env vars |
 | `SESSION_SECRET` | Generate: `openssl rand -hex 32` | `.env` or hosting env vars |
+| `AUTH_COOKIE_SECURE` | Optional. Force HTTPS-only auth cookies when set to `true`; leave unset for localhost previews | `.env` or hosting env vars |
+| `OB1_DEMO_AUTH_BYPASS` | Optional. Local walkthrough capture only; bypasses login when set to `true` | local shell only |
+| `OB1_DASHBOARD_DEMO_KEY` | Optional. Local walkthrough capture key used by the demo REST shim | local shell only |
 | `RESTRICTED_PASSPHRASE_HASH` | Optional. Generate: `echo -n "passphrase" \| shasum -a 256` | `.env` or hosting env vars |
 
 ## Steps
@@ -77,6 +80,8 @@ NEXT_PUBLIC_API_URL=https://YOUR-PROJECT-REF.supabase.co/functions/v1/open-brain
 # AGENT_MEMORY_API_URL=https://YOUR-PROJECT-REF.supabase.co/functions/v1/agent-memory-api
 # AGENT_MEMORY_WORKSPACE_ID=ob1-staging
 SESSION_SECRET=your-32-char-secret-here
+# Optional on HTTPS hosts:
+# AUTH_COOKIE_SECURE=true
 ```
 
 ### Step 4: Run locally
@@ -183,6 +188,9 @@ Agent Memory pages also call these endpoints on `agent-memory-api`:
 > [!NOTE]
 > If your Open Brain instance doesn't have all these endpoints (e.g., no smart-ingest or duplicates), those pages will show errors but the core pages (dashboard, browse, search, detail) will still work.
 
+> [!IMPORTANT]
+> OB1's real `thoughts.id` values are UUID strings. The dashboard treats thought IDs as strings end to end so detail links, workflow updates, audit deletes, and duplicate resolution work against production Supabase rows.
+
 ## Optional: Restricted Content
 
 If you've applied the [sensitivity-tiers](https://github.com/NateBJones-Projects/OB1/pull/110) primitive and want to control access to sensitive thoughts:
@@ -205,6 +213,21 @@ The dashboard uses **iron-session** for encrypted HTTP-only session cookies:
 5. Sessions expire after 24 hours
 
 No API key is stored in environment variables or exposed to the browser.
+
+## Local Walkthrough Capture
+
+The walkthrough asset pipeline lives in [docs/walkthroughs/ob1-agent-dashboard](../../docs/walkthroughs/ob1-agent-dashboard). It seeds the Dashboard, Thoughts, Workflow, Duplicates, Audit, Agent Memory, and Recall Trace surfaces with Nate B. Jones / OB1 demo data for screenshots, PDF guides, and video walkthroughs.
+
+The dashboard has a gated local-only bypass for that capture flow:
+
+```bash
+OB1_DEMO_AUTH_BYPASS=true
+OB1_DASHBOARD_DEMO_KEY=local-screenshot-key
+NEXT_PUBLIC_API_URL=http://127.0.0.1:3024
+AGENT_MEMORY_API_URL=http://127.0.0.1:3022
+```
+
+Do not enable `OB1_DEMO_AUTH_BYPASS` in shared previews or production. It exists so repeatable screenshot and video generation can run without putting real API keys in browser automation.
 
 ## Tech Stack
 

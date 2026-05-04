@@ -24,8 +24,8 @@ interface KanbanColumnProps {
   status: string;
   thoughts: Thought[];
   onCardClick: (thought: Thought) => void;
-  onPriorityChange: (thoughtId: number, importance: number) => void;
-  onArchive: (thoughtId: number) => void;
+  onPriorityChange: (thoughtId: string, importance: number) => void;
+  onArchive: (thoughtId: string) => void;
 }
 
 export function KanbanColumn({

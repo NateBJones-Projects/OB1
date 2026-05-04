@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { LoginForm } from "./LoginForm";
@@ -38,12 +39,20 @@ export default async function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-bg-primary ml-0">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen flex items-center justify-center bg-transparent ml-0 px-4">
+      <div className="ob1-login-panel w-full max-w-sm p-6">
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-xl bg-violet flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl font-bold">OB</span>
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center border border-violet/35 bg-violet-surface p-3">
+            <Image
+              src="/brand/ob1-logo.png"
+              alt=""
+              width={40}
+              height={40}
+              unoptimized
+              className="h-full w-full object-contain"
+            />
           </div>
+          <p className="ob1-brand-kicker mb-2">Nate B. Jones / OB1</p>
           <h1 className="text-2xl font-semibold text-text-primary">
             Open Brain
           </h1>

@@ -20,9 +20,9 @@ function formatAge(dateString: string): string {
 interface KanbanCardProps {
   thought: Thought;
   onCardClick: (thought: Thought) => void;
-  onPriorityChange: (thoughtId: number, importance: number) => void;
+  onPriorityChange: (thoughtId: string, importance: number) => void;
   showArchiveButton?: boolean;
-  onArchive?: (thoughtId: number) => void;
+  onArchive?: (thoughtId: string) => void;
 }
 
 export function KanbanCard({
