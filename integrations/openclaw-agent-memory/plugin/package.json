@@ -24,25 +24,30 @@
   "files": [
     "README.md",
     "openclaw.plugin.json",
+    "dist",
     "src",
     "skills",
     "smoke"
   ],
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js"
   },
   "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --external:openclaw/* --external:typebox --outfile=dist/index.js",
     "smoke:native": "bash smoke/native-openclaw-smoke.sh"
   },
   "dependencies": {
     "typebox": "^1.1.37"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
   },
   "peerDependencies": {
     "openclaw": ">=2026.3.24-beta.2"
   },
   "openclaw": {
     "extensions": [
-      "./src/index.ts"
+      "./dist/index.js"
     ],
     "compat": {
       "pluginApi": ">=2026.3.24-beta.2",

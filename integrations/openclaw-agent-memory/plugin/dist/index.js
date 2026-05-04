@@ -1,67 +1,141 @@
+// src/index.ts
 import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { resolveConfiguredSecretInputString } from "openclaw/plugin-sdk/secret-input-runtime";
-import { AgentMemoryClient, type AgentMemoryConfig } from "./client.js";
 
-async function clientFromApi(api: { pluginConfig?: unknown; config?: unknown }) {
-  const raw = (api.pluginConfig || {}) as Record<string, unknown>;
+// src/client.ts
+var AgentMemoryClient = class {
+  constructor(config) {
+    this.config = config;
+    this.endpoint = config.endpoint.replace(/\/$/, "");
+    this.accessKey = config.accessKey;
+    if (!this.accessKey) {
+      throw new Error("OB1 Agent Memory access key missing. Configure plugins.entries.nbj-ob1-agent-memory.config.accessKey.");
+    }
+  }
+  endpoint;
+  accessKey;
+  async request(path, options = {}) {
+    const response = await fetch(`${this.endpoint}${path}`, {
+      method: options.method || "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-brain-key": this.accessKey
+      },
+      body: options.body === void 0 ? void 0 : JSON.stringify(options.body)
+    });
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+    if (!response.ok) {
+      throw new Error(`OB1 Agent Memory API ${response.status}: ${data.error || text}`);
+    }
+    return data;
+  }
+  recall(input) {
+    return this.request("/recall", {
+      method: "POST",
+      body: {
+        workspace_id: this.config.workspaceId,
+        project_id: this.config.projectId ?? null,
+        ...input,
+        scope: {
+          include_unconfirmed: this.config.includeUnconfirmedRecall ?? false,
+          ...typeof input.scope === "object" && input.scope ? input.scope : {}
+        }
+      }
+    });
+  }
+  writeback(input) {
+    return this.request("/writeback", {
+      method: "POST",
+      body: {
+        workspace_id: this.config.workspaceId,
+        project_id: this.config.projectId ?? null,
+        ...input,
+        provenance: {
+          default_status: "generated",
+          confidence: 0.5,
+          requires_review: this.config.requireReviewByDefault ?? true,
+          ...typeof input.provenance === "object" && input.provenance ? input.provenance : {}
+        }
+      }
+    });
+  }
+  reportUsage(requestId, input) {
+    return this.request(`/recall/${requestId}/usage`, { method: "POST", body: input });
+  }
+  inspectMemory(memoryId) {
+    return this.request(`/memories/${memoryId}`);
+  }
+  listReviewQueue(input = {}) {
+    const workspaceId = input.workspace_id || this.config.workspaceId;
+    const projectId = input.project_id || this.config.projectId;
+    const params = new URLSearchParams({ workspace_id: workspaceId });
+    if (projectId) params.set("project_id", projectId);
+    return this.request(`/memories/review?${params.toString()}`);
+  }
+  reviewMemory(memoryId, input) {
+    return this.request(`/memories/${memoryId}/review`, { method: "PATCH", body: input });
+  }
+  getRecallTrace(requestId) {
+    return this.request(`/recall-traces/${requestId}`);
+  }
+};
+
+// src/index.ts
+async function clientFromApi(api) {
+  const raw = api.pluginConfig || {};
   if (typeof raw.endpoint !== "string" || raw.endpoint.length === 0) {
     throw new Error("OB1 Agent Memory plugin requires config.endpoint");
   }
   if (typeof raw.workspaceId !== "string" || raw.workspaceId.length === 0) {
     throw new Error("OB1 Agent Memory plugin requires config.workspaceId");
   }
-
   const accessKey = await resolveConfiguredSecretInputString({
-    config: (api.config || {}) as any,
+    config: api.config || {},
     env: process.env,
     value: raw.accessKey,
     path: "plugins.entries.nbj-ob1-agent-memory.config.accessKey",
-    unresolvedReasonStyle: "detailed",
+    unresolvedReasonStyle: "detailed"
   });
-
   if (!accessKey.value) {
     const reason = accessKey.unresolvedRefReason ? ` ${accessKey.unresolvedRefReason}` : "";
     throw new Error(`OB1 Agent Memory plugin requires config.accessKey.${reason}`);
   }
-
-  const config: AgentMemoryConfig = {
+  const config = {
     endpoint: raw.endpoint,
     accessKey: accessKey.value,
     workspaceId: raw.workspaceId,
-    projectId: typeof raw.projectId === "string" ? raw.projectId : undefined,
+    projectId: typeof raw.projectId === "string" ? raw.projectId : void 0,
     requireReviewByDefault: typeof raw.requireReviewByDefault === "boolean" ? raw.requireReviewByDefault : true,
-    includeUnconfirmedRecall: typeof raw.includeUnconfirmedRecall === "boolean" ? raw.includeUnconfirmedRecall : false,
+    includeUnconfirmedRecall: typeof raw.includeUnconfirmedRecall === "boolean" ? raw.includeUnconfirmedRecall : false
   };
   return new AgentMemoryClient(config);
 }
-
-function toolResult(value: unknown) {
+function toolResult(value) {
   return {
     content: [
       {
         type: "text",
-        text: JSON.stringify(value, null, 2),
-      },
+        text: JSON.stringify(value, null, 2)
+      }
     ],
-    details: value,
+    details: value
   };
 }
-
-function registerTool(api: any, tool: { name: string; label: string; description: string; parameters: unknown; run: (client: AgentMemoryClient, input: any) => Promise<unknown> }) {
+function registerTool(api, tool) {
   api.registerTool({
     name: tool.name,
     label: tool.label,
     description: tool.description,
     parameters: tool.parameters,
-    async execute(_id: string, params: unknown) {
+    async execute(_id, params) {
       const result = await tool.run(await clientFromApi(api), params);
       return toolResult(result);
-    },
+    }
   });
 }
-
-export default definePluginEntry({
+var index_default = definePluginEntry({
   id: "nbj-ob1-agent-memory",
   name: "NBJ OB1 Agent Memory for OpenClaw",
   description: "Recall and write governed Nate Jones OB1 memory from OpenClaw workflows.",
@@ -72,17 +146,15 @@ export default definePluginEntry({
       label: "NBJ OB1 recall",
       description: "Recall scoped Nate Jones OB1 Agent Memory before meaningful work begins.",
       parameters: Type.Record(Type.String(), Type.Any()),
-      run: (client, input) => client.recall(input),
+      run: (client, input) => client.recall(input)
     });
-
     registerTool(api, {
       name: "openbrain_writeback",
       label: "NBJ OB1 write-back",
       description: "Write compact, provenance-labeled Nate Jones OB1 Agent Memory after work finishes.",
       parameters: Type.Record(Type.String(), Type.Any()),
-      run: (client, input) => client.writeback(input),
+      run: (client, input) => client.writeback(input)
     });
-
     registerTool(api, {
       name: "openbrain_report_usage",
       label: "NBJ OB1 report usage",
@@ -92,34 +164,31 @@ export default definePluginEntry({
         used_memory_ids: Type.Optional(Type.Array(Type.String())),
         ignored: Type.Optional(Type.Array(Type.Object({
           memory_id: Type.String(),
-          reason: Type.Optional(Type.String()),
-        }))),
+          reason: Type.Optional(Type.String())
+        })))
       }),
       run: (client, input) => client.reportUsage(input.request_id, {
         used_memory_ids: input.used_memory_ids || [],
-        ignored: input.ignored || [],
-      }),
+        ignored: input.ignored || []
+      })
     });
-
     registerTool(api, {
       name: "openbrain_inspect_memory",
       label: "NBJ OB1 inspect memory",
       description: "Inspect one Nate Jones OB1 Agent Memory record, including provenance and source references.",
       parameters: Type.Object({ memory_id: Type.String() }),
-      run: (client, input) => client.inspectMemory(input.memory_id),
+      run: (client, input) => client.inspectMemory(input.memory_id)
     });
-
     registerTool(api, {
       name: "openbrain_list_review_queue",
       label: "NBJ OB1 review queue",
       description: "List agent-written memories pending human review.",
       parameters: Type.Object({
         workspace_id: Type.Optional(Type.String()),
-        project_id: Type.Optional(Type.String()),
+        project_id: Type.Optional(Type.String())
       }),
-      run: (client, input) => client.listReviewQueue(input),
+      run: (client, input) => client.listReviewQueue(input)
     });
-
     registerTool(api, {
       name: "openbrain_review_memory",
       label: "NBJ OB1 review memory",
@@ -135,7 +204,7 @@ export default definePluginEntry({
           Type.Literal("merge"),
           Type.Literal("reject"),
           Type.Literal("dispute"),
-          Type.Literal("supersede"),
+          Type.Literal("supersede")
         ]),
         actor_id: Type.Optional(Type.String()),
         actor_label: Type.Optional(Type.String()),
@@ -143,20 +212,22 @@ export default definePluginEntry({
         content: Type.Optional(Type.String()),
         summary: Type.Optional(Type.String()),
         visibility: Type.Optional(Type.String()),
-        related_memory_id: Type.Optional(Type.String()),
+        related_memory_id: Type.Optional(Type.String())
       }),
       run: (client, input) => {
         const { memory_id, ...body } = input;
         return client.reviewMemory(memory_id, body);
-      },
+      }
     });
-
     registerTool(api, {
       name: "openbrain_get_recall_trace",
       label: "NBJ OB1 recall trace",
       description: "Fetch a recall trace to debug which memories were returned and used.",
       parameters: Type.Object({ request_id: Type.String() }),
-      run: (client, input) => client.getRecallTrace(input.request_id),
+      run: (client, input) => client.getRecallTrace(input.request_id)
     });
-  },
+  }
 });
+export {
+  index_default as default
+};

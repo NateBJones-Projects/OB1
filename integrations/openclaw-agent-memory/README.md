@@ -61,6 +61,7 @@ For local development, install plugin package dependencies first, then link the 
 ```bash
 cd integrations/openclaw-agent-memory/plugin
 npm install --ignore-scripts --omit=peer
+npm run build
 
 cd ../../..
 openclaw --profile ob1-agent-memory plugins install integrations/openclaw-agent-memory/plugin --link
@@ -92,7 +93,7 @@ Solution: Confirm [`plugin/openclaw.plugin.json`](./plugin/openclaw.plugin.json)
 Solution: Add every `openbrain_*` tool to the OpenClaw profile's `tools.allow` list. Runtime inspect validates plugin registration; a native agent smoke test validates model tool exposure.
 
 **Issue: Linked plugin reports missing dependencies**
-Solution: Run `npm install --ignore-scripts --omit=peer` inside [`plugin`](./plugin/) before `openclaw plugins install --link`. Linked plugins resolve package dependencies from the plugin directory, while OpenClaw itself remains a host-provided peer.
+Solution: Run `npm install --ignore-scripts --omit=peer` and `npm run build` inside [`plugin`](./plugin/) before `openclaw plugins install --link`. Linked plugins resolve package dependencies from the plugin directory, while OpenClaw itself remains a host-provided peer.
 
 **Issue: Agent writes too much**
 Solution: Tighten the skill instructions and keep `requireReviewByDefault` enabled in plugin config.

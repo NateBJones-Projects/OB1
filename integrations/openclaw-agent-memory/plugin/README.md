@@ -14,6 +14,7 @@ For local linked development:
 
 ```bash
 npm install --ignore-scripts --omit=peer
+npm run build
 openclaw --profile ob1-agent-memory plugins install . --link
 ```
 
