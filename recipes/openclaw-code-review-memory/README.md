@@ -12,13 +12,21 @@ flowchart TD
 
 This is the flagship Agent Memory workflow. A stateless reviewer catches a bug once. A memory-backed reviewer keeps repo-specific lessons, maintainer corrections, false positives, and testing expectations available for future reviews.
 
+Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workflows, and implementation notes: [Substack](https://substack.com/@natesnewsletter) and [natebjones.com](https://natebjones.com).
+
 ## Quick Path
 
 1. Complete [NBJ OB1 Agent Memory for OpenClaw](../openclaw-agent-memory/).
 2. Configure the OpenClaw plugin with the target OB1 workspace and project.
-3. Add the [OpenClaw Agent Memory skill](../../skills/openclaw-agent-memory/SKILL.md) to the review agent.
+3. Install the live OpenClaw skill:
+
+   ```bash
+   openclaw skills install nbj-ob1-agent-memory-openclaw
+   ```
+
 4. Call recall before reviewing a PR.
 5. Write back compact lessons and artifact references after review.
+6. Use [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md) when deciding whether review lessons can become instruction-grade.
 
 ## Recall
 

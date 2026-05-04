@@ -67,19 +67,33 @@ cd ../../..
 openclaw --profile ob1-agent-memory plugins install integrations/openclaw-agent-memory/plugin --link
 ```
 
-For public distribution, publish through ClawHub using the package publishing path documented in [`CLAW_HUB_PUBLISHING.md`](./CLAW_HUB_PUBLISHING.md).
+For public distribution, install the live ClawHub package:
+
+```bash
+openclaw plugins install clawhub:@natebjones/ob1-agent-memory
+```
+
+Publishing details live in [`CLAW_HUB_PUBLISHING.md`](./CLAW_HUB_PUBLISHING.md).
 
 **Done when:** `openclaw --profile ob1-agent-memory plugins inspect nbj-ob1-agent-memory --runtime --json` shows a loaded plugin with all seven `openbrain_*` tools and no diagnostics.
 
 ![Step 3](https://img.shields.io/badge/Step_3-Install_the_Skill-1E88E5?style=for-the-badge)
 
-Install [`skills/openclaw-agent-memory`](../../skills/openclaw-agent-memory/) so OpenClaw knows when to recall, write back, report usage, and ask for review.
+Install the live skill so OpenClaw knows when to recall, write back, report usage, and ask for review:
+
+```bash
+openclaw skills install nbj-ob1-agent-memory-openclaw
+```
+
+The repo copy remains in [`skills/openclaw-agent-memory`](../../skills/openclaw-agent-memory/) for local development and review.
 
 **Done when:** OpenClaw can use `openbrain_recall` before work and `openbrain_writeback` after work without storing raw transcripts.
 
 ## Expected Outcome
 
 OpenClaw workflows can retrieve governed OB1 memory before work starts and write compact, provenance-labeled operational memory after work finishes.
+
+Review [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md) before enabling write-back for team workflows.
 
 ## Troubleshooting
 

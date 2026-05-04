@@ -31,6 +31,8 @@ License note: the OB1 repository is licensed under `FSL-1.1-MIT`; the ClawHub
 skill files are published under `MIT-0` as a ClawHub-specific distribution
 carveout because ClawHub requires MIT-0 for public skills.
 
+Safety guide: [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md).
+
 ## What It Enforces
 
 | Rule | Why |

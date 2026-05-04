@@ -73,6 +73,8 @@ Deploy the runtime API from [`../../integrations/agent-memory-api/`](../../integ
 
 After applying this schema, OB1 can store agent memories as governed records instead of raw transcript dumps. Agent-written memories start as evidence-only pending review. Only `user_confirmed` or trusted `imported` memories can become instruction-grade.
 
+Use [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md) as the operating guide for provenance, review status, use policy, and scope decisions.
+
 ## Troubleshooting
 
 **Issue: `agent-memory requires public.thoughts`**

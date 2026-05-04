@@ -18,6 +18,10 @@ Step-by-step builds that add a new capability to your Open Brain. Follow the ins
 | [OpenClaw Code Review Memory](openclaw-code-review-memory/) | Flagship workflow for compounding repo-specific review lessons, maintainer corrections, and false positives |
 | [OpenClaw TaskFlow Work Log](openclaw-taskflow-work-log/) | Durable handoff recipe for long-running OpenClaw TaskFlows across agents, models, and channels |
 
+Agent Memory recipes should be paired with
+[Safe Agent Memory and Provenance](../docs/safe-agent-memory-provenance.md)
+before enabling write-back in shared workspaces.
+
 ## Contributing
 
 Recipes are open for community contributions. See [CONTRIBUTING.md](../CONTRIBUTING.md) for details.

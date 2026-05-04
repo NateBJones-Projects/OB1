@@ -18,9 +18,22 @@ Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workfl
 
 1. Install [the Agent Memory schema](../../schemas/agent-memory/schema.sql).
 2. Deploy [the Agent Memory API](../../integrations/agent-memory-api/).
-3. Configure [the OpenClaw plugin](../../integrations/openclaw-agent-memory/plugin/).
-4. Install [the OpenClaw Agent Memory skill](../../skills/openclaw-agent-memory/SKILL.md).
-5. Start with [Code Review Memory](../openclaw-code-review-memory/) or [TaskFlow Work Log](../openclaw-taskflow-work-log/).
+3. Install the live OpenClaw plugin:
+
+   ```bash
+   openclaw plugins install clawhub:@natebjones/ob1-agent-memory
+   ```
+
+4. Install the live OpenClaw skill:
+
+   ```bash
+   openclaw skills install nbj-ob1-agent-memory-openclaw
+   ```
+
+5. Read [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md).
+6. Start with [Code Review Memory](../openclaw-code-review-memory/) or [TaskFlow Work Log](../openclaw-taskflow-work-log/).
+
+Local development path: use [the plugin README](../../integrations/openclaw-agent-memory/plugin/) if you need to link the plugin from this repo instead of installing the ClawHub package.
 
 ## Contract Files
 
@@ -46,6 +59,8 @@ Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workfl
 - Raw transcripts, model reasoning traces, secrets, large code blocks, and private customer dumps are blocked or flagged.
 - Project scope is the default when available.
 - Personal or channel memory never auto-promotes to team or workspace scope.
+
+The full safety model lives in [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md).
 
 ## What To Recall
 

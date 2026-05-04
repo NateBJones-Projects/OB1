@@ -103,6 +103,8 @@ The API accepts the runtime-neutral core schema versions and the OpenClaw launch
 
 An agent runtime can recall relevant context, write back compact memories, and leave a trace that explains what happened. Unsafe write-backs are blocked before durable storage.
 
+The trust model is documented in [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md).
+
 ## Smoke Harness
 
 Use the live smoke harness after deploying the Edge Function or rotating secrets:
