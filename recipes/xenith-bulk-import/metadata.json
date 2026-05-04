@@ -1,0 +1,19 @@
+{
+  "name": "Xenith Bulk Import",
+  "description": "Bulk import Google Docs exports, transcripts, pasted text batches, and Slack messages into the Xenith Open Brain while preserving original event dates.",
+  "category": "recipes",
+  "author": {
+    "name": "Stephen Strauss"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "Anthropic", "Slack"],
+    "tools": ["Deno", "Ollama"]
+  },
+  "tags": ["xenith", "bulk-import", "transcripts", "slack", "google-docs"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-05-04",
+  "updated": "2026-05-04"
+}

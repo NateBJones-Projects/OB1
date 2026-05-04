@@ -32,6 +32,7 @@ function loadEnv() {
   return {
     ...parseEnvFile(path.join(REPO_ROOT, ".env")),
     ...parseEnvFile(path.join(REPO_ROOT, ".env.local")),
+    ...parseEnvFile(path.join(REPO_ROOT, "server", ".env.xenith.local")),
     ...process.env,
   };
 }
@@ -62,6 +63,9 @@ function defaultArgs() {
     requireExtraction: false,
     topics: [],
     scopes: [],
+    programId: "",
+    schemaPath: path.join(REPO_ROOT, "SCHEMA.md"),
+    programOverlayPath: "",
   };
 }
 
@@ -71,6 +75,12 @@ function parseArgs(argv) {
     const current = argv[i];
     const next = () => argv[++i];
     if (current === "--help" || current === "-h") args.help = true;
+    else if (current === "--xenith") {
+      args.programId = "xenith";
+      args.outDir = path.join(REPO_ROOT, "wiki", "xenith");
+      args.programOverlayPath = path.join(REPO_ROOT, "wiki", "programs", "xenith.md");
+      if (args.topics.length === 0) args.topics.push("xenith_program");
+    }
     else if (current === "--dry-run") args.dryRun = true;
     else if (current === "--best-effort") args.bestEffort = true;
     else if (current === "--mirror-supersedes") args.mirrorSupersedes = true;
@@ -85,6 +95,9 @@ function parseArgs(argv) {
     else if (current === "--require-extraction") args.requireExtraction = true;
     else if (current === "--topic") args.topics.push(next());
     else if (current === "--scope") args.scopes.push(next());
+    else if (current === "--program") args.programId = next();
+    else if (current === "--schema-path") args.schemaPath = path.resolve(REPO_ROOT, next());
+    else if (current === "--program-overlay") args.programOverlayPath = path.resolve(REPO_ROOT, next());
     else if (current === "--out-dir") args.outDir = path.resolve(REPO_ROOT, next());
     else if (current === "--extract-limit") args.extractLimit = Number(next()) || args.extractLimit;
     else if (current === "--edge-limit") args.edgeLimit = Number(next()) || args.edgeLimit;
@@ -97,6 +110,12 @@ function parseArgs(argv) {
     else if (current === "--entity-output-mode") args.entityOutputMode = next();
     else if (current === "--gmail-limit") args.gmailLimit = Number(next()) || 0;
     else throw new Error(`Unknown flag: ${current}`);
+  }
+  if (args.programId && !args.scopes.some((scope) => scope.startsWith("program_id="))) {
+    args.scopes.push(`program_id=${args.programId}`);
+  }
+  if (args.programId && !args.programOverlayPath) {
+    args.programOverlayPath = path.join(REPO_ROOT, "wiki", "programs", `${args.programId}.md`);
   }
   if (!args.skipTopicWiki && args.topics.length === 0) {
     args.topics.push("autobiography");
@@ -127,6 +146,12 @@ Flags:
   --gmail                      Also run Gmail thread wiki synthesis
   --gmail-limit <N>            Cap Gmail thread synthesis count
   --re-evaluate                Re-check already-processed Gmail threads
+
+Xenith/program mode:
+  --xenith                     Shortcut for --program xenith --topic xenith_program --out-dir wiki/xenith
+  --program <id>               Scope topic synthesis to metadata.program_id
+  --schema-path <path>         Editorial policy Markdown (default: ./SCHEMA.md)
+  --program-overlay <path>     Program overlay Markdown (default: wiki/programs/<program>.md)
 
 Phase toggles:
   --skip-extraction            Do not trigger the entity extraction worker
@@ -192,6 +217,24 @@ function spawnNode(scriptPath, scriptArgs, envOverrides = {}) {
       else reject(new Error(`Command failed (${code}): ${formatCommand([process.execPath, scriptPath, ...scriptArgs])}`));
     });
   });
+}
+
+function childEnvFor(args, env) {
+  const childEnv = { ...env };
+  if (!childEnv.OPEN_BRAIN_URL && childEnv.SUPABASE_URL) {
+    childEnv.OPEN_BRAIN_URL = childEnv.SUPABASE_URL;
+  }
+  if (!childEnv.OPEN_BRAIN_SERVICE_KEY && childEnv.SUPABASE_SERVICE_ROLE_KEY) {
+    childEnv.OPEN_BRAIN_SERVICE_KEY = childEnv.SUPABASE_SERVICE_ROLE_KEY;
+  }
+  if (childEnv.ANTHROPIC_API_KEY && !childEnv.LLM_API_KEY) {
+    childEnv.LLM_PROVIDER = childEnv.LLM_PROVIDER || "anthropic";
+    childEnv.LLM_MODEL = childEnv.LLM_MODEL || childEnv.ANTHROPIC_MODEL || "claude-opus-4-7";
+  }
+  if (args.programId) childEnv.WIKI_PROGRAM_ID = args.programId;
+  if (args.schemaPath) childEnv.WIKI_SCHEMA_PATH = args.schemaPath;
+  if (args.programOverlayPath) childEnv.WIKI_PROGRAM_OVERLAY_PATH = args.programOverlayPath;
+  return childEnv;
 }
 
 async function triggerEntityExtraction(args, env) {
@@ -285,6 +328,7 @@ async function main() {
   ensureScriptsExist();
 
   const env = loadEnv();
+  const childEnv = childEnvFor(args, env);
   const entityOutDir = path.join(args.outDir, "entities");
   const topicOutDir = path.join(args.outDir, "topics");
   ensureDir(args.outDir);
@@ -295,6 +339,7 @@ async function main() {
 
   console.log(`[wiki-compiler] repo=${REPO_ROOT}`);
   console.log(`[wiki-compiler] out=${args.outDir}`);
+  if (args.programId) console.log(`[wiki-compiler] program=${args.programId}`);
   console.log(`[wiki-compiler] topics=${args.topics.join(", ") || "(none)"}`);
 
   if (!args.skipExtraction) {
@@ -322,7 +367,7 @@ async function main() {
       "typed-edge-classifier",
       async () => {
         console.log(`[wiki-compiler] running typed-edge classifier`);
-        await spawnNode(SCRIPT_PATHS.typedEdges, edgeArgs);
+        await spawnNode(SCRIPT_PATHS.typedEdges, edgeArgs, childEnv);
         return {
           limit: args.edgeLimit,
           min_support: args.edgeMinSupport,
@@ -349,7 +394,7 @@ async function main() {
       "entity-wiki",
       async () => {
         console.log(`[wiki-compiler] generating entity wiki pages -> ${entityOutDir}`);
-        await spawnNode(SCRIPT_PATHS.entityWiki, entityArgs);
+        await spawnNode(SCRIPT_PATHS.entityWiki, entityArgs, childEnv);
         return {
           output_mode: args.entityOutputMode,
           out_dir: entityOutDir,
@@ -372,6 +417,7 @@ async function main() {
         async () => {
           console.log(`[wiki-compiler] generating topic wiki "${topic}" -> ${topicOutDir}`);
           await spawnNode(SCRIPT_PATHS.topicWiki, topicArgs, {
+            ...childEnv,
             WIKI_OUTPUT_DIR: topicOutDir,
           });
           return {
@@ -396,7 +442,7 @@ async function main() {
       "gmail-wiki",
       async () => {
         console.log(`[wiki-compiler] generating Gmail thread wiki pages`);
-        await spawnNode(SCRIPT_PATHS.gmailWiki, gmailArgs);
+        await spawnNode(SCRIPT_PATHS.gmailWiki, gmailArgs, childEnv);
         return {
           limit: args.gmailLimit,
           re_evaluate: Boolean(args.reEvaluate),

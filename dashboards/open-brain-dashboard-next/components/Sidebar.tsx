@@ -7,6 +7,7 @@ import { RestrictedToggle } from "@/components/RestrictedToggle";
 const nav = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
+  { href: "/triage", label: "Triage", icon: TriageIcon },
   { href: "/kanban", label: "Workflow", icon: KanbanIcon },
   { href: "/search", label: "Search", icon: SearchIcon },
   { href: "/audit", label: "Audit", icon: AuditIcon },
@@ -94,6 +95,16 @@ function ThoughtsIcon({ active }: { active: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
       <path d="M3 4.5h12M3 9h8M3 13.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TriageIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M9 1.5L16 15H2L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M9 6.5v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="9" cy="13" r=".75" fill="currentColor" />
     </svg>
   );
 }

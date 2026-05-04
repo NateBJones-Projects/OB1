@@ -89,6 +89,16 @@ export interface IngestionJob {
   completed_at: string | null;
 }
 
+export interface PendingThought {
+  id: string;
+  content: string;
+  candidate_metadata: Record<string, unknown> | null;
+  confidence: number | null;
+  surrounding_context: string | null;
+  source_ref: string | null;
+  created_at: string;
+}
+
 export interface BrowseResponse {
   data: Thought[];
   total: number;

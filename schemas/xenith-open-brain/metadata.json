@@ -1,0 +1,19 @@
+{
+  "name": "Xenith Open Brain Schema",
+  "description": "Create a 2560-dimensional Open Brain schema with Xenith program metadata indexes and a low-confidence triage queue.",
+  "category": "schemas",
+  "author": {
+    "name": "Stephen Strauss"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "Anthropic"],
+    "tools": ["Ollama", "Qwen3-Embedding-4B"]
+  },
+  "tags": ["xenith", "pgvector", "triage", "ollama"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-05-03",
+  "updated": "2026-05-03"
+}

@@ -170,6 +170,39 @@ node recipes/wiki-compiler/compile-wiki.mjs \
 node recipes/wiki-compiler/compile-wiki.mjs --gmail --gmail-limit 10
 ```
 
+### 6. Compile the Xenith program wiki
+
+For Stephen's Xenith install, use the Xenith shortcut. It reads `SCHEMA.md`,
+`wiki/programs/xenith.md`, scopes topic synthesis to `metadata.program_id =
+xenith`, and writes generated artifacts under `wiki/xenith/`.
+
+```bash
+node recipes/wiki-compiler/compile-wiki.mjs \
+  --xenith \
+  --best-effort
+```
+
+Dry-run the Xenith page without calling the LLM:
+
+```bash
+node recipes/wiki-compiler/compile-wiki.mjs \
+  --xenith \
+  --dry-run \
+  --skip-extraction \
+  --skip-edges \
+  --skip-entity-wiki
+```
+
+You can use the same program mode for another overlay later:
+
+```bash
+node recipes/wiki-compiler/compile-wiki.mjs \
+  --program personal \
+  --topic xenith_program \
+  --program-overlay wiki/programs/personal.md \
+  --out-dir wiki/personal
+```
+
 ## Scheduling
 
 This is designed to run on demand **or** on a schedule.
@@ -201,6 +234,20 @@ node recipes/wiki-compiler/compile-wiki.mjs \
 ```cron
 0 6 * * * cd /path/to/OB1 && /usr/bin/env node recipes/wiki-compiler/compile-wiki.mjs --edge-limit 25 --entity-batch-limit 15 --topic autobiography >> logs/wiki-compiler.log 2>&1
 ```
+
+### Xenith schedule
+
+For the Xenith install, use a light nightly compile and a deeper weekly run:
+
+```cron
+0 2 * * * cd /path/to/RVT_TPM_OpenBrain && /usr/bin/env node recipes/wiki-compiler/compile-wiki.mjs --xenith --best-effort --edge-limit 25 --entity-batch-limit 15 >> logs/xenith-wiki-compiler.log 2>&1
+0 0 * * 6 cd /path/to/RVT_TPM_OpenBrain && /usr/bin/env node recipes/wiki-compiler/compile-wiki.mjs --xenith --best-effort --edge-limit 150 --entity-batch-limit 75 --semantic-expand >> logs/xenith-wiki-compiler.log 2>&1
+```
+
+The shortcut loads `server/.env.xenith.local` in addition to `.env` and
+`.env.local`, maps `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` to the
+Open Brain environment names used by the underlying recipes, and uses direct
+Anthropic calls when `ANTHROPIC_API_KEY` is present.
 
 ### Agent-driven schedule
 
@@ -274,3 +321,7 @@ Solution: confirm your email thoughts use the expected Gmail metadata shape and 
 
 **Issue: topic synthesis writes the wrong pages**
 Solution: pass explicit `--topic` and `--scope key=value` flags so the wrapper only runs the slice you want.
+
+**Issue: Xenith compile finds no thoughts**
+Solution: confirm captured rows include `metadata.program_id = "xenith"`, or pass
+`--program <id>` for the program you want to compile.
