@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: Props) {
             name="password"
             required
             autoFocus
-            className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-500"
+            className="mt-1 block w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-base sm:text-sm text-zinc-900 focus:outline-none focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:focus:border-zinc-500"
           />
         </label>
         {error ? (
