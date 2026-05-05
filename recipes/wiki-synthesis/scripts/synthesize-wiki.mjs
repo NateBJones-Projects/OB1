@@ -94,10 +94,33 @@ SYNTHESIZERS.autobiography = {
     for (const year of years) {
       const entries = byYear.get(year);
       entries.sort((a, b) => a.lifeAt.localeCompare(b.lifeAt));
-      const sample = entries
-        .slice(0, 300) // cap per-year prompt size
-        .map((e) => `- [${e.lifeAt.slice(0, 10)}] ${String(e.content || "").replace(/\s+/g, " ")}`)
-        .join("\n");
+      // Build a bounded-size sample so we don't blow up model context
+      // when individual entries are long (meeting notes, code blocks, etc).
+      const MAX_ENTRIES = 300;
+      const MAX_ENTRY_CHARS = 240;
+      const MAX_SAMPLE_CHARS = 25_000;
+      const MIN_ENTRIES_BEFORE_BUDGET = 25;
+
+      const sampleLines = [];
+      let sampleChars = 0;
+      for (const e of entries) {
+        const raw = String(e.content || "").replace(/\s+/g, " ").trim();
+        const trimmed =
+          raw.length <= MAX_ENTRY_CHARS
+            ? raw
+            : raw.slice(0, MAX_ENTRY_CHARS - 1).trim() + "…";
+        const line = `- [${e.lifeAt.slice(0, 10)}] ${trimmed}`;
+        if (sampleLines.length >= MAX_ENTRIES) break;
+        if (
+          sampleChars + line.length + 1 > MAX_SAMPLE_CHARS &&
+          sampleLines.length >= MIN_ENTRIES_BEFORE_BUDGET
+        ) {
+          break;
+        }
+        sampleLines.push(line);
+        sampleChars += line.length + 1;
+      }
+      const sample = sampleLines.join("\n");
 
       const prompt = autobiographyYearPrompt(subjectName, year, sample, entries.length);
 
@@ -273,20 +296,58 @@ class BrainApi {
     };
   }
 
+  _inferSourceType(row) {
+    // OB1 schema variants:
+    // - some deployments have a dedicated `source_type` column
+    // - OB_mybcat canonical stores origin under metadata (e.g. source_system)
+    if (!row || typeof row !== "object") return null;
+    if (typeof row.source_type === "string" && row.source_type) return row.source_type;
+    const meta = row.metadata;
+    if (meta && typeof meta === "object") {
+      for (const key of ["source_type", "source_system", "source", "kind"]) {
+        const v = meta[key];
+        if (typeof v === "string" && v) return v;
+      }
+    }
+    return null;
+  }
+
   async fetchThoughts({ sourceType = null, pageLimit = 50 } = {}) {
     const all = [];
+    let supportsSourceTypeColumn = true;
     for (let page = 0; page < pageLimit; page++) {
       const offset = page * PAGE_SIZE;
+      const select = supportsSourceTypeColumn
+        ? "id,content,created_at,metadata,source_type"
+        : "id,content,created_at,metadata";
       let qs =
-        `thoughts?select=id,content,created_at,metadata,source_type` +
+        `thoughts?select=${select}` +
         `&order=id.asc&limit=${PAGE_SIZE}&offset=${offset}`;
-      if (sourceType) qs += `&source_type=eq.${encodeURIComponent(sourceType)}`;
+      // Prefer server-side filtering when the column exists; otherwise fall back
+      // to client-side filtering via metadata (see _inferSourceType()).
+      if (sourceType && supportsSourceTypeColumn) {
+        qs += `&source_type=eq.${encodeURIComponent(sourceType)}`;
+      }
       const res = await fetch(`${this.base}/${qs}`, { headers: this.headers });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
+        // Back-compat: some deployments don't have `thoughts.source_type`.
+        // Detect and retry without the column rather than failing the run.
+        if (
+          supportsSourceTypeColumn &&
+          (body.includes("thoughts.source_type") || body.includes("column thoughts.source_type")) &&
+          body.includes("does not exist")
+        ) {
+          supportsSourceTypeColumn = false;
+          page -= 1; // retry this page with the reduced select list
+          continue;
+        }
         throw new Error(`GET thoughts ${res.status}: ${body.slice(0, 300)}`);
       }
-      const rows = await res.json();
+      let rows = await res.json();
+      if (sourceType && !supportsSourceTypeColumn) {
+        rows = rows.filter((r) => this._inferSourceType(r) === sourceType);
+      }
       all.push(...rows);
       if (rows.length < PAGE_SIZE) break;
     }
