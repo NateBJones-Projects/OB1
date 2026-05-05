@@ -393,3 +393,12 @@ entrypoint = "./functions/open-brain-mcp/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/open-brain-mcp/*.html" ]
+
+[functions.update-thought]
+enabled = true
+# verify_jwt = false: the dashboard's Next.js server (the only caller) doesn't
+# have a Supabase user JWT. Auth is enforced inside the function via a shared
+# secret in the x-dashboard-secret header (UPDATE_THOUGHT_SECRET).
+verify_jwt = false
+import_map = "./functions/update-thought/deno.json"
+entrypoint = "./functions/update-thought/index.ts"

@@ -54,6 +54,7 @@ export async function listThoughts(
   let q = client()
     .from("thoughts")
     .select("id, content, metadata, created_at")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .limit(PAGE_SIZE + 1);
@@ -91,6 +92,7 @@ export async function distinctMetadataValues(): Promise<FilterFacets> {
   const { data: rows, error } = await client()
     .from("thoughts")
     .select("metadata")
+    .is("deleted_at", null)
     .limit(10000);
   if (error) throw new Error(`distinctMetadataValues: ${error.message}`);
 
@@ -121,6 +123,7 @@ export async function getThought(id: string): Promise<Thought | null> {
     .from("thoughts")
     .select("id, content, metadata, created_at")
     .eq("id", id)
+    .is("deleted_at", null)
     .maybeSingle();
   if (error) throw new Error(`getThought: ${error.message}`);
   return (data as Thought | null) ?? null;
@@ -131,21 +134,37 @@ export async function getNeighbors(id: string, k = 5): Promise<Thought[]> {
     .from("thoughts")
     .select("embedding")
     .eq("id", id)
+    .is("deleted_at", null)
     .maybeSingle();
   if (srcErr) throw new Error(`getNeighbors src: ${srcErr.message}`);
   const embedding = (src as { embedding: number[] | string | null } | null)?.embedding;
   if (!embedding) return [];
 
+  // match_thoughts is the core RPC and doesn't filter on deleted_at. Pull
+  // extra candidates and post-filter against a visible-id set so soft-deleted
+  // rows can't appear as neighbors.
   const { data, error } = await client().rpc("match_thoughts", {
     query_embedding: embedding as unknown as number[],
     match_threshold: 0.7,
-    match_count: k + 1,
+    match_count: k * 4 + 1,
     filter: {},
   });
   if (error) throw new Error(`getNeighbors match: ${error.message}`);
   type MatchRow = Thought & { similarity: number };
-  return ((data ?? []) as MatchRow[])
-    .filter((r) => r.id !== id)
+  const rows = (data ?? []) as MatchRow[];
+  const candidateIds = rows.map((r) => r.id).filter((rid) => rid !== id);
+  if (candidateIds.length === 0) return [];
+
+  const { data: visible, error: visErr } = await client()
+    .from("thoughts")
+    .select("id")
+    .in("id", candidateIds)
+    .is("deleted_at", null);
+  if (visErr) throw new Error(`getNeighbors visible: ${visErr.message}`);
+  const visibleSet = new Set((visible ?? []).map((r) => (r as { id: string }).id));
+
+  return rows
+    .filter((r) => r.id !== id && visibleSet.has(r.id))
     .slice(0, k)
     .map(({ id, content, metadata, created_at }) => ({ id, content, metadata, created_at }));
 }

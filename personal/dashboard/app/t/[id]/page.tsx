@@ -3,7 +3,8 @@ import { getNeighbors, getThought } from "@/lib/db";
 import { readTheme } from "@/lib/theme";
 import { BackLink } from "@/components/back-link";
 import { ConnectedPanel } from "@/components/connected-panel";
-import { Markdown } from "@/components/markdown";
+import { DeleteButton } from "@/components/delete-button";
+import { EditableContent } from "@/components/editable-content";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 type Params = Promise<{ id: string }>;
@@ -33,7 +34,8 @@ export default async function ThoughtDetailPage({ params }: { params: Params }) 
       <div className="mx-auto max-w-4xl p-6 space-y-6">
         <header className="flex items-center justify-between">
           <BackLink>← Browse</BackLink>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <DeleteButton id={thought.id} />
             <span className="text-xs text-zinc-500">
               {new Date(thought.created_at).toLocaleString()}
             </span>
@@ -56,9 +58,7 @@ export default async function ThoughtDetailPage({ params }: { params: Params }) 
               ) : null}
             </div>
             {title ? <h1 className="text-xl font-medium">{title}</h1> : null}
-            <div className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
-              <Markdown>{thought.content}</Markdown>
-            </div>
+            <EditableContent id={thought.id} initialContent={thought.content} />
 
             <details className="rounded border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
               <summary className="cursor-pointer px-3 py-2 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100">

@@ -92,10 +92,13 @@ server.registerTool(
   async ({ query, limit, threshold }) => {
     try {
       const qEmb = await getEmbedding(query);
+      // match_thoughts (core RPC) doesn't filter deleted_at, so over-fetch
+      // and post-filter against a visible-id set.
+      const overFetch = Math.min(200, limit * 4);
       const { data, error } = await supabase.rpc("match_thoughts", {
         query_embedding: qEmb,
         match_threshold: threshold,
-        match_count: limit,
+        match_count: overFetch,
         filter: {},
       });
 
@@ -106,13 +109,37 @@ server.registerTool(
         };
       }
 
-      if (!data || data.length === 0) {
+      let rows = (data ?? []) as Array<{
+        id: string;
+        content: string;
+        metadata: Record<string, unknown>;
+        similarity: number;
+        created_at: string;
+      }>;
+      if (rows.length > 0) {
+        const ids = rows.map((r) => r.id);
+        const { data: visible, error: visErr } = await supabase
+          .from("thoughts")
+          .select("id")
+          .in("id", ids)
+          .is("deleted_at", null);
+        if (visErr) {
+          return {
+            content: [{ type: "text" as const, text: `Search error: ${visErr.message}` }],
+            isError: true,
+          };
+        }
+        const visibleSet = new Set((visible ?? []).map((r: { id: string }) => r.id));
+        rows = rows.filter((r) => visibleSet.has(r.id)).slice(0, limit);
+      }
+
+      if (rows.length === 0) {
         return {
           content: [{ type: "text" as const, text: `No thoughts found matching "${query}".` }],
         };
       }
 
-      const results = data.map(
+      const results = rows.map(
         (
           t: {
             content: string;
@@ -143,7 +170,7 @@ server.registerTool(
         content: [
           {
             type: "text" as const,
-            text: `Found ${data.length} thought(s):\n\n${results.join("\n\n")}`,
+            text: `Found ${rows.length} thought(s):\n\n${results.join("\n\n")}`,
           },
         ],
       };
@@ -176,6 +203,7 @@ server.registerTool(
       let q = supabase
         .from("thoughts")
         .select("content, metadata, created_at")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false })
         .limit(limit);
 
@@ -241,11 +269,13 @@ server.registerTool(
     try {
       const { count } = await supabase
         .from("thoughts")
-        .select("*", { count: "exact", head: true });
+        .select("*", { count: "exact", head: true })
+        .is("deleted_at", null);
 
       const { data } = await supabase
         .from("thoughts")
         .select("metadata, created_at")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       const types: Record<string, number> = {};

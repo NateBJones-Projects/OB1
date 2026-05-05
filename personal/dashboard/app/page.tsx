@@ -10,6 +10,7 @@ import { SynthesisAnswer } from "@/components/synthesis-answer";
 import { SynthesisFallback } from "@/components/synthesis-fallback";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ThoughtCard } from "@/components/thought-card";
+import { UndeleteToast } from "@/components/undelete-toast";
 
 type Mode = "ask" | "search";
 
@@ -19,6 +20,7 @@ type SearchParams = Promise<{
   source?: string;
   project?: string;
   cursor?: string;
+  deleted?: string;
 }>;
 
 export default async function BrowsePage({
@@ -30,6 +32,7 @@ export default async function BrowsePage({
   const query = sp.q?.trim() ?? "";
   const rawMode = sp.mode;
   const mode: Mode = rawMode === "search" ? "search" : "ask"; // default ask
+  const deletedId = sp.deleted?.trim() ?? "";
   const theme = await readTheme();
 
   return (
@@ -72,6 +75,7 @@ export default async function BrowsePage({
           <BrowseView sp={sp} />
         )}
       </div>
+      {deletedId ? <UndeleteToast id={deletedId} /> : null}
     </main>
   );
 }
