@@ -4,15 +4,68 @@
 
 ### "Claude Desktop / ChatGPT gives me an auth error but Claude Code works fine"
 
-This is the single most common issue. The tell is right in the pattern: Claude Code can send custom headers, but Claude Desktop, Claude Web, and ChatGPT can't.
+This is the single most common setup issue. Every Open Brain connection requires **two headers** — one for Supabase's gateway, one for the Open Brain itself. Missing either one returns a 401 with no useful explanation.
 
-The fix: use the MCP Connection URL with the key embedded as a query parameter (`?key=your-access-key`), not as a custom header. Your URL should look like:
+#### Why two headers?
 
-```text
-https://your-project-ref.supabase.co/functions/v1/open-brain-mcp?key=your-access-key
+Open Brain sits behind a Supabase Edge Function. Supabase's gateway validates `Authorization: Bearer <anon_jwt>` before it will let a request reach your function at all — that's Supabase's own layer, not yours. Once the gateway passes the request through, the Open Brain function checks `x-brain-key: <your-access-key>` — that's the layer preventing anyone else from reading your brain. Both checks happen in sequence. Both headers must be present.
+
+- `Authorization: Bearer <SUPABASE_ANON_KEY>` — gateway auth. The anon key is safe to include in client configs; it's a JWT signed by Supabase, not a secret. Find it: Supabase Dashboard → Settings → API → "anon public" key.
+- `x-brain-key: <OPEN_BRAIN_ACCESS_KEY>` — app auth. This is the access key you set during initial Open Brain setup (`MCP_ACCESS_KEY` in Supabase secrets).
+
+#### Claude Desktop
+
+In `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "open-brain": {
+      "url": "https://your-project-ref.supabase.co/functions/v1/open-brain-mcp",
+      "headers": {
+        "Authorization": "Bearer your-supabase-anon-key",
+        "x-brain-key": "your-open-brain-access-key"
+      }
+    }
+  }
+}
 ```
 
-When adding the connector in Claude Desktop (Settings → Connectors) or ChatGPT (Settings → Apps & Connectors), paste that full URL. Set authentication to "none" — the key is already in the URL.
+#### ChatGPT custom GPT / OpenAI action
+
+In the Action schema Authentication section, set type to `custom` and add both headers:
+
+```json
+{
+  "type": "custom",
+  "headers": {
+    "Authorization": "Bearer your-supabase-anon-key",
+    "x-brain-key": "your-open-brain-access-key"
+  }
+}
+```
+
+#### Cursor / Claude Code (`.mcp.json`)
+
+```json
+{
+  "mcpServers": {
+    "open-brain": {
+      "url": "https://your-project-ref.supabase.co/functions/v1/open-brain-mcp",
+      "headers": {
+        "Authorization": "Bearer your-supabase-anon-key",
+        "x-brain-key": "your-open-brain-access-key"
+      }
+    }
+  }
+}
+```
+
+#### Migrating from the old `?key=` URL pattern
+
+URL parameter auth (`?key=your-access-key`) was removed in v7 (2026-05-04). Keys in URLs leak to server logs, browser history, and HTTP referer headers. If you have an existing config using that pattern, update it to the two-header format above. Remove the `?key=` portion from the URL and add the `headers` block instead. Any config still using `?key=` will receive a 401 after the v7 deploy.
+
+---
 
 ### "ChatGPT disabled my memory when I added the Open Brain"
 
@@ -220,7 +273,7 @@ That said: check your usage tier in your provider's console, make sure your agen
 
 1. **Did you follow the guide step by step?** Most issues trace back to a skipped or modified step.
 2. **Check Edge Function logs.** Supabase dashboard → Edge Functions → your function → Logs. This tells you what's actually breaking.
-3. **Is your URL format correct?** Should be: `https://your-ref.supabase.co/functions/v1/open-brain-mcp?key=your-key`
+3. **Are both auth headers present?** The URL needs no `?key=` param. You need `Authorization: Bearer <anon-key>` (Supabase gateway) AND `x-brain-key: <access-key>` (Open Brain). Missing either returns 401. See the setup section above for the exact header format for your client.
 4. **Use the Supabase AI assistant.** Paste your error and it can help diagnose Supabase-specific issues.
 5. **Don't let AI rewrite your server code** unless you understand what it's changing. Configuration problems need configuration fixes.
 
