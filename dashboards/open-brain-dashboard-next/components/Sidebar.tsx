@@ -26,7 +26,7 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen w-56 bg-bg-surface border-r border-border flex flex-col z-50
+      className={`fixed left-0 top-0 h-dvh w-56 bg-bg-surface border-r border-border flex flex-col z-50
         hidden md:flex
         ${isOpen ? "!flex" : ""}
       `}
