@@ -1,0 +1,7 @@
+{
+  "model": "gpt-image-2",
+  "output_format": "png",
+  "prompt": "Wide clean banner background for an AI developer plugin launch. Matte black and graphite, subtle olive and bone-white accents, faint modular circuit traces, thin pinstripe microtype texture, practical engineering feel, no readable text, no logo, high-end open-source documentation aesthetic.",
+  "quality": "high",
+  "size": "1536x512"
+}

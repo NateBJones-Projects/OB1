@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     if (!thoughtId || typeof thoughtId !== "string") {
       return NextResponse.json(
-        { error: "thoughtId (number) is required" },
+        { error: "thoughtId (string) is required" },
         { status: 400 }
       );
     }

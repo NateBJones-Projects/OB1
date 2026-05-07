@@ -1,0 +1,46 @@
+{
+  "schema_version": "openbrain.openclaw.recall.v1",
+  "workspace_id": "workspace_123",
+  "project_id": "project_ob1",
+  "task_id": "taskflow_step_002",
+  "flow_id": "taskflow_agent_memory_launch",
+  "task_type": "taskflow_work_log",
+  "channel": {
+    "kind": "openclaw",
+    "id": "flow_agent_memory_launch",
+    "thread_id": "step_002"
+  },
+  "runtime": {
+    "name": "openclaw",
+    "version": "2026.3.24-beta.2"
+  },
+  "model_intent": {
+    "provider": "anthropic",
+    "model": "claude-sonnet"
+  },
+  "query": "Continue the Agent Memory launch TaskFlow. Retrieve prior attempts, blockers, decisions, constraints, and what the next agent should know.",
+  "entities": {
+    "people": ["Jonathan Edwards"],
+    "orgs": ["OB1"],
+    "repos": ["NateBJones-Projects/OB1"],
+    "files": [],
+    "customers": [],
+    "topics": ["taskflow", "agent memory", "handoff"]
+  },
+  "scope": {
+    "visibility": "project",
+    "project_only": true,
+    "include_unconfirmed": true,
+    "include_stale": false
+  },
+  "limits": {
+    "max_items": 12,
+    "max_tokens": 6000,
+    "recency_days": 90
+  },
+  "sensitivity": {
+    "contains_code": false,
+    "contains_customer_data": false,
+    "contains_private_meeting_data": false
+  }
+}

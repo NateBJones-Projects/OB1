@@ -1,0 +1,13 @@
+flowchart LR
+  BadOutput["Bad agent output"] --> Trace["Open recall trace"]
+  Trace --> Ask["What did the agent ask?"]
+  Trace --> Returned["What memories returned?"]
+  Trace --> Used["Which were used?"]
+  Trace --> Ignored["Which were ignored?"]
+  Trace --> WriteBack["What was written back?"]
+  Returned --> Inspect["Inspect memory provenance and scope"]
+  Used --> Policy["Check use policy"]
+  WriteBack --> Review["Confirm, edit, reject, or mark stale"]
+  Inspect --> Fix["Fix memory, prompt, retrieval, or model choice"]
+  Policy --> Fix
+  Review --> Fix

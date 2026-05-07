@@ -112,7 +112,7 @@ export function KanbanBoard() {
     const { active, over } = event;
     if (!over) return;
 
-    const thoughtId = active.id as string;
+    const thoughtId = String(active.id);
     const newStatus = over.id as string;
 
     // Find which column the thought is currently in

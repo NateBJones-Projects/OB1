@@ -15,6 +15,7 @@ Reusable AI client skills and prompt packs for Open Brain workflows. These are t
 | [Aiception Skill Pack (formerly Claudeception)](claudeception/) | Extracts reusable lessons from work sessions into new skills | [@jaredirish](https://github.com/jaredirish) |
 | [Work Operating Model Skill Pack](work-operating-model/) | Runs a five-layer work elicitation interview and turns the approved result into structured Open Brain records plus exports | [@jonathanedwards](https://github.com/jonathanedwards) |
 | [World Model Readiness Diagnostic](world-model-diagnostic/) | Runs a 20-minute diagnostic that maps company fit, audits the boundary layer, flags simulated-judgment exposure, and returns a labeled build sequence | [@jonathanedwards](https://github.com/jonathanedwards) |
+| [OpenClaw Agent Memory Skill Pack](openclaw-agent-memory/) | Teaches OpenClaw agents to recall, write back, report usage, and respect OB1 provenance/use-policy rules | OB1 Team |
 
 ## How Skills Differ From Recipes
 

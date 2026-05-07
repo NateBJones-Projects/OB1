@@ -73,7 +73,7 @@ export async function fetchThoughts(
 
 export async function fetchThought(
   apiKey: string,
-  id: string | number,
+  id: string,
   excludeRestricted: boolean = true
 ): Promise<Thought> {
   const qs = excludeRestricted ? "" : "?exclude_restricted=false";
@@ -82,10 +82,10 @@ export async function fetchThought(
 
 export async function updateThought(
   apiKey: string,
-  id: string | number,
+  id: string,
   data: { content?: string; type?: string; importance?: number; status?: string | null }
-): Promise<{ id: string | number; action: string; message: string }> {
-  return apiFetch<{ id: string | number; action: string; message: string }>(
+): Promise<{ id: string; action: string; message: string }> {
+  return apiFetch<{ id: string; action: string; message: string }>(
     apiKey,
     `/thought/${id}`,
     {
@@ -136,7 +136,7 @@ export async function fetchDuplicates(
 
 export async function deleteThought(
   apiKey: string,
-  id: string | number
+  id: string
 ): Promise<void> {
   const url = `${API_URL}/thought/${id}`;
   const res = await fetch(url, {
@@ -229,7 +229,7 @@ export async function triggerIngest(
   apiKey: string,
   text: string,
   opts?: { dry_run?: boolean }
-): Promise<{ job_id: string; status: string }> {
+): Promise<{ job_id: number; status: string }> {
   return apiFetch(apiKey, "/ingest", {
     method: "POST",
     body: JSON.stringify({ text, ...opts }),

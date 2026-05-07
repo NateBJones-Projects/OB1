@@ -1,0 +1,21 @@
+{
+  "name": "ob1-agent-dashboard-walkthrough",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "screenshots": "node capture-chrome-screenshots.mjs",
+    "screenshots:playwright": "node capture-screenshots.mjs",
+    "guide": "node generate-guide.mjs",
+    "voiceover": "node generate-voiceover.mjs",
+    "prepare-video": "node prepare-video-assets.mjs",
+    "video": "npm run prepare-video && remotion render video/src/index.ts OB1AgentDashboard output/OB1-Agent-Dashboard-Walkthrough.mp4 --codec=h264 --audio-codec=aac",
+    "build": "npm run screenshots && npm run guide && npm run voiceover && npm run video"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.456",
+    "@remotion/renderer": "4.0.456",
+    "playwright": "1.59.1",
+    "remotion": "4.0.456"
+  }
+}

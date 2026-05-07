@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ReflectionInput,
-  ReflectionOption,
   ReflectionFactor,
 } from "@/lib/types";
 

@@ -1,0 +1,21 @@
+{
+  "name": "OpenClaw Code Review Memory",
+  "description": "Flagship OB1 Agent Memory workflow for making OpenClaw code review agents accumulate repo-specific lessons, maintainer preferences, and false positives safely.",
+  "category": "recipes",
+  "author": {
+    "name": "OB1 Team",
+    "github": "NateBJones-Projects"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "OpenRouter"],
+    "tools": ["OpenClaw", "GitHub", "OB1 Agent Memory API"]
+  },
+  "requires_skills": ["openclaw-agent-memory"],
+  "tags": ["openclaw", "code-review", "agent-memory", "github"],
+  "difficulty": "advanced",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-03",
+  "updated": "2026-05-03"
+}

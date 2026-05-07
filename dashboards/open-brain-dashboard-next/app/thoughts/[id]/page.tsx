@@ -26,7 +26,7 @@ export default async function ThoughtDetailPage({
   const session = await getSession();
   const excludeRestricted = !session.restrictedUnlocked;
   const { id } = await params;
-  const thoughtId = id;
+  const thoughtId = id.trim();
   if (!thoughtId) notFound();
 
   let thought;
