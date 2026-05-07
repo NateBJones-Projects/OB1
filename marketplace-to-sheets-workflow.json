@@ -1,0 +1,106 @@
+{
+  "name": "Marketplace Reports → Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      },
+      "id": "trigger",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const files = [\n  { file: 'reporting/processed/active_subscriptions.csv', sheet: 'Active Subscriptions' },\n  { file: 'reporting/processed/invoices_ytd.csv', sheet: 'Invoices YTD' },\n  { file: 'reporting/processed/lapsed_subscriptions.csv', sheet: 'Lapsed Subscriptions' },\n  { file: 'reporting/processed/metered_usage_rs.csv', sheet: 'RS Metered Usage' },\n  { file: 'reporting/processed/metered_usage_rs_by_customer_month.csv', sheet: 'RS by Customer Month' },\n  { file: 'reporting/processed/monthly_disbursements.csv', sheet: 'Monthly Disbursements' },\n  { file: 'reporting/processed/undisbursed.csv', sheet: 'Undisbursed' }\n];\n\nreturn files.map(f => ({ json: f }));"
+      },
+      "id": "define-files",
+      "name": "Define Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "bucketName": "cloudfix-seller-datafeeds",
+        "filePath": "={{ $json.file }}",
+        "options": {}
+      },
+      "id": "s3-get",
+      "name": "Download from S3",
+      "type": "n8n-nodes-base.awsS3",
+      "typeVersion": 2,
+      "position": [660, 300],
+      "credentials": {
+        "aws": {
+          "id": "YOUR_AWS_CREDENTIAL_ID",
+          "name": "AWS Marketplace"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "fromFile",
+        "fileFormat": "csv",
+        "options": {}
+      },
+      "id": "parse-csv",
+      "name": "Parse CSV",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": "1tsoQpgWa5bvM7KXLwFd4K92jcQz84sWmY1SH0SB_ImU",
+        "sheetName": "={{ $('Define Files').item.json.sheet }}",
+        "options": {
+          "cellFormat": "USER_ENTERED"
+        }
+      },
+      "id": "sheets-write",
+      "name": "Write to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1100, 300],
+      "credentials": {
+        "googleSheetsApi": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Monthly Schedule": {
+      "main": [
+        [{"node": "Define Files", "type": "main", "index": 0}]
+      ]
+    },
+    "Define Files": {
+      "main": [
+        [{"node": "Download from S3", "type": "main", "index": 0}]
+      ]
+    },
+    "Download from S3": {
+      "main": [
+        [{"node": "Parse CSV", "type": "main", "index": 0}]
+      ]
+    },
+    "Parse CSV": {
+      "main": [
+        [{"node": "Write to Google Sheets", "type": "main", "index": 0}]
+      ]
+    }
+  }
+}

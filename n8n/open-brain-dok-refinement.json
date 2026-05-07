@@ -1,0 +1,61 @@
+{
+  "name": "Open Brain - DOK Refinement Loop",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerRule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 0"
+            }
+          ],
+          "timezone": "UTC"
+        }
+      },
+      "id": "1",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://zpeedfgyuusscsrirzsg.supabase.co/functions/v1/dok-refinement/trigger",
+        "options": {
+          "method": "POST"
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-brain-key",
+              "value": "={{ $credentials.mcpAccessKey }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.supabaseServiceKey }}"
+            }
+          ]
+        }
+      },
+      "id": "2",
+      "name": "Run Refinement",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [[{"node": "Run Refinement", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "active": false,
+  "versionId": "2",
+  "id": "open-brain-dok-refinement",
+  "tags": []
+}

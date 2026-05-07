@@ -1,0 +1,206 @@
+{
+  "name": "Open Brain — Daily Gmail Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Every Day 23:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "returnAll": false,
+        "limit": 100,
+        "filters": {
+          "from": "",
+          "to": "",
+          "subject": "",
+          "label": "INBOX",
+          "query": "newer_than:1d -from:noreply -from:no-reply -from:mailer-daemon -from:postmaster -from:notifications -from:donotreply -subject:unsubscribe -subject:\"security alert\" -subject:\"verification code\""
+        }
+      },
+      "id": "gmail-read",
+      "name": "Gmail — Get New Emails",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [440, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_GMAIL_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "min-length",
+              "leftValue": "={{ $json.text || $json.snippet || '' }}",
+              "rightValue": "150",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "filter-noise",
+      "name": "Filter — Min 150 chars",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const emails = $input.all();\nconst results = [];\n\nfor (const item of emails) {\n  const email = item.json;\n  const text = (email.text || email.snippet || '').slice(0, 8000);\n  const subject = email.subject || 'No Subject';\n  const from = email.from?.email || email.from || 'Unknown';\n  const date = email.date || new Date().toISOString();\n  const dateIso = date.slice(0, 10);\n  \n  const content = `Email: ${subject}\\nFrom: ${from}\\nDate: ${dateIso}\\n\\n${text}`;\n  \n  results.push({\n    json: {\n      content,\n      subject: subject.slice(0, 300),\n      from: from.slice(0, 200),\n      date: dateIso,\n      source_type: 'gmail_daily',\n      metadata: JSON.stringify({\n        source: 'gmail_daily',\n        from: from.slice(0, 200),\n        subject: subject.slice(0, 300),\n        date: dateIso\n      })\n    }\n  });\n}\n\nreturn results;"
+      },
+      "id": "format-email",
+      "name": "Code — Format for Brain",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_OPENAI_API_KEY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"model\": \"text-embedding-3-small\", \"input\": {{ JSON.stringify($json.content.slice(0, 2000)) }} }",
+        "options": {}
+      },
+      "id": "get-embedding",
+      "name": "OpenAI — Get Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://zpeedfgyuusscsrirzsg.supabase.co/rest/v1/thoughts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify($node[\"Code — Format for Brain\"].json.content) }},\n  \"embedding\": {{ JSON.stringify($json.data[0].embedding) }},\n  \"source_type\": \"gmail_daily\",\n  \"metadata\": {{ $node[\"Code — Format for Brain\"].json.metadata }}\n}",
+        "options": {}
+      },
+      "id": "insert-thought",
+      "name": "Supabase — Insert Thought",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 300]
+    }
+  ],
+  "connections": {
+    "Every Day 23:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "Gmail — Get New Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail — Get New Emails": {
+      "main": [
+        [
+          {
+            "node": "Filter — Min 150 chars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter — Min 150 chars": {
+      "main": [
+        [
+          {
+            "node": "Code — Format for Brain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Format for Brain": {
+      "main": [
+        [
+          {
+            "node": "OpenAI — Get Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI — Get Embedding": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Insert Thought",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

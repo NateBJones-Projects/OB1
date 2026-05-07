@@ -1,0 +1,13 @@
+{
+  "name": "Substack Ingestion",
+  "description": "Automated capture of Substack newsletter articles with full paywalled content extraction",
+  "category": "recipes",
+  "author": { "name": "Bill Gleeson", "github": "gleesonb" },
+  "version": "1.0.0",
+  "requires": { "open_brain": true, "services": ["supabase"] },
+  "tags": ["substack", "ingestion", "newsletter", "capture"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
+}

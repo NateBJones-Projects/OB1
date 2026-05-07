@@ -1,68 +1,56 @@
-# Daily Digest
+# Daily Brain Digest
 
-> Automated daily summary of your recent thoughts, delivered to your inbox.
+Enhanced morning digest with DOK-aware grouping, SPOV status tags, and items needing review.
 
-## What It Does
+## Features
 
-Queries your most recent Open Brain thoughts, groups them by type and topic, and delivers a formatted summary. You wake up to a digest of everything your brain captured yesterday.
+- **DOK-aware grouping**: Thoughts organized by Depth of Knowledge level
+- **SPOV status tags**: [TRUTH], [MYTH], [OK], [NEEDS REVIEW] for DOK4 entries
+- **Needing Your Review**: Highlights broken SPOVs that require attention
+- **Source insights**: Shows source context for each entry
+- **Statistics and summaries**: Counts and trends over time
 
-There are two approaches — pick the one that fits your setup:
+## Usage
 
-| Approach | Infrastructure | Difficulty | Auto-send? |
-| -------- | -------------- | ---------- | ---------- |
-| **Claude Code Scheduled Task** (below) | None — uses MCP tools you already have | Beginner | Draft only (one-tap send) |
-| **Supabase Edge Function** (planned) | Edge Function + pg_cron + email service | Intermediate | Full auto-send |
+The skill runs automatically as part of your weekly digest workflow, or can be triggered manually:
 
----
+1. Uses Open Brain MCP `recall` tool to get recent thoughts (last 7 days)
+2. Groups content by DOK level with appropriate formatting
+3. Highlights items needing human review
+4. Generates a comprehensive email digest
 
-## Approach A: Claude Code Scheduled Task
-
-Zero-infrastructure variant. If you already run Claude Code (or Claude Desktop's Code mode) with Open Brain MCP and Gmail MCP connected, this works today with no deployment.
-
-### Prerequisites
-
-- Working Open Brain setup ([guide](../../docs/01-getting-started.md))
-- Claude Code or Claude Desktop (Code mode) with:
-  - Open Brain MCP connected
-  - Gmail MCP connected (for email delivery)
-
-### How It Works
-
-Claude Code has built-in scheduled tasks (visible in Claude Desktop under the **Scheduled** tab). You install a skill file — a prompt template — that tells Claude what to do on each run:
-
-1. Query Open Brain for thoughts from the last 24 hours
-2. Organize them into a scannable digest (grouped by type, with topic/people tags)
-3. Create a Gmail draft addressed to you
-
-Claude *is* the LLM — no OpenRouter key needed.
-
-### Steps
-
-![Step 1](https://img.shields.io/badge/Step_1-Install_the_Skill_File-1E88E5?style=for-the-badge)
-
-Copy the skill template into your Claude scheduled tasks directory:
-
-```bash
-mkdir -p ~/.claude/scheduled-tasks/daily-digest
-cp recipes/daily-digest/daily-digest-skill.md ~/.claude/scheduled-tasks/daily-digest/SKILL.md
-```
-
-Then open the file and replace `YOUR_EMAIL@example.com` with your actual email address.
-
-> [!IMPORTANT]
-> The skill file is a local prompt — it never gets committed to any repo. Your email stays on your machine.
-
----
-
-![Step 2](https://img.shields.io/badge/Step_2-Create_the_Scheduled_Task-1E88E5?style=for-the-badge)
-
-In any Claude Code session (or Claude Desktop Code mode), run:
+## Output Format
 
 ```
-/schedule
+=== Weekly Brain Digest — April 14-20, 2026 ===
+
+Summary:
+- 12 new insights captured
+- DOK2: 5 clusters, DOK3: 4 insights, DOK4: 3 SPOVs
+- Top topics: AI, Product Strategy, Personal Development
+
+=== DOK2 — Clusters (5) ===
+- **AI Implementation Trends** [Work Project]: Summary of emerging patterns in AI adoption across industries...
+- **Competitive Analysis** [Competitive Intel]: Latest developments in market positioning...
+
+=== DOK3 — Insights (4) ===
+- **Market Disruption Timing** [Product Strategy]: Analysis suggests Q3 2026 is the inflection point...
+- **Team Productivity Patterns** [Personal Dev]: Data reveals 2x output increase when using async...
+
+=== DOK4 — SPOVs (3) ===
+- **Remote Work Superiority** [TRUTH]: Contrarian position that distributed teams outperform collocated in knowledge work...
+- **AI Will Replace All Programming** [NEEDS REVIEW]: Strong position challenged by recent evidence about human-AI collaboration...
+
+=== Items Needing Your Review ===
+❗ **Remote Work Superiority** [BROKEN]: Contradicted by new productivity data from team studies...
 ```
 
-Or create it directly by telling Claude:
+## Integration
+
+Depends on:
+- Open Brain v2 MCP server
+- DOK pipeline processing
+- Access stats tracking (for determining relevance)
 
 > "Create a scheduled task called daily-digest that runs every day at 7am using the skill file at ~/.claude/scheduled-tasks/daily-digest/SKILL.md"
 

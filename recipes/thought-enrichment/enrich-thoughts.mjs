@@ -12,13 +12,14 @@
  *   node enrich-thoughts.mjs --dry-run --limit 10
  *   node enrich-thoughts.mjs --apply --concurrency 5
  *   node enrich-thoughts.mjs --apply --provider anthropic --concurrency 20
+ *   node enrich-thoughts.mjs --apply --provider openai --concurrency 20
  *   node enrich-thoughts.mjs --apply --retry-failed
  *
  * Flags:
  *   --apply              Write enrichment results back to Supabase
  *   --dry-run             Preview classifications without writing
  *   --status              Show enrichment progress stats
- *   --provider <name>     openrouter (default) or anthropic
+ *   --provider <name>     openai (default), openrouter, or anthropic
  *   --concurrency <n>     Parallel calls (default: 20)
  *   --limit <n>           Process at most N thoughts
  *   --skip <n>            Skip first N un-enriched thoughts
@@ -161,8 +162,36 @@ async function callOpenRouter(userInput, config) {
   return (result?.choices?.[0]?.message?.content || "").trim();
 }
 
+async function callOpenAI(userInput, config) {
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.openaiApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: config.openaiModel || "gpt-4o-mini",
+      max_tokens: 1024,
+      temperature: 0.1,
+      messages: [
+        { role: "system", content: CLASSIFICATION_PROMPT },
+        { role: "user", content: userInput },
+      ],
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`OpenAI ${res.status}: ${body.substring(0, 300)}`);
+  }
+
+  const result = await res.json();
+  return (result?.choices?.[0]?.message?.content || "").trim();
+}
+
 async function classifyWithProvider(userInput, config) {
   if (config.provider === "anthropic") return callAnthropic(userInput, config);
+  if (config.provider === "openai") return callOpenAI(userInput, config);
   return callOpenRouter(userInput, config);
 }
 
@@ -186,6 +215,7 @@ async function withRetry(fn, maxRetries = 3) {
 
 function resolveModelLabel(config) {
   if (config.provider === "anthropic") return config.anthropicModel;
+  if (config.provider === "openai") return config.openaiModel;
   return config.openRouterModel;
 }
 
@@ -224,6 +254,11 @@ async function main() {
   }
   if (config.provider === "openrouter" && !config.openRouterApiKey) {
     console.error("ERROR: --provider openrouter requires OPENROUTER_API_KEY in .env.local");
+    process.exitCode = 1;
+    return;
+  }
+  if (config.provider === "openai" && !config.openaiApiKey) {
+    console.error("ERROR: --provider openai requires OPENAI_API_KEY in .env.local");
     process.exitCode = 1;
     return;
   }
@@ -444,32 +479,128 @@ async function classifyAndUpdate(thought, config) {
 // --- Supabase Operations ---
 
 async function fetchUnenriched(config, cursor, limit) {
-  const url = new URL(`${config.supabaseUrl}/rest/v1/thoughts`);
-  url.searchParams.set("select", "id,content,source_type,metadata");
-  url.searchParams.set("enriched", "eq.false");
-  url.searchParams.set("order", "id.asc");
-  url.searchParams.set("limit", String(limit));
+  // Start with just id and content, then we'll check what columns exist
+  const url = `${config.supabaseUrl}/rest/v1/thoughts?select=id,content&order=id.asc&limit=${limit}`;
 
   if (cursor?.afterId != null) {
-    url.searchParams.set("id", `gt.${cursor.afterId}`);
+    url += `&id=gt.${cursor.afterId}`;
   } else if (cursor?.offset) {
-    url.searchParams.set("offset", String(cursor.offset));
+    url += `&offset=${cursor.offset}`;
   }
 
-  const res = await fetch(url, { headers: supabaseHeaders(config) });
+  const res = await fetch(url, {
+    headers: {
+      apikey: config.supabaseServiceRoleKey,
+      Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+      "Content-Type": "application/json"
+    }
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Fetch un-enriched failed (${res.status}): ${body.substring(0, 300)}`);
   }
   const rows = await res.json();
-  return Array.isArray(rows) ? rows : [];
+
+  // If we have source_type and metadata columns, fetch them separately
+  if (rows.length > 0) {
+    const idList = rows.map(r => r.id).join(',');
+    const metadataUrl = `${config.supabaseUrl}/rest/v1/thoughts?select=source_type,metadata&id=in.(${idList})`;
+
+    const metadataRes = await fetch(metadataUrl, {
+      headers: {
+        apikey: config.supabaseServiceRoleKey,
+        Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (metadataRes.ok) {
+      const metadataRows = await metadataRes.json();
+      const metadataMap = {};
+      metadataRows.forEach(row => {
+        metadataMap[row.id] = row;
+      });
+
+      // Merge metadata with basic data
+      return rows.map(row => ({
+        ...row,
+        source_type: metadataMap[row.id]?.source_type || null,
+        metadata: metadataMap[row.id]?.metadata || {}
+      }));
+    }
+  }
+
+  return rows.map(row => ({
+    ...row,
+    source_type: null,
+    metadata: row.metadata || {}
+  }));
+}
+
+async function fetchAnyThoughts(config, cursor, limit) {
+  // Similar to fetchUnenriched but doesn't filter by enriched column
+  const url = `${config.supabaseUrl}/rest/v1/thoughts?select=id,content&order=id.asc&limit=${limit}`;
+
+  if (cursor?.afterId != null) {
+    url += `&id=gt.${cursor.afterId}`;
+  } else if (cursor?.offset) {
+    url += `&offset=${cursor.offset}`;
+  }
+
+  const res = await fetch(url, {
+    headers: {
+      apikey: config.supabaseServiceRoleKey,
+      Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+      "Content-Type": "application/json"
+    }
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Fetch thoughts failed (${res.status}): ${body.substring(0, 300)}`);
+  }
+  const rows = await res.json();
+
+  // Fetch additional columns if they exist
+  if (rows.length > 0) {
+    const idList = rows.map(r => r.id).join(',');
+    const additionalUrl = `${config.supabaseUrl}/rest/v1/thoughts?select=source_type,metadata,enriched&id=in.(${idList})`;
+
+    const additionalRes = await fetch(additionalUrl, {
+      headers: {
+        apikey: config.supabaseServiceRoleKey,
+        Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (additionalRes.ok) {
+      const additionalRows = await additionalRes.json();
+      const additionalMap = {};
+      additionalRows.forEach(row => {
+        additionalMap[row.id] = row;
+      });
+
+      return rows.map(row => ({
+        ...row,
+        ...additionalMap[row.id]
+      }));
+    }
+  }
+
+  return rows;
 }
 
 async function fetchByIds(config, ids) {
   if (ids.length === 0) return [];
   const idList = ids.join(",");
-  const url = `${config.supabaseUrl}/rest/v1/thoughts?select=id,content,source_type,metadata&id=in.(${idList})`;
-  const res = await fetch(url, { headers: supabaseHeaders(config) });
+  const url = `${config.supabaseUrl}/rest/v1/thoughts?select=id,content&source_type,metadata&id=in.(${idList})`;
+  const res = await fetch(url, {
+    headers: {
+      apikey: config.supabaseServiceRoleKey,
+      Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+      "Content-Type": "application/json"
+    }
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Fetch by IDs failed (${res.status}): ${body.substring(0, 300)}`);
@@ -487,7 +618,8 @@ async function patchThought(id, patch, config) {
   const res = await fetch(url, {
     method: "PATCH",
     headers: {
-      ...supabaseHeaders(config),
+      apikey: config.supabaseServiceRoleKey,
+      Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
       "Content-Type": "application/json",
       Prefer: "return=minimal",
     },
@@ -501,7 +633,8 @@ async function patchThought(id, patch, config) {
     const res2 = await fetch(url, {
       method: "PATCH",
       headers: {
-        ...supabaseHeaders(config),
+        apikey: config.supabaseServiceRoleKey,
+        Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
         "Content-Type": "application/json",
         Prefer: "return=minimal",
       },
@@ -540,6 +673,8 @@ function supabaseHeaders(config) {
   return {
     apikey: config.supabaseServiceRoleKey,
     Authorization: `Bearer ${config.supabaseServiceRoleKey}`,
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal"
   };
 }
 
@@ -626,7 +761,7 @@ function nextFetchCursor(currentCursor, thoughts) {
 // --- Config & CLI ---
 
 function buildConfig(args, env) {
-  const provider = args.provider || env.ENRICH_PROVIDER || "openrouter";
+  const provider = args.provider || env.ENRICH_PROVIDER || "openai";
   return {
     provider,
     concurrency: parseInt(args.concurrency || "20", 10),
@@ -641,6 +776,9 @@ function buildConfig(args, env) {
     // OpenRouter
     openRouterApiKey: env.OPENROUTER_API_KEY || "",
     openRouterModel: args.model || env.OPENROUTER_CLASSIFIER_MODEL || "openai/gpt-4o-mini",
+    // OpenAI direct
+    openaiApiKey: env.OPENAI_API_KEY || "",
+    openaiModel: args.model || env.OPENAI_CLASSIFIER_MODEL || "gpt-4o-mini",
     // Supabase
     supabaseUrl: env.SUPABASE_URL || "",
     supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY || "",

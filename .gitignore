@@ -23,3 +23,35 @@ sync-log.json
 
 # Build artifacts
 deno.lock
+
+# ── GSD baseline (auto-generated) ──
+.gsd
+.gsd-id
+.mcp.json
+.bg-shell/
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.code-workspace
+.env.*
+!.env.example
+.next/
+dist/
+build/
+.venv/
+venv/
+target/
+vendor/
+*.log
+coverage/
+.cache/
+tmp/
+exports/
+backup/
+compiled-wiki/
+.hive/
+.claude/
+*.heapsnapshot

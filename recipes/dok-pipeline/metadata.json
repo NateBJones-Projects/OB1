@@ -1,0 +1,14 @@
+{
+  "name": "DOK Pipeline",
+  "description": "Progressive knowledge enrichment from raw facts to Spiky Points of View",
+  "category": "recipes",
+  "author": { "name": "Bill Gleeson", "github": "gleesonb" },
+  "version": "1.0.0",
+  "requires": { "open_brain": true, "services": ["supabase", "openai"] },
+  "requires_skills": ["spov-generation"],
+  "tags": ["dok", "pipeline", "insights", "spov", "enrichment"],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
+}

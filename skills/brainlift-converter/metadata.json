@@ -1,0 +1,21 @@
+{
+  "name": "BrainLift Converter",
+  "description": "Analyze and restructure data into knowledge bases optimized for LLMs using the BrainLift methodology",
+  "category": "skills",
+  "author": {
+    "name": "Bill Gleeson",
+    "github": "gleesonb"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "requires_skills": ["spov-generation"],
+    "services": [],
+    "tools": []
+  },
+  "tags": ["brainlift", "converter", "knowledge-base", "synthesis"],
+  "difficulty": "advanced",
+  "estimated_time": "30 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
+}

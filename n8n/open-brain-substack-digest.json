@@ -1,0 +1,266 @@
+{
+  "name": "Open Brain — Daily Substack Capture",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerRule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 7 * * *"
+            }
+          ],
+          "timezone": "UTC"
+        }
+      },
+      "id": "1",
+      "name": "Every Day 07:30 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://natesnewsletter.substack.com/feed",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "2",
+      "name": "Fetch Substack RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse RSS XML, filter to posts from the last 2 days only\nconst xml = $input.first().json.body || String($input.first().json);\nconst items = [];\nconst itemRegex = /<item>([\\s\\S]*?)<\\/item>/g;\nlet match;\nwhile ((match = itemRegex.exec(xml)) !== null) {\n  const item = match[1];\n  const title = (item.match(/<title>(?:<![CDATA[)?([\\s\\S]*?)(?:]]>)?<\\/title>/) || [])[1] || '';\n  const link = (item.match(/<link>([\\s\\S]*?)<\\/link>/) || [])[1] || '';\n  const pubDate = (item.match(/<pubDate>([\\s\\S]*?)<\\/pubDate>/) || [])[1] || '';\n  items.push({ title: title.trim(), link: link.trim(), pubDate: pubDate.trim() });\n}\n\n// Filter to last 2 days\nconst cutoff = new Date(Date.now() - 2 * 86400000);\nconst recent = items.filter(i => {\n  const d = new Date(i.pubDate);\n  return !isNaN(d) && d >= cutoff;\n});\n\nif (recent.length === 0) {\n  return [{ json: { skipped: true, reason: 'No new posts in last 2 days' } }];\n}\n\nreturn recent.map(i => ({ json: i }));"
+      },
+      "id": "3",
+      "name": "Parse RSS + Filter Recent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-link",
+              "leftValue": "={{ $json.link }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "not-skipped",
+              "leftValue": "={{ $json.skipped }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4",
+      "name": "Filter — Has Content",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.link }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "5",
+      "name": "Fetch Full Article",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract article text from Substack page HTML\nconst html = $input.first().json.body || String($input.first().json);\nconst title = $input.first().json.title || 'Untitled';\nconst link = $input.first().json.link || '';\nconst pubDate = $input.first().json.pubDate || '';\n\n// Try to extract from _preloads JSON first (full content)\nlet text = '';\nconst preloadMatch = html.match(/window\\._preloads\\s*=\\s*JSON\\.parse\\(\"(.*?)\"\\)/);\nif (preloadMatch) {\n  try {\n    const raw = preloadMatch[1].replace(/\\\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));\n    const data = JSON.parse(raw);\n    const bodyHtml = data?.post?.body_html || '';\n    text = bodyHtml.replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"').replace(/&#39;/g, \"'\").replace(/\\s+/g, ' ').trim();\n  } catch (e) {\n    // Fall through to meta extraction\n  }\n}\n\n// Fallback: extract from meta tags / visible text\nif (!text || text.length < 100) {\n  // Try og:description\n  const ogMatch = html.match(/<meta[^>]*property=\"og:description\"[^>]*content=\"([^\"]*)\"/);\n  if (ogMatch) {\n    text = ogMatch[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '\"');\n  }\n  // Also grab any visible paragraphs\n  const paras = html.match(/<p[^>]*>([\\s\\S]*?)<\\/p>/g);\n  if (paras && text.length < 500) {\n    const paraText = paras.map(p => p.replace(/<[^>]+>/g, '').trim()).filter(p => p.length > 20).join(' ');\n    text = text ? text + ' ' + paraText : paraText;\n  }\n}\n\nif (!text || text.length < 50) {\n  return [{ json: { skipped: true, reason: 'Could not extract content', link } }];\n}\n\nconst content = `Substack: ${title}\\nDate: ${pubDate ? new Date(pubDate).toISOString().slice(0, 10) : 'unknown'}\\n\\n${text.slice(0, 8000)}`;\n\nreturn [{ json: {\n  content,\n  title: title.slice(0, 300),\n  link,\n  pubDate,\n  source_type: 'substack',\n  metadata: JSON.stringify({\n    source: 'substack-daily',\n    title: title.slice(0, 300),\n    url: link,\n    date: pubDate ? new Date(pubDate).toISOString().slice(0, 10) : 'unknown'\n  })\n}}];"
+      },
+      "id": "6",
+      "name": "Code — Extract Content",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_OPENAI_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"model\": \"text-embedding-3-small\", \"input\": {{ JSON.stringify($json.content.slice(0, 2000)) }} }",
+        "options": {}
+      },
+      "id": "7",
+      "name": "OpenAI — Get Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://zpeedfgyuusscsrirzsg.supabase.co/rest/v1/thoughts",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "YOUR_SUPABASE_SERVICE_KEY"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_SUPABASE_SERVICE_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": {{ JSON.stringify($node[\"Code — Extract Content\"].json.content) }},\n  \"embedding\": {{ JSON.stringify($json.data[0].embedding) }},\n  \"source_type\": \"substack\",\n  \"metadata\": {{ $node[\"Code — Extract Content\"].json.metadata }}\n}",
+        "options": {}
+      },
+      "id": "8",
+      "name": "Supabase — Insert Thought",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300]
+    }
+  ],
+  "connections": {
+    "Every Day 07:30 UTC": {
+      "main": [
+        [
+          {
+            "node": "Fetch Substack RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Substack RSS": {
+      "main": [
+        [
+          {
+            "node": "Parse RSS + Filter Recent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse RSS + Filter Recent": {
+      "main": [
+        [
+          {
+            "node": "Filter — Has Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter — Has Content": {
+      "main": [
+        [
+          {
+            "node": "Fetch Full Article",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full Article": {
+      "main": [
+        [
+          {
+            "node": "Code — Extract Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code — Extract Content": {
+      "main": [
+        [
+          {
+            "node": "OpenAI — Get Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI — Get Embedding": {
+      "main": [
+        [
+          {
+            "node": "Supabase — Insert Thought",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "active": false,
+  "versionId": "3",
+  "id": "open-brain-substack-digest",
+  "tags": []
+}

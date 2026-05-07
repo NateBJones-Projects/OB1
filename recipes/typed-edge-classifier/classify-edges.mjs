@@ -71,6 +71,9 @@ const PRICING = {
   "claude-haiku-4-5": { in: 1.0, out: 5.0 },
   "claude-opus-4-7": { in: 15.0, out: 75.0 },
   "claude-opus-4-6": { in: 15.0, out: 75.0 },
+  "o4-mini": { in: 1.10, out: 4.40 },
+  "o3": { in: 2.0, out: 8.0 },
+  "gpt-4o-mini": { in: 0.15, out: 0.60 },
 };
 
 // Tracks which unknown models we've already warned about so the log
@@ -241,20 +244,32 @@ function printHelp() {
 function loadEnv() {
   const env = process.env;
   const missing = [];
-  for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY", "ANTHROPIC_API_KEY"]) {
+  for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY"]) {
     if (!env[k]) missing.push(k);
+  }
+  // Prefer OpenAI if available and valid; fall back to Anthropic
+  const hasOpenAI = env.OPENAI_API_KEY && !env.OPENAI_API_KEY.startsWith("placeholder");
+  const hasAnthropic = env.ANTHROPIC_API_KEY && !env.ANTHROPIC_API_KEY.startsWith("placeholder");
+  let llmKey, provider;
+  if (hasOpenAI) {
+    llmKey = env.OPENAI_API_KEY;
+    provider = "openai";
+  } else if (hasAnthropic) {
+    llmKey = env.ANTHROPIC_API_KEY;
+    provider = "anthropic";
+  } else {
+    missing.push("OPENAI_API_KEY or ANTHROPIC_API_KEY (real key, not placeholder)");
   }
   if (missing.length > 0) {
     throw new Error(`Missing env vars: ${missing.join(", ")}`);
   }
-  // Normalize URL — allow OPEN_BRAIN_URL with or without trailing slash,
-  // with or without /rest/v1. Store the base project URL.
   let base = String(env.OPEN_BRAIN_URL).replace(/\/+$/, "");
   base = base.replace(/\/rest\/v1$/, "");
   return {
     OPEN_BRAIN_URL: base,
     OPEN_BRAIN_SERVICE_KEY: env.OPEN_BRAIN_SERVICE_KEY,
-    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+    LLM_API_KEY: llmKey,
+    LLM_PROVIDER: provider,
   };
 }
 
@@ -311,23 +326,62 @@ function sbClient(env) {
 
 // ── candidate sampling ─────────────────────────────────────────────────────
 
+const HIGH_VALUE_SOURCES = new Set([
+  "substack", "chatgpt_memory", "perplexity_memory", "mcp", "manual",
+  "daily_digest", "google_drive",
+]);
+const OPERATIONAL_SOURCES = new Set(["gmail", "gmail_daily", "google_chat"]);
+
 /**
- * Sample candidate thought pairs. Strategy: find pairs of thoughts that
- * share at least `minSupport` entities via `thought_entities`. These
- * are the pairs with the most signal for the classifier.
+ * Fetch the source_type for a set of thought IDs.
+ * Returns Map<thought_id, source_type>.
+ * Uses POST with body via Supabase RPC or falls back to batched GET.
+ */
+async function fetchThoughtSources(sb, thoughtIds) {
+  if (thoughtIds.length === 0) return new Map();
+  const result = new Map();
+  // Batch in groups of 50 to stay within URL length limits
+  const BATCH = 50;
+  for (let i = 0; i < thoughtIds.length; i += BATCH) {
+    const batch = thoughtIds.slice(i, i + BATCH);
+    const filter = batch.map((id) => `id.eq.${id}`).join(",");
+    const rows = await sb.get(
+      `thoughts?select=id,source_type&or=(${filter})&limit=${BATCH}`,
+    );
+    for (const r of rows) result.set(r.id, r.source_type);
+  }
+  return result;
+}
+
+/**
+ * Sample candidate thought pairs using source-aware stratified sampling.
  *
- * If `thought_entities` is not installed (i.e. the caller hasn't set up
- * entity-extraction), fall back to nothing — force them to use --pair.
+ * Problem: with 53K Gmail thoughts, entity co-occurrence is dominated by
+ * operational data. Substack articles (140) almost never pair with each
+ * other in the top-5000 entity rows.
+ *
+ * Solution: fetch ALL thought_entities for high-value sources, then sample
+ * operational sources. Build three pair categories:
+ *   1. HV↔HV  (substack↔substack, mcp↔mcp, etc.)
+ *   2. HV↔OP  (substack↔gmail cross-pollination)
+ *   3. OP↔OP  (gmail↔gmail, capped)
+ *
+ * Within each category, require entity overlap >= minSupport.
  */
 async function sampleCandidatePairs(sb, minSupport, limit) {
-  // Pull recent thought_entities rows, build a thought -> [entity_ids]
-  // map in JS, then find pairs with overlap >= minSupport. We cap the
-  // pull at 5000 rows to keep memory bounded.
-  let rows;
+  // Step 1: Fetch ALL thought_entities rows (paginate past Supabase's 1000-row default)
+  let allRows = [];
   try {
-    rows = await sb.get(
-      `thought_entities?select=thought_id,entity_id&order=created_at.desc&limit=5000`,
-    );
+    let offset = 0;
+    const pageSize = 1000;
+    while (true) {
+      const batch = await sb.get(
+        `thought_entities?select=thought_id,entity_id&order=created_at.desc&offset=${offset}&limit=${pageSize}`,
+      );
+      allRows.push(...batch);
+      if (batch.length < pageSize) break;
+      offset += pageSize;
+    }
   } catch (e) {
     if (String(e.message).includes("404") || String(e.message).includes("42P01")) {
       throw new Error(
@@ -338,38 +392,111 @@ async function sampleCandidatePairs(sb, minSupport, limit) {
     throw e;
   }
 
+  // Step 2: Build thought → [entity_ids] map
   const thoughtToEntities = new Map();
-  for (const r of rows) {
+  for (const r of allRows) {
     const arr = thoughtToEntities.get(r.thought_id) || [];
     arr.push(r.entity_id);
     thoughtToEntities.set(r.thought_id, arr);
   }
 
-  const thoughtIds = [...thoughtToEntities.keys()];
+  const allThoughtIds = [...thoughtToEntities.keys()];
+  console.log(`[sample] ${allRows.length} thought_entities rows, ${allThoughtIds.length} unique thoughts`);
+
+  // Step 3: Fetch source_type for all thoughts
+  const thoughtSources = await fetchThoughtSources(sb, allThoughtIds);
+  console.log(`[sample] Fetched source_type for ${thoughtSources.size} thoughts`);
+
+  // Step 4: Partition thoughts by source category
+  // null source_type thoughts are pre-import curated content (original ~1442)
+  // that have entity extraction — treat as high-value.
+  const hvThoughts = allThoughtIds.filter((id) => {
+    const src = thoughtSources.get(id);
+    return !src || HIGH_VALUE_SOURCES.has(src);
+  });
+  const opThoughts = allThoughtIds.filter((id) => {
+    const src = thoughtSources.get(id);
+    return src && OPERATIONAL_SOURCES.has(src);
+  });
+  const otherThoughts = allThoughtIds.filter((id) => {
+    const src = thoughtSources.get(id);
+    return src && !HIGH_VALUE_SOURCES.has(src) && !OPERATIONAL_SOURCES.has(src);
+  });
+
+  console.log(`[sample] HV: ${hvThoughts.length}, OP: ${opThoughts.length}, Other: ${otherThoughts.length}`);
+
+  // Step 5: Sample candidate pairs with priority tiers
   const pairs = [];
-  for (let i = 0; i < thoughtIds.length; i++) {
-    const entsA = new Set(thoughtToEntities.get(thoughtIds[i]));
-    for (let j = i + 1; j < thoughtIds.length; j++) {
-      const entsB = thoughtToEntities.get(thoughtIds[j]);
-      let overlap = 0;
-      for (const e of entsB) {
-        if (entsA.has(e)) overlap++;
-        if (overlap >= minSupport) break;
+  const seen = new Set();
+
+  const pairKey = (a, b) => (a < b ? `${a}|${b}` : `${b}|${a}`);
+  const tryAdd = (idA, idB) => {
+    const key = pairKey(idA, idB);
+    if (seen.has(key)) return;
+    const entsA = new Set(thoughtToEntities.get(idA));
+    const entsB = thoughtToEntities.get(idB);
+    let overlap = 0;
+    for (const e of entsB) {
+      if (entsA.has(e)) overlap++;
+      if (overlap >= minSupport) break;
+    }
+    if (overlap >= minSupport) {
+      seen.add(key);
+      pairs.push({ from_thought_id: idA, to_thought_id: idB, support: overlap });
+    }
+  };
+
+  // Tier 1: HV ↔ HV (highest priority — analytical content paired together)
+  for (let i = 0; i < hvThoughts.length; i++) {
+    for (let j = i + 1; j < hvThoughts.length; j++) {
+      tryAdd(hvThoughts[i], hvThoughts[j]);
+    }
+    if (pairs.length >= limit * 4) break;
+  }
+  console.log(`[sample] Tier 1 (HV↔HV): ${pairs.length} pairs`);
+
+  // Tier 2: HV ↔ OP (cross-pollination — substack insights vs operational data)
+  const tier1Count = pairs.length;
+  // Limit OP thoughts sampled to avoid O(n*m) explosion
+  const opSample = opThoughts.length > 500
+    ? opThoughts.filter((_, i) => i % Math.ceil(opThoughts.length / 500) === 0)
+    : opThoughts;
+  for (const hvId of hvThoughts) {
+    if (pairs.length >= limit * 4) break;
+    for (const opId of opSample) {
+      tryAdd(hvId, opId);
+      if (pairs.length >= limit * 4) break;
+    }
+  }
+  console.log(`[sample] Tier 2 (HV↔OP): +${pairs.length - tier1Count} pairs`);
+
+  // Tier 3: OP ↔ OP (fill remaining budget, evenly sampled)
+  const tier2Count = pairs.length;
+  if (pairs.length < limit * 4) {
+    // Sample a subset of OP thoughts for inter-pairing
+    const opSubset = opSample.slice(0, 300);
+    for (let i = 0; i < opSubset.length && pairs.length < limit * 4; i++) {
+      for (let j = i + 1; j < opSubset.length && pairs.length < limit * 4; j++) {
+        tryAdd(opSubset[i], opSubset[j]);
       }
-      if (overlap >= minSupport) {
-        pairs.push({
-          from_thought_id: thoughtIds[i],
-          to_thought_id: thoughtIds[j],
-          support: overlap,
-        });
+    }
+  }
+  console.log(`[sample] Tier 3 (OP↔OP): +${pairs.length - tier2Count} pairs`);
+
+  // Also include other/unknown thoughts in cross-pairs
+  if (otherThoughts.length > 0 && pairs.length < limit * 4) {
+    for (const oId of otherThoughts.slice(0, 200)) {
+      for (const hvId of hvThoughts.slice(0, 100)) {
+        tryAdd(oId, hvId);
+        if (pairs.length >= limit * 4) break;
       }
       if (pairs.length >= limit * 4) break;
     }
-    if (pairs.length >= limit * 4) break;
   }
 
   // Sort by support desc, then trim to limit
   pairs.sort((a, b) => b.support - a.support);
+  console.log(`[sample] Total: ${pairs.length} candidate pairs, returning top ${limit}`);
   return pairs.slice(0, limit);
 }
 
@@ -424,10 +551,13 @@ function backoffDelayMs(attempt) {
 }
 
 async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
+  if (env.LLM_PROVIDER === "openai") {
+    return await callOpenAI(env, model, system, userMsg, maxTokens);
+  }
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
-      "x-api-key": env.ANTHROPIC_API_KEY,
+      "x-api-key": env.LLM_API_KEY,
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
@@ -452,6 +582,48 @@ async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
     raw,
     inTokens: usage.input_tokens || 0,
     outTokens: usage.output_tokens || 0,
+  };
+}
+
+async function callOpenAI(env, model, system, userMsg, maxTokens) {
+  // Map Anthropic model names to OpenAI equivalents
+  // Use gpt-4o-mini for fast filter (not a reasoning model), o3 for classification
+  const modelMap = {
+    "claude-haiku-4-5-20251001": "gpt-4o-mini",
+    "claude-opus-4-7": "o3",
+  };
+  const openaiModel = modelMap[model] || "o3";
+  // Reasoning models need much higher token limits (thinking tokens count against the budget)
+  const effectiveMaxTokens = openaiModel.startsWith("o") ? Math.max(maxTokens * 5, 2000) : maxTokens;
+  const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.LLM_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: openaiModel,
+      max_completion_tokens: effectiveMaxTokens,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    const err = new Error(`OpenAI ${openaiModel}: ${res.status} ${body.slice(0, 400)}`);
+    err.status = res.status;
+    err.retryable = shouldRetryAnthropicStatus(res.status);
+    throw err;
+  }
+  const body = await res.json();
+  const raw = body?.choices?.[0]?.message?.content?.trim() ?? "";
+  const usage = body?.usage || {};
+  return {
+    raw,
+    inTokens: usage.prompt_tokens || 0,
+    outTokens: usage.completion_tokens || 0,
   };
 }
 
@@ -581,26 +753,44 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
   const validFrom = cls.valid_from && cls.valid_from !== "null" ? cls.valid_from : null;
   const validUntil = cls.valid_until && cls.valid_until !== "null" ? cls.valid_until : null;
 
-  // Call the thought_edges_upsert RPC so duplicates bump support_count
-  // and refresh valid_until atomically (see schemas/typed-reasoning-edges/
-  // schema.sql section 4b, and README duplicate-handling contract). A
-  // plain POST to the table would raise a unique-violation on repeat
-  // classifications and we would lose the evidence accumulation the
-  // docs promise.
-  const rpcArgs = {
-    p_from_thought_id: from,
-    p_to_thought_id: to,
-    p_relation: cls.relation,
-    p_confidence: Math.round(cls.confidence * 100) / 100,
-    p_support_count: pair.support || 1,
-    p_classifier_version: CLASSIFIER_VERSION,
-    p_valid_from: validFrom,
-    p_valid_until: validUntil,
-    p_metadata: metadata,
+  // Direct REST insert into thought_edges. Prefer the upsert RPC for
+  // evidence accumulation, but fall back to plain POST if the RPC
+  // has different parameter names on the deployed instance.
+  const edgeRow = {
+    from_thought_id: from,
+    to_thought_id: to,
+    relation: cls.relation,
+    confidence: Math.round(cls.confidence * 100) / 100,
+    support_count: pair.support || 1,
+    classifier_version: CLASSIFIER_VERSION,
+    valid_from: validFrom,
+    valid_until: validUntil,
+    metadata,
   };
 
   try {
-    const inserted = await sb.post("rpc/thought_edges_upsert", rpcArgs);
+    // Try upsert RPC first (atomic duplicate handling)
+    let inserted;
+    try {
+      inserted = await sb.post("rpc/thought_edges_upsert", {
+        p_from_thought_id: from,
+        p_to_thought_id: to,
+        p_relation: cls.relation,
+        p_confidence: Math.round(cls.confidence * 100) / 100,
+        p_support_count: pair.support || 1,
+        p_classifier_version: CLASSIFIER_VERSION,
+        p_valid_from: validFrom,
+        p_valid_until: validUntil,
+        p_metadata: metadata,
+      });
+    } catch (rpcErr) {
+      // RPC parameter mismatch — fall back to direct REST insert
+      if (String(rpcErr.message).includes("PGRST202") || String(rpcErr.message).includes("schema cache")) {
+        inserted = await sb.post("thought_edges", edgeRow, { prefer: "return=representation" });
+      } else {
+        throw rpcErr;
+      }
+    }
     // RPC returning a composite type yields an object directly; if
     // PostgREST wraps it in an array for some versions, unwrap.
     const row = Array.isArray(inserted) ? inserted[0] : inserted;
@@ -658,10 +848,10 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
 
     return { ok: true, id: edgeId };
   } catch (e) {
-    // The RPC uses ON CONFLICT DO UPDATE, so unique-violation cannot
-    // occur for valid inputs. Any error here is a real failure (FK
-    // violation on a deleted thought, RLS denial, network, schema
-    // cache stale after migration, etc.).
+    // 409 = unique constraint violation = duplicate, treat as success
+    if (e.status === 409 || String(e.message).includes("409") || String(e.message).includes("duplicate")) {
+      return { ok: true, id: null };
+    }
     return { ok: false, reason: e.message };
   }
 }
@@ -695,6 +885,7 @@ async function processPair(env, sb, args, pair, costState) {
     try {
       filt = await filterCandidate(env, args.filterModel, thoughtA, thoughtB);
     } catch (e) {
+      console.error(`[classify-edges] filter error for pair ${pair.a}/${pair.b}: ${e.message}`);
       return { ...pair, status: "filter_error", error: e.message };
     }
     filterModelUsed = args.filterModel;
@@ -713,6 +904,7 @@ async function processPair(env, sb, args, pair, costState) {
   try {
     cls = await classifyPair(env, classifyModel, thoughtA, thoughtB);
   } catch (e) {
+    console.error(`[classify-edges] classify error for pair ${pair.a}/${pair.b}: ${e.message}`);
     return { ...pair, status: "classifier_error", error: e.message };
   }
   costState.spent += estimateCost(classifyModel, cls.inTokens, cls.outTokens);

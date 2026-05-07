@@ -240,16 +240,15 @@ async function fetchLinkedThoughts(sb, entityId, limit = 200) {
 }
 
 async function fetchTypedEdges(sb, entityId, perDirection = 200) {
-  // Typed edges only — co_occurs_with is noise. Order by support_count desc.
   const base = "edges?";
   const selects =
-    "select=id,from_entity_id,to_entity_id,relation,support_count,confidence,metadata,created_at,updated_at";
+    "select=id,source_id,target_id,type,strength,metadata,created_at,updated_at";
   const [out, inc] = await Promise.all([
     sb.get(
-      `${base}${selects}&from_entity_id=eq.${entityId}&relation=neq.co_occurs_with&order=support_count.desc.nullslast&limit=${perDirection}`,
+      `${base}${selects}&source_id=eq.${entityId}&type=neq.co_occurs_with&order=strength.desc.nullslast&limit=${perDirection}`,
     ),
     sb.get(
-      `${base}${selects}&to_entity_id=eq.${entityId}&relation=neq.co_occurs_with&order=support_count.desc.nullslast&limit=${perDirection}`,
+      `${base}${selects}&target_id=eq.${entityId}&type=neq.co_occurs_with&order=strength.desc.nullslast&limit=${perDirection}`,
     ),
   ]);
   return { out: out || [], in: inc || [] };
@@ -410,15 +409,15 @@ function buildSynthesisInput(entity, linked, semantic, nameMap, maxLinked, maxSe
   // co-mention branch — do not reintroduce one without also un-excluding
   // those rows upstream.
   function describe(edge, dir) {
-    const otherId = dir === "out" ? edge.to_entity_id : edge.from_entity_id;
+    const otherId = dir === "out" ? edge.target_id : edge.source_id;
     const other = nameMap.get(otherId) || { name: `#${otherId}`, type: "unknown" };
     return {
-      relation: edge.relation,
+      relation: edge.type,
       direction: dir,
       other_name: other.name,
       other_type: other.type,
-      support: edge.support_count,
-      confidence: edge.confidence,
+      support: edge.strength,
+      confidence: null,
     };
   }
   const allEdges = [
@@ -777,7 +776,7 @@ async function generateForEntity(sb, env, entity, args) {
   const linked = await fetchLinkedThoughts(sb, entity.id);
   // 2. Typed edges + connected entity names
   const { out: eOut, in: eIn } = await fetchTypedEdges(sb, entity.id);
-  const otherIds = [...eOut.map((e) => e.to_entity_id), ...eIn.map((e) => e.from_entity_id)];
+  const otherIds = [...eOut.map((e) => e.target_id), ...eIn.map((e) => e.source_id)];
   const nameMap = await fetchEntityNames(sb, otherIds);
   entity.__edges_out = eOut;
   entity.__edges_in = eIn;

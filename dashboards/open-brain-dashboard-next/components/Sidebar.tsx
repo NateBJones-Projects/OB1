@@ -9,6 +9,7 @@ const nav = [
   { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
   { href: "/kanban", label: "Workflow", icon: KanbanIcon },
   { href: "/search", label: "Search", icon: SearchIcon },
+  { href: "/candidates", label: "Candidates", icon: CandidatesIcon },
   { href: "/audit", label: "Audit", icon: AuditIcon },
   { href: "/duplicates", label: "Duplicates", icon: DuplicatesIcon },
   { href: "/ingest", label: "Add", icon: AddIcon },
@@ -111,6 +112,14 @@ function AuditIcon({ active }: { active: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
       <path d="M9 1.5L2 5v4c0 4.4 3 8.5 7 9.5 4-1 7-5.1 7-9.5V5L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CandidatesIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M9 1.5L11.5 6.5L17 7.2L13 11.1L14 16.5L9 13.8L4 16.5L5 11.1L1 7.2L6.5 6.5L9 1.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
   );
 }

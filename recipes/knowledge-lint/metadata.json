@@ -1,0 +1,13 @@
+{
+  "name": "Knowledge Lint",
+  "description": "Weekly health check that prunes stale, redundant, or low-value knowledge entries",
+  "category": "recipes",
+  "author": { "name": "Bill Gleeson", "github": "gleesonb" },
+  "version": "1.0.0",
+  "requires": { "open_brain": true, "services": ["supabase", "openai"] },
+  "tags": ["lint", "prune", "maintenance", "archive"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
+}

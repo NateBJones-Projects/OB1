@@ -1,20 +1,13 @@
 {
-  "name": "Daily Digest",
-  "description": "Automated daily summary of recent thoughts delivered via Gmail draft, powered by Claude Code scheduled tasks and Open Brain MCP. Zero infrastructure required.",
+  "name": "Daily Brain Digest",
+  "description": "Enhanced morning digest with DOK-aware grouping, SPOV status tags, and items needing review",
   "category": "recipes",
-  "author": {
-    "name": "Matt Hallett",
-    "github": "matthallett"
-  },
-  "version": "1.0.0",
-  "requires": {
-    "open_brain": true,
-    "services": ["Gmail MCP"],
-    "tools": ["Claude Code or Claude Desktop"]
-  },
-  "tags": ["digest", "summary", "email", "automation", "scheduled-task", "gmail", "claude-code"],
+  "author": { "name": "Bill Gleeson", "github": "gleesonb" },
+  "version": "2.0.0",
+  "requires": { "open_brain": true, "services": ["supabase", "openai"], "recipes": ["dok-pipeline"] },
+  "tags": ["digest", "email", "daily", "spov", "dok"],
   "difficulty": "beginner",
-  "estimated_time": "10 minutes",
-  "created": "2026-03-25",
-  "updated": "2026-03-25"
+  "estimated_time": "15 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
 }

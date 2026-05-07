@@ -1,0 +1,20 @@
+{
+  "name": "SPOV Generation",
+  "description": "Generate truth/myth Spiky Points of View with confidence scoring from accumulated insights",
+  "category": "skills",
+  "author": {
+    "name": "Bill Gleeson",
+    "github": "gleesonb"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["spov", "truth", "myth", "contrarian", "insights"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
+}

@@ -15,8 +15,8 @@ export async function POST(request: NextRequest) {
   try {
     const { action, thought_id_a, thought_id_b } = (await request.json()) as {
       action: "keep_a" | "keep_b" | "keep_both";
-      thought_id_a: number;
-      thought_id_b: number;
+      thought_id_a: string;
+      thought_id_b: string;
     };
 
     if (!thought_id_a || !thought_id_b) {

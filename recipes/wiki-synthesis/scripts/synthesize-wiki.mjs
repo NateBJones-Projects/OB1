@@ -94,9 +94,10 @@ SYNTHESIZERS.autobiography = {
     for (const year of years) {
       const entries = byYear.get(year);
       entries.sort((a, b) => a.lifeAt.localeCompare(b.lifeAt));
-      const sample = entries
-        .slice(0, 300) // cap per-year prompt size
-        .map((e) => `- [${e.lifeAt.slice(0, 10)}] ${String(e.content || "").replace(/\s+/g, " ")}`)
+      // Spread sample evenly across the year instead of taking first N
+      const cap = 150;
+      const sample = (entries.length <= cap ? entries : entries.filter((_, i) => i % Math.ceil(entries.length / cap) === 0).slice(0, cap))
+        .map((e) => `- [${e.lifeAt.slice(0, 10)}] ${String(e.content || "").replace(/\s+/g, " ").slice(0, 300)}`)
         .join("\n");
 
       const prompt = autobiographyYearPrompt(subjectName, year, sample, entries.length);

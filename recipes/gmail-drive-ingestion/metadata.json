@@ -1,0 +1,13 @@
+{
+  "name": "Gmail & Drive Ingestion",
+  "description": "Automated daily capture from Gmail inbox and Google Drive notes via n8n",
+  "category": "recipes",
+  "author": { "name": "Bill Gleeson", "github": "gleesonb" },
+  "version": "1.0.0",
+  "requires": { "open_brain": true, "services": ["supabase", "n8n", "gmail", "google-drive"] },
+  "tags": ["gmail", "drive", "ingestion", "capture", "n8n"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
+}
