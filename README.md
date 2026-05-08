@@ -50,6 +50,9 @@ Some concepts show up in multiple extensions. Learn them once, apply them everyw
 
 | Primitive | What It Teaches | Used By |
 | --------- | --------------- | ------- |
+| [Deploy an Edge Function](primitives/deploy-edge-function/) | Deploying any extension as a Supabase Edge Function | All extensions |
+| [Remote MCP Connection](primitives/remote-mcp/) | Connecting to Claude Desktop, ChatGPT, Claude Code, Cursor, and other clients | All extensions |
+| [Common Troubleshooting](primitives/troubleshooting/) | Solutions for connection, deployment, and database issues | All extensions |
 | [Row Level Security](primitives/rls/) | PostgreSQL policies for multi-user data isolation | Extensions 4, 5, 6 |
 | [Shared MCP Server](primitives/shared-mcp/) | Giving others scoped access to parts of your brain | Extension 4 |
 
@@ -144,12 +147,6 @@ Tables and sidecars that extend the base `thoughts` model without replacing it.
 | Schema | What It Does | Contributor |
 | ------ | ------------ | ----------- |
 | [Agent Memory](schemas/agent-memory/) | Provenance, review, use-policy, source-reference, relation, recall-trace, and audit sidecars for agent workflow memory | OB1 Team |
-
-### [`/primitives`](primitives/) — Reusable Patterns
-
-| Primitive | What It Does | Contributor |
-| --------- | ------------ | ----------- |
-| [Content Fingerprint Dedup](primitives/content-fingerprint-dedup/) | SHA-256 deduplication for thought ingestion — prevents duplicates across all import recipes | [@alanshurafa](https://github.com/alanshurafa) |
 
 ## Using a Contribution
 
