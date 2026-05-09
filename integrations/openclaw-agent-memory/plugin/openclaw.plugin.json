@@ -2,7 +2,9 @@
   "id": "nbj-ob1-agent-memory",
   "name": "NBJ OB1 Agent Memory for OpenClaw",
   "description": "Typed OpenClaw tools for governed Nate Jones OB1 memory recall, write-back, review, inspection, and trace debugging.",
-  "skills": ["./skills/openclaw-agent-memory"],
+  "skills": [
+    "./skills/openclaw-agent-memory"
+  ],
   "kind": "memory",
   "contracts": {
     "tools": [
@@ -12,7 +14,10 @@
       "openbrain_inspect_memory",
       "openbrain_list_review_queue",
       "openbrain_review_memory",
-      "openbrain_get_recall_trace"
+      "openbrain_get_recall_trace",
+      "memory_search",
+      "memory_get",
+      "memory_store"
     ]
   },
   "configSchema": {
@@ -33,11 +38,19 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["source", "provider", "id"],
+            "required": [
+              "source",
+              "provider",
+              "id"
+            ],
             "properties": {
               "source": {
                 "type": "string",
-                "enum": ["env", "file", "exec"]
+                "enum": [
+                  "env",
+                  "file",
+                  "exec"
+                ]
               },
               "provider": {
                 "type": "string"

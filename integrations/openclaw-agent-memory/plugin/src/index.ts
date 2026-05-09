@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { resolveConfiguredSecretInputString } from "openclaw/plugin-sdk/secret-input-runtime";
 import { AgentMemoryClient, type AgentMemoryConfig } from "./client.js";
+import { createOB1Runtime } from "./search-manager.js";
 
 async function clientFromApi(api: { pluginConfig?: unknown; config?: unknown }) {
   const raw = (api.pluginConfig || {}) as Record<string, unknown>;
@@ -46,6 +47,16 @@ function toolResult(value: unknown) {
     ],
     details: value,
   };
+}
+
+function clampInt(n: number, lo: number, hi: number): number {
+  if (typeof n !== "number" || Number.isNaN(n)) return lo;
+  return Math.max(lo, Math.min(hi, Math.floor(n)));
+}
+
+function clampFloat(n: number, lo: number, hi: number): number {
+  const v = typeof n === "number" && !Number.isNaN(n) ? n : lo;
+  return Math.max(lo, Math.min(hi, v));
 }
 
 function registerTool(api: any, tool: { name: string; label: string; description: string; parameters: unknown; run: (client: AgentMemoryClient, input: any) => Promise<unknown> }) {
@@ -158,5 +169,299 @@ export default definePluginEntry({
       parameters: Type.Object({ request_id: Type.String() }),
       run: (client, input) => client.getRecallTrace(input.request_id),
     });
+
+    // ------------------------------------------------------------------
+    // Memory-host hooks (fix for #279).
+    //
+    // The plugin registers tools above, but without participating in the
+    // OpenClaw memory-host lifecycle, agents only invoke OB1 if they
+    // remember to. We register two additive memory hooks so OB1 lands
+    // in every turn automatically:
+    //
+    //   1. registerMemoryPromptSupplement — auto-injects an OB1 discipline
+    //      block into the system prompt (recall-before / writeback-after
+    //      reminder, instruction-vs-evidence semantics, tool list).
+    //   2. registerMemoryCorpusSupplement — exposes OB1 as a searchable
+    //      corpus so OpenClaw's native recall flow queries OB1 alongside
+    //      whatever other corpora are active.
+    //
+    // Both are additive (per the SDK contract), coexist with the active
+    // exclusive memory plugin, and no-op cleanly when OB1 isn't configured.
+    // ------------------------------------------------------------------
+
+    const OB1_TOOL_NAMES = [
+      "openbrain_recall",
+      "openbrain_writeback",
+      "openbrain_report_usage",
+      "openbrain_inspect_memory",
+      "openbrain_list_review_queue",
+      "openbrain_review_memory",
+      "openbrain_get_recall_trace",
+    ] as const;
+
+    function isConfigured(): boolean {
+      const raw = ((api as any).pluginConfig || {}) as Record<string, unknown>;
+      return typeof raw.endpoint === "string"
+        && raw.endpoint.length > 0
+        && typeof raw.workspaceId === "string"
+        && raw.workspaceId.length > 0;
+    }
+
+    if (typeof (api as any).registerMemoryPromptSupplement === "function") {
+      (api as any).registerMemoryPromptSupplement((params: { availableTools: Set<string> }) => {
+        if (!isConfigured()) return [];
+        const present = OB1_TOOL_NAMES.filter((t) => params.availableTools.has(t));
+        if (present.length === 0) return [];
+        return [
+          "## OB1 Agent Memory",
+          "Long-term governed memory is available via OB1. Use it as a discipline, not a fallback.",
+          "",
+          "Workflow:",
+          "- Before meaningful work, call `openbrain_recall` with a task-scoped query.",
+          "- Treat returned memories tagged `instruction` as binding rules; `evidence`-tagged ones as supporting context only.",
+          "- After meaningful work, call `openbrain_writeback` with compact, provenance-labeled findings (decisions, lessons, constraints, outputs, failures).",
+          "- After acting on recalled memories, call `openbrain_report_usage` with `request_id` and the IDs you used vs. ignored — closes the recall-quality loop.",
+          "",
+          `Available tools: ${present.map((t) => "`" + t + "`").join(", ")}.`,
+        ];
+      });
+    }
+
+    // ------------------------------------------------------------------
+    // Active-memory capability (#282).
+    //
+    // The supplements above (#281) layer additive context onto whatever the
+    // active memory plugin is. To make OB1 *be* the active memory plugin
+    // (so OpenClaw routes its native memory_search / memory_get tools and
+    // the active-memory pipeline through us), we also register a real
+    // MemoryCapability with a search-manager runtime.
+    //
+    // Selection still requires user config: plugins.slots.memory =
+    // "nbj-ob1-agent-memory". registerMemoryCapability alone declares
+    // candidacy; the slots config flips the switch.
+    // ------------------------------------------------------------------
+
+    if (typeof (api as any).registerMemoryCapability === "function") {
+      const ob1Runtime = createOB1Runtime({
+        buildClient: (_agentId: string) => clientFromApi(api),
+        // Phase 9 will derive workspaceId from agentId for multi-tenant; for
+        // now, every agent shares the configured workspace.
+        workspaceIdFor: (_agentId: string) => {
+          const raw = ((api as any).pluginConfig || {}) as Record<string, unknown>;
+          return typeof raw.workspaceId === "string" && raw.workspaceId.length > 0
+            ? raw.workspaceId
+            : "default";
+        },
+      });
+
+      (api as any).registerMemoryCapability({
+        // Mirror the supplement section so it shows up even when OB1 is the
+        // active memory plugin (no other promptBuilder will run).
+        promptBuilder: (params: { availableTools: Set<string> }) => {
+          if (!isConfigured()) return [];
+          const present = OB1_TOOL_NAMES.filter((t) => params.availableTools.has(t));
+          if (present.length === 0) return [];
+          return [
+            "## OB1 Agent Memory (active backend)",
+            "Long-term governed memory is available via OB1 as the active memory backend.",
+            "",
+            "Workflow:",
+            "- Use `memory_search` (or `openbrain_recall`) to recall relevant prior memory before meaningful work.",
+            "- Treat returned memories tagged `instruction` as binding rules; `evidence`-tagged ones as supporting context only.",
+            "- Use `openbrain_writeback` to capture compact, provenance-labeled findings (decisions, lessons, constraints, outputs, failures).",
+            "- After acting on recalled memories, call `openbrain_report_usage` to close the recall-quality loop.",
+          ];
+        },
+        runtime: ob1Runtime,
+      });
+    }
+
+    // Standard memory_search / memory_get tool wrappers — these are the
+    // names the active-memory plugin and OpenClaw's prompt template look
+    // for. The seven openbrain_* tools above stay as the advanced surface
+    // (governance review queue, recall traces, etc.).
+
+    api.registerTool({
+      name: "memory_search",
+      label: "Memory search (OB1)",
+      description: "Search long-term memory for relevant prior decisions, lessons, constraints, or notes.",
+      parameters: Type.Object({
+        query: Type.String({ description: "Natural-language search query." }),
+        max_results: Type.Optional(Type.Number({ description: "Maximum results, 1-50.", default: 10 })),
+      }),
+      async execute(_id: string, params: any) {
+        const client = await clientFromApi(api);
+        const max = clampInt(params?.max_results ?? 10, 1, 50);
+        const result = await client.recall({
+          query: String(params?.query ?? "").slice(0, 2000),
+          task_type: "search",
+          limits: { max_items: max, max_tokens: 4000 },
+          scope: {
+            visibility: "personal",
+            project_only: false,
+            include_unconfirmed: true,
+            include_stale: false,
+          },
+          runtime: { name: "openclaw" },
+        });
+        return toolResult(result);
+      },
+    });
+
+    api.registerTool({
+      name: "memory_get",
+      label: "Memory get (OB1)",
+      description: "Inspect one specific OB1 memory by id, including provenance.",
+      parameters: Type.Object({
+        memory_id: Type.String({ description: "OB1 memory id (uuid)." }),
+      }),
+      async execute(_id: string, params: any) {
+        const client = await clientFromApi(api);
+        const memory = await client.inspectMemory(String(params?.memory_id ?? ""));
+        return toolResult(memory);
+      },
+    });
+
+    api.registerTool({
+      name: "memory_store",
+      label: "Memory store (OB1)",
+      description:
+        "Store a compact, governed memory in OB1 — decisions, lessons, constraints, outputs, or failures. Lands as pending review by default.",
+      parameters: Type.Object({
+        content: Type.String({ description: "The memory content. Compact, single point per call." }),
+        memory_type: Type.Optional(
+          Type.Union(
+            [
+              Type.Literal("decision"),
+              Type.Literal("lesson"),
+              Type.Literal("constraint"),
+              Type.Literal("output"),
+              Type.Literal("failure"),
+              Type.Literal("next_step"),
+              Type.Literal("unresolved_question"),
+            ],
+            { description: "OB1 governance category. Defaults to 'output'.", default: "output" },
+          ),
+        ),
+        confidence: Type.Optional(
+          Type.Number({ description: "Self-reported confidence 0-1.", default: 0.7 }),
+        ),
+      }),
+      async execute(_id: string, params: any) {
+        const client = await clientFromApi(api);
+        const content = String(params?.content ?? "").trim();
+        if (!content) {
+          return toolResult({ error: "memory_store requires non-empty content" });
+        }
+        const type = String(params?.memory_type ?? "output");
+        const conf = clampFloat(params?.confidence ?? 0.7, 0, 1);
+        const categoryMap: Record<string, string> = {
+          decision: "decisions",
+          lesson: "lessons",
+          constraint: "constraints",
+          output: "outputs",
+          failure: "failures",
+          next_step: "next_steps",
+          unresolved_question: "unresolved_questions",
+        };
+        const bucket = categoryMap[type] ?? "outputs";
+        const result = await client.writeback({
+          memory_payload: { [bucket]: [content] },
+          runtime: { name: "openclaw" },
+          provenance: {
+            default_status: "generated",
+            confidence: conf,
+            requires_review: true,
+          },
+        });
+        return toolResult(result);
+      },
+    });
+
+    if (typeof (api as any).registerMemoryCorpusSupplement === "function") {
+      (api as any).registerMemoryCorpusSupplement({
+        async search(input: { query: string; maxResults?: number; agentSessionKey?: string }) {
+          if (!isConfigured()) return [];
+          let client: AgentMemoryClient;
+          try {
+            client = await clientFromApi(api);
+          } catch {
+            return [];
+          }
+          const limit = Math.min(Math.max(input.maxResults ?? 10, 1), 50);
+          let response: any;
+          try {
+            response = await client.recall({
+              query: input.query.slice(0, 2000),
+              task_type: "general",
+              limits: { max_items: limit, max_tokens: 4000 },
+              scope: { project_only: false, include_unconfirmed: false, include_stale: false },
+            });
+          } catch {
+            return [];
+          }
+          const memories: any[] = Array.isArray(response?.memories) ? response.memories : [];
+          return memories.map((m, i) => {
+            const policy = m?.use_policy ?? {};
+            const provenance = policy?.can_use_as_instruction
+              ? "instruction"
+              : policy?.can_use_as_evidence
+                ? "evidence"
+                : undefined;
+            return {
+              corpus: "openbrain",
+              path: `openbrain://memory/${m?.id ?? i}`,
+              title: typeof m?.summary === "string" ? m.summary.slice(0, 80) : undefined,
+              kind: "memory",
+              score: typeof m?.score === "number" ? m.score : Math.max(0, 1 - i / Math.max(memories.length, 1)),
+              snippet: String(m?.summary ?? m?.content ?? "").slice(0, 600),
+              id: typeof m?.id === "string" ? m.id : undefined,
+              provenanceLabel: provenance,
+              source: "openbrain.agent_memory",
+              sourceType: "openbrain.agent_memory",
+              updatedAt: typeof m?.updated_at === "string" ? m.updated_at : undefined,
+            };
+          });
+        },
+        async get(input: { lookup: string }) {
+          if (!isConfigured()) return null;
+          const id = input.lookup.replace(/^openbrain:\/\/memory\//, "");
+          if (!id) return null;
+          let client: AgentMemoryClient;
+          try {
+            client = await clientFromApi(api);
+          } catch {
+            return null;
+          }
+          let memory: any;
+          try {
+            memory = await client.inspectMemory(id);
+          } catch {
+            return null;
+          }
+          if (!memory || typeof memory !== "object") return null;
+          const policy = (memory as any)?.use_policy ?? {};
+          const provenance = policy?.can_use_as_instruction
+            ? "instruction"
+            : policy?.can_use_as_evidence
+              ? "evidence"
+              : undefined;
+          const content = String((memory as any)?.content ?? (memory as any)?.summary ?? "");
+          return {
+            corpus: "openbrain",
+            path: input.lookup,
+            title: typeof (memory as any)?.summary === "string" ? (memory as any).summary.slice(0, 80) : undefined,
+            kind: "memory",
+            content,
+            fromLine: 1,
+            lineCount: content.split("\n").length,
+            id: typeof (memory as any)?.id === "string" ? (memory as any).id : id,
+            provenanceLabel: provenance,
+            sourceType: "openbrain.agent_memory",
+            updatedAt: typeof (memory as any)?.updated_at === "string" ? (memory as any).updated_at : undefined,
+          };
+        },
+      });
+    }
   },
 });

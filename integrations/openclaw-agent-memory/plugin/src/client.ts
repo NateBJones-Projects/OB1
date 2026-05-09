@@ -45,11 +45,23 @@ export class AgentMemoryClient {
     return this.request("/recall", {
       method: "POST",
       body: {
+        // schema_version is REQUIRED by the Edge Function recallSchema;
+        // omitting it returns "400 Invalid recall payload".
+        schema_version: "openbrain.openclaw.recall.v1",
         workspace_id: this.config.workspaceId,
         project_id: this.config.projectId ?? null,
         ...input,
+        // Two Edge Function defaults make naive recall return zero rows:
+        //   1. writes land with visibility="personal" but scopeMatches drops
+        //      personal unless scope.visibility="personal" is passed.
+        //   2. writes default to requires_review=true (governance), which
+        //      gives them review_status="pending"; scope.include_unconfirmed
+        //      must be true or pending memories are filtered out.
+        // Default both here so callers don't have to know these quirks; an
+        // explicit input.scope still wins via the spread below.
         scope: {
-          include_unconfirmed: this.config.includeUnconfirmedRecall ?? false,
+          visibility: "personal",
+          include_unconfirmed: this.config.includeUnconfirmedRecall ?? true,
           ...(typeof input.scope === "object" && input.scope ? input.scope : {}),
         },
       },
@@ -60,6 +72,9 @@ export class AgentMemoryClient {
     return this.request("/writeback", {
       method: "POST",
       body: {
+        // schema_version REQUIRED; openclaw variant accepted alongside
+        // openbrain.agent_memory.writeback.v1 by the Edge Function.
+        schema_version: "openbrain.openclaw.writeback.v1",
         workspace_id: this.config.workspaceId,
         project_id: this.config.projectId ?? null,
         ...input,
