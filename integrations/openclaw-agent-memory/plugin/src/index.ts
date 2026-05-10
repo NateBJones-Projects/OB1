@@ -59,6 +59,26 @@ function clampFloat(n: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+// LLM tool callers occasionally JSON.stringify nested-object parameters,
+// which the Edge Function's zod schema then rejects as "expected object,
+// received string." Coerce string-shaped fields back to objects before
+// sending. Walks one level deep — that is what the contract needs and any
+// further nesting that arrived as a string would be a separate caller bug.
+function coerceObjectFields(input: Record<string, unknown>, fields: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...input };
+  for (const key of fields) {
+    const value = out[key];
+    if (typeof value === "string") {
+      try {
+        out[key] = JSON.parse(value);
+      } catch {
+        // leave as string; let the server return a structured error
+      }
+    }
+  }
+  return out;
+}
+
 function registerTool(api: any, tool: { name: string; label: string; description: string; parameters: unknown; run: (client: AgentMemoryClient, input: any) => Promise<unknown> }) {
   api.registerTool({
     name: tool.name,
@@ -83,7 +103,9 @@ export default definePluginEntry({
       label: "NBJ OB1 recall",
       description: "Recall scoped Nate Jones OB1 Agent Memory before meaningful work begins.",
       parameters: Type.Record(Type.String(), Type.Any()),
-      run: (client, input) => client.recall(input),
+      run: (client, input) => client.recall(
+        coerceObjectFields(input, ["scope", "limits", "runtime", "model_intent", "channel", "entities", "sensitivity"]),
+      ),
     });
 
     registerTool(api, {
@@ -91,7 +113,16 @@ export default definePluginEntry({
       label: "NBJ OB1 write-back",
       description: "Write compact, provenance-labeled Nate Jones OB1 Agent Memory after work finishes.",
       parameters: Type.Record(Type.String(), Type.Any()),
-      run: (client, input) => client.writeback(input),
+      run: (client, input) => {
+        const coerced = coerceObjectFields(input, ["memory_payload", "provenance", "runtime", "models_used", "source_refs", "retention", "visibility", "channel"]);
+        // Default runtime.name to "openclaw" so writes from this plugin
+        // are correctly attributed without requiring the agent to know the
+        // contract. Explicit input.runtime still wins.
+        const runtime = (typeof coerced.runtime === "object" && coerced.runtime) ? coerced.runtime as Record<string, unknown> : {};
+        if (!runtime.name) runtime.name = "openclaw";
+        coerced.runtime = runtime;
+        return client.writeback(coerced);
+      },
     });
 
     registerTool(api, {
