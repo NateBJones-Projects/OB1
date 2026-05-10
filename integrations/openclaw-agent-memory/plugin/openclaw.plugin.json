@@ -64,7 +64,16 @@
       },
       "workspaceId": {
         "type": "string",
-        "description": "Default OB1 workspace ID."
+        "description": "Default OB1 workspace ID. In 'per-agent' mode (see workspaceMode) this is used as a fallback when no agent id is available."
+      },
+      "workspaceMode": {
+        "type": "string",
+        "enum": ["shared", "per-agent"],
+        "description": "How to derive the OB1 workspace_id for each request. 'shared' (default) sends every request to the configured workspaceId. 'per-agent' uses each OpenClaw agent's id as its own workspace, isolating memory per agent."
+      },
+      "workspacePrefix": {
+        "type": "string",
+        "description": "Optional prefix applied to the per-agent workspace_id (e.g. 'openclaw-' produces 'openclaw-nina'). Only used when workspaceMode is 'per-agent'."
       },
       "projectId": {
         "type": "string",

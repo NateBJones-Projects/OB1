@@ -75,6 +75,11 @@ export class OB1MemorySearchManager {
     let response: any;
     try {
       response = await this.client.recall({
+        // Per-agent override: when workspaceMode="per-agent", this.workspaceId
+        // is already the agent's isolated workspace (e.g., "nina"). When
+        // workspaceMode="shared", it equals the configured workspaceId. Either
+        // way the override beats the client's default.
+        workspace_id: this.workspaceId,
         query: trimmed.slice(0, 2000),
         task_type: "general",
         limits: { max_items: limit, max_tokens: 4000 },

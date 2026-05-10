@@ -79,6 +79,26 @@ function coerceObjectFields(input: Record<string, unknown>, fields: string[]): R
   return out;
 }
 
+// Resolve the OB1 workspace_id for a given agent, mirroring the same
+// workspaceMode logic the SearchManager uses. Phase 9 multi-tenant: when
+// workspaceMode="per-agent", each agent's writeback lands in its own
+// isolated workspace so that recall (also scoped to that workspace) finds
+// only its own prior writes. When workspaceMode="shared" or unset, every
+// agent uses the configured workspaceId (back-compat with PR #282 single
+// tenant default).
+function resolveAgentWorkspaceId(api: any, agentId: string | undefined): string {
+  const raw = ((api as any).pluginConfig || {}) as Record<string, unknown>;
+  const fallback = typeof raw.workspaceId === "string" && raw.workspaceId.length > 0
+    ? raw.workspaceId
+    : "default";
+  const mode = typeof raw.workspaceMode === "string" ? raw.workspaceMode : "shared";
+  if (mode !== "per-agent") return fallback;
+  const id = String(agentId || "").trim();
+  if (!id) return fallback;
+  const prefix = typeof raw.workspacePrefix === "string" ? raw.workspacePrefix : "";
+  return prefix + id;
+}
+
 function registerTool(api: any, tool: { name: string; label: string; description: string; parameters: unknown; run: (client: AgentMemoryClient, input: any) => Promise<unknown> }) {
   api.registerTool({
     name: tool.name,
@@ -108,22 +128,38 @@ export default definePluginEntry({
       ),
     });
 
-    registerTool(api, {
+    // openbrain_writeback uses the factory form so we get ctx.agentId from
+    // the per-call OpenClawPluginToolContext. Phase 9: per-agent workspace
+    // resolution requires agentId at write time (not just at search time).
+    // Factory registrations REQUIRE the {names: [...]} opts so the host can
+    // discover the tool without invoking the factory eagerly.
+    api.registerTool((ctx: any) => ({
       name: "openbrain_writeback",
       label: "NBJ OB1 write-back",
       description: "Write compact, provenance-labeled Nate Jones OB1 Agent Memory after work finishes.",
       parameters: Type.Record(Type.String(), Type.Any()),
-      run: (client, input) => {
+      async execute(_id: string, params: unknown) {
+        const client = await clientFromApi(api);
+        const input = (params || {}) as Record<string, unknown>;
         const coerced = coerceObjectFields(input, ["memory_payload", "provenance", "runtime", "models_used", "source_refs", "retention", "visibility", "channel"]);
-        // Default runtime.name to "openclaw" so writes from this plugin
-        // are correctly attributed without requiring the agent to know the
-        // contract. Explicit input.runtime still wins.
+        // Default runtime.name to "openclaw" so writes are correctly
+        // attributed without requiring the agent to know the contract.
         const runtime = (typeof coerced.runtime === "object" && coerced.runtime) ? coerced.runtime as Record<string, unknown> : {};
         if (!runtime.name) runtime.name = "openclaw";
         coerced.runtime = runtime;
-        return client.writeback(coerced);
+        // Per-agent workspace override. Explicit input.workspace_id still wins.
+        if (!coerced.workspace_id) {
+          coerced.workspace_id = resolveAgentWorkspaceId(api, ctx?.agentId);
+        }
+        // Tag flow_id with agent identity so traces are attributable even
+        // when the agent didn't pass one.
+        if (!coerced.flow_id && ctx?.agentId) {
+          coerced.flow_id = String(ctx.agentId);
+        }
+        const result = await client.writeback(coerced);
+        return toolResult(result);
       },
-    });
+    }), { names: ["openbrain_writeback"] });
 
     registerTool(api, {
       name: "openbrain_report_usage",
@@ -274,14 +310,31 @@ export default definePluginEntry({
 
     if (typeof (api as any).registerMemoryCapability === "function") {
       const ob1Runtime = createOB1Runtime({
+        // Per-agent client: each call picks up the current pluginConfig +
+        // resolved access key. The agent-scoped workspace selection happens
+        // inside the search manager via workspaceIdFor below — the client
+        // itself stays config-defaulted; per-request workspace overrides are
+        // injected in the search() body.
         buildClient: (_agentId: string) => clientFromApi(api),
-        // Phase 9 will derive workspaceId from agentId for multi-tenant; for
-        // now, every agent shares the configured workspace.
-        workspaceIdFor: (_agentId: string) => {
+        // Multi-tenant resolution (Phase 9). Three modes via plugin config:
+        //   workspaceMode="shared" (default): every agent uses the configured
+        //     workspaceId. Fleet-wide single-tenant.
+        //   workspaceMode="per-agent": workspace_id = workspacePrefix + agentId.
+        //     Each agent's writes/recalls live in their own isolated workspace.
+        //   workspacePrefix is optional; defaults to empty (raw agentId used).
+        // Falls back to configured workspaceId for empty agentId in per-agent
+        // mode so the runtime never sends an empty workspace.
+        workspaceIdFor: (agentId: string) => {
           const raw = ((api as any).pluginConfig || {}) as Record<string, unknown>;
-          return typeof raw.workspaceId === "string" && raw.workspaceId.length > 0
+          const fallback = typeof raw.workspaceId === "string" && raw.workspaceId.length > 0
             ? raw.workspaceId
             : "default";
+          const mode = typeof raw.workspaceMode === "string" ? raw.workspaceMode : "shared";
+          if (mode !== "per-agent") return fallback;
+          const id = String(agentId || "").trim();
+          if (!id) return fallback;
+          const prefix = typeof raw.workspacePrefix === "string" ? raw.workspacePrefix : "";
+          return prefix + id;
         },
       });
 
@@ -312,7 +365,10 @@ export default definePluginEntry({
     // for. The seven openbrain_* tools above stay as the advanced surface
     // (governance review queue, recall traces, etc.).
 
-    api.registerTool({
+    // memory_search: factory form so per-agent workspace_id is resolved
+    // per call. The SearchManager-driven recall path (active memory pipeline)
+    // also routes through workspaceIdFor below — this tool path mirrors it.
+    api.registerTool((ctx: any) => ({
       name: "memory_search",
       label: "Memory search (OB1)",
       description: "Search long-term memory for relevant prior decisions, lessons, constraints, or notes.",
@@ -324,6 +380,7 @@ export default definePluginEntry({
         const client = await clientFromApi(api);
         const max = clampInt(params?.max_results ?? 10, 1, 50);
         const result = await client.recall({
+          workspace_id: resolveAgentWorkspaceId(api, ctx?.agentId),
           query: String(params?.query ?? "").slice(0, 2000),
           task_type: "search",
           limits: { max_items: max, max_tokens: 4000 },
@@ -334,12 +391,13 @@ export default definePluginEntry({
             include_stale: false,
           },
           runtime: { name: "openclaw" },
+          flow_id: ctx?.agentId ? String(ctx.agentId) : undefined,
         });
         return toolResult(result);
       },
-    });
+    }), { names: ["memory_search"] });
 
-    api.registerTool({
+    api.registerTool((ctx: any) => ({
       name: "memory_get",
       label: "Memory get (OB1)",
       description: "Inspect one specific OB1 memory by id, including provenance.",
@@ -347,13 +405,21 @@ export default definePluginEntry({
         memory_id: Type.String({ description: "OB1 memory id (uuid)." }),
       }),
       async execute(_id: string, params: any) {
+        // Note: inspectMemory queries a memory by ID directly without a
+        // workspace_id filter (the ID is globally unique). Per-agent
+        // isolation is preserved at write/recall time, not at inspect time.
+        // We intentionally don't gate inspect by ctx.agentId so that
+        // governance review tools can fetch any memory by id.
+        void ctx; // keep ctx in scope for symmetry / future audit hooks
         const client = await clientFromApi(api);
         const memory = await client.inspectMemory(String(params?.memory_id ?? ""));
         return toolResult(memory);
       },
-    });
+    }), { names: ["memory_get"] });
 
-    api.registerTool({
+    // memory_store: factory form so we can read ctx.agentId for per-agent
+    // workspace resolution.
+    api.registerTool((ctx: any) => ({
       name: "memory_store",
       label: "Memory store (OB1)",
       description:
@@ -397,8 +463,10 @@ export default definePluginEntry({
         };
         const bucket = categoryMap[type] ?? "outputs";
         const result = await client.writeback({
+          workspace_id: resolveAgentWorkspaceId(api, ctx?.agentId),
           memory_payload: { [bucket]: [content] },
           runtime: { name: "openclaw" },
+          flow_id: ctx?.agentId ? String(ctx.agentId) : undefined,
           provenance: {
             default_status: "generated",
             confidence: conf,
@@ -407,7 +475,7 @@ export default definePluginEntry({
         });
         return toolResult(result);
       },
-    });
+    }), { names: ["memory_store"] });
 
     if (typeof (api as any).registerMemoryCorpusSupplement === "function") {
       (api as any).registerMemoryCorpusSupplement({
