@@ -61,6 +61,105 @@ function registerTool(api: any, tool: { name: string; label: string; description
   });
 }
 
+const channelSchema = Type.Object({
+  kind: Type.String(),
+  id: Type.String(),
+  thread_id: Type.Optional(Type.String()),
+});
+
+const runtimeSchema = Type.Object({
+  name: Type.String(),
+  version: Type.Optional(Type.String()),
+});
+
+const modelRefSchema = Type.Object({
+  provider: Type.String(),
+  model: Type.String(),
+  role: Type.Optional(Type.String()),
+});
+
+const sourceRefSchema = Type.Object({
+  kind: Type.String(),
+  uri: Type.Optional(Type.String()),
+  title: Type.Optional(Type.String()),
+  source_timestamp: Type.Optional(Type.String()),
+  metadata: Type.Optional(Type.Record(Type.String(), Type.Any())),
+});
+
+const visibilitySchema = Type.Object({
+  workspace: Type.Optional(Type.String()),
+  project: Type.Optional(Type.String()),
+  channel: Type.Optional(Type.String()),
+});
+
+const writebackSchema = Type.Object({
+  schema_version: Type.String(),
+  workspace_id: Type.Optional(Type.String()),
+  project_id: Type.Optional(Type.String()),
+  task_id: Type.String(),
+  step_id: Type.Optional(Type.String()),
+  flow_id: Type.Optional(Type.String()),
+  idempotency_key: Type.Optional(Type.String()),
+  channel: Type.Optional(channelSchema),
+  runtime: Type.Optional(runtimeSchema),
+  models_used: Type.Optional(Type.Array(modelRefSchema)),
+  source_refs: Type.Optional(Type.Array(sourceRefSchema)),
+  memory_payload: Type.Object({
+    decisions: Type.Optional(Type.Array(Type.String())),
+    outputs: Type.Optional(Type.Array(Type.String())),
+    lessons: Type.Optional(Type.Array(Type.String())),
+    constraints: Type.Optional(Type.Array(Type.String())),
+    unresolved_questions: Type.Optional(Type.Array(Type.String())),
+    next_steps: Type.Optional(Type.Array(Type.String())),
+    failures: Type.Optional(Type.Array(Type.String())),
+    artifacts: Type.Optional(Type.Array(Type.Object({
+      kind: Type.String(),
+      uri: Type.Optional(Type.String()),
+      description: Type.Optional(Type.String()),
+      metadata: Type.Optional(Type.Record(Type.String(), Type.Any())),
+    }))),
+    entities: Type.Optional(Type.Record(Type.String(), Type.Any())),
+  }),
+  provenance: Type.Optional(Type.Object({
+    default_status: Type.Optional(Type.String()),
+    confidence: Type.Optional(Type.Number()),
+    requires_review: Type.Optional(Type.Boolean()),
+  })),
+  retention: Type.Optional(Type.Object({
+    stale_after_days: Type.Optional(Type.Number()),
+  })),
+  visibility: Type.Optional(visibilitySchema),
+});
+
+const recallSchema = Type.Object({
+  schema_version: Type.String(),
+  workspace_id: Type.Optional(Type.String()),
+  project_id: Type.Optional(Type.String()),
+  task_id: Type.Optional(Type.String()),
+  task_type: Type.Optional(Type.String()),
+  channel: Type.Optional(channelSchema),
+  runtime: Type.Optional(runtimeSchema),
+  model_intent: Type.Optional(modelRefSchema),
+  query: Type.String(),
+  entities: Type.Optional(Type.Record(Type.String(), Type.Any())),
+  scope: Type.Optional(Type.Object({
+    visibility: Type.Optional(Type.String()),
+    project_only: Type.Optional(Type.Boolean()),
+    include_unconfirmed: Type.Optional(Type.Boolean()),
+    include_stale: Type.Optional(Type.Boolean()),
+  })),
+  limits: Type.Optional(Type.Object({
+    max_items: Type.Optional(Type.Number()),
+    max_tokens: Type.Optional(Type.Number()),
+    recency_days: Type.Optional(Type.Number()),
+  })),
+  sensitivity: Type.Optional(Type.Object({
+    contains_code: Type.Optional(Type.Boolean()),
+    contains_customer_data: Type.Optional(Type.Boolean()),
+    contains_private_meeting_data: Type.Optional(Type.Boolean()),
+  })),
+});
+
 export default definePluginEntry({
   id: "nbj-ob1-agent-memory",
   name: "NBJ OB1 Agent Memory for OpenClaw",
@@ -71,7 +170,7 @@ export default definePluginEntry({
       name: "openbrain_recall",
       label: "NBJ OB1 recall",
       description: "Recall scoped Nate Jones OB1 Agent Memory before meaningful work begins.",
-      parameters: Type.Record(Type.String(), Type.Any()),
+      parameters: recallSchema,
       run: (client, input) => client.recall(input),
     });
 
@@ -79,7 +178,7 @@ export default definePluginEntry({
       name: "openbrain_writeback",
       label: "NBJ OB1 write-back",
       description: "Write compact, provenance-labeled Nate Jones OB1 Agent Memory after work finishes.",
-      parameters: Type.Record(Type.String(), Type.Any()),
+      parameters: writebackSchema,
       run: (client, input) => client.writeback(input),
     });
 
