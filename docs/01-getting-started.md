@@ -7,7 +7,7 @@ This is the core of Open Brain — the foundation everything else builds on. Onc
 About 30 minutes. Zero coding experience. Two services:
 
 - **[Supabase](https://supabase.com)** — Your database (free tier)
-- **[OpenRouter](https://openrouter.ai)** — Your AI gateway (~$5 in credits, lasts months)
+- **An AI API provider** — OpenRouter by default, or OpenAI directly if you prefer one provider
 
 ---
 
@@ -247,11 +247,13 @@ You'll land on the **"Publishable and secret API keys"** tab. Copy these into yo
 
 ---
 
-![Step 4](https://img.shields.io/badge/Step_4-Get_an_OpenRouter_API_Key-43A047?style=for-the-badge)
+![Step 4](https://img.shields.io/badge/Step_4-Get_an_AI_API_Key-43A047?style=for-the-badge)
 
-OpenRouter is a universal AI API gateway — one account gives you access to every major model. We're using it for embeddings and lightweight LLM metadata extraction.
+Open Brain needs an AI API for embeddings and lightweight LLM metadata extraction.
 
-Why OpenRouter instead of OpenAI directly? One account, one key, one billing relationship — and it future-proofs you for Claude, Gemini, or any other model later.
+OpenRouter is the default path because one account gives you access to every major model. If you already have an OpenAI API key and do not want OpenRouter in the request path, use the OpenAI Direct option below.
+
+**Option A: OpenRouter default**
 
 1. Go to [openrouter.ai](https://openrouter.ai) and sign up
 2. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
@@ -259,7 +261,13 @@ Why OpenRouter instead of OpenAI directly? One account, one key, one billing rel
 4. Copy the key into your credential tracker immediately
 5. Add $5 in credits under Credits (lasts months)
 
-✅ **Done when:** Your credential tracker has the **OpenRouter API key** filled in.
+**Option B: OpenAI direct**
+
+1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Click **Create new secret key**, name it `open-brain`
+3. Copy the key into your credential tracker immediately
+
+✅ **Done when:** Your credential tracker has either the **OpenRouter API key** or the **OpenAI API key** filled in.
 
 ---
 
@@ -406,14 +414,24 @@ Set your access key from Step 5:
 supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
 ```
 
-Set your OpenRouter key from Step 4:
+Set your AI API key from Step 4.
+
+For OpenRouter:
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 ```
 
+For OpenAI direct:
+
+```bash
+supabase secrets set OPENAI_API_KEY=your-openai-key-here
+```
+
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+>
+> Advanced: Open Brain also supports any OpenAI-compatible endpoint through `AI_API_BASE_URL`, `AI_API_KEY`, `EMBEDDING_MODEL`, and `CHAT_MODEL`.
 >
 > Optional: if you have an Open Brain dashboard or another stable page for viewing individual thoughts, set `OPEN_BRAIN_CITATION_BASE_URL` to that base URL. ChatGPT's `search`/`fetch` compatibility tools use it when returning citation URLs.
 
@@ -422,7 +440,7 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 >
-> **If you ever rotate your OpenRouter key:** you must re-run the `supabase secrets set` command above with the new key, AND update any local `.env` files that reference it. The edge function reads from Supabase secrets at runtime — updating the key on openrouter.ai alone won't propagate here. See the [FAQ on key rotation](03-faq.md#api-key-rotation) for the full checklist.
+> **If you ever rotate your AI API key:** you must re-run the matching `supabase secrets set` command above with the new key, AND update any local `.env` files that reference it. The edge function reads from Supabase secrets at runtime — updating the key on the provider dashboard alone won't propagate here. See the [FAQ on key rotation](03-faq.md#api-key-rotation) for the full checklist.
 
 ### Create the Function
 
@@ -588,14 +606,24 @@ Set your access key from Step 5:
 supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
 ```
 
-Set your OpenRouter key from Step 4:
+Set your AI API key from Step 4.
+
+For OpenRouter:
 
 ```powershell
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 ```
 
+For OpenAI direct:
+
+```powershell
+supabase secrets set OPENAI_API_KEY=your-openai-key-here
+```
+
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+>
+> Advanced: Open Brain also supports any OpenAI-compatible endpoint through `AI_API_BASE_URL`, `AI_API_KEY`, `EMBEDDING_MODEL`, and `CHAT_MODEL`.
 >
 > Optional: if you have an Open Brain dashboard or another stable page for viewing individual thoughts, set `OPEN_BRAIN_CITATION_BASE_URL` to that base URL. ChatGPT's `search`/`fetch` compatibility tools use it when returning citation URLs.
 
@@ -910,9 +938,11 @@ The metadata extraction is best-effort — the LLM is making its best guess with
 
 The embedding is what makes retrieval powerful. "Sarah's thinking about leaving" and "What did I note about career changes?" match semantically even though they share zero keywords. The metadata is a bonus layer for structured filtering on top.
 
-### Swapping Models Later
+### Swapping Providers or Models Later
 
-Because you're using OpenRouter, you can swap models by editing the model strings in the Edge Function code and redeploying. Browse available models at [openrouter.ai/models](https://openrouter.ai/models). Just make sure embedding dimensions match (1536 for the current setup).
+You can swap models by changing Supabase secrets and redeploying. OpenRouter uses `openai/text-embedding-3-small` and `openai/gpt-4o-mini` by default. OpenAI direct uses `text-embedding-3-small` and `gpt-4o-mini` by default. For another OpenAI-compatible endpoint, set `AI_API_BASE_URL`, `AI_API_KEY`, `EMBEDDING_MODEL`, and `CHAT_MODEL`.
+
+Just make sure embedding dimensions match `vector(1536)` in the current setup.
 
 </details>
 

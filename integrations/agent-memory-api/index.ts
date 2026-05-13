@@ -6,9 +6,23 @@ import { z } from "zod";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const DEFAULT_AI_API_BASE =
+  OPENAI_API_KEY && !OPENROUTER_API_KEY
+    ? "https://api.openai.com/v1"
+    : "https://openrouter.ai/api/v1";
+const AI_API_BASE = (Deno.env.get("AI_API_BASE_URL") || DEFAULT_AI_API_BASE).replace(/\/$/, "");
+const AI_API_KEY =
+  Deno.env.get("AI_API_KEY") ||
+  (AI_API_BASE.includes("openai.com") ? OPENAI_API_KEY : OPENROUTER_API_KEY) ||
+  OPENAI_API_KEY ||
+  OPENROUTER_API_KEY;
+const USES_OPENROUTER = /openrouter\.ai/i.test(AI_API_BASE);
+const EMBEDDING_MODEL =
+  Deno.env.get("EMBEDDING_MODEL") ||
+  (USES_OPENROUTER ? "openai/text-embedding-3-small" : "text-embedding-3-small");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -180,18 +194,19 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 async function getEmbedding(text: string): Promise<number[]> {
-  const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
+  if (!AI_API_KEY) throw new Error("AI API key is not configured. Set OPENROUTER_API_KEY, OPENAI_API_KEY, or AI_API_KEY.");
+  const r = await fetch(`${AI_API_BASE}/embeddings`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${AI_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/text-embedding-3-small",
+      model: EMBEDDING_MODEL,
       input: text,
     }),
   });
-  if (!r.ok) throw new Error(`OpenRouter embeddings failed: ${r.status} ${await r.text()}`);
+  if (!r.ok) throw new Error(`Embedding API failed: ${r.status} ${await r.text()}`);
   const d = await r.json();
   return d.data[0].embedding;
 }
