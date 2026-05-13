@@ -62,6 +62,7 @@ export class AgentMemoryClient {
       body: {
         workspace_id: this.config.workspaceId,
         project_id: this.config.projectId ?? null,
+        schema_version: "openbrain.openclaw.writeback.v1",
         ...input,
         provenance: {
           default_status: "generated",
