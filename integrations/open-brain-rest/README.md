@@ -19,9 +19,18 @@ Set these as Supabase function secrets:
 | Secret | Use |
 | --- | --- |
 | `MCP_ACCESS_KEY` | Dashboard/API access key, sent as `x-brain-key` |
-| `OPENROUTER_API_KEY` | Embeddings and metadata extraction |
+| `OPENROUTER_API_KEY` | Default AI API key for embeddings and metadata extraction |
+| `OPENAI_API_KEY` | Optional direct OpenAI key. Used automatically when `OPENROUTER_API_KEY` is not set |
+| `AI_API_BASE_URL` | Optional OpenAI-compatible API base URL override |
+| `AI_API_KEY` | Optional OpenAI-compatible API key override for `AI_API_BASE_URL` |
+| `EMBEDDING_MODEL` | Optional embedding model override |
+| `CHAT_MODEL` | Optional metadata extraction model override |
 | `SUPABASE_URL` | Provided automatically by Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Provided automatically by Supabase |
+
+OpenRouter remains the default provider. To route directly to OpenAI instead,
+set `OPENAI_API_KEY` and leave `OPENROUTER_API_KEY` unset. The function then
+uses `https://api.openai.com/v1`, `text-embedding-3-small`, and `gpt-4o-mini`.
 
 ## Required Database Shape
 
@@ -89,5 +98,6 @@ Run without `--apply` first for a dry run. The seed writes through `/capture`, s
 ## Notes
 
 - Duplicate review uses a local token-similarity scan in v1. It is intentionally simple and cheap for solo/small-team OB1 deployments.
-- Semantic search and capture require `OPENROUTER_API_KEY`.
+- Semantic search and capture require an AI API key: `OPENROUTER_API_KEY`,
+  `OPENAI_API_KEY`, or `AI_API_KEY` with `AI_API_BASE_URL`.
 - Reflection and smart-ingest routes are compatibility surfaces. If the optional tables/workers are missing, the dashboard still works for the core thoughts/workflow/search/audit surfaces.
