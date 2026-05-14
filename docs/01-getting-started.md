@@ -267,7 +267,7 @@ OpenRouter is the default path because one account gives you access to every maj
 2. Click **Create new secret key**, name it `open-brain`
 3. Copy the key into your credential tracker immediately
 
-✅ **Done when:** Your credential tracker has **AI Provider** set to `OpenRouter` or `OpenAI`, and the **AI API Key** row filled in.
+✅ **Done when:** Your credential tracker has **AI Provider** set to `OpenRouter` or `OpenAI`, your provider account details filled in, and the **AI API Key** row filled in.
 
 ---
 
