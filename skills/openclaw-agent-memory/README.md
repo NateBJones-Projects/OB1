@@ -13,13 +13,27 @@ This skill gives OpenClaw agents a disciplined way to use Nate Jones OB1 Agent M
 
 Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workflows, and implementation notes: [Substack](https://substack.com/@natesnewsletter) and [natebjones.com](https://natebjones.com).
 
-## Install
+## Prerequisites
 
-Install the live ClawHub skill:
+- Working Open Brain setup with [Agent Memory API](../../integrations/agent-memory-api/) deployed
+- OpenClaw installed
+- Agent Memory API URL and access key available through an OpenClaw secret provider
 
-```bash
-openclaw skills install nbj-ob1-agent-memory-openclaw
-```
+## Supported Clients
+
+- OpenClaw
+- Other AI clients that can load plain-text skill instructions manually
+
+## Installation
+
+1. Install the live ClawHub skill.
+
+   ```bash
+   openclaw skills install nbj-ob1-agent-memory-openclaw
+   ```
+
+2. Configure the paired Agent Memory API endpoint and access key in OpenClaw.
+3. Run a task that should recall project memory and confirm the skill calls Agent Memory before meaningful work.
 
 ClawHub listing: [NBJ OB1 Agent Memory for OpenClaw][skill-listing].
 
@@ -32,6 +46,20 @@ skill files are published under `MIT-0` as a ClawHub-specific distribution
 carveout because ClawHub requires MIT-0 for public skills.
 
 Safety guide: [Safe Agent Memory and Provenance](../../docs/safe-agent-memory-provenance.md).
+
+## Trigger Conditions
+
+Use this skill when OpenClaw is doing meaningful project work that should recall OB1 Agent Memory first, write back compact operational memory afterward, or inspect memory provenance before trusting a prior note.
+
+## Expected Outcome
+
+OpenClaw recalls scoped memories before work starts, treats unreviewed generated memories as evidence by default, writes back compact provenance-rich notes, and leaves recall traces that a human can inspect.
+
+## Troubleshooting
+
+1. **No memories are recalled** — Verify the Agent Memory API URL, access key, workspace, and project scope.
+2. **Write-back is rejected** — Remove raw transcript text, secret-like values, model reasoning traces, or large code blocks from the memory payload.
+3. **A memory should be trusted but is evidence-only** — Review and confirm it through the Agent Memory API review workflow instead of relying on automatic promotion.
 
 ## What It Enforces
 
