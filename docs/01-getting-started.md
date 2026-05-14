@@ -267,7 +267,7 @@ OpenRouter is the default path because one account gives you access to every maj
 2. Click **Create new secret key**, name it `open-brain`
 3. Copy the key into your credential tracker immediately
 
-✅ **Done when:** Your credential tracker has either the **OpenRouter API key** or the **OpenAI API key** filled in.
+✅ **Done when:** Your credential tracker has **AI Provider** set to `OpenRouter` or `OpenAI`, and the **AI API Key** row filled in.
 
 ---
 
@@ -414,7 +414,7 @@ Set your access key from Step 5:
 supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
 ```
 
-Set your AI API key from Step 4.
+Set your AI API key from Step 4. If you're using the credential tracker, copy the generated **Terminal: set AI API Key secret** command from Step 6.5.
 
 For OpenRouter:
 
@@ -606,7 +606,7 @@ Set your access key from Step 5:
 supabase secrets set MCP_ACCESS_KEY=your-access-key-from-step-5
 ```
 
-Set your AI API key from Step 4.
+Set your AI API key from Step 4. If you're using the credential tracker, copy the generated **Terminal: set AI API Key secret** command from Step 6.5.
 
 For OpenRouter:
 
