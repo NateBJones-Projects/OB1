@@ -57,6 +57,10 @@ embeddings. For another OpenAI-compatible endpoint, set `AI_API_BASE_URL`,
 
 ## Steps
 
+1. Apply the Agent Memory schema.
+2. Deploy the Agent Memory API Edge Function.
+3. Test the health endpoint with your `MCP_ACCESS_KEY`.
+
 ![Step 1](https://img.shields.io/badge/Step_1-Install_the_Schema-1E88E5?style=for-the-badge)
 
 Apply [`schemas/agent-memory/schema.sql`](../../schemas/agent-memory/schema.sql).
