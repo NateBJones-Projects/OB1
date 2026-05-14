@@ -7,8 +7,25 @@ import { z } from "zod";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") || "";
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
-const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const DEFAULT_AI_API_BASE =
+  OPENAI_API_KEY && !OPENROUTER_API_KEY
+    ? "https://api.openai.com/v1"
+    : "https://openrouter.ai/api/v1";
+const AI_API_BASE = (Deno.env.get("AI_API_BASE_URL") || DEFAULT_AI_API_BASE).replace(/\/$/, "");
+const AI_API_KEY =
+  Deno.env.get("AI_API_KEY") ||
+  (AI_API_BASE.includes("openai.com") ? OPENAI_API_KEY : OPENROUTER_API_KEY) ||
+  OPENAI_API_KEY ||
+  OPENROUTER_API_KEY;
+const USES_OPENROUTER = /openrouter\.ai/i.test(AI_API_BASE);
+const EMBEDDING_MODEL =
+  Deno.env.get("EMBEDDING_MODEL") ||
+  (USES_OPENROUTER ? "openai/text-embedding-3-small" : "text-embedding-3-small");
+const CHAT_MODEL =
+  Deno.env.get("CHAT_MODEL") ||
+  (USES_OPENROUTER ? "openai/gpt-4o-mini" : "gpt-4o-mini");
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -181,33 +198,33 @@ function applySort(query: ReturnType<typeof supabase.from> extends { select: (..
 }
 
 async function getEmbedding(text: string): Promise<number[]> {
-  if (!OPENROUTER_API_KEY) throw new Error("OPENROUTER_API_KEY is not configured");
-  const response = await fetch(`${OPENROUTER_BASE}/embeddings`, {
+  if (!AI_API_KEY) throw new Error("AI API key is not configured. Set OPENROUTER_API_KEY, OPENAI_API_KEY, or AI_API_KEY.");
+  const response = await fetch(`${AI_API_BASE}/embeddings`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${AI_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/text-embedding-3-small",
+      model: EMBEDDING_MODEL,
       input: text,
     }),
   });
-  if (!response.ok) throw new Error(`OpenRouter embeddings failed: ${response.status} ${await response.text()}`);
+  if (!response.ok) throw new Error(`Embedding API failed: ${response.status} ${await response.text()}`);
   const data = await response.json();
   return data.data[0].embedding;
 }
 
 async function extractMetadata(text: string): Promise<Record<string, unknown>> {
-  if (!OPENROUTER_API_KEY) return fallbackMetadata(text);
-  const response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+  if (!AI_API_KEY) return fallbackMetadata(text);
+  const response = await fetch(`${AI_API_BASE}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${AI_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
+      model: CHAT_MODEL,
       response_format: { type: "json_object" },
       messages: [
         {

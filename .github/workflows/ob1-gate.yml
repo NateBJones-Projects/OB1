@@ -49,11 +49,11 @@ jobs:
 
       - name: Run review checks
         id: review
+        env:
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          CONTRIB_DIRS: ${{ steps.changed.outputs.contrib_dirs }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          CHANGED_FILES="${{ steps.changed.outputs.files }}"
-          CONTRIB_DIRS="${{ steps.changed.outputs.contrib_dirs }}"
-          PR_TITLE="${{ github.event.pull_request.title }}"
-
           pass_count=0
           fail_count=0
           results=""
@@ -446,6 +446,7 @@ jobs:
             [ -z "$f" ] && continue
             [ ! -f "$f" ] && continue
             case "$f" in *.md|*.ts|*.js) ;; *) continue ;; esac
+            case "$f" in integrations/*|extensions/*) ;; *) continue ;; esac
 
             # Check for old local MCP config pattern
             local_mcp=$(grep -niE '(claude_desktop_config|"command":\s*"node"|StdioServerTransport|mcpServers.*command)' "$f" 2>/dev/null || true)
@@ -624,6 +625,15 @@ jobs:
           REVIEW_COMMENT: ${{ steps.review.outputs.comment }}
           REVIEW_FAILED: ${{ steps.review.outputs.failed }}
           SECRET_BLOCKED: ${{ steps.review.outputs.secret_blocked }}
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          CONTRIB_DIRS: ${{ steps.changed.outputs.contrib_dirs }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          IS_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
 
@@ -631,17 +641,17 @@ jobs:
 
           printf '%s\n' "$REVIEW_COMMENT" > gate-artifact/ob1-review-summary.md
           printf '%s\n' "$REVIEW_COMMENT" >> "$GITHUB_STEP_SUMMARY"
-          printf '%s\n' "${{ steps.changed.outputs.files }}" > gate-artifact/changed-files.txt
-          printf '%s\n' "${{ steps.changed.outputs.contrib_dirs }}" > gate-artifact/contribution-dirs.txt
+          printf '%s\n' "$CHANGED_FILES" > gate-artifact/changed-files.txt
+          printf '%s\n' "$CONTRIB_DIRS" > gate-artifact/contribution-dirs.txt
 
           jq -n \
-            --argjson pr_number "${{ github.event.pull_request.number }}" \
-            --arg pr_url "${{ github.event.pull_request.html_url }}" \
-            --arg title "${{ github.event.pull_request.title }}" \
-            --arg head_sha "${{ github.event.pull_request.head.sha }}" \
-            --arg author_login "${{ github.event.pull_request.user.login }}" \
-            --arg author_association "${{ github.event.pull_request.author_association }}" \
-            --arg is_draft "${{ github.event.pull_request.draft }}" \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg pr_url "$PR_URL" \
+            --arg title "$PR_TITLE" \
+            --arg head_sha "$HEAD_SHA" \
+            --arg author_login "$AUTHOR_LOGIN" \
+            --arg author_association "$AUTHOR_ASSOCIATION" \
+            --arg is_draft "$IS_DRAFT" \
             --arg failed "$REVIEW_FAILED" \
             --arg secret_blocked "$SECRET_BLOCKED" \
             '{
