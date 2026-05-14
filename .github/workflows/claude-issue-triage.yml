@@ -13,7 +13,7 @@ jobs:
   triage:
     runs-on: ubuntu-latest
     steps:
-      - uses: anthropics/claude-code-action@v1
+      - uses: anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2 # v1.0.122
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}

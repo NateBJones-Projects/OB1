@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR head safely
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           ref: refs/pull/${{ github.event.pull_request.number }}/head
           fetch-depth: 0
@@ -658,7 +658,7 @@ jobs:
 
       - name: Upload gate artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: ob1-pr-gate-context
           path: gate-artifact/

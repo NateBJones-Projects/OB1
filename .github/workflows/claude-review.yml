@@ -29,7 +29,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
@@ -58,7 +58,7 @@ jobs:
           git checkout "pr-$PR_NUMBER"
 
       - name: Run Claude review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2 # v1.0.122
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
