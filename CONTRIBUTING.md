@@ -265,7 +265,7 @@ Example for a recipe that depends on a reusable skill:
 - Requires paid services with no free-tier alternative
 - Poorly documented (missing README sections, unclear instructions)
 - Duplicates an existing contribution without meaningful improvement
-- Modifies core Open Brain infrastructure (the `thoughts` table structure, the core MCP server) as part of a standalone community contribution. Core fixes should be reviewed as repo-level maintenance changes, not hidden inside an unrelated contribution.
+- Modifies core Open Brain infrastructure (the `thoughts` table structure, the core MCP server) — that's upstream, not here
 
 ## Contributor Ladder
 
@@ -295,7 +295,7 @@ Every PR is checked against these rules. All must pass before human review.
 9. **README completeness** — Contribution README includes Prerequisites, step-by-step instructions, and expected outcome sections
 10. **Contribution dependencies** — If a contribution declares `requires_primitives` or `requires_skills`, those folders must exist in the repo and be linked in the README
 11. **LLM clarity review** — *(Planned for v2)* Automated check that instructions are clear and complete
-12. **Scope check** — Contribution changes are within the contribution folder(s). Repo-support changes in `docs/`, `resources/`, `.github/`, or `server/` are allowed when they directly support the contribution or repair the review workflow.
+12. **Scope check** — All changes are within the contribution folder(s)
 13. **Internal links** — All relative links in READMEs resolve to existing files
 14. **Remote MCP pattern** — Extensions and integrations must use remote MCP via Supabase Edge Functions. No `claude_desktop_config.json`, no local Node.js stdio servers. See the [Getting Started guide](docs/01-getting-started.md) for the correct pattern
 15. **Tool audit link** — Extensions and integrations must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in their README. This ensures users are aware of tool surface area management as they add capabilities

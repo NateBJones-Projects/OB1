@@ -94,7 +94,7 @@ jobs:
           # ─── Rule 1: Folder structure ───
           rule1_pass=true
           bad_files=""
-          allowed_pattern='^(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs|resources|server|CONTRIBUTING\.md|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
+          allowed_pattern='^(recipes|schemas|dashboards|integrations|skills|primitives|extensions|docs|resources|\.github|\.gitkeep|\.gitignore|\.markdownlint)'
           while IFS= read -r f; do
             [ -z "$f" ] && continue
             if ! echo "$f" | grep -qE "$allowed_pattern"; then
@@ -359,7 +359,7 @@ jobs:
             if ! grep -qi 'prerequisite' "$readme"; then
               missing_sections="${missing_sections}Prerequisites, "
             fi
-            if ! grep -qiE '^\s*[0-9]+\.|Step_[0-9]+|badge/Step' "$readme"; then
+            if ! grep -qiE '^\s*[0-9]+\.' "$readme"; then
               missing_sections="${missing_sections}Step-by-step instructions, "
             fi
             if ! grep -qiE '(expected|outcome|result)' "$readme"; then
@@ -514,9 +514,6 @@ jobs:
                 break
               fi
             done <<< "$CONTRIB_DIRS"
-            if echo "$f" | grep -qE '^(docs|resources|server|\.github)/|^(README\.md|CONTRIBUTING\.md)$'; then
-              in_scope=true
-            fi
             if [ "$in_scope" = false ]; then
               out_of_scope="${out_of_scope}  - \`$f\`\n"
               rule12_pass=false
