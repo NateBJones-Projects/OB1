@@ -1,0 +1,102 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Open Brain",
+  "description": "One database, one AI gateway, one chat channel. Any AI you use shares the same persistent memory.",
+  "colors": {
+    "primary": "#1E88E5",
+    "light": "#5C6BC0",
+    "dark": "#0D47A1"
+  },
+  "favicon": "/favicon.png",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Docs",
+        "groups": [
+          {
+            "group": "Start Here",
+            "pages": [
+              "introduction",
+              "how-it-works",
+              "architecture"
+            ]
+          },
+          {
+            "group": "Quickstart",
+            "pages": [
+              "quickstart/overview",
+              "quickstart/supabase",
+              "quickstart/openrouter",
+              "quickstart/mcp-deploy",
+              "quickstart/connect-client",
+              "quickstart/verify"
+            ]
+          },
+          {
+            "group": "Extend",
+            "pages": [
+              "extend/extensions",
+              "extend/recipes",
+              "extend/schemas",
+              "extend/dashboards",
+              "extend/integrations"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/mcp-tools",
+              "reference/thoughts-table",
+              "faq"
+            ]
+          },
+          {
+            "group": "Community",
+            "pages": [
+              "contributing"
+            ]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": [
+        {
+          "anchor": "GitHub",
+          "href": "https://github.com/NateBJones-Projects/OB1",
+          "icon": "github"
+        },
+        {
+          "anchor": "Discord",
+          "href": "https://discord.gg/Cgh9WJEkeG",
+          "icon": "discord"
+        },
+        {
+          "anchor": "Substack",
+          "href": "https://natesnewsletter.substack.com/",
+          "icon": "newspaper"
+        }
+      ]
+    }
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/NateBJones-Projects/OB1"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Setup Guide",
+      "href": "/quickstart/overview"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/NateBJones-Projects/OB1",
+      "discord": "https://discord.gg/Cgh9WJEkeG"
+    }
+  }
+}

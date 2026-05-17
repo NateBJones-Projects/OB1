@@ -1,0 +1,51 @@
+---
+title: "What is Open Brain?"
+description: "One database, one AI gateway, one chat channel. Any AI you use plugs in."
+---
+
+Open Brain is the infrastructure layer for your thinking. It's a database with vector search and an open protocol — built so that every AI tool you use shares the same persistent memory.
+
+Claude, ChatGPT, Cursor, Claude Code, whatever ships next month — **one brain, all of them**.
+
+## What this is not
+
+- **Not a notes app.** Notion, Obsidian, and Bear are documents-first. Open Brain is retrieval-first.
+- **Not a SaaS chain.** No Zapier, no middleware. Your AI talks directly to your database.
+- **Not opinionated about clients.** If a tool supports the Model Context Protocol, it works.
+
+## What it is
+
+A Supabase project running:
+
+1. **A `thoughts` table** — your text, an embedding vector, and JSON metadata.
+2. **A search function** — semantic similarity over pgvector's HNSW index.
+3. **A remote MCP server** — a Supabase Edge Function exposing capture, search, browse, and stats tools.
+
+Total cost: ~$0.10/month in embeddings on the free tier of Supabase. Setup time: ~45 minutes, zero coding required.
+
+<Card title="Start the quickstart" icon="rocket" href="/quickstart/overview">
+  Build the full system in eight steps.
+</Card>
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="How it works" icon="brain" href="/how-it-works">
+    The day-to-day loop: capture → embed → retrieve.
+  </Card>
+  <Card title="Architecture" icon="diagram-project" href="/architecture">
+    Schema, MCP protocol, and the Edge Function pattern.
+  </Card>
+  <Card title="Extend it" icon="puzzle-piece" href="/extend/extensions">
+    Six progressive builds plus the community recipes catalog.
+  </Card>
+  <Card title="FAQ" icon="circle-question" href="/faq">
+    Common gotchas, key rotation, and Obsidian questions.
+  </Card>
+</CardGroup>
+
+## Credit
+
+Open Brain was created by [Nate B. Jones](https://natesnewsletter.substack.com/). Real-time help and community lives on [Discord](https://discord.gg/Cgh9WJEkeG). Source: [github.com/NateBJones-Projects/OB1](https://github.com/NateBJones-Projects/OB1).
+
+License: [FSL-1.1-MIT](https://github.com/NateBJones-Projects/OB1/blob/main/LICENSE.md).

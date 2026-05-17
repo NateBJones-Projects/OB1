@@ -1,0 +1,119 @@
+---
+title: "Connect your AI client"
+description: "One URL per client. Same Open Brain, every tool."
+---
+
+Pick whichever clients you actually use. You can connect the same Open Brain to as many as you want — they all share the same memory.
+
+You'll need your **MCP Connection URL** (the one ending in `?key=...`) from your tracker.
+
+## Claude Desktop
+
+The simplest connection.
+
+1. Open Claude Desktop → **Settings** → **Connectors**
+2. **Add custom connector**
+3. Name: `Open Brain`
+4. Remote MCP server URL: paste your **MCP Connection URL**
+5. **Add**
+
+Start a new conversation. Enable Open Brain per-conversation via the **+** button → Connectors.
+
+## ChatGPT
+
+<Warning>
+Requires a **paid** ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu). Web only — not mobile.
+</Warning>
+
+**One-time setup — enable Developer Mode:**
+
+1. [chatgpt.com](https://chatgpt.com) → profile icon → **Settings**
+2. **Apps & Connectors** → **Advanced settings**
+3. Toggle **Developer mode** ON
+
+<Note>
+Developer Mode disables ChatGPT's built-in Memory. Yes, that's ironic. Your Open Brain replaces it — and works across every AI, not just ChatGPT.
+</Note>
+
+**Add the connector:**
+
+1. **Apps & Connectors** → **Create**
+2. Name: `Open Brain`
+3. Description: anything (just for you)
+4. MCP endpoint URL: your **MCP Connection URL**
+5. Authentication: **No Authentication** (key is in the URL)
+6. **Create**
+
+<Tip>
+ChatGPT is less intuitive than Claude at picking the right MCP tool. The first few times, be explicit: *"Use the Open Brain search_thoughts tool to find my notes about X."* It catches on within a conversation.
+</Tip>
+
+## Claude Code
+
+One terminal command:
+
+```bash
+claude mcp add --transport http open-brain \
+  https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp \
+  --header "x-brain-key: your-access-key"
+```
+
+## OpenAI Codex
+
+Codex needs `mcp-remote` to bridge to remote MCP. Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.open-brain]
+command = "npx"
+args = [
+  "-y",
+  "mcp-remote",
+  "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_ACCESS_KEY"
+]
+startup_timeout_sec = 30
+```
+
+<Warning>
+`startup_timeout_sec = 30` is **required**. Without it Codex times out after 10s (`mcp-remote` needs longer to spin up).
+</Warning>
+
+Restart Codex. The four Open Brain tools appear immediately.
+
+## Cursor, VS Code Copilot, Windsurf, other MCP clients
+
+Two options:
+
+**Option A — URL with embedded key (easiest).** If the client has a remote MCP URL field, paste the full **MCP Connection URL** including `?key=...`.
+
+**Option B — `mcp-remote` bridge (for stdio-only clients).** Requires Node.js:
+
+```json
+{
+  "mcpServers": {
+    "open-brain": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp",
+        "--header",
+        "x-brain-key:${BRAIN_KEY}"
+      ],
+      "env": {
+        "BRAIN_KEY": "your-access-key"
+      }
+    }
+  }
+}
+```
+
+<Note>
+No space after the colon in `x-brain-key:${BRAIN_KEY}` — some clients mangle spaces inside args.
+</Note>
+
+<Check>
+You can start a conversation in your AI client and it has access to four tools: `search_thoughts`, `list_thoughts`, `thought_stats`, `capture_thought`.
+</Check>
+
+<Card title="Next: verify it works" icon="arrow-right" href="/quickstart/verify">
+  Capture a test thought, retrieve it.
+</Card>

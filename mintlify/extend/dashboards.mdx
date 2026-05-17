@@ -1,0 +1,32 @@
+---
+title: "Dashboards"
+description: "Frontend templates that read from your Supabase backend."
+---
+
+Dashboards give your Open Brain a visual face — browsing, editing, auditing. Pick the framework you prefer; both are community-built.
+
+| Dashboard | Stack | Contributor |
+| --- | --- | --- |
+| [Open Brain Dashboard](https://github.com/NateBJones-Projects/OB1/tree/main/dashboards/open-brain-dashboard) | SvelteKit + MCP proxy + Supabase auth | @headcrest |
+| [Open Brain Dashboard (Next.js)](https://github.com/NateBJones-Projects/OB1/tree/main/dashboards/open-brain-dashboard-next) | Next.js, 8 pages, dark theme, smart ingest, quality auditing | @alanshurafa |
+
+## Deployment
+
+Both target Vercel or Netlify free tiers. Point them at your existing Supabase project — no separate backend.
+
+Each dashboard's README walks through the deploy. Typical flow:
+
+1. Fork the dashboard folder into your own repo.
+2. Connect Vercel/Netlify to that repo.
+3. Set environment variables for your Supabase URL + service-role key.
+4. Deploy.
+
+<Warning>
+Dashboards run with your **service-role key** — they have full database access. Never deploy publicly without putting your own auth (Supabase Auth, Clerk, or a simple password gate) in front.
+</Warning>
+
+## Contributing
+
+A new dashboard is welcome if it offers something the existing two don't — different framework (Astro? Remix? plain HTML?), different focus (read-only browser? mobile-first capture? analytics-heavy?), or a meaningfully different design.
+
+PR title: `[dashboards] Short description`. See [contributing](/contributing).

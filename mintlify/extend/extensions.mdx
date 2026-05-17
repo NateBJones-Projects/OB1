@@ -1,0 +1,72 @@
+---
+title: "Extensions"
+description: "Six progressive builds that turn Open Brain into a household OS."
+---
+
+Extensions are a curated, ordered learning path. Each one teaches new concepts through something you'll actually use day-to-day. By the end, your agent manages your household, schedule, meals, professional network, and job hunt — interconnected.
+
+<Note>
+Extensions are **curated**. Adding a new one requires maintainer approval. To propose: [open an extension submission issue](https://github.com/NateBJones-Projects/OB1/issues/new?template=extension-submission.yml) first.
+</Note>
+
+## The path
+
+<Steps>
+  <Step title="Household Knowledge Base (Beginner)">
+    Home facts your agent recalls instantly — Wi-Fi password, paint colors, filter sizes, appliance manuals.
+
+    [`extensions/household-knowledge/`](https://github.com/NateBJones-Projects/OB1/tree/main/extensions/household-knowledge)
+  </Step>
+  <Step title="Home Maintenance Tracker (Beginner)">
+    Scheduling and history for home upkeep. First taste of structured schemas alongside thoughts.
+
+    [`extensions/home-maintenance/`](https://github.com/NateBJones-Projects/OB1/tree/main/extensions/home-maintenance)
+  </Step>
+  <Step title="Family Calendar (Intermediate)">
+    Multi-person schedule coordination. Introduces Row Level Security for shared access.
+
+    [`extensions/family-calendar/`](https://github.com/NateBJones-Projects/OB1/tree/main/extensions/family-calendar)
+  </Step>
+  <Step title="Meal Planning (Intermediate)">
+    Recipes, weekly meal plans, shared shopping lists. Uses the shared-MCP-server primitive.
+
+    [`extensions/meal-planning/`](https://github.com/NateBJones-Projects/OB1/tree/main/extensions/meal-planning)
+  </Step>
+  <Step title="Professional CRM (Intermediate)">
+    Contact tracking wired into your thoughts. Your CRM and your memory share context.
+
+    [`extensions/professional-crm/`](https://github.com/NateBJones-Projects/OB1/tree/main/extensions/professional-crm)
+  </Step>
+  <Step title="Job Hunt Pipeline (Advanced)">
+    Application tracking and interview pipeline. Capstone — pulls every prior concept together.
+
+    [`extensions/job-hunt/`](https://github.com/NateBJones-Projects/OB1/tree/main/extensions/job-hunt)
+  </Step>
+</Steps>
+
+## Why the order matters
+
+Extensions compound. Your CRM knows about thoughts you captured. Your meal planner checks who's home this week. Your job-hunt contacts automatically join your professional network. Building in order means each one teaches concepts the next one assumes.
+
+## Primitives (shared concepts)
+
+Two patterns get extracted because multiple extensions use them:
+
+| Primitive | Used by |
+| --- | --- |
+| [Row Level Security](https://github.com/NateBJones-Projects/OB1/tree/main/primitives/rls) | Extensions 3, 4, 5, 6 |
+| [Shared MCP Server](https://github.com/NateBJones-Projects/OB1/tree/main/primitives/shared-mcp) | Extension 4 |
+
+Learn the pattern once in the primitive; reference it from each extension.
+
+## What you'll learn along the way
+
+- Designing schemas around your real workflows (not academic data modeling)
+- pgvector + structured columns in the same query
+- RLS for multi-user access without rebuilding the stack
+- Deploying multiple Edge Functions side-by-side
+- Cross-table semantic search
+
+<Card title="Tool audit" icon="list-check" href="https://github.com/NateBJones-Projects/OB1/blob/main/docs/05-tool-audit.md">
+  After 2–3 extensions you'll have ~12+ MCP tools. The audit guide explains how to keep your tool surface manageable.
+</Card>

@@ -1,0 +1,39 @@
+---
+title: "Schemas"
+description: "Database table extensions that live alongside the thoughts table."
+---
+
+Schemas add tables to your Open Brain — structured data that complements the unstructured `thoughts` stream. They're open for community contributions.
+
+## What schemas are for
+
+The `thoughts` table is a **stream**. Append-only, retrieval by meaning, no rigid structure. Great for ideas, decisions, observations, conversations.
+
+A **registry** is the opposite — discrete records you query, update, and browse without semantic search. Taste preferences. Recipe library. Contact lists. Reading list.
+
+Schemas are how you add registries.
+
+## Design rules
+
+1. **Never modify or drop columns on the core `thoughts` table.** Adding columns is fine; altering existing ones breaks every extension downstream. The automated PR review enforces this.
+2. **One clear purpose per table.** Don't shoehorn unrelated concepts into one schema.
+3. **Document the queries.** Schemas are useless without examples of how to read and write them.
+4. **Provide the GRANT.** Supabase no longer auto-grants CRUD on new tables — include `grant select, insert, update, delete on table public.<your_table> to service_role;`.
+
+## Where schemas live
+
+Each schema is a folder under [`schemas/`](https://github.com/NateBJones-Projects/OB1/tree/main/schemas) with:
+
+- `README.md` — what it stores, prerequisites, setup SQL, expected outcome, troubleshooting
+- `metadata.json` — name, description, author, tags, difficulty
+- The SQL files themselves
+
+## Example: Taste Preferences
+
+The community has already built a `taste_preferences` schema as an example registry. See the [Add a Taste Preferences Table to Your Open Brain](https://github.com/NateBJones-Projects/OB1/tree/main/extensions/_taste-preferences-example) guide.
+
+It illustrates the pattern: a separate table from `thoughts`, queried with normal SQL (not semantic search), updated deliberately rather than streamed.
+
+## Contributing
+
+See [the contribution guide](/contributing). Title your PR `[schemas] Short description`. The 11-rule automated review checks SQL safety, metadata validity, and that you haven't touched `thoughts`.

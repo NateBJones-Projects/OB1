@@ -1,0 +1,136 @@
+---
+title: "Deploy the MCP server"
+description: "One Edge Function. Four MCP tools. Live in 10 minutes."
+---
+
+You're going to deploy a single Supabase Edge Function called `open-brain-mcp`. It exposes four MCP tools to any client you connect: capture, semantic search, browse, stats.
+
+<Warning>
+**Coming back from a failed attempt?** Delete any leftover `supabase/` folder in your home directory — it will silently hijack the new setup. `rm -rf ~/supabase` (Mac/Linux) or `Remove-Item -Recurse ~\supabase` (Windows).
+</Warning>
+
+## 1. Pick a project folder
+
+Make a new folder somewhere sensible (e.g. `~/Projects/open-brain`), then `cd` into it in your terminal.
+
+<CodeGroup>
+```bash Mac/Linux
+mkdir -p ~/Projects/open-brain
+cd ~/Projects/open-brain
+pwd
+```
+
+```powershell Windows
+mkdir $HOME\Projects\open-brain
+cd $HOME\Projects\open-brain
+Get-Location
+```
+</CodeGroup>
+
+<Info>
+Every following command runs from this folder. If you close the terminal and come back, `cd` here again.
+</Info>
+
+## 2. Install the Supabase CLI
+
+<CodeGroup>
+```bash Mac/Linux (Homebrew)
+brew install supabase/tap/supabase
+supabase --version
+```
+
+```bash Mac/Linux (npm)
+npm install -g supabase
+supabase --version
+```
+
+```powershell Windows (Scoop)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+Invoke-RestMethod -Uri https://get.scoop.sh | Invoke-Expression
+scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+scoop install supabase
+supabase --version
+```
+</CodeGroup>
+
+## 3. Log in + link
+
+```bash
+supabase login
+```
+
+Browser opens — authenticate, return when it says "You are now logged in."
+
+```bash
+supabase init
+supabase link --project-ref YOUR_PROJECT_REF
+```
+
+Replace `YOUR_PROJECT_REF` with the value from your tracker.
+
+## 4. Set your secrets
+
+```bash
+supabase secrets set MCP_ACCESS_KEY=your-access-key
+supabase secrets set OPENROUTER_API_KEY=your-openrouter-key
+```
+
+<Note>
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are auto-available inside Edge Functions — you don't set those.
+</Note>
+
+<Warning>
+The `MCP_ACCESS_KEY` you set here must **exactly match** the one you saved in your tracker. Mismatch = 401 errors when connecting.
+</Warning>
+
+## 5. Download the server files
+
+<CodeGroup>
+```bash Mac/Linux
+supabase functions new open-brain-mcp
+curl -o supabase/functions/open-brain-mcp/index.ts \
+  https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts
+curl -o supabase/functions/open-brain-mcp/deno.json \
+  https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json
+head -1 supabase/functions/open-brain-mcp/index.ts
+```
+
+```powershell Windows
+supabase functions new open-brain-mcp
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts -OutFile supabase\functions\open-brain-mcp\index.ts
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json -OutFile supabase\functions\open-brain-mcp\deno.json
+Get-Content supabase\functions\open-brain-mcp\index.ts -Head 1
+```
+</CodeGroup>
+
+The last command should print `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — **not** `console.log("Hello from Functions!")`. If you see the latter, the curl/Invoke-WebRequest didn't overwrite the starter; delete the folder and retry.
+
+## 6. Deploy
+
+```bash
+supabase functions deploy open-brain-mcp --no-verify-jwt
+```
+
+<Warning>
+First line of output should say `Using workdir <your project folder>`. If it shows your home directory, your Supabase project structure is in the wrong place — start over from step 1 in a clean folder.
+</Warning>
+
+Your live URLs:
+
+```text
+MCP Server URL:
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp
+
+MCP Connection URL (with key embedded):
+https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_ACCESS_KEY
+```
+
+Paste both into your tracker.
+
+<Check>
+`supabase functions list` shows `open-brain-mcp` as **ACTIVE**. Your tracker has both URLs filled in.
+</Check>
+
+<Card title="Next: connect a client" icon="arrow-right" href="/quickstart/connect-client">
+  Claude Desktop, ChatGPT, Claude Code, Codex, or anything else MCP-capable.
+</Card>

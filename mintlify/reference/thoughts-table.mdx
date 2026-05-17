@@ -1,0 +1,138 @@
+---
+title: "thoughts table reference"
+description: "The single load-bearing schema in Open Brain."
+---
+
+The `thoughts` table is the core contract. Every extension, recipe, and integration assumes its shape. **You can add columns; you cannot modify or drop the existing ones.**
+
+## Definition
+
+```sql
+create table thoughts (
+  id uuid default gen_random_uuid() primary key,
+  content text not null,
+  embedding vector(1536),
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+```
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key. Random per row. |
+| `content` | `text` | The thought as captured. Not null. |
+| `embedding` | `vector(1536)` | OpenRouter-generated, cosine-similarity. |
+| `metadata` | `jsonb` | LLM-extracted + caller-provided tags. |
+| `created_at` | `timestamptz` | Set on insert. |
+| `updated_at` | `timestamptz` | Trigger-maintained. |
+
+## Indexes
+
+```sql
+create index on thoughts using hnsw (embedding vector_cosine_ops);
+create index on thoughts using gin (metadata);
+create index on thoughts (created_at desc);
+```
+
+- **HNSW (vector)** — sub-millisecond similarity at million-row scale.
+- **GIN (metadata)** — fast filtering on JSON fields (`metadata @> '{"source":"gmail"}'`).
+- **B-tree (created_at)** — efficient recency queries.
+
+## Trigger
+
+```sql
+create or replace function update_updated_at()
+returns trigger as $$ begin new.updated_at = now(); return new; end; $$
+language plpgsql;
+
+create trigger thoughts_updated_at
+  before update on thoughts
+  for each row
+  execute function update_updated_at();
+```
+
+## Row Level Security
+
+```sql
+alter table thoughts enable row level security;
+
+create policy "Service role full access"
+  on thoughts
+  for all
+  using (auth.role() = 'service_role');
+```
+
+Only the service role can read/write. Anon clients are blocked entirely — no public access path. Multi-user setups (Extensions 3–6) add per-user RLS policies on top.
+
+## Service-role grant
+
+Required on new Supabase projects:
+
+```sql
+grant select, insert, update, delete on table public.thoughts to service_role;
+```
+
+Without it, the MCP server returns `permission denied for table thoughts` on every call.
+
+## The search function
+
+A single SQL function handles ranked similarity search with optional metadata filtering:
+
+```sql
+create or replace function match_thoughts(
+  query_embedding vector(1536),
+  match_threshold float default 0.7,
+  match_count int default 10,
+  filter jsonb default '{}'::jsonb
+)
+returns table (
+  id uuid,
+  content text,
+  metadata jsonb,
+  similarity float,
+  created_at timestamptz
+)
+language plpgsql as $$
+begin
+  return query
+  select t.id, t.content, t.metadata,
+         1 - (t.embedding <=> query_embedding) as similarity,
+         t.created_at
+  from thoughts t
+  where 1 - (t.embedding <=> query_embedding) > match_threshold
+    and (filter = '{}'::jsonb or t.metadata @> filter)
+  order by t.embedding <=> query_embedding
+  limit match_count;
+end;
+$$;
+```
+
+The `<=>` operator is pgvector's cosine distance. `1 - distance` converts it to similarity (0–1, higher is closer).
+
+## Metadata conventions
+
+Open Brain doesn't enforce a metadata schema, but contributions follow a few conventions:
+
+```json
+{
+  "type": "decision | observation | idea | question | task | reference",
+  "topics": ["array", "of", "tags"],
+  "people": ["names mentioned"],
+  "source": "claude | chatgpt | gmail | obsidian | manual | ...",
+  "action_items": ["array", "of", "to-dos"]
+}
+```
+
+Imports stamp `source`. Extensions add their own fields (e.g., `crm_contact_id`, `recipe_id`). Filter against these via the `filter` parameter on `match_thoughts`.
+
+## Adding columns
+
+Adding columns is allowed and encouraged when an extension needs structured data on every thought:
+
+```sql
+alter table thoughts add column priority text;
+alter table thoughts add column reviewed boolean default false;
+```
+
+But **never** rename, retype, or drop the six original columns. The automated PR review enforces this.

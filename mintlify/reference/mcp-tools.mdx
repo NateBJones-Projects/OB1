@@ -1,0 +1,72 @@
+---
+title: "MCP tools"
+description: "Four tools exposed by the open-brain-mcp Edge Function."
+---
+
+Every Open Brain exposes the same four tools to any connected MCP client. The actual implementations live in [`server/index.ts`](https://github.com/NateBJones-Projects/OB1/blob/main/server/index.ts) — this page is the contract.
+
+## `capture_thought`
+
+Write a new thought. The server auto-generates the embedding and extracts metadata.
+
+**Parameters**
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `content` | string | ✅ | The thought text. No length cap, but chunk long content for better retrieval. |
+| `metadata` | object | optional | Caller-provided metadata, merged with LLM-extracted fields. |
+
+**Returns** — the inserted row's `id`, plus the extracted metadata so the user can see what was tagged.
+
+**When the LLM picks this tool** — phrases like "remember", "save this", "make a note", "capture", "add to my brain", or any clearly-narrative statement framed as something to retain.
+
+## `search_thoughts`
+
+Semantic similarity search against your thoughts.
+
+**Parameters**
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `query` | string | ✅ | Natural-language query — the server embeds it. |
+| `match_threshold` | float | optional | Cosine similarity floor (default 0.7). Lower = more results, more noise. |
+| `match_count` | int | optional | Top-K limit (default 10). |
+| `filter` | object | optional | JSONB metadata filter — e.g. `{ "source": "gmail" }`. |
+
+**Returns** — rows with `id`, `content`, `metadata`, `similarity` (0–1), `created_at`. Sorted by similarity descending.
+
+**When the LLM picks this tool** — questions about what you've said, decided, learned, or captured on a topic. "What do I think about X?" "Did I save anything about Y?" "Find my notes on Z."
+
+## `list_thoughts`
+
+Browse recent thoughts, optionally filtered. No semantic matching — pure recency.
+
+**Parameters**
+
+| Name | Type | Required | Notes |
+| --- | --- | --- | --- |
+| `limit` | int | optional | How many rows (default 20). |
+| `filter` | object | optional | JSONB metadata filter. |
+| `since` | timestamp | optional | Only thoughts created after this. |
+
+**Returns** — rows sorted by `created_at` descending.
+
+**When the LLM picks this tool** — time-bound queries: "what did I capture this week", "show me my recent thoughts", "what was I thinking about Tuesday".
+
+## `thought_stats`
+
+High-level stats about your brain.
+
+**Parameters** — none.
+
+**Returns** — total thought count, most-common metadata values (top topics, top people, source breakdown), first/last capture dates.
+
+**When the LLM picks this tool** — questions about volume, patterns, or who/what shows up most.
+
+## Auth
+
+Every request includes the access key — either as `?key=...` in the URL, or as the `x-brain-key` header. Mismatch returns 401. See [the FAQ](/faq) if you're seeing auth errors despite a correct key.
+
+## Tool surface area
+
+After a few extensions, you'll have a dozen+ tools across multiple MCP servers. The clients don't filter them well by default — read the [Tool Audit guide](https://github.com/NateBJones-Projects/OB1/blob/main/docs/05-tool-audit.md) for how to keep this manageable.

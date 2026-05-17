@@ -1,0 +1,64 @@
+---
+title: "Quickstart overview"
+description: "Build the full Open Brain in eight steps, about 45 minutes."
+---
+
+By the end of this quickstart you'll have:
+
+- A Supabase project with a `thoughts` table and vector search
+- An OpenRouter account funded for embeddings + lightweight LLM calls
+- A remote MCP server deployed as a Supabase Edge Function
+- Your AI client connected to it, writing and reading thoughts on demand
+
+## What you need
+
+- Email + a few minutes to verify accounts (Supabase, OpenRouter)
+- About **$5 on a card** for OpenRouter credits (lasts months)
+- An MCP-capable AI client: Claude Desktop, ChatGPT (paid), Claude Code, Cursor, Codex, Windsurf
+
+No coding experience required. The whole flow is paste-the-SQL, paste-the-command, paste-the-URL.
+
+<Warning>
+**Download the [credential tracker](https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/docs/open-brain-credential-tracker.xlsx) before you start.** You'll generate keys you can't retrieve later. The spreadsheet has a slot for every credential.
+</Warning>
+
+## The eight steps
+
+<Steps>
+  <Step title="Create a Supabase project">
+    See [Supabase setup](/quickstart/supabase). Sign up, create the `open-brain` project, save the project ref.
+  </Step>
+  <Step title="Set up the database">
+    Enable pgvector, create the `thoughts` table, the `match_thoughts` function, and grant service-role access. Five SQL blocks — covered in [Supabase setup](/quickstart/supabase).
+  </Step>
+  <Step title="Save your API keys">
+    Settings → API Keys → copy Project URL and Secret key into the tracker.
+  </Step>
+  <Step title="Get an OpenRouter key">
+    See [OpenRouter setup](/quickstart/openrouter). Sign up, fund $5 in credits, generate a key.
+  </Step>
+  <Step title="Generate an access key">
+    `openssl rand -hex 32` (Mac/Linux) or PowerShell one-liner (Windows). This guards your MCP server.
+  </Step>
+  <Step title="Deploy the MCP server">
+    See [MCP deploy](/quickstart/mcp-deploy). Install the Supabase CLI, link your project, set secrets, deploy the Edge Function.
+  </Step>
+  <Step title="Connect your AI client">
+    See [Connect client](/quickstart/connect-client). One URL per client.
+  </Step>
+  <Step title="Verify it works">
+    Capture a test thought, search for it. See [Verify](/quickstart/verify).
+  </Step>
+</Steps>
+
+<Info>
+**Source of truth.** This quickstart is a polished walkthrough. The canonical, maintained, fully-screenshotted version lives in the OB1 repo at [`docs/01-getting-started.md`](https://github.com/NateBJones-Projects/OB1/blob/main/docs/01-getting-started.md). If you hit something not covered here, that's where to look — plus the [FAQ](/faq).
+</Info>
+
+## Prefer video?
+
+[Open Brain Startup Guide](https://vimeo.com/1174979042/f883f6489a) — ~27 minutes, same flow.
+
+## Prefer AI-assisted?
+
+If you'd rather have Cursor, Claude Code, or another agent drive the build for you, see [`docs/04-ai-assisted-setup.md`](https://github.com/NateBJones-Projects/OB1/blob/main/docs/04-ai-assisted-setup.md) in the repo.

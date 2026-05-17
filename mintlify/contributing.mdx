@@ -1,0 +1,98 @@
+---
+title: "Contributing"
+description: "Open extends the system. Curated paths preserve the core."
+---
+
+Open Brain accepts community contributions. The full source-of-truth document is [`CONTRIBUTING.md`](https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md) in the repo — this page is a shorter orientation.
+
+## Before you contribute
+
+You need a working Open Brain. Every contribution should be tested against your own instance — don't submit something you haven't run yourself.
+
+Start with the [Quickstart](/quickstart/overview) if you haven't built one yet.
+
+## Not a developer? You can still contribute
+
+You don't need to write code. If you have a workflow, a use case, or an idea — that counts.
+
+1. Open a [Non-Technical Contribution issue](https://github.com/NateBJones-Projects/OB1/issues/new?template=non-technical-contribution.yml). Describe your idea in plain language.
+2. A community mentor picks it up — they write the code, structure the README, fill the metadata.
+3. You get full credit. Your name goes in `metadata.json` and `CONTRIBUTORS.md`. The mentor is co-author on the PR.
+
+Or just post ideas in `#non-dev-contributions` on [Discord](https://discord.gg/Cgh9WJEkeG).
+
+## What goes where
+
+| Category | What belongs | Open or curated? |
+| --- | --- | --- |
+| `extensions/` | Progressive, ordered builds | **Curated** — discuss first |
+| `primitives/` | Reusable concept guides referenced by 2+ extensions | **Curated** |
+| `recipes/` | Step-by-step capability builds | Open |
+| `schemas/` | Database table extensions | Open |
+| `dashboards/` | Frontend templates | Open |
+| `integrations/` | MCP extensions, webhooks, capture sources | Open |
+
+If unsure where yours fits, open a discussion issue first.
+
+## Required files
+
+Every contribution lives in its own subfolder under the right category and must include:
+
+- **`README.md`** — what it does, prerequisites, step-by-step setup, expected outcome, troubleshooting
+- **`metadata.json`** — structured metadata (template in [CONTRIBUTING.md](https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md))
+- **Your actual code** — SQL files, Edge Function code, frontend, configs
+- **No credentials, API keys, or secrets** — automated review rejects them
+
+## The review process
+
+1. You submit a PR.
+2. An automated GitHub Action runs 11+ machine-readable checks ([`.github/workflows/ob1-review.yml`](https://github.com/NateBJones-Projects/OB1/blob/main/.github/workflows/ob1-review.yml)).
+3. If automated checks pass, a human admin reviews for quality, clarity, and safety.
+4. Expect 2–5 business days for human review.
+
+### What gets rejected
+
+- Contains credentials, API keys, or secrets
+- Requires paid services with no free-tier alternative
+- Poorly documented (missing README sections, unclear instructions)
+- Duplicates an existing contribution without meaningful improvement
+- Modifies core Open Brain infrastructure (`thoughts` table, core MCP server) — that's upstream, not here
+
+## PR format
+
+**Title:** `[category] Short description`
+
+- `[recipes] Email history import via Gmail API`
+- `[schemas] CRM contacts table with interaction tracking`
+- `[extensions] Household Knowledge Base`
+
+**Description must include:**
+
+- What the contribution does
+- What it requires (services, tools)
+- Confirmation that you tested it on your own instance
+
+## Contributor ladder
+
+| Level | What it means |
+| --- | --- |
+| **Community Member** | You use Open Brain and participate in discussions |
+| **Contributor** | One or more merged contributions |
+| **Regular** | 3+ merged, or sustained help reviewing others' work |
+| **Maintainer** | Invited based on sustained, quality involvement |
+
+Non-code contributions count at every level.
+
+## The hard rules
+
+These are enforced by automated review and apply to **everything**:
+
+1. **Never modify the core `thoughts` table structure.** Adding columns is fine; altering or dropping existing ones is not.
+2. **No credentials, API keys, or secrets** in any file.
+3. **No binary blobs over 1 MB.** No `.exe`, `.dmg`, `.zip`, `.tar.gz`.
+4. **No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`** in SQL files.
+5. **MCP servers must be remote** (Supabase Edge Functions), not local. No `claude_desktop_config.json`. No `StdioServerTransport`.
+
+<Card title="Full CONTRIBUTING.md" icon="github" href="https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md">
+  The canonical, exhaustive version — metadata templates, the 11-rule checklist, README formatting standards.
+</Card>

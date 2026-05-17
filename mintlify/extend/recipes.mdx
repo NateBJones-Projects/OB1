@@ -1,0 +1,47 @@
+---
+title: "Recipes"
+description: "Community-built capabilities. Standalone builds with no prerequisites beyond a working Open Brain."
+---
+
+Recipes are standalone — pick what's useful, skip the rest. No ordering, no prerequisites past a working Open Brain. Open for community contributions.
+
+## Import your data
+
+Pull your digital life into Open Brain. Each recipe handles a specific source — parsing, deduplication, embedding, ingestion.
+
+| Recipe | What it does | Contributor |
+| --- | --- | --- |
+| [ChatGPT Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/chatgpt-conversation-import) | Parse ChatGPT data exports, filter trivial conversations, summarize via LLM | @matthallett1 |
+| [Perplexity Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/perplexity-conversation-import) | Import Perplexity search history and memory entries | @demarant |
+| [Obsidian Vault Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/obsidian-vault-import) | Parse and import Obsidian vault notes with metadata | @snapsynapse |
+| [X/Twitter Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/x-twitter-import) | Import tweets, DMs, and Grok chats from X data exports | @alanshurafa |
+| [Instagram Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/instagram-import) | Import DMs, comments, captions from Instagram exports | @alanshurafa |
+| [Google Activity Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/google-activity-import) | Import Google Search, Gmail, Maps, YouTube, Chrome history from Takeout | @alanshurafa |
+| [Grok (xAI) Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/grok-export-import) | Import Grok conversation exports | @alanshurafa |
+| [Journals/Blogger Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/journals-blogger-import) | Import Atom XML blog archives | @alanshurafa |
+| [Email History Import](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/email-history-import) | Pull Gmail archive into searchable thoughts | @matthallett1 |
+
+## Tools & workflows
+
+Standalone capabilities that make your Open Brain smarter.
+
+| Recipe | What it does | Contributor |
+| --- | --- | --- |
+| [Panning for Gold](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold) | Mine brain dumps and voice transcripts for actionable ideas | @jaredirish |
+| [Claudeception](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/claudeception) | Self-improving system that creates new skills from work sessions | @jaredirish |
+| [Schema-Aware Routing](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/schema-aware-routing) | LLM-powered routing of unstructured text across multiple tables | @claydunker-yalc |
+| [Fingerprint Dedup Backfill](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/fingerprint-dedup-backfill) | Backfill content fingerprints and remove duplicate thoughts | @alanshurafa |
+| [Source Filtering](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/source-filtering) | Filter thoughts by source, backfill missing metadata | @matthallett1 |
+| [Life Engine](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/life-engine) | Self-improving personal assistant — calendar, habits, health, briefings via Telegram or Discord | @justfinethanku |
+| [Life Engine Video](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/life-engine-video) | Render Life Engine briefings as short animated videos with voiceover | @justfinethanku |
+| [Daily Digest](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/daily-digest) | Automated daily summary via email or Slack | OB1 Team |
+
+## Contributing a recipe
+
+Anything that adds a capability without modifying the core `thoughts` table or MCP server is welcome.
+
+- Read [the contribution guide](/contributing).
+- Use the template at [`recipes/_template/`](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/_template).
+- Title your PR `[recipes] Short description`.
+
+Automated review checks 11 rules (folder layout, no secrets, SQL safety, README completeness, etc.) before a human admin reviews.

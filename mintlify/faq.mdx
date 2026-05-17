@@ -1,0 +1,145 @@
+---
+title: "FAQ"
+description: "Real questions from the Open Brain community."
+---
+
+This FAQ is sourced from [`docs/03-faq.md`](https://github.com/NateBJones-Projects/OB1/blob/main/docs/03-faq.md) in the repo, where the canonical version lives. Common gotchas first, then philosophy.
+
+## Setup and connection
+
+### Claude Desktop / ChatGPT throws an auth error but Claude Code works
+
+The single most common issue. Claude Code can send custom headers; Claude Desktop and ChatGPT cannot.
+
+**Fix:** use the MCP Connection URL with the key as a **query parameter**, not a header:
+
+```text
+https://YOUR_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_KEY
+```
+
+In Claude Desktop or ChatGPT settings, paste that full URL and set auth to "None" — the key is already in the URL.
+
+### ChatGPT disabled my memory when I added Open Brain
+
+OpenAI requirement, not a bug. Enabling Developer Mode (needed for custom MCP connectors) disables built-in Memory. Open Brain replaces it — and works across every AI, not just ChatGPT.
+
+### ChatGPT doesn't use the Open Brain tools automatically
+
+ChatGPT is less intuitive than Claude at picking the right MCP tool. Be explicit for the first few prompts: *"Use the Open Brain search_thoughts tool to find my notes on X."* It picks up the pattern within a conversation.
+
+### "I'm stuck and Claude is rewriting my Edge Function code"
+
+Pause. The problems are almost never in the code. They're in the configuration: a secret that doesn't match, a URL missing the key, a step that got skipped.
+
+Check Supabase dashboard → **Edge Functions → open-brain-mcp → Logs** first. That tells you what's actually happening.
+
+### Search isn't working but capture is
+
+Good news — your database, function, and MCP connection are fine. The issue is isolated.
+
+Most likely culprits:
+1. `vector` extension not enabled — run `create extension if not exists vector;`
+2. Embedding generation failing silently — check function logs
+3. `match_thoughts` deployed with an error — check Database → Functions
+
+## Importing data
+
+### Can I import my Gmail?
+
+Yes — see the [Email History Import recipe](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/email-history-import). OAuth, filter by label and time window, strip signatures, load each email as a thought. ~30 min setup; you'll need a Google Cloud project with Gmail API enabled.
+
+### How do I import my ChatGPT conversations?
+
+Export from ChatGPT (Settings → Data controls → Export data), then use the [ChatGPT Conversation Import recipe](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/chatgpt-conversation-import). Handles the full export automatically.
+
+### What other sources can I import?
+
+See the [recipes index](/extend/recipes). Active community work on Obsidian, Twitter/X, Perplexity, Google Takeout, Instagram, Blogger, Grok, and more.
+
+## How it relates to other tools
+
+### How does this work with Obsidian?
+
+Short answer: it doesn't, and it's not supposed to.
+
+Obsidian is a note-taking app. Open Brain is a database with vector search. Different categories — you don't need a middleman between your AI and your data.
+
+If you want to bring an existing Obsidian vault over, use the [Obsidian Vault Import recipe](https://github.com/NateBJones-Projects/OB1/tree/main/recipes/obsidian-vault-import). It moves content **into** Open Brain. Obsidian doesn't sit alongside or on top.
+
+### I want the visual editing experience — headings, drag, browse
+
+That's a fair ask and Open Brain doesn't offer it natively. The Supabase Table Editor is functional but it's a database view, not a writing environment.
+
+Frame it this way: Open Brain is the backend. Obsidian is a frontend. There's nothing stopping you from having both — use Open Brain for AI-accessible storage and retrieval; keep Obsidian for the visual workflow. Or build a frontend on top — see [dashboards](/extend/dashboards).
+
+## Storage and retrieval
+
+### How do I store long-form content?
+
+Two questions in one.
+
+**Can Postgres store long content?** Yes. It's a database. A 4,000-word article is just a text column.
+
+**How does retrieval handle it?** Less well, if you embed the whole article as a single vector. You're compressing dozens of ideas into one point in vector space — search quality drops.
+
+The fix: **chunking**. Break long content into sections. Embed each chunk separately. Keep metadata tying chunks back to the parent. That's a hybrid query — filter on metadata first, vector search within the filtered set.
+
+### How do I prevent memory from getting noisy?
+
+"Store more and more" isn't the right framing. Open Brain is a capture tool — what goes in is up to you.
+
+The real answer is **siloing**. Different contexts need different memory. Your coding thoughts shouldn't pollute your creative-writing context. Tag aggressively with `source`, `domain`, or `context` and filter retrieval accordingly.
+
+ChatGPT's built-in memory has this exact problem: one flat pool with no separation. That's an architecture problem, not a memory problem.
+
+### What's the right unit of embedding?
+
+One idea per entry. Zettelkasten-style atomic notes are a near-perfect fit for vector search.
+
+- Calendar events — one per event.
+- Emails — one per email or per thread.
+- Tasks — one per task.
+- Long articles — chunk into sections.
+- Health data — one per night/day, not per month.
+
+The key is metadata. Every source tags itself (`source: "garmin"`, `source: "gmail"`) so retrieval can filter by context.
+
+### Search seems sub-par — I have to coax Claude to find things
+
+Diagnose in this order:
+
+1. **Check row count.** Supabase → Table Editor → thoughts. Under 20–30 entries? Semantic search just doesn't have enough data points. It gets better with volume.
+2. **Test directly.** Ask the AI to search for something you **know** is in there using words close to your original phrasing. If that works, the system is fine — it needs more content for vague queries to land.
+3. **Check Edge Function logs.** Silent errors show up there.
+4. **Compare list vs search.** If `list_thoughts` returns it but `search_thoughts` doesn't, that's an embedding/similarity issue — usually improves with more data.
+
+## Key rotation
+
+### I rotated my OpenRouter key and now nothing works
+
+The old key is revoked immediately on rotation. Your Open Brain uses it in **multiple places**:
+
+1. **Supabase Edge Function secrets** — the most common one to miss:
+   ```bash
+   supabase secrets set OPENROUTER_API_KEY=sk-or-v1-NEW
+   ```
+2. **Local `.env` files** for recipes/integrations that run outside the Edge Function.
+3. **Any CI/CD configs** that reference it.
+
+Verify with:
+
+```bash
+curl https://openrouter.ai/api/v1/models -H "Authorization: Bearer sk-or-v1-NEW"
+```
+
+JSON response = valid. 401 = wrong or not yet active.
+
+## Before you ask for help
+
+1. **Did you follow the guide step by step?** Most issues trace back to a skipped or modified step.
+2. **Check Edge Function logs.** Supabase → Edge Functions → your function → Logs.
+3. **Is the URL format right?** `https://YOUR_REF.supabase.co/functions/v1/open-brain-mcp?key=YOUR_KEY`
+4. **Use the Supabase AI assistant** in the dashboard for Supabase-specific errors.
+5. **Don't let AI rewrite your server code** unless you understand what it's changing.
+
+Still stuck? [Open an issue](https://github.com/NateBJones-Projects/OB1/issues) or post in the [Discord](https://discord.gg/Cgh9WJEkeG) / [Substack community](https://natesnewsletter.substack.com/).

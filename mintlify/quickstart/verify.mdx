@@ -1,0 +1,62 @@
+---
+title: "Verify it works"
+description: "Two prompts. Two checks. You're done."
+---
+
+## 1. Capture a thought
+
+In your connected AI, say:
+
+```text
+Remember this: Sarah mentioned she's thinking about leaving her job to start a consulting business
+```
+
+Wait a few seconds. The AI should confirm the capture and show the extracted metadata (type, topics, people, action items).
+
+## 2. Confirm it landed in the database
+
+Supabase dashboard → **Table Editor → thoughts**. You should see one row with:
+
+- Your message in `content`
+- A non-null `embedding` (long array of floats)
+- JSON in `metadata`
+
+## 3. Retrieve it
+
+In the same conversation (or a fresh one — that's the point):
+
+```text
+What did Sarah tell me?
+```
+
+The AI should retrieve the thought and answer using it as context.
+
+<Check>
+Row visible in Supabase. AI retrieves it on demand. You have a working Open Brain.
+</Check>
+
+## Common prompts to try next
+
+| Prompt | Tool triggered |
+| --- | --- |
+| "Save this: shipped v2 on March 15" | `capture_thought` |
+| "What did I capture about career changes?" | `search_thoughts` |
+| "What did I write down this week?" | `list_thoughts` |
+| "How many thoughts do I have?" | `thought_stats` |
+
+## Where to go now
+
+<CardGroup cols={2}>
+  <Card title="Build extensions" icon="cubes" href="/extend/extensions">
+    Six progressive builds — household, calendar, CRM, job hunt.
+  </Card>
+  <Card title="Import your data" icon="file-import" href="/extend/recipes">
+    ChatGPT exports, Gmail, Obsidian, Twitter, Perplexity.
+  </Card>
+  <Card title="Read the FAQ" icon="circle-question" href="/faq">
+    Auth errors, key rotation, the Obsidian question.
+  </Card>
+  <Card title="MCP tool reference" icon="terminal" href="/reference/mcp-tools">
+    Exact tool signatures and parameter shapes.
+  </Card>
+</CardGroup>

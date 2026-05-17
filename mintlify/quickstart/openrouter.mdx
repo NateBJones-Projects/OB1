@@ -1,0 +1,47 @@
+---
+title: "OpenRouter setup"
+description: "One key, every major model. About 3 minutes."
+---
+
+OpenRouter is a single-API gateway in front of every major LLM and embedding provider. Open Brain uses it for embeddings and lightweight metadata extraction.
+
+Why not OpenAI directly? One billing relationship, one key, future-proof.
+
+## 1. Sign up + fund
+
+1. Go to [openrouter.ai](https://openrouter.ai), sign up.
+2. Go to **Credits**, add **$5**. That lasts months at typical Open Brain usage.
+
+## 2. Generate the key
+
+1. Go to [openrouter.ai/keys](https://openrouter.ai/keys).
+2. **Create Key**, name it `open-brain`.
+3. **Copy it into your credential tracker immediately.** You can't view it again after closing the dialog.
+
+## 3. Generate your MCP access key
+
+This is the secret your MCP server checks on every request. Different from the OpenRouter key — it guards your endpoint.
+
+<CodeGroup>
+```bash Mac/Linux
+openssl rand -hex 32
+```
+
+```powershell Windows
+-join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
+```
+</CodeGroup>
+
+Copy the 64-character output into your tracker as **MCP Access Key**.
+
+<Warning>
+This is **the** access key for all of Open Brain — every extension you add later reuses it. Don't regenerate unless you want to update every deployed function.
+</Warning>
+
+<Check>
+Tracker has **OpenRouter API key** and **MCP Access Key** filled in.
+</Check>
+
+<Card title="Next: deploy the server" icon="arrow-right" href="/quickstart/mcp-deploy">
+  Install the Supabase CLI, link, set secrets, deploy.
+</Card>

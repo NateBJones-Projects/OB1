@@ -1,0 +1,30 @@
+---
+title: "Integrations"
+description: "MCP extensions, alternative deployment targets, and new capture sources."
+---
+
+Integrations are connections — new ways data flows in and out of Open Brain.
+
+| Integration | What it does | Contributor |
+| --- | --- | --- |
+| [Kubernetes Deployment](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/kubernetes-deployment) | Fully self-hosted K8s deployment with Postgres + pgvector — no Supabase | @velo |
+| [Slack Capture](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/slack-capture) | Capture thoughts via Slack messages with auto-embedding and classification | Core |
+| [Discord Capture](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/discord-capture) | Discord bot mirroring the Slack pattern | Core |
+
+## Three flavors of integration
+
+- **Deployment target** — Run Open Brain somewhere other than Supabase. Kubernetes is the existing example; self-hosted Postgres + pgvector + a Deno or Node MCP server is the pattern.
+- **Capture source** — Wire a chat channel, an inbox, a browser extension, or anything else as a one-tap capture surface. Slack and Discord are the templates.
+- **MCP extension** — Add tools beyond capture/search/list/stats. Examples: webhooks, calendar sync, browser-extension bookmarklet.
+
+## The non-negotiable rule
+
+**MCP servers must be remote** (Supabase Edge Functions, or your own remote runtime). No `claude_desktop_config.json`. No local `StdioServerTransport`. No per-machine Node setup.
+
+This is enforced by automated PR review. The reason: remote means it works on mobile, on the web, on every device the user owns, with one URL to paste.
+
+## Contributing
+
+PR title: `[integrations] Short description`. See [contributing](/contributing).
+
+Every extension and integration must link to the [Tool Audit guide](https://github.com/NateBJones-Projects/OB1/blob/main/docs/05-tool-audit.md) in its README — as users add more tools, surface-area management matters.
