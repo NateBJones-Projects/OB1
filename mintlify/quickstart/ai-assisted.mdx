@@ -1,0 +1,86 @@
+---
+title: "AI-assisted setup"
+description: "Point your coding AI at this repo and let it walk you through the build."
+---
+
+The fastest path to a working Open Brain: point your AI coding tool at the OB1 repo and tell it to walk you through [the setup guide](/quickstart/overview). The guide has every SQL block, every Edge Function, every config step — your AI reads it and helps you execute.
+
+Works in Cursor, Claude Code, Codex, Windsurf, OpenClaw, or any AI coding tool that can read files.
+
+## How to start
+
+<Steps>
+  <Step title="Clone or open the OB1 repo in your AI coding tool">
+    `git clone https://github.com/NateBJones-Projects/OB1.git` (or open in the IDE of your choice).
+  </Step>
+  <Step title="Give your AI the magic sentence">
+    > "Read `docs/01-getting-started.md` and walk me through building my Open Brain step by step."
+  </Step>
+  <Step title="Follow along">
+    It handles the code parts. You handle the clicking (Supabase dashboard, OpenRouter signup, Slack app, Claude Desktop connector).
+  </Step>
+</Steps>
+
+That's the whole workflow. The sections below are what to watch out for.
+
+## What your AI handles well
+
+- **SQL setup** — Tables, functions, indexes, RLS policies. Can paste into Supabase SQL Editor or walk you through it.
+- **Edge Function code** — `ingest-thought` (Slack capture) and `open-brain-mcp` (MCP server) are fully written in the guide. AI reads them and helps deploy.
+- **CLI commands** — Installing the Supabase CLI, linking, deploying, setting secrets. AI can run these directly if your tool has terminal access.
+- **Debugging** — Read Edge Function logs, diagnose the issue. This is where AI-assisted shines over going solo.
+
+## What you should do manually
+
+These are fast but require a browser:
+
+- **Account signups** — Supabase, OpenRouter, Slack.
+- **Supabase dashboard** — Enabling the vector extension, copying Project URL and Secret key.
+- **Slack app config** — Creating the app, OAuth scopes, installing to workspace, Event Subscriptions.
+- **AI client connection** — Claude Desktop / ChatGPT / etc. Settings → Connectors.
+
+Your AI can tell you exactly what to click and where — it just can't click for you.
+
+## Common gotchas
+
+<Warning>
+**Don't let your AI improvise when it can't read the source.**
+
+If your AI can't access a file, it will make something up rather than say it's stuck. This happened in early builds when the guide lived on Substack — collapsed code sections weren't visible, so the AI invented Edge Function code that looked plausible but was wrong.
+
+Now that the full guide is in this repo, this shouldn't happen — but the principle stays: if your AI is generating setup code *from scratch* instead of referencing `docs/01-getting-started.md`, stop it and point it back to the file.
+</Warning>
+
+<Warning>
+**Configuration problems need configuration fixes — not code rewrites.**
+
+When something breaks, your AI's instinct is to rewrite code. Resist. The Edge Function code in the guide works. Problems are almost always config:
+
+- A secret that doesn't match (`supabase secrets list` to check)
+- A URL missing the access key
+- A Slack event subscription missing `message.groups`
+- A step that got skipped
+
+Check the Edge Function logs first (Supabase dashboard → Edge Functions → your function → Logs). Paste the error and let the AI diagnose — but don't let it rewrite the server code unless the logs point to an actual code problem.
+</Warning>
+
+<Tip>
+**Keep your credential tracker open.**
+
+The [setup guide](/quickstart/overview) has a credential tracker linked at the top. Download it before you start. Your AI can remind you to fill it in, but you need to actually save the values somewhere it can reference later. Skip this and you'll hit Step 7 without the Channel ID from Step 5.
+</Tip>
+
+## Tips
+
+- **Go step by step.** Don't ask your AI to "set up the whole thing." Walk through Part 1 (Capture), test it, then do Part 2 (Retrieval). The guide is structured this way on purpose.
+- **Test at the verify step.** The guide has specific test prompts and expected responses. Run them. If capture works, your database + Edge Function + connection are all solid before you trust the MCP layer.
+- **Use Supabase's built-in AI too.** The Supabase dashboard has its own AI assistant (chat icon, bottom-right). It knows Supabase docs cold and handles database-specific debugging well. Your coding AI handles the big picture; the Supabase AI handles Supabase details.
+- **Read the [FAQ](/faq) when stuck.** Covers the most common issues — including the exact auth-error pattern that trips up Claude Desktop and ChatGPT.
+
+## After setup
+
+Once Open Brain is running, the [extensions learning path](/extend/extensions) works the same way — point your AI at an extension's README and build together.
+
+---
+
+*Inspired by Matt Hallett's first Open Brain build (entirely through Cursor with Claude). If you build yours with an AI coding tool, [share how it went in `#show-and-tell` on Discord](https://discord.gg/Cgh9WJEkeG).*

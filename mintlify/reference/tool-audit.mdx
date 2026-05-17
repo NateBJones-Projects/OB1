@@ -1,0 +1,91 @@
+---
+title: "Tool surface audit"
+description: "When you have 30+ MCP tools loaded, your AI starts misrouting. Here's how to right-size."
+---
+
+Every MCP tool you expose sends its full definition into your AI's context window on every message. At 4 extensions you have ~20 tools. At 6 you're north of 40. Your AI is reading 6,000–16,000 tokens of tool definitions before you say a word — and it gets worse: routing accuracy degrades as similarly-named tools (`search_thoughts`, `search_contacts`, `search_recipes`, ...) compete for the same intent.
+
+This page summarizes the patterns. The [canonical guide in the repo](https://github.com/NateBJones-Projects/OB1/blob/main/docs/05-tool-audit.md) has the four prompt kits ready to paste.
+
+## When this matters
+
+- **Under 10 tools** — you're fine. Skip this page.
+- **10–20 tools** — keep an eye out; you'll feel it on weaker models.
+- **20+ tools** — actively measure (Prompt Kit 4 below). Worth merging.
+- **40+ tools** — routing problems are real. Scope into multiple servers (capture / query / admin).
+
+## The three consolidation patterns
+
+<AccordionGroup>
+  <Accordion title="Pattern A — Unified CRUD tool" icon="square-1">
+    Replace 5 tools (`create_X`, `get_X`, `update_X`, `delete_X`, `list_X`) with one `manage_X` tool that takes an `action` parameter.
+
+    **Savings:** ~800–1,500 tokens per table.
+
+    **Tradeoff:** The single tool's parameter schema is more complex. Strong models handle it; weaker ones may not.
+  </Accordion>
+  <Accordion title="Pattern B — Read/write split" icon="square-2">
+    Two tools per entity:
+    - `save_X` — creates or updates (upsert)
+    - `query_X` — search, filter, get-by-id, list
+
+    Maps to how people actually talk to AI ("save this" / "find that"). Misrouting is rare because intent is unambiguous.
+
+    **Savings:** ~500–1,000 tokens per table.
+  </Accordion>
+  <Accordion title="Pattern C — Generic entity manager" icon="square-3">
+    For tables with similar schemas, two or three tools handle everything:
+    - `save_entity(entity_type, data)`
+    - `query_entities(entity_type, filters)`
+    - `get_entity_detail(entity_type, id)`
+
+    Replaces N×5 tools with 2–3. **Most aggressive.** Works if tables share structure; falls apart if they don't.
+  </Accordion>
+</AccordionGroup>
+
+## When NOT to merge
+
+- **Cross-extension bridge tools** (`link_thought_to_contact`) — specificity is the point.
+- **Complex unique workflows** (`generate_shopping_list`) — these aren't CRUD; merging loses context.
+- **High-frequency core tools** (`capture_thought`, `search_thoughts`) — benefit from being individually named.
+
+## Scoping into multiple servers
+
+The three-server pattern most Open Brain users converge on:
+
+| Server | Purpose | Context cost | Tools to include |
+| --- | --- | --- | --- |
+| **Capture** | Write-heavy moments — jotting a thought, logging interaction | ~5–8 tools | `capture_thought`, `save_entity`, `log_*` |
+| **Query** | Recall, weekly review, planning | ~8–12 tools | `search_thoughts`, `query_entities`, bridge tools |
+| **Admin** | Occasional maintenance (rarely connected) | doesn't matter | `update_*`, `delete_*`, bulk ops |
+
+Each scoped server is its own Edge Function with its own MCP tool definitions. Same database — scoping is about which tools are exposed, not which data is accessible.
+
+In Claude Desktop: connect only the servers relevant to your current task. Admin stays disconnected until you need it.
+
+## Four prompt kits to run
+
+The full prompts are in [`docs/05-tool-audit.md`](https://github.com/NateBJones-Projects/OB1/blob/main/docs/05-tool-audit.md). Paste them into any MCP-connected AI client.
+
+1. **Audit My MCP Tools** — full inventory, grouping, redundancy flags.
+2. **Suggest Tool Merges** — before/after merge recommendations with token-savings estimates.
+3. **Design My MCP Scoping** — interactive conversation that splits your tools across multiple servers based on your actual usage.
+4. **Estimate My Context Cost** — 30-second calculation of how much context window your tool definitions are consuming.
+
+## Reference benchmark
+
+With all 6 official Open Brain extensions connected:
+
+| Extensions installed | Total tools | Roughly |
+| --- | --- | --- |
+| Just core MCP | 4 | trivial |
+| + 2 extensions | ~14 | comfortable |
+| All 6 extensions | ~40 + 2 bridges | scope or merge |
+
+Community testing ([Issue #36](https://github.com/NateBJones-Projects/OB1/issues/36)) shows Claude Opus handles ~40 tools fine in scripted use but routing accuracy degrades for ambiguous multi-domain prompts. Weaker models struggle significantly.
+
+## Further reading
+
+- [`docs/05-tool-audit.md`](https://github.com/NateBJones-Projects/OB1/blob/main/docs/05-tool-audit.md) — the four prompt kits in full
+- [Issue #36](https://github.com/NateBJones-Projects/OB1/issues/36) — context weight + routing accuracy discussion
+- [Issue #61](https://github.com/NateBJones-Projects/OB1/issues/61) — standardize ingestion patterns

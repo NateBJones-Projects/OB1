@@ -17,6 +17,17 @@ Integrations are connections — new ways data flows in and out of Open Brain.
 - **Capture source** — Wire a chat channel, an inbox, a browser extension, or anything else as a one-tap capture surface. Slack and Discord are the templates.
 - **MCP extension** — Add tools beyond capture/search/list/stats. Examples: webhooks, calendar sync, browser-extension bookmarklet.
 
+## The Slack/Discord capture pattern
+
+Both Slack and Discord integrations follow the same blueprint, worth understanding because new capture sources copy it:
+
+1. **A second Edge Function** (typically `ingest-thought`) deployed alongside `open-brain-mcp` in the same Supabase project.
+2. **A webhook subscription** in the chat platform (Slack Event Subscriptions / Discord bot events) pointing at the Edge Function URL.
+3. **The function** verifies the signature, dedups via `content_fingerprint`, calls OpenRouter for embedding + metadata extraction, writes via `upsert_thought`, and posts a threaded confirmation back to the source channel.
+4. **Same `OPENROUTER_API_KEY` and `MCP_ACCESS_KEY`** as the main MCP server — secrets are project-wide.
+
+Anything that can fire a webhook can become a capture source. Telegram, iMessage relay, an Apple Shortcut, a watchOS complication — all the same pattern.
+
 ## The non-negotiable rule
 
 **MCP servers must be remote** (Supabase Edge Functions, or your own remote runtime). No `claude_desktop_config.json`. No local `StdioServerTransport`. No per-machine Node setup.

@@ -26,11 +26,18 @@
             "group": "Quickstart",
             "pages": [
               "quickstart/overview",
+              "quickstart/ai-assisted",
               "quickstart/supabase",
               "quickstart/openrouter",
               "quickstart/mcp-deploy",
               "quickstart/connect-client",
               "quickstart/verify"
+            ]
+          },
+          {
+            "group": "Use it",
+            "pages": [
+              "companion-prompts"
             ]
           },
           {
@@ -48,6 +55,7 @@
             "pages": [
               "reference/mcp-tools",
               "reference/thoughts-table",
+              "reference/tool-audit",
               "faq"
             ]
           },

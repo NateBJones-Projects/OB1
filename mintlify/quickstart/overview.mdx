@@ -55,10 +55,19 @@ No coding experience required. The whole flow is paste-the-SQL, paste-the-comman
 **Source of truth.** This quickstart is a polished walkthrough. The canonical, maintained, fully-screenshotted version lives in the OB1 repo at [`docs/01-getting-started.md`](https://github.com/NateBJones-Projects/OB1/blob/main/docs/01-getting-started.md). If you hit something not covered here, that's where to look — plus the [FAQ](/faq).
 </Info>
 
-## Prefer video?
+## Other paths
 
-[Open Brain Startup Guide](https://vimeo.com/1174979042/f883f6489a) — ~27 minutes, same flow.
+<CardGroup cols={2}>
+  <Card title="AI-assisted" icon="robot" href="/quickstart/ai-assisted">
+    Have Cursor, Claude Code, or another coding agent drive the build for you.
+  </Card>
+  <Card title="Video walkthrough" icon="video" href="https://vimeo.com/1174979042/f883f6489a">
+    27-minute video — same eight steps, different format.
+  </Card>
+</CardGroup>
 
-## Prefer AI-assisted?
+## What about Slack capture?
 
-If you'd rather have Cursor, Claude Code, or another agent drive the build for you, see [`docs/04-ai-assisted-setup.md`](https://github.com/NateBJones-Projects/OB1/blob/main/docs/04-ai-assisted-setup.md) in the repo.
+The core quickstart above gets you a working MCP server you can use from any AI client. **Slack capture is a separate, optional integration** — it adds a Slack channel as a quick-capture surface (type a thought, Slack message gets embedded and stored).
+
+If you want it, follow [`integrations/slack-capture/README.md`](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/slack-capture) after the core quickstart is working. It deploys a second Edge Function (`ingest-thought`) alongside `open-brain-mcp` and reuses the same database + access key.

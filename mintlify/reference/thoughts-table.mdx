@@ -136,3 +136,37 @@ alter table thoughts add column reviewed boolean default false;
 ```
 
 But **never** rename, retype, or drop the six original columns. The automated PR review enforces this.
+
+## Content fingerprint dedup primitive
+
+The `capture_thought` MCP tool actually writes through a SQL function called `upsert_thought`, which SHA-256-hashes normalized content into a `content_fingerprint` column. Inserting the same content twice updates the existing row instead of creating a duplicate.
+
+The primitive ([`primitives/content-fingerprint-dedup/`](https://github.com/NateBJones-Projects/OB1/tree/main/primitives/content-fingerprint-dedup)) adds:
+
+```sql
+alter table thoughts add column content_fingerprint text;
+
+create unique index idx_thoughts_fingerprint
+  on thoughts (content_fingerprint)
+  where content_fingerprint is not null;
+```
+
+And the `upsert_thought(p_content, p_payload)` function that hashes, inserts-or-updates, and returns the row id.
+
+<Warning>
+**Postgres 17 gotcha — partial unique index inference.**
+
+The upstream primitive's `ON CONFLICT (content_fingerprint) DO UPDATE` clause fails on Postgres 17 with *"no unique or exclusion constraint matching the ON CONFLICT specification"* because the partial unique index requires its predicate to be repeated in the ON CONFLICT inference.
+
+The working form:
+
+```sql
+on conflict (content_fingerprint) where content_fingerprint is not null do update
+set updated_at = now(),
+    metadata = thoughts.metadata || coalesce(excluded.metadata, '{}'::jsonb)
+```
+
+The `where content_fingerprint is not null` after the inference column is what makes it work. See [`primitives/content-fingerprint-dedup/`](https://github.com/NateBJones-Projects/OB1/tree/main/primitives/content-fingerprint-dedup) for the full function.
+</Warning>
+
+Why this matters: bulk imports become idempotent. Re-running the same Gmail export, ChatGPT JSON, or Obsidian vault doesn't create duplicates. Slack webhook retries don't create duplicates. Multi-source capture (browser extension + MCP server) doesn't create duplicates.
