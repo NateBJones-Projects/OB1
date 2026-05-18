@@ -30,6 +30,18 @@ Fair warning: if you've been a heavy ChatGPT user, the export is A LOT of data. 
 
 ChatGPT is less intuitive than Claude at picking the right MCP tool on its own. Be explicit the first few times: "Use the Open Brain search_thoughts tool to find my notes about [topic]." After it gets the pattern once or twice in a conversation, it usually starts picking them up automatically.
 
+### "ChatGPT says the Open Brain tool is not available"
+
+First check Supabase dashboard → Edge Functions → `open-brain-mcp` → Logs. If you see **zero requests** while ChatGPT is failing, stop debugging keys, URLs, and Edge Function code. ChatGPT never called your server; the problem is the tools exposed to that chat session.
+
+As of May 2026, OpenAI's ChatGPT developer-mode docs are in beta and the plan/model behavior is not perfectly stable. The important implementation detail: ChatGPT treats MCP tools without `readOnlyHint` as write actions. Open Brain now marks `search_thoughts`, `list_thoughts`, `thought_stats`, `search`, and `fetch` as read-only. It marks `capture_thought` as a bounded, non-destructive write action.
+
+After updating your deployed MCP server, redeploy it, then refresh or recreate the ChatGPT app so ChatGPT pulls the new tool metadata. Expected behavior:
+
+- Full MCP-capable chats should expose the four core tools, plus ChatGPT compatibility aliases (`search` and `fetch`).
+- Restricted Pro/read-only sessions may expose only read tools and hide or block `capture_thought`.
+- If a Pro chat exposes none of the tools, switch that chat to a thinking model, start a fresh chat, and make sure the Open Brain app is selected in Developer Mode.
+
 ### "I'm stuck and Claude is rewriting my edge function code to fix the connection"
 
 Pause. The problems are almost never in the code. They're in the configuration: a secret that doesn't match, a URL that's missing the key, a step that got skipped. Letting an AI rewrite working code when the issue is a mismatched environment variable will make things harder to debug, not easier.

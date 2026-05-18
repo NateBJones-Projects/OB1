@@ -1,0 +1,20 @@
+{
+  "name": "Agent Memory",
+  "description": "Adds governed agent memory sidecar tables for provenance, use policy, review, recall traces, and audit events while preserving the core thoughts table.",
+  "category": "schemas",
+  "author": {
+    "name": "Nate Jones Team",
+    "github": "NateBJones"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["agent-memory", "provenance", "recall", "writeback", "audit"],
+  "difficulty": "advanced",
+  "estimated_time": "20 minutes",
+  "created": "2026-05-03",
+  "updated": "2026-05-03"
+}

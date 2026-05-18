@@ -1,0 +1,277 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>OB1 Agent Dashboard Walkthrough</title>
+  <style>
+    @page { size: 16in 9in; margin: 0; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #111511;
+      color: #ece5d1;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page {
+      position: relative;
+      width: 16in;
+      height: 9in;
+      overflow: hidden;
+      padding: .72in .82in;
+      break-after: page;
+      background:
+        linear-gradient(90deg, rgba(236,229,209,.06) 1px, transparent 1px),
+        linear-gradient(rgba(236,229,209,.045) 1px, transparent 1px),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='132' height='22' viewBox='0 0 132 22'%3E%3Ctext x='0' y='9' fill='%23ece5d1' fill-opacity='.09' font-family='monospace' font-size='5.7' letter-spacing='1.8'%3ENBJ OB1%3C/text%3E%3Ctext x='66' y='20' fill='%23ece5d1' fill-opacity='.06' font-family='monospace' font-size='5.7' letter-spacing='1.8'%3ENBJ OB1%3C/text%3E%3C/svg%3E"),
+        linear-gradient(120deg, #161b17, #101310 70%);
+      background-size: 96px 96px, 96px 96px, 132px 22px, cover;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: .16in;
+      color: #a6c675;
+      font-size: .13in;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    .brand img {
+      width: .44in;
+      height: .44in;
+      object-fit: contain;
+      border: 1px solid rgba(166,198,117,.45);
+      padding: .08in;
+    }
+    .title {
+      margin-top: 1.2in;
+      max-width: 8.8in;
+      font-size: .72in;
+      line-height: .95;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin-top: .26in;
+      max-width: 7.5in;
+      color: rgba(236,229,209,.72);
+      font-size: .24in;
+      line-height: 1.35;
+    }
+    .meta {
+      position: absolute;
+      right: .82in;
+      bottom: .68in;
+      color: rgba(236,229,209,.55);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .13in;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 9.8in 4.3in;
+      gap: .48in;
+      align-items: start;
+    }
+    .shot {
+      width: 9.8in;
+      height: 5.51in;
+      object-fit: cover;
+      border: 1px solid rgba(236,229,209,.22);
+      box-shadow: 0 .18in .7in rgba(0,0,0,.38);
+    }
+    .eyebrow {
+      color: #a6c675;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .12in;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+    h1 {
+      margin: .13in 0 .14in;
+      font-size: .46in;
+      line-height: 1.02;
+      letter-spacing: 0;
+    }
+    .summary {
+      color: rgba(236,229,209,.73);
+      font-size: .19in;
+      line-height: 1.42;
+    }
+    .callouts {
+      display: grid;
+      gap: .14in;
+      margin-top: .3in;
+      padding: 0;
+      list-style: none;
+    }
+    .callouts li {
+      border: 1px solid rgba(236,229,209,.16);
+      background: rgba(236,229,209,.045);
+      padding: .16in .18in;
+      color: rgba(236,229,209,.78);
+      font-size: .15in;
+      line-height: 1.38;
+    }
+    .footer {
+      position: absolute;
+      left: .82in;
+      bottom: .38in;
+      right: .82in;
+      display: flex;
+      justify-content: space-between;
+      color: rgba(236,229,209,.48);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: .1in;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+  <section class="page">
+    <div class="brand">
+      <img src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/brand/ob1-logo.png" alt="" />
+      <span>Nate B. Jones / OB1</span>
+    </div>
+    <div class="title">OB1 Agent Dashboard Walkthrough</div>
+    <div class="subtitle">A screenshot-first guide to the dashboard surfaces that make agent memory visible, reviewable, and useful for real work.</div>
+    <div class="meta">Personal continuity layer / OpenClaw launch demo</div>
+  </section>
+
+  <section class="page">
+    <div class="grid">
+      <img class="shot" src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/screenshots/dashboard-walkthrough/dashboard-overview.png" alt="Dashboard screenshot" />
+      <div>
+        <div class="eyebrow">One operational scan</div>
+        <h1>Dashboard</h1>
+        <div class="summary">The dashboard answers the first operator question: what is in this OB1 and what needs attention now?</div>
+        <ul class="callouts">
+          <li>Total thoughts, type mix, and top topics show the current memory shape.</li>
+<li>Workflow counts reveal active execution state without opening the board.</li>
+<li>Recent activity confirms the newest continuity and launch notes are landing.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>NBJ / OB1</span>
+      <span>01 / 07</span>
+    </div>
+  </section>
+<section class="page">
+    <div class="grid">
+      <img class="shot" src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/screenshots/dashboard-walkthrough/thoughts-table.png" alt="Thoughts screenshot" />
+      <div>
+        <div class="eyebrow">Canonical memory list</div>
+        <h1>Thoughts</h1>
+        <div class="summary">Thoughts is the raw operating table: browse, filter, and inspect the durable records that the rest of the system builds on.</div>
+        <ul class="callouts">
+          <li>Filters let a user slice by type, source, or importance.</li>
+<li>Nate proposal, OpenClaw registry, workflow, and audit seed data are visible together.</li>
+<li>This page is useful when a user wants the memory graph, not just agent-written memory.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>NBJ / OB1</span>
+      <span>02 / 07</span>
+    </div>
+  </section>
+<section class="page">
+    <div class="grid">
+      <img class="shot" src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/screenshots/dashboard-walkthrough/workflow-board.png" alt="Workflow screenshot" />
+      <div>
+        <div class="eyebrow">Task and idea continuity</div>
+        <h1>Workflow</h1>
+        <div class="summary">Workflow turns task and idea thoughts into a board so agents and humans can see what is new, active, in review, and done.</div>
+        <ul class="callouts">
+          <li>Cards preserve task context as memory instead of trapping it in a chat.</li>
+<li>Priority and status make handoffs faster for the next agent or human.</li>
+<li>OpenClaw launch work, screenshots, evals, and plugin distribution are represented as live work.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>NBJ / OB1</span>
+      <span>03 / 07</span>
+    </div>
+  </section>
+<section class="page">
+    <div class="grid">
+      <img class="shot" src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/screenshots/dashboard-walkthrough/agent-memory-review.png" alt="Agent Memory screenshot" />
+      <div>
+        <div class="eyebrow">Governed write-back</div>
+        <h1>Agent Memory</h1>
+        <div class="summary">Agent Memory is where OB1 reviews what agents saved before those memories can influence future work.</div>
+        <ul class="callouts">
+          <li>Generated or inferred memories start as evidence, not instructions.</li>
+<li>Review actions confirm, downgrade, restrict, stale, or reject a memory.</li>
+<li>Nate continuity seed data shows how public context, repo map, and launch rules are kept auditable.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>NBJ / OB1</span>
+      <span>04 / 07</span>
+    </div>
+  </section>
+<section class="page">
+    <div class="grid">
+      <img class="shot" src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/screenshots/dashboard-walkthrough/recall-trace.png" alt="Recall Trace screenshot" />
+      <div>
+        <div class="eyebrow">Debug retrieval</div>
+        <h1>Recall Trace</h1>
+        <div class="summary">Recall Trace shows what an agent asked for, what OB1 returned, and which memories the agent used or ignored.</div>
+        <ul class="callouts">
+          <li>This is the trust surface for debugging bad agent behavior.</li>
+<li>Use policies travel with each recalled memory.</li>
+<li>The request payload keeps runtime, model, project, query, and scope visible.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>NBJ / OB1</span>
+      <span>05 / 07</span>
+    </div>
+  </section>
+<section class="page">
+    <div class="grid">
+      <img class="shot" src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/screenshots/dashboard-walkthrough/duplicates-review.png" alt="Duplicates screenshot" />
+      <div>
+        <div class="eyebrow">Memory graph hygiene</div>
+        <h1>Duplicates</h1>
+        <div class="summary">Duplicates keeps repeated ideas from turning OB1 into a noisy dumping ground.</div>
+        <ul class="callouts">
+          <li>Similarity pairs compare both versions side by side.</li>
+<li>Quality scores help decide which record should survive.</li>
+<li>The walkthrough data includes real launch-adjacent duplicate patterns.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>NBJ / OB1</span>
+      <span>06 / 07</span>
+    </div>
+  </section>
+<section class="page">
+    <div class="grid">
+      <img class="shot" src="file:///Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/screenshots/dashboard-walkthrough/audit-quality.png" alt="Audit screenshot" />
+      <div>
+        <div class="eyebrow">Quality and safety pass</div>
+        <h1>Audit</h1>
+        <div class="summary">Audit surfaces low-quality thoughts so bad assumptions, unsafe storage ideas, and stale scope notes do not become hidden system behavior.</div>
+        <ul class="callouts">
+          <li>Low scores are easy to scan and bulk-select.</li>
+<li>The seed rows intentionally include bad memory-policy ideas.</li>
+<li>This reinforces the proposal's point: remembering the wrong thing is worse than forgetting.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer">
+      <span>NBJ / OB1</span>
+      <span>07 / 07</span>
+    </div>
+  </section>
+</body>
+</html>

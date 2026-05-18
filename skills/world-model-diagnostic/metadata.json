@@ -1,0 +1,28 @@
+{
+  "name": "World Model Readiness Diagnostic",
+  "description": "Standalone skill pack for running a 20-minute world-model diagnostic that maps company fit, audits the boundary layer, flags simulated-judgment exposure, and returns a labeled starting sequence.",
+  "category": "skills",
+  "author": {
+    "name": "Jonathan Edwards",
+    "github": "jonathanedwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": "optional",
+    "services": [],
+    "tools": [
+      "AI client with reusable skills/prompts or plain chat"
+    ]
+  },
+  "tags": [
+    "skill",
+    "world-model",
+    "diagnostic",
+    "boundary-layer",
+    "strategy"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-04-18",
+  "updated": "2026-04-18"
+}

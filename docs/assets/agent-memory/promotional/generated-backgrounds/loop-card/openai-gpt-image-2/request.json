@@ -1,0 +1,7 @@
+{
+  "model": "gpt-image-2",
+  "output_format": "png",
+  "prompt": "Editorial explainer background for a governed agent memory loop. Four abstract stations connected by thin lines, dark graphite board, olive and cream highlights, subtle source/provenance cues as abstract labels, no readable text, no logos, clean technical diagram atmosphere.",
+  "quality": "high",
+  "size": "1536x1024"
+}

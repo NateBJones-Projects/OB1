@@ -30,6 +30,7 @@ Every contribution lives in its own subfolder under the right category and must 
 - **No credentials, API keys, or secrets in any file.** Use environment variables.
 - **No binary blobs** over 1MB. No `.exe`, `.dmg`, `.zip`, `.tar.gz`.
 - **No `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`, or unqualified `DELETE FROM`** in SQL files.
+- **Avoid profanity in all content.** Keep docs, examples, seed data, UI copy, prompts, walkthroughs, and generated assets clean and professional.
 - **MCP servers must be remote (Supabase Edge Functions), not local.** Never use `claude_desktop_config.json`, `StdioServerTransport`, or local Node.js servers. All extensions deploy as Edge Functions and connect via Claude Desktop's custom connectors UI (Settings → Connectors → Add custom connector → paste URL). See `docs/01-getting-started.md` Step 7 for the pattern.
 
 ## PR Standards
@@ -47,3 +48,12 @@ Every contribution lives in its own subfolder under the right category and must 
 - `.github/metadata.schema.json` — JSON schema for metadata.json validation
 - `.github/PULL_REQUEST_TEMPLATE.md` — PR description template
 - `LICENSE.md` — FSL-1.1-MIT terms
+
+## Local GSD Execution Layer
+
+This repo also has a maintainer-local GSD layer in `.planning/`.
+
+- If `.planning/` exists, use it for local brownfield planning and phased execution.
+- Start with `.planning/STATE.md`, then read `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and the relevant `.planning/codebase/*.md` documents.
+- Keep `.planning/` local. It is gitignored intentionally and is not part of the public contribution contract or upstream PR scope.
+- Public contributor rules still come from `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`, and the committed repo files.

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbrain.dev/schemas/openclaw-agent-memory/recall.v1.json",
+  "title": "OB1 Agent Memory Recall Request",
+  "type": "object",
+  "required": ["schema_version", "workspace_id", "task_type", "query", "entities", "scope", "limits", "sensitivity"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "openbrain.openclaw.recall.v1" },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": ["string", "null"] },
+    "task_id": { "type": ["string", "null"] },
+    "flow_id": { "type": ["string", "null"] },
+    "task_type": {
+      "type": "string",
+      "enum": ["code_review", "taskflow_work_log", "meeting_to_execution", "incident_response", "customer_feedback", "general"]
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string" },
+        "id": { "type": ["string", "null"] },
+        "thread_id": { "type": ["string", "null"] }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "openclaw" },
+        "version": { "type": ["string", "null"] }
+      }
+    },
+    "model_intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] }
+      }
+    },
+    "query": { "type": "string", "minLength": 1 },
+    "entities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "people": { "type": "array", "items": { "type": "string" } },
+        "orgs": { "type": "array", "items": { "type": "string" } },
+        "repos": { "type": "array", "items": { "type": "string" } },
+        "files": { "type": "array", "items": { "type": "string" } },
+        "customers": { "type": "array", "items": { "type": "string" } },
+        "topics": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["visibility", "project_only", "include_unconfirmed", "include_stale"],
+      "additionalProperties": false,
+      "properties": {
+        "visibility": { "type": "string", "enum": ["personal", "channel", "project", "workspace", "organization"] },
+        "project_only": { "type": "boolean" },
+        "include_unconfirmed": { "type": "boolean" },
+        "include_stale": { "type": "boolean" }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": ["max_items", "max_tokens"],
+      "additionalProperties": false,
+      "properties": {
+        "max_items": { "type": "integer", "minimum": 1, "maximum": 50 },
+        "max_tokens": { "type": "integer", "minimum": 100, "maximum": 20000 },
+        "recency_days": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "sensitivity": {
+      "type": "object",
+      "required": ["contains_code", "contains_customer_data", "contains_private_meeting_data"],
+      "additionalProperties": false,
+      "properties": {
+        "contains_code": { "type": "boolean" },
+        "contains_customer_data": { "type": "boolean" },
+        "contains_private_meeting_data": { "type": "boolean" }
+      }
+    }
+  }
+}

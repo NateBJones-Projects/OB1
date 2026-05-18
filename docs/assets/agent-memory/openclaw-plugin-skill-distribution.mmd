@@ -1,0 +1,10 @@
+flowchart TD
+  OB1Core["OB1 Agent Memory API and schema"] --> Plugin["OpenClaw native plugin"]
+  OB1Core --> Skill["OpenClaw Agent Memory skill"]
+  Plugin --> Tools["Runtime tools: recall, writeback, usage, inspect, review"]
+  Skill --> Behavior["Memory hygiene and workflow rules"]
+  Tools --> OpenClaw["OpenClaw runtime"]
+  Behavior --> OpenClaw
+  OpenClaw --> ClawHub["ClawHub publishing path"]
+  OpenClaw --> LocalInstall["Local plugin install path"]
+  OB1Core --> OtherRuntimes["Future Codex, Claude Code, internal runtimes"]

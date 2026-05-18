@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { Sidebar } from "@/components/Sidebar";
 
@@ -9,7 +10,7 @@ export function SidebarShell() {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-50 h-12 bg-bg-surface border-b border-border flex items-center px-4 gap-3">
+      <div className="ob1-glass-panel md:hidden fixed top-0 left-0 right-0 z-50 h-12 border-x-0 border-t-0 flex items-center px-4 gap-3">
         <button
           type="button"
           onClick={() => setIsOpen(true)}
@@ -20,7 +21,20 @@ export function SidebarShell() {
             <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
         </button>
-        <span className="text-text-primary font-semibold text-base tracking-tight">Open Brain</span>
+        <Image
+          src="/brand/ob1-logo.png"
+          alt=""
+          width={24}
+          height={24}
+          unoptimized
+          className="h-6 w-6 object-contain"
+        />
+        <div className="min-w-0">
+          <span className="block text-text-primary font-semibold text-base leading-tight tracking-tight">
+            Open Brain
+          </span>
+          <span className="ob1-brand-kicker">Nate B. Jones</span>
+        </div>
       </div>
 
       {/* Backdrop */}

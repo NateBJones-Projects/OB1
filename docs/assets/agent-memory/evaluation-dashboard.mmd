@@ -1,0 +1,7 @@
+flowchart LR
+  RecallPrecision["Recall precision"] --> Scorecard["Agent Memory scorecard"]
+  WriteBackQuality["Write-back quality"] --> Scorecard
+  HandoffSuccess["Handoff success"] --> Scorecard
+  SafetyTrust["Safety and trust"] --> Scorecard
+  LongitudinalValue["Longitudinal value"] --> Scorecard
+  Scorecard --> Decisions["Tune ranking, policy, review, recipes"]

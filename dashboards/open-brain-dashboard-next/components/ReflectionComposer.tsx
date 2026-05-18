@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   ReflectionInput,
-  ReflectionOption,
   ReflectionFactor,
 } from "@/lib/types";
 
@@ -23,7 +22,7 @@ const emptyForm: ReflectionInput = {
   reflection_type: "decision_trace",
 };
 
-export function ReflectionComposer({ thoughtId }: { thoughtId: number }) {
+export function ReflectionComposer({ thoughtId }: { thoughtId: string }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<ReflectionInput>({ ...emptyForm });
   const [submitting, setSubmitting] = useState(false);

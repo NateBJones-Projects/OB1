@@ -43,6 +43,7 @@ existing OB1 schema — nothing existing is modified.
 **Supabase Studio:** open the SQL editor, paste the contents of `schema.sql`, and run it.
 
 **Supabase CLI:**
+
 ```bash
 supabase migration new adaptive_capture_classification
 # paste the contents of schema.sql into the generated migration file
@@ -77,6 +78,7 @@ of your active projects and any domain vocabulary the classifier might otherwise
 typos or generic words. Store this string wherever your capture interface loads configuration.
 
 Example:
+
 ```
 Maya is a product designer in San Francisco. Active projects: Onboarding v3, Design System
 audit, Q2 mobile app. Domain terms: Figma, Lottie, handoff, A11y, WCAG.
@@ -211,6 +213,7 @@ update_ab_compare(compare_id, winner=user_choice)
 ```
 
 Query `ab_comparisons` to see win rates:
+
 ```sql
 SELECT
     model_a,
@@ -242,6 +245,7 @@ If you correct it to `decision`, the threshold for `note` nudges up (you were ri
 and the correction is recorded.
 
 **Checking learned thresholds:**
+
 ```sql
 SELECT item_type, threshold, sample_count, updated_at
 FROM capture_thresholds
@@ -249,6 +253,7 @@ ORDER BY sample_count DESC;
 ```
 
 **Checking model accuracy:**
+
 ```sql
 SELECT
     model,
@@ -266,6 +271,7 @@ GROUP BY model;
 **Capture:** "need to call alex re thursday meeting"
 
 **Classifier output:**
+
 ```json
 {
   "type": "task",
@@ -287,6 +293,7 @@ GROUP BY model;
 **Capture:** "alex thursday"
 
 **Classifier output:**
+
 ```json
 {
   "type": "task",

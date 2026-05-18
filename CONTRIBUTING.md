@@ -128,6 +128,7 @@ grant select, insert, update, delete on table public.your_table to service_role;
 - **"Cross-Extension Integration"** prominently documenting connections to other extensions
 - **"Next Steps"** linking to the next extension
 - **Tool audit link** — Any extension or integration that exposes MCP tools must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in its "Next Steps" or closing section. This helps users manage their tool surface area as they add extensions. The link is checked by the automated review.
+- **MCP tool annotations** — Any extension or integration that exposes MCP tools must mark read-only tools with `annotations: { readOnlyHint: true }` and write tools with `annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: false }` unless the tool really can touch arbitrary external resources or destroy data. ChatGPT uses this metadata to distinguish read tools from write actions.
 - **Remote MCP setup** — MCP servers must be deployed as Supabase Edge Functions and connected via custom connectors (URL-based). Do NOT use local Node.js servers or `claude_desktop_config.json`. See the [extension template](extensions/_template/) for the correct pattern.
 
 **Primitives** additionally require:
@@ -298,3 +299,4 @@ Every PR is checked against these rules. All must pass before human review.
 13. **Internal links** — All relative links in READMEs resolve to existing files
 14. **Remote MCP pattern** — Extensions and integrations must use remote MCP via Supabase Edge Functions. No `claude_desktop_config.json`, no local Node.js stdio servers. See the [Getting Started guide](docs/01-getting-started.md) for the correct pattern
 15. **Tool audit link** — Extensions and integrations must link to the [MCP Tool Audit & Optimization Guide](docs/05-tool-audit.md) in their README. This ensures users are aware of tool surface area management as they add capabilities
+16. **MCP tool annotations** — Read-only tools include `readOnlyHint: true`; write tools include `readOnlyHint: false`, `openWorldHint`, and `destructiveHint`

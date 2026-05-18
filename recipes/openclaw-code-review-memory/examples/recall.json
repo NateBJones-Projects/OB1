@@ -1,0 +1,46 @@
+{
+  "schema_version": "openbrain.openclaw.recall.v1",
+  "workspace_id": "workspace_123",
+  "project_id": "project_ob1",
+  "task_id": "pr_review_123",
+  "flow_id": null,
+  "task_type": "code_review",
+  "channel": {
+    "kind": "github",
+    "id": "NateBJones-Projects/OB1",
+    "thread_id": "pull/123"
+  },
+  "runtime": {
+    "name": "openclaw",
+    "version": "2026.3.24-beta.2"
+  },
+  "model_intent": {
+    "provider": "openai",
+    "model": "gpt-5.5"
+  },
+  "query": "Review this PR using known OB1 repo conventions, prior maintainer feedback, false positives, and security-sensitive patterns.",
+  "entities": {
+    "people": ["Jonathan Edwards"],
+    "orgs": ["OB1"],
+    "repos": ["NateBJones-Projects/OB1"],
+    "files": ["schemas/agent-memory/schema.sql", "integrations/agent-memory-api/index.ts"],
+    "customers": [],
+    "topics": ["code review", "agent memory"]
+  },
+  "scope": {
+    "visibility": "project",
+    "project_only": true,
+    "include_unconfirmed": false,
+    "include_stale": false
+  },
+  "limits": {
+    "max_items": 10,
+    "max_tokens": 5000,
+    "recency_days": 365
+  },
+  "sensitivity": {
+    "contains_code": true,
+    "contains_customer_data": false,
+    "contains_private_meeting_data": false
+  }
+}
