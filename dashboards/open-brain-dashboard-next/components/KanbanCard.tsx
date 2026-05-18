@@ -68,7 +68,7 @@ export function KanbanCard({
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <PriorityDot
           importance={thought.importance}
-          onPriorityChange={(val) => onPriorityChange(thought.id, val)}
+          onPriorityChange={(val) => onPriorityChange(Number(thought.id), val)}
         />
         <TypeBadge type={thought.type} />
       </div>
@@ -97,7 +97,7 @@ export function KanbanCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onArchive(thought.id);
+                onArchive(Number(thought.id));
               }}
               className="text-[10px] text-text-muted hover:text-text-secondary transition-colors"
               title="Archive"

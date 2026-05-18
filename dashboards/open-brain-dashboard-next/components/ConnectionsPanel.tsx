@@ -6,7 +6,7 @@ import { TypeBadge } from "./ThoughtCard";
 import { FormattedDate } from "./FormattedDate";
 
 interface Connection {
-  id: number;
+  id: string | number;
   type: string;
   importance: number;
   preview: string;
@@ -23,23 +23,40 @@ export function ConnectionsPanel({
   thoughtId,
   hasMetadata,
 }: {
-  thoughtId: number;
+  thoughtId: string | number;
   hasMetadata: boolean;
 }) {
   const [connections, setConnections] = useState<Connection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(hasMetadata);
 
   useEffect(() => {
     if (!hasMetadata) {
-      setLoading(false);
       return;
     }
 
+    let cancelled = false;
+
     fetch(`/api/thoughts/${thoughtId}/connections`)
       .then((res) => res.json())
-      .then((data) => setConnections(data.connections ?? []))
-      .catch(() => setConnections([]))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) {
+          setConnections(data.connections ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setConnections([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [thoughtId, hasMetadata]);
 
   if (!hasMetadata || (!loading && connections.length === 0)) return null;

@@ -1,5 +1,5 @@
 export interface Thought {
-  id: number;
+  id: string | number;
   uuid?: string;
   content: string;
   type: string;
@@ -169,4 +169,37 @@ export interface AddToBrainResult {
   status?: string;
   extracted_count?: number | null;
   message: string;
+}
+
+export interface GraphNode {
+  id: string;
+  type: string;
+  importance: number;
+  content: string;
+  preview: string;
+  created_at: string;
+  metadata: {
+    topics?: string[];
+    people?: string[];
+  };
+  ring: 0 | 1 | 2;
+  similarity?: number;
+  overlap_count?: number;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  similarity?: number;
+  overlap_count?: number;
+  shared_topics?: string[];
+  shared_people?: string[];
+}
+
+export interface GraphResponse {
+  centerId: string;
+  depth: 1 | 2;
+  truncated: boolean;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
 }

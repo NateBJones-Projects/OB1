@@ -21,9 +21,6 @@ export function RestrictedToggle() {
       .catch(() => {});
   }, []);
 
-  // Don't render if restricted content feature is not configured
-  if (!configured) return null;
-
   const handleUnlock = useCallback(async () => {
     if (!passphrase.trim()) return;
     setLoading(true);
@@ -61,6 +58,9 @@ export function RestrictedToggle() {
       // ignore
     }
   }, []);
+
+  // Don't render if restricted content feature is not configured
+  if (!configured) return null;
 
   return (
     <>

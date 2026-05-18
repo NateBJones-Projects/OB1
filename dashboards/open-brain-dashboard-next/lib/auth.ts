@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 export interface SessionData {
-  apiKey?: string;
+  userId?: string;
+  email?: string;
   loggedIn?: boolean;
   restrictedUnlocked?: boolean;
 }
@@ -45,11 +46,17 @@ export async function getSession() {
  * Call BEFORE parsing request body so unauthed requests get 401, not 400.
  */
 export async function requireSession(): Promise<{ apiKey: string }> {
+  const apiKey =
+    process.env.OPEN_BRAIN_MCP_ACCESS_KEY || process.env.MCP_ACCESS_KEY;
+  if (!apiKey) {
+    throw new Error("OPEN_BRAIN_MCP_ACCESS_KEY env var is required");
+  }
+
   const session = await getSession();
-  if (!session.loggedIn || !session.apiKey) {
+  if (!session.loggedIn || !session.userId) {
     throw new AuthError();
   }
-  return { apiKey: session.apiKey };
+  return { apiKey };
 }
 
 /**
@@ -58,9 +65,15 @@ export async function requireSession(): Promise<{ apiKey: string }> {
 export async function requireSessionOrRedirect(): Promise<{
   apiKey: string;
 }> {
+  const apiKey =
+    process.env.OPEN_BRAIN_MCP_ACCESS_KEY || process.env.MCP_ACCESS_KEY;
+  if (!apiKey) {
+    throw new Error("OPEN_BRAIN_MCP_ACCESS_KEY env var is required");
+  }
+
   const session = await getSession();
-  if (!session.loggedIn || !session.apiKey) {
+  if (!session.loggedIn || !session.userId) {
     redirect("/login");
   }
-  return { apiKey: session.apiKey };
+  return { apiKey };
 }

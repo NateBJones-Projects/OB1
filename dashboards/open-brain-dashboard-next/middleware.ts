@@ -6,6 +6,7 @@ export function middleware(request: NextRequest) {
   // Allow login page, API routes, and static assets
   if (
     pathname === "/login" ||
+    pathname.startsWith("/auth") ||
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")

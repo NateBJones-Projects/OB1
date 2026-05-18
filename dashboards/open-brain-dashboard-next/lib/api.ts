@@ -6,8 +6,12 @@ import type {
   Reflection,
   IngestionJob,
 } from "./types";
+import { KANBAN_TYPES } from "./types";
+import { mcpFetchThought, mcpThoughtStats } from "./openBrainMcp";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL!;
+const MCP_URL = process.env.OPEN_BRAIN_MCP_URL;
+const LEGACY_MCP_SERVER_URL = MCP_URL?.replace(/open-brain-mcp\/?$/, "mcp-server");
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -21,6 +25,151 @@ function headers(apiKey: string): HeadersInit {
     "x-brain-key": apiKey,
     "Content-Type": "application/json",
   };
+}
+
+type LegacyThoughtRecord = {
+  id: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+function normalizeThoughtType(metadata: Record<string, unknown> | undefined): string {
+  const type = metadata?.type;
+  return typeof type === "string" && type.length > 0 ? type : "reference";
+}
+
+function normalizeImportance(metadata: Record<string, unknown> | undefined): number {
+  const raw = metadata?.importance;
+  if (typeof raw === "number") {
+    return Math.min(Math.max(Math.round(raw), 1), 5);
+  }
+  return 0;
+}
+
+function toThought(record: LegacyThoughtRecord): Thought {
+  const metadata = record.metadata ?? {};
+  const sensitivityTier = metadata.sensitivity_tier;
+  const status = metadata.status;
+  const sourceType = metadata.source;
+
+  return {
+    id: record.id,
+    content: record.content,
+    type: normalizeThoughtType(metadata),
+    source_type: typeof sourceType === "string" ? sourceType : "",
+    importance: normalizeImportance(metadata),
+    quality_score: 0,
+    sensitivity_tier:
+      typeof sensitivityTier === "string" ? sensitivityTier : "standard",
+    metadata,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+    status: typeof status === "string" ? status : null,
+    status_updated_at: null,
+  };
+}
+
+function summarizeThoughts(thoughts: Thought[]): StatsResponse {
+  const types: Record<string, number> = {};
+  const topics: Record<string, number> = {};
+
+  for (const thought of thoughts) {
+    types[thought.type] = (types[thought.type] ?? 0) + 1;
+
+    const thoughtTopics = thought.metadata.topics;
+    if (Array.isArray(thoughtTopics)) {
+      for (const topic of thoughtTopics) {
+        if (typeof topic === "string" && topic.trim()) {
+          topics[topic] = (topics[topic] ?? 0) + 1;
+        }
+      }
+    }
+  }
+
+  return {
+    total_thoughts: thoughts.length,
+    window_days: "all",
+    types,
+    top_topics: Object.entries(topics)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([topic, count]) => ({ topic, count })),
+  };
+}
+
+function parseMcpStatsReport(report: string): StatsResponse {
+  const lines = report.split(/\r?\n/);
+  const stats: StatsResponse = {
+    total_thoughts: 0,
+    window_days: "all",
+    types: {},
+    top_topics: [],
+  };
+
+  let section: "types" | "topics" | "people" | null = null;
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
+
+    const totalMatch = line.match(/^Total thoughts:\s*(\d+)/i);
+    if (totalMatch) {
+      stats.total_thoughts = Number(totalMatch[1]);
+      continue;
+    }
+
+    if (/^Types:/i.test(line)) {
+      section = "types";
+      continue;
+    }
+    if (/^Top topics:/i.test(line)) {
+      section = "topics";
+      continue;
+    }
+    if (/^People mentioned:/i.test(line)) {
+      section = "people";
+      continue;
+    }
+
+    const entryMatch = line.match(/^(.+):\s*(\d+)$/);
+    if (!entryMatch) continue;
+
+    const label = entryMatch[1].trim();
+    const count = Number(entryMatch[2]);
+    if (section === "types") {
+      stats.types[label] = count;
+    }
+    if (section === "topics") {
+      stats.top_topics.push({ topic: label, count });
+    }
+  }
+
+  return stats;
+}
+
+async function fetchLegacyRecentThoughts(apiKey: string): Promise<Thought[]> {
+  if (!LEGACY_MCP_SERVER_URL) {
+    throw new ApiError("Legacy MCP browse endpoint is not configured", 500);
+  }
+
+  const url = new URL(LEGACY_MCP_SERVER_URL);
+  url.searchParams.set("key", apiKey);
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ApiError(`API ${res.status}: ${text || res.statusText}`, res.status);
+  }
+
+  const data = (await res.json()) as LegacyThoughtRecord[];
+  return data.map(toThought);
 }
 
 async function apiFetch<T>(
@@ -54,6 +203,33 @@ export async function fetchThoughts(
     exclude_restricted?: boolean;
   }
 ): Promise<BrowseResponse> {
+  if (MCP_URL) {
+    const recent = await fetchLegacyRecentThoughts(apiKey);
+    const filtered = recent.filter((thought) => {
+      if (params?.type && thought.type !== params.type) return false;
+      if (params?.source_type && thought.source_type !== params.source_type) return false;
+      if (
+        params?.importance_min !== undefined &&
+        thought.importance < params.importance_min
+      ) {
+        return false;
+      }
+      return true;
+    });
+
+    const page = params?.page ?? 1;
+    const perPage = params?.per_page ?? 25;
+    const start = (page - 1) * perPage;
+    const data = filtered.slice(start, start + perPage);
+
+    return {
+      data,
+      total: filtered.length,
+      page,
+      per_page: perPage,
+    };
+  }
+
   const sp = new URLSearchParams();
   if (params?.page) sp.set("page", String(params.page));
   if (params?.per_page) sp.set("per_page", String(params.per_page));
@@ -73,9 +249,21 @@ export async function fetchThoughts(
 
 export async function fetchThought(
   apiKey: string,
-  id: number,
+  id: string | number,
   excludeRestricted: boolean = true
 ): Promise<Thought> {
+  if (MCP_URL) {
+    const thought = await mcpFetchThought(apiKey, String(id));
+    return toThought({
+      id: thought.id,
+      content: thought.text,
+      metadata: thought.metadata,
+      created_at: thought.metadata.created_at ?? new Date().toISOString(),
+      updated_at:
+        thought.metadata.updated_at ?? thought.metadata.created_at ?? new Date().toISOString(),
+    });
+  }
+
   const qs = excludeRestricted ? "" : "?exclude_restricted=false";
   return apiFetch<Thought>(apiKey, `/thought/${id}${qs}`);
 }
@@ -102,6 +290,20 @@ export async function fetchKanbanThoughts(
     exclude_restricted?: boolean;
   }
 ): Promise<Thought[]> {
+  if (MCP_URL) {
+    const allowedStatuses = new Set(
+      params?.status?.split(",").map((status) => status.trim()).filter(Boolean)
+    );
+    const recent = await fetchLegacyRecentThoughts(apiKey);
+    return recent
+      .filter((thought) => KANBAN_TYPES.includes(thought.type))
+      .filter((thought) => {
+        if (allowedStatuses.size === 0) return true;
+        return allowedStatuses.has(thought.status ?? "new");
+      })
+      .sort((a, b) => b.importance - a.importance);
+  }
+
   // Fetch tasks and ideas separately (API only supports single type filter)
   const results: Thought[] = [];
   for (const thoughtType of ["task", "idea"]) {
@@ -178,6 +380,14 @@ export async function fetchStats(
   days?: number,
   excludeRestricted: boolean = true
 ): Promise<StatsResponse> {
+  if (MCP_URL) {
+    try {
+      return parseMcpStatsReport(await mcpThoughtStats(apiKey));
+    } catch {
+      return summarizeThoughts(await fetchLegacyRecentThoughts(apiKey));
+    }
+  }
+
   const sp = new URLSearchParams();
   if (days) sp.set("days", String(days));
   if (!excludeRestricted) sp.set("exclude_restricted", "false");

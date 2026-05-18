@@ -9,6 +9,7 @@ const nav = [
   { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
   { href: "/kanban", label: "Workflow", icon: KanbanIcon },
   { href: "/search", label: "Search", icon: SearchIcon },
+  { href: "/graph", label: "Graph", icon: GraphIcon },
   { href: "/audit", label: "Audit", icon: AuditIcon },
   { href: "/duplicates", label: "Duplicates", icon: DuplicatesIcon },
   { href: "/ingest", label: "Add", icon: AddIcon },
@@ -103,6 +104,17 @@ function SearchIcon({ active }: { active: boolean }) {
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
       <circle cx="7.5" cy="7.5" r="5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M11.5 11.5L16 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function GraphIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <circle cx="4" cy="4" r="2" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="14" cy="5" r="2" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="9" cy="14" r="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5.7 5.1L8 12.1M12.3 6.2L9.9 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }

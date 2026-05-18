@@ -47,7 +47,7 @@ export default function AuditPage() {
     if (selected.size === data.data.length) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(data.data.map((t) => t.id)));
+      setSelected(new Set(data.data.map((t) => Number(t.id))));
     }
   };
 
@@ -131,8 +131,8 @@ export default function AuditPage() {
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
-                      checked={selected.has(t.id)}
-                      onChange={() => toggleSelect(t.id)}
+                      checked={selected.has(Number(t.id))}
+                      onChange={() => toggleSelect(Number(t.id))}
                       className="accent-violet"
                     />
                   </td>

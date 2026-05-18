@@ -20,12 +20,30 @@ const IMPORTANCE_OPTIONS = [1, 2, 3, 4, 5];
 export function ThoughtEditor({
   thought,
   editAction,
+  readOnly = false,
 }: {
   thought: Thought;
   editAction: (formData: FormData) => Promise<void>;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const router = useRouter();
+
+  if (readOnly) {
+    return (
+      <div className="bg-bg-surface border border-border rounded-lg p-5">
+        <div className="flex justify-between items-start mb-3">
+          <h2 className="text-sm font-medium text-text-muted uppercase tracking-wider">
+            Content
+          </h2>
+          <span className="text-xs text-text-muted">Read only</span>
+        </div>
+        <p className="text-text-primary whitespace-pre-wrap leading-relaxed">
+          {thought.content}
+        </p>
+      </div>
+    );
+  }
 
   if (!editing) {
     return (
