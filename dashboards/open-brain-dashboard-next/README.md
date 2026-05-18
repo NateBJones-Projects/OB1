@@ -1,210 +1,215 @@
 # Open Brain Dashboard (Next.js)
 
-<div align="center">
+A web dashboard for Open Brain with dashboard stats, search, workflow, thought browsing, and a visual graph view.
 
-![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+This version is built for the **MCP-backed Open Brain setup** and uses **Supabase Auth** for login.
 
-**Created by [@alanshurafa](https://github.com/alanshurafa)**
+## What this dashboard does
 
-*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+- shows dashboard stats and recent activity
+- lets users browse recent thoughts
+- supports semantic search
+- includes a workflow board for task-style thoughts
+- includes a graph explorer for connected thoughts
+- supports quick capture / add-to-brain flows
+- uses email/password, GitHub, or Google sign-in
 
-</div>
+## Important architecture note
 
-A full-featured web dashboard for your Open Brain second brain. Browse, search, capture, and manage thoughts through a modern dark-themed UI. Built with Next.js, React, TypeScript, and Tailwind CSS. Deploy to Vercel or any Node.js host.
+This dashboard no longer assumes a deployed `open-brain-rest` backend.
 
-## What It Does
+It is wired to the Open Brain backend pieces that are actually deployed in this project:
 
-Provides 9 pages for managing your thoughts:
+- `open-brain-mcp`
+- `mcp-server`
 
-| Page | Description |
-|------|-------------|
-| **Dashboard** | Stats overview (total thoughts, type distribution, top topics), recent activity, quick capture, workflow summary widget |
-| **Workflow** | Kanban board for tasks and ideas with drag-and-drop status management (New → Planning → Active → Review → Done → Archived) |
-| **Browse** | Paginated thought table with filters for type, source, and importance |
-| **Detail** | Full thought view with inline editing, delete, linked reflections, and related connections |
-| **Search** | Semantic (vector similarity) and full-text search with match scores and pagination |
-| **Add to Brain** | Smart ingest with auto-routing — short text goes to single capture, long text to extraction with dry-run preview |
-| **Audit** | Quality review for low-score thoughts with bulk delete |
-| **Duplicates** | Semantic similarity detection with keep/delete/keep-both resolution |
-| **Login** | API key authentication via encrypted session cookie |
+That means the dashboard is primarily **MCP-backed**.
 
 ## Prerequisites
 
-- A working Open Brain setup with the **REST API gateway** (`open-brain-rest`) deployed
-- **Node.js 18+** installed
-- A **Vercel account** (free tier works) or any Node.js hosting
+- a working Supabase project for Open Brain
+- `open-brain-mcp` deployed
+- `mcp-server` deployed
+- Node.js 18+
+- a Supabase Auth setup
 
-### Credential Tracker
+## Environment variables
 
-| Credential | Where to get it | Where it goes |
-|------------|----------------|---------------|
-| `NEXT_PUBLIC_API_URL` | Your Supabase project URL + `/functions/v1/open-brain-rest` | `.env` or hosting env vars |
-| `SESSION_SECRET` | Generate: `openssl rand -hex 32` | `.env` or hosting env vars |
-| `RESTRICTED_PASSPHRASE_HASH` | Optional. Generate: `echo -n "passphrase" \| shasum -a 256` | `.env` or hosting env vars |
+Create `.env.local` and set:
 
-## Steps
-
-### Step 1: Clone the dashboard
-
-```bash
-# From the OB1 repo
-cd dashboards/open-brain-dashboard
-```
-
-Or copy the folder to your own project directory.
-
-### Step 2: Install dependencies
-
-```bash
-npm install
-```
-
-### Step 3: Configure environment
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and set your values:
-
-```
-NEXT_PUBLIC_API_URL=https://YOUR-PROJECT-REF.supabase.co/functions/v1/open-brain-rest
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
+OPEN_BRAIN_MCP_URL=https://YOUR-PROJECT-REF.supabase.co/functions/v1/open-brain-mcp
+OPEN_BRAIN_MCP_ACCESS_KEY=your-mcp-access-key
+NEXT_PUBLIC_APP_URL=http://127.0.0.1:3001
 SESSION_SECRET=your-32-char-secret-here
 ```
 
-### Step 4: Run locally
+Optional:
+
+```env
+RESTRICTED_PASSPHRASE_HASH=optional-hash
+```
+
+## Local setup
 
 ```bash
+npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). You should see the login page.
+Open the local URL shown by Next.js. In this project it has commonly been:
 
-Enter your Open Brain API key (the `MCP_ACCESS_KEY` from your Supabase Edge Function secrets). After login, the dashboard loads with your stats and recent thoughts.
+`http://127.0.0.1:3001`
 
-### Step 5: Deploy to Vercel (optional)
+## Login flow
+
+Login uses **Supabase Auth**.
+
+Supported sign-in methods:
+
+- email/password
+- GitHub
+- Google
+
+The dashboard keeps `OPEN_BRAIN_MCP_ACCESS_KEY` on the server. End users do **not** paste the MCP key into the login form.
+
+## Supabase Auth setup
+
+### URL Configuration
+
+In Supabase:
+
+`Authentication -> URL Configuration`
+
+Set:
+
+- `Site URL`
+  `https://open-brain-dashboard-next-eight.vercel.app`
+
+- `Redirect URLs`
+  `https://open-brain-dashboard-next-eight.vercel.app/auth/callback`
+  `http://127.0.0.1:3001/auth/callback`
+
+### GitHub provider
+
+In Supabase:
+
+`Authentication -> Sign In / Providers -> GitHub`
+
+Use a real GitHub OAuth app.
+
+GitHub OAuth app settings:
+
+- Homepage URL:
+  `https://open-brain-dashboard-next-eight.vercel.app`
+- Authorization callback URL:
+  `https://mnihakzwdnhnxkinpuhy.supabase.co/auth/v1/callback`
+
+Paste the GitHub-issued:
+
+- `Client ID`
+- `Client Secret`
+
+into the Supabase GitHub provider settings.
+
+### Google provider
+
+In Supabase:
+
+`Authentication -> Sign In / Providers -> Google`
+
+Use a real Google OAuth client.
+
+Google OAuth settings should include:
+
+- redirect URI:
+  `https://mnihakzwdnhnxkinpuhy.supabase.co/auth/v1/callback`
+- origins:
+  `https://open-brain-dashboard-next-eight.vercel.app`
+  `http://127.0.0.1:3001`
+
+Paste the Google-issued:
+
+- `Client ID`
+- `Client Secret`
+
+into the Supabase Google provider settings.
+
+## Current behavior
+
+Working well now:
+
+- GitHub sign-in
+- dashboard stats
+- recent thoughts
+- graph page
+- MCP-backed thought loading
+- workflow summary
+
+## Validation
+
+These checks pass:
+
+```bash
+npm run lint
+npx tsc --noEmit
+```
+
+## Main files
+
+- `app/login/page.tsx`
+- `app/login/LoginForm.tsx`
+- `app/auth/callback/route.ts`
+- `lib/supabaseAuth.ts`
+- `lib/supabaseServerAuth.ts`
+- `lib/openBrainMcp.ts`
+- `components/GraphExplorer.tsx`
+- `app/api/graph/route.ts`
+- `app/api/graph-search/route.ts`
+
+## Troubleshooting
+
+### `Authentication callback failed`
+
+Check:
+
+- Supabase `Site URL`
+- Supabase redirect URLs
+- GitHub / Google provider credentials
+- production deploy contains the latest callback code
+
+### GitHub or Google button opens provider but never signs in
+
+Usually means one of these is wrong:
+
+- provider `Client ID`
+- provider `Client Secret`
+- Supabase callback URL
+- Supabase redirect URL allow-list
+
+### `SESSION_SECRET env var is required`
+
+Set a 32+ character `SESSION_SECRET`.
+
+### Search returns no results
+
+Make sure thoughts have embeddings populated.
+
+## Deployment
+
+Deploy with Vercel:
 
 ```bash
 npx vercel --prod
 ```
 
-Or connect the folder to Vercel via the dashboard. Set the environment variables (`NEXT_PUBLIC_API_URL`, `SESSION_SECRET`) in your Vercel project settings.
+Make sure production env vars match your local `.env.local` values, especially:
 
-> [!TIP]
-> The free Vercel tier is sufficient. The dashboard makes server-side API calls to your Open Brain REST endpoint — there's no heavy compute.
-
-## Expected Outcome
-
-When working correctly:
-
-- **Login page** accepts your Open Brain API key and redirects to the dashboard
-- **Dashboard** shows thought count, type distribution chart, top topics, and recent thoughts
-- **Browse** displays a paginated table of all thoughts with working type/source/importance filters
-- **Search** returns results with similarity scores (semantic mode) or rank scores (full-text mode)
-- **Add to Brain** auto-routes short text (< 500 chars, single paragraph) to single capture, and long/structured text to extraction with dry-run preview
-- **Detail page** shows full thought content with metadata, inline edit for content/type/importance, and linked reflections
-
-## Workflow Board
-
-The Workflow page adds a visual kanban board for managing `task` and `idea` thoughts through status stages.
-
-### Features
-
-- **Drag-and-drop** between status columns using @dnd-kit (touch-friendly with 200ms hold delay)
-- **Collapsible columns** — click the arrow to collapse any column to a slim vertical bar (persisted in localStorage)
-- **Auto-adjusting widths** — expanded columns share available space equally, no horizontal scrollbar
-- **Inline editing** — tap a card to open the edit modal (status, priority, type, content)
-- **Priority dots** — click to change priority (Critical/High/Medium/Low mapped from importance 0-100)
-- **Dashboard widget** — summary of active workflow items on the main dashboard
-- **Mobile-first** — responsive layout, pinch-to-zoom enabled, full-screen edit modal on small screens
-
-### Status Flow
-
-```
-New → Planning → Active → Review → Done → (Archived)
-```
-
-Cards auto-archive from Done after 30 days. Archived cards are hidden by default (toggle with "Show archived").
-
-### Database Requirements
-
-The Workflow board requires two additional columns on the `thoughts` table. See the [workflow-status schema](../../schemas/workflow-status/) for the migration SQL.
-
-### MCP Integration
-
-The `progress_task` tool in the Open Brain MCP server allows AI assistants to update task status and priority conversationally:
-
-```
-"Move the API redesign task to active"
-"Set priority on thought 42 to high"
-```
-
-When a new task or idea is captured, the MCP server auto-assigns `status: "new"`.
-
-## REST API Endpoints Required
-
-The dashboard calls these endpoints on your Open Brain REST API:
-
-| Endpoint | Method | Used By |
-|----------|--------|---------|
-| `/health` | GET | Login validation |
-| `/thoughts` | GET | Browse page (paginated, filtered) |
-| `/thought/:id` | GET | Detail page |
-| `/thought/:id` | PUT | Inline edit (content, type, importance) |
-| `/thought/:id` | DELETE | Delete button |
-| `/search` | POST | Search page (semantic + full-text) |
-| `/stats` | GET | Dashboard stats widget |
-| `/capture` | POST | Quick capture (single thought) |
-| `/thought/:id/reflection` | GET | Detail page (linked reflections) |
-| `/ingest` | POST | Smart ingest (extraction) |
-| `/ingestion-jobs` | GET | Ingest page (job history) |
-| `/duplicates` | GET | Duplicates page |
-| `/thoughts?type=task` | GET | Workflow board (filtered by type) |
-| `/thought/:id` | PUT | Workflow board (status/priority updates) |
-
-> [!NOTE]
-> If your Open Brain instance doesn't have all these endpoints (e.g., no smart-ingest or duplicates), those pages will show errors but the core pages (dashboard, browse, search, detail) will still work.
-
-## Optional: Restricted Content
-
-If you've applied the [sensitivity-tiers](https://github.com/NateBJones-Projects/OB1/pull/110) primitive and want to control access to sensitive thoughts:
-
-1. Set `RESTRICTED_PASSPHRASE_HASH` in your environment
-2. A lock/unlock toggle appears in the sidebar
-3. When locked (default), restricted thoughts are filtered from all views
-4. Enter your passphrase to temporarily unlock restricted content for the session
-
-If `RESTRICTED_PASSPHRASE_HASH` is not set, the toggle is hidden — no action needed.
-
-## Authentication
-
-The dashboard uses **iron-session** for encrypted HTTP-only session cookies:
-
-1. User enters their Open Brain API key once at login
-2. Key is validated against the `/health` endpoint
-3. Key is stored in an encrypted session cookie (not in client-side JS or localStorage)
-4. All server-side API calls use the key from the session
-5. Sessions expire after 24 hours
-
-No API key is stored in environment variables or exposed to the browser.
-
-## Tech Stack
-
-- **Next.js 16** (App Router)
-- **React 19** with TypeScript
-- **Tailwind CSS 4** (dark theme)
-- **iron-session 8** (encrypted cookies)
-- **@dnd-kit** (drag-and-drop for workflow board)
-- Zero external runtime dependencies beyond these
-
-## Troubleshooting
-
-1. **"Could not reach API" on login** — Verify `NEXT_PUBLIC_API_URL` is correct and your REST API gateway (`open-brain-rest`) is deployed. Test with: `curl https://YOUR-REF.supabase.co/functions/v1/open-brain-rest/health -H "x-brain-key: YOUR_KEY"`.
-
-2. **"SESSION_SECRET env var is required"** — The app requires a 32+ character secret for cookie encryption. Generate one with `openssl rand -hex 32`.
-
-3. **Build fails with SWC error** — This happens when `node_modules` was installed on a different platform (e.g., Windows modules on Linux). Delete `node_modules` and `package-lock.json`, then run `npm install` on your target platform.
-
-4. **Search returns no results** — Ensure your thoughts have embeddings. Semantic search requires the `embedding` column to be populated. Run an embedding backfill if needed.
-
-5. **Ingest page shows "extracting" forever** — Check that the `smart-ingest` Edge Function is deployed. The ingest feature depends on a separate Edge Function for document extraction.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `OPEN_BRAIN_MCP_URL`
+- `OPEN_BRAIN_MCP_ACCESS_KEY`
+- `NEXT_PUBLIC_APP_URL`
+- `SESSION_SECRET`

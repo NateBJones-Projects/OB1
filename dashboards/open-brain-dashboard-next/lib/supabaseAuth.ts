@@ -6,6 +6,7 @@ import {
   type Provider,
   type User,
 } from "@supabase/supabase-js";
+import { createSupabaseServerAuthClient } from "@/lib/supabaseServerAuth";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -15,13 +16,28 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function normalizeBaseUrl(value: string) {
+  const trimmed = value.trim().replace(/\/$/, "");
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  if (
+    trimmed.startsWith("localhost") ||
+    trimmed.startsWith("127.0.0.1") ||
+    trimmed.startsWith("[::1]")
+  ) {
+    return `http://${trimmed}`;
+  }
+  return `https://${trimmed}`;
+}
+
 function getBaseUrl() {
-  return (
+  return normalizeBaseUrl(
     process.env.NEXT_PUBLIC_APP_URL ||
     process.env.VERCEL_PROJECT_PRODUCTION_URL ||
     process.env.VERCEL_URL ||
     "http://127.0.0.1:3001"
-  ).replace(/\/$/, "");
+  );
 }
 
 function createSupabaseAuthClient() {
@@ -42,7 +58,7 @@ export function getMagicLinkRedirectUrl(next = "/") {
 }
 
 async function getOAuthSignInUrl(provider: Provider, next = "/") {
-  const supabase = createSupabaseAuthClient();
+  const supabase = await createSupabaseServerAuthClient();
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
@@ -126,7 +142,7 @@ export async function verifyMagicLink(
 }
 
 export async function exchangeAuthCodeForUser(code: string): Promise<User> {
-  const supabase = createSupabaseAuthClient();
+  const supabase = await createSupabaseServerAuthClient();
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (error) {
