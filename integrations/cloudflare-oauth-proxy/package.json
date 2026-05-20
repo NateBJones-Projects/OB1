@@ -1,0 +1,13 @@
+{
+  "name": "ob-cloudflare-oauth-proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker proxying Supabase-hosted MCP servers to a clean origin so MCP TypeScript SDK OAuth discovery works.",
+  "scripts": {
+    "deploy": "wrangler deploy --env core",
+    "tail": "wrangler tail --env core"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}
