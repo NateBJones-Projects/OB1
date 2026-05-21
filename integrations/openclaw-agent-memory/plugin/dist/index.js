@@ -27,7 +27,8 @@ var AgentMemoryClient = class {
     const text = await response.text();
     const data = text ? JSON.parse(text) : {};
     if (!response.ok) {
-      throw new Error(`OB1 Agent Memory API ${response.status}: ${data.error || text}`);
+      const detail = data && typeof data === "object" && data.details !== void 0 ? ` ${JSON.stringify(data.details)}` : "";
+      throw new Error(`OB1 Agent Memory API ${response.status}: ${data?.error || text}${detail}`);
     }
     return data;
   }
@@ -35,6 +36,7 @@ var AgentMemoryClient = class {
     return this.request("/recall", {
       method: "POST",
       body: {
+        schema_version: "openbrain.openclaw.recall.v1",
         workspace_id: this.config.workspaceId,
         project_id: this.config.projectId ?? null,
         ...input,
@@ -49,6 +51,7 @@ var AgentMemoryClient = class {
     return this.request("/writeback", {
       method: "POST",
       body: {
+        schema_version: "openbrain.openclaw.writeback.v1",
         workspace_id: this.config.workspaceId,
         project_id: this.config.projectId ?? null,
         ...input,
