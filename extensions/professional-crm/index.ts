@@ -567,6 +567,14 @@ app.post("*", async (c) => {
         throw new Error(`Contact not found: ${contactRes.error.message}`);
       }
 
+      if (interactionsRes.error) {
+        throw new Error(`Failed to get interactions: ${interactionsRes.error.message}`);
+      }
+
+      if (opportunitiesRes.error) {
+        throw new Error(`Failed to get opportunities: ${opportunitiesRes.error.message}`);
+      }
+
       const contact = contactRes.data;
       const interactions = interactionsRes.data || [];
       const opportunities = opportunitiesRes.data || [];
