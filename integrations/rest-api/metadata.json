@@ -1,0 +1,18 @@
+{
+  "name": "REST API Gateway",
+  "description": "Documented REST gateway for non-MCP clients, dashboards, webhooks, and custom integrations with CORS support and full CRUD plus search, ingest, and entity endpoints.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter or OpenAI (embeddings + classification)", "Supabase"],
+    "tools": ["Supabase CLI", "Deno"]
+  },
+  "tags": ["rest", "api", "gateway", "crud", "search", "dashboard", "webhook"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes"
+}
