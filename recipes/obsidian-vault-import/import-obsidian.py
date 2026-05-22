@@ -505,6 +505,13 @@ def main():
                         help="Show detailed progress")
     parser.add_argument("--report", action="store_true",
                         help="Generate a markdown summary report")
+    parser.add_argument("--source-label", type=str, default="obsidian",
+                        help="Value to stamp in metadata.source for every "
+                             "imported thought (default: 'obsidian'). Useful "
+                             "when one vault aggregates notes from multiple "
+                             "upstream tools and you want to filter by origin "
+                             "in OB1 — e.g. 'apple-journal', 'day-one', "
+                             "'roam-export'.")
     args = parser.parse_args()
 
     vault_root = Path(args.vault_path).expanduser().resolve()
@@ -713,7 +720,7 @@ def main():
                 'content': content,
                 'fingerprint': content_fingerprint(content),
                 'metadata': {
-                    'source': 'obsidian',
+                    'source': args.source_label,
                     'title': note['title'],
                     'folder': note['folder'],
                     'tags': note['tags'],

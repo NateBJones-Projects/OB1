@@ -228,6 +228,22 @@ After a successful import, searching your Open Brain for topics from your vault 
 
 You can filter by source to find only Obsidian-imported thoughts: search with `{"source": "obsidian"}` as a metadata filter.
 
+### Customizing the source label
+
+The default `source` value is `"obsidian"` — useful when you want to filter all
+Obsidian-imported thoughts as one group. If you have multiple upstream tools
+feeding into Obsidian-style markdown (e.g. an Apple Journal exporter, a
+Day One exporter, an old Roam dump), pass `--source-label` to distinguish
+them in OB1:
+
+```bash
+python import-obsidian.py /path/to/journal-vault --source-label apple-journal
+python import-obsidian.py /path/to/dayone-vault   --source-label day-one
+```
+
+After this, your metadata filter becomes `{"source": "apple-journal"}` to
+retrieve only Apple Journal entries, etc.
+
 ## Troubleshooting
 
 **Issue: `python-frontmatter` not found**
