@@ -1,0 +1,35 @@
+{
+  "name": "Local Brain (No MCP)",
+  "description": "Self-hosted Open Brain on a single LAN host: official Supabase docker stack + Ollama for local embeddings + two Edge Functions (capture, search). Designed for office networks that block third-party cloud and disable Claude Code's MCP feature. Accessed via plain HTTPS from each dev host through the companion ob1-local-http skill.",
+  "category": "recipes",
+  "author": {
+    "name": "dhanjit",
+    "github": "dhanjit"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": [
+      "Docker 24+ with Compose v2.20+",
+      "git",
+      "openssl",
+      "python3"
+    ]
+  },
+  "requires_skills": ["ob1-local-http"],
+  "tags": [
+    "self-hosted",
+    "local",
+    "supabase",
+    "pgvector",
+    "ollama",
+    "no-mcp",
+    "air-gapped",
+    "lan"
+  ],
+  "difficulty": "advanced",
+  "estimated_time": "45 minutes",
+  "created": "2026-05-13",
+  "updated": "2026-05-13"
+}
