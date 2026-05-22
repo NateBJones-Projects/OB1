@@ -1,0 +1,20 @@
+{
+  "name": "Auto-Capture Claude Code Adapter",
+  "description": "Claude Code adapter for the auto-capture skill, adding automatic session-end thought capture via Claude Code hooks.",
+  "category": "skills",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Claude Code", "Node.js 18+"]
+  },
+  "requires_skills": ["auto-capture"],
+  "tags": ["skill", "capture", "claude-code", "hooks", "session-end", "ambient"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-04-06"
+}
