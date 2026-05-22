@@ -105,6 +105,30 @@ Or connect the folder to Vercel via the dashboard. Set the environment variables
 > [!TIP]
 > The free Vercel tier is sufficient. The dashboard makes server-side API calls to your Open Brain REST endpoint — there's no heavy compute.
 
+### Step 5 (alternative): Deploy to Cloudflare Workers (optional)
+
+If you're already on Cloudflare for the [`open-brain-rest`](../../integrations/cloudflare-rest-worker/) gateway, you can host the dashboard on the same platform via the [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter. The older `@cloudflare/next-on-pages` adapter caps at Next 15.5.x and doesn't support this dashboard's Next 16.
+
+The repo ships the two config files this needs out of the box (`open-next.config.ts` and `wrangler.jsonc`); rename the Worker in `wrangler.jsonc` if you want something other than `ob-dashboard`.
+
+```bash
+# 1. Make sure .env has NEXT_PUBLIC_API_URL set — it's read at *build*
+#    time and baked into the client bundle.
+npx opennextjs-cloudflare build
+
+# 2. First-time deploy creates the Worker.
+npx opennextjs-cloudflare deploy
+
+# 3. Set SESSION_SECRET as a *runtime* secret on the deployed Worker.
+#    (NEXT_PUBLIC_API_URL is build-time only, so no Worker secret for it.)
+wrangler secret put SESSION_SECRET --name ob-dashboard
+```
+
+The dashboard ends up at `https://ob-dashboard.<your-cf-subdomain>.workers.dev`.
+
+> [!TIP]
+> `NEXT_PUBLIC_API_URL` is build-time, `SESSION_SECRET` is runtime. If you change the API URL later you have to rebuild and redeploy; rotating the session secret only needs `wrangler secret put`.
+
 ## Expected Outcome
 
 When working correctly:
