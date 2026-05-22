@@ -1,0 +1,29 @@
+{
+  "name": "Weekly Digest",
+  "description": "Scheduled importance-ranked synthesis of recent thoughts, delivered to Telegram",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Telegram Bot API (optional)", "Anthropic API or OpenRouter"],
+    "tools": ["Node.js 18+"],
+    "env": {
+      "required": ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"],
+      "llm_one_of": ["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"],
+      "optional": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "DIGEST_MODEL"],
+      "legacy_aliases": {
+        "OPEN_BRAIN_URL": "SUPABASE_URL",
+        "OPEN_BRAIN_SERVICE_KEY": "SUPABASE_SERVICE_ROLE_KEY"
+      }
+    }
+  },
+  "tags": ["consumption-formats", "digest", "telegram", "synthesis", "scheduled"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}
