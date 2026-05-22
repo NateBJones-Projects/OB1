@@ -12,6 +12,16 @@ type RequestOptions = {
   body?: unknown;
 };
 
+function requestInput(input: Record<string, unknown>) {
+  return input && typeof input === "object" ? input : {};
+}
+
+function projectIdFrom(input: Record<string, unknown>, configuredProjectId?: string) {
+  if (configuredProjectId) return configuredProjectId;
+  if (typeof input.project_id === "string" || input.project_id === null) return input.project_id;
+  return null;
+}
+
 export class AgentMemoryClient {
   private endpoint: string;
   private accessKey: string;
@@ -42,32 +52,38 @@ export class AgentMemoryClient {
   }
 
   recall(input: Record<string, unknown>) {
+    const request = requestInput(input);
+    const projectId = projectIdFrom(request, this.config.projectId);
     return this.request("/recall", {
       method: "POST",
       body: {
+        ...request,
+        schema_version: "openbrain.openclaw.recall.v1",
         workspace_id: this.config.workspaceId,
-        project_id: this.config.projectId ?? null,
-        ...input,
+        project_id: projectId,
         scope: {
           include_unconfirmed: this.config.includeUnconfirmedRecall ?? false,
-          ...(typeof input.scope === "object" && input.scope ? input.scope : {}),
+          ...(typeof request.scope === "object" && request.scope ? request.scope : {}),
         },
       },
     });
   }
 
   writeback(input: Record<string, unknown>) {
+    const request = requestInput(input);
+    const projectId = projectIdFrom(request, this.config.projectId);
     return this.request("/writeback", {
       method: "POST",
       body: {
+        ...request,
+        schema_version: "openbrain.openclaw.writeback.v1",
         workspace_id: this.config.workspaceId,
-        project_id: this.config.projectId ?? null,
-        ...input,
+        project_id: projectId,
         provenance: {
           default_status: "generated",
           confidence: 0.5,
           requires_review: this.config.requireReviewByDefault ?? true,
-          ...(typeof input.provenance === "object" && input.provenance ? input.provenance : {}),
+          ...(typeof request.provenance === "object" && request.provenance ? request.provenance : {}),
         },
       },
     });

@@ -2,6 +2,7 @@ import { Type } from "typebox";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { resolveConfiguredSecretInputString } from "openclaw/plugin-sdk/secret-input-runtime";
 import { AgentMemoryClient, type AgentMemoryConfig } from "./client.js";
+import { recallParameters, writebackParameters } from "./tool-schemas.js";
 
 async function clientFromApi(api: { pluginConfig?: unknown; config?: unknown }) {
   const raw = (api.pluginConfig || {}) as Record<string, unknown>;
@@ -14,7 +15,7 @@ async function clientFromApi(api: { pluginConfig?: unknown; config?: unknown }) 
 
   const accessKey = await resolveConfiguredSecretInputString({
     config: (api.config || {}) as any,
-    env: process.env,
+    env: {},
     value: raw.accessKey,
     path: "plugins.entries.nbj-ob1-agent-memory.config.accessKey",
     unresolvedReasonStyle: "detailed",
@@ -71,7 +72,7 @@ export default definePluginEntry({
       name: "openbrain_recall",
       label: "NBJ OB1 recall",
       description: "Recall scoped Nate Jones OB1 Agent Memory before meaningful work begins.",
-      parameters: Type.Record(Type.String(), Type.Any()),
+      parameters: recallParameters,
       run: (client, input) => client.recall(input),
     });
 
@@ -79,7 +80,7 @@ export default definePluginEntry({
       name: "openbrain_writeback",
       label: "NBJ OB1 write-back",
       description: "Write compact, provenance-labeled Nate Jones OB1 Agent Memory after work finishes.",
-      parameters: Type.Record(Type.String(), Type.Any()),
+      parameters: writebackParameters,
       run: (client, input) => client.writeback(input),
     });
 

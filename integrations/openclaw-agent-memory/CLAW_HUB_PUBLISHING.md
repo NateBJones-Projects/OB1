@@ -115,6 +115,21 @@ npx -y clawhub@0.12.2 package publish integrations/openclaw-agent-memory/plugin 
   --source-path integrations/openclaw-agent-memory/plugin
 ```
 
+## Prepared 0.1.5 Schema Fix
+
+Prepared on 2026-05-22:
+
+- Package version bumped to `0.1.5`.
+- `openbrain_recall` and `openbrain_writeback` now expose explicit TypeBox
+  object properties instead of patternProperties-only record schemas.
+- `npm run schema:check` passed.
+- `npm run build` passed from the plugin package.
+- `npm pack --dry-run` produced `natebjones-ob1-agent-memory-0.1.5.tgz`
+  with built `dist/index.js`, schema check script, source files, bundled skill
+  files, and native smoke script.
+- `clawhub package publish --dry-run --json` passed for
+  `@natebjones/ob1-agent-memory` version `0.1.5`.
+
 License note: the OB1 repository is `FSL-1.1-MIT`. ClawHub requires public
 skills to be `MIT-0`, so the standalone skill files in
 [../../skills/openclaw-agent-memory](../../skills/openclaw-agent-memory/) are
@@ -147,8 +162,8 @@ npx -y clawhub@0.12.2 package publish integrations/openclaw-agent-memory/plugin 
   --family code-plugin \
   --name @natebjones/ob1-agent-memory \
   --display-name "NBJ OB1 Agent Memory for OpenClaw" \
-  --version 0.1.1 \
-  --changelog "Package installability fix: publish plugin package with latest tag so OpenClaw can install typed OB1 Agent Memory tools from ClawHub." \
+  --version 0.1.5 \
+  --changelog "OpenClaw/Claude compatibility fix: recall and write-back now expose explicit tool parameter properties instead of patternProperties-only schemas." \
   --tags latest,nbj,nate-jones,ob1,openbrain,agent-memory,openclaw,provenance \
   --source-repo NateBJones-Projects/OB1 \
   --source-commit "$(git rev-parse HEAD)" \
@@ -184,8 +199,8 @@ npx -y clawhub@0.12.2 package publish integrations/openclaw-agent-memory/plugin 
   --family code-plugin \
   --name @natebjones/ob1-agent-memory \
   --display-name "NBJ OB1 Agent Memory for OpenClaw" \
-  --version 0.1.1 \
-  --changelog "Package installability fix: publish plugin package with latest tag so OpenClaw can install typed OB1 Agent Memory tools from ClawHub." \
+  --version 0.1.5 \
+  --changelog "OpenClaw/Claude compatibility fix: recall and write-back now expose explicit tool parameter properties instead of patternProperties-only schemas." \
   --tags latest,nbj,nate-jones,ob1,openbrain,agent-memory,openclaw,provenance \
   --source-repo NateBJones-Projects/OB1 \
   --source-commit "$(git rev-parse HEAD)" \
@@ -242,7 +257,7 @@ openclaw plugins install clawhub:@natebjones/ob1-agent-memory
 
 ## Release Notes
 
-See [RELEASE_NOTES_0.1.0.md](./RELEASE_NOTES_0.1.0.md).
+See [RELEASE_NOTES_0.1.5.md](./RELEASE_NOTES_0.1.5.md).
 
 Public release copy should always include a short Nate Jones CTA. Keep it useful-first, not hype-first: Nate gives away practical AI systems like this, and the next step is following or subscribing for more.
 

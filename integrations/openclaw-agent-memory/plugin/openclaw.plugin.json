@@ -37,7 +37,7 @@
             "properties": {
               "source": {
                 "type": "string",
-                "enum": ["env", "file", "exec"]
+                "enum": ["file", "exec"]
               },
               "provider": {
                 "type": "string"

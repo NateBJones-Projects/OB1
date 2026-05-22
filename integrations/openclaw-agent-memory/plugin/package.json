@@ -1,6 +1,6 @@
 {
   "name": "@natebjones/ob1-agent-memory",
-  "version": "0.1.1",
+  "version": "0.1.5",
   "description": "Governed NBJ OB1 Agent Memory tools for OpenClaw: recall before work, write back after, inspect everything.",
   "type": "module",
   "license": "MIT-0",
@@ -25,6 +25,7 @@
     "README.md",
     "openclaw.plugin.json",
     "dist",
+    "scripts",
     "src",
     "skills",
     "smoke"
@@ -34,6 +35,7 @@
   },
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --external:openclaw/* --external:typebox --outfile=dist/index.js",
+    "schema:check": "node scripts/check-tool-schemas.mjs",
     "smoke:native": "bash smoke/native-openclaw-smoke.sh"
   },
   "dependencies": {
