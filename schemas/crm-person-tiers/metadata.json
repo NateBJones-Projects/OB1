@@ -1,0 +1,18 @@
+{
+  "name": "CRM Person Tiers",
+  "description": "Adds a standalone crm_persons table with a four-tier relationship taxonomy (connected, contact, known, unknown), a mentions join table linking persons to the core thoughts table, and an RPC that returns per-person tiers with an activity-based 'connected' promotion rule.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true
+  },
+  "tags": ["crm", "people", "relationships", "tiers", "schema"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-21",
+  "updated": "2026-04-21"
+}
