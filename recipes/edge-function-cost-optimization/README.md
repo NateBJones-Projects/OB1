@@ -156,9 +156,11 @@ In Claude Desktop → Settings → Connectors:
 
 1. **Delete** the old connectors (one per extension)
 2. **Add** a single new connector pointing to:
+
    ```
    https://<your-project-ref>.supabase.co/functions/v1/open-brain-mcp?key=<MCP_ACCESS_KEY>
    ```
+
 3. Restart Claude Desktop. All your tools (now from a single server) appear in the tools panel.
 
 ### Step 7 — Verify the savings
