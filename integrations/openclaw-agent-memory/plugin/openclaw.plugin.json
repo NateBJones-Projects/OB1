@@ -2,7 +2,9 @@
   "id": "nbj-ob1-agent-memory",
   "name": "NBJ OB1 Agent Memory for OpenClaw",
   "description": "Typed OpenClaw tools for governed Nate Jones OB1 memory recall, write-back, review, inspection, and trace debugging.",
-  "skills": ["./skills/openclaw-agent-memory"],
+  "skills": [
+    "./skills/openclaw-agent-memory"
+  ],
   "kind": "memory",
   "contracts": {
     "tools": [
@@ -12,7 +14,10 @@
       "openbrain_inspect_memory",
       "openbrain_list_review_queue",
       "openbrain_review_memory",
-      "openbrain_get_recall_trace"
+      "openbrain_get_recall_trace",
+      "memory_search",
+      "memory_get",
+      "memory_store"
     ]
   },
   "configSchema": {
@@ -33,11 +38,19 @@
           {
             "type": "object",
             "additionalProperties": false,
-            "required": ["source", "provider", "id"],
+            "required": [
+              "source",
+              "provider",
+              "id"
+            ],
             "properties": {
               "source": {
                 "type": "string",
-                "enum": ["env", "file", "exec"]
+                "enum": [
+                  "env",
+                  "file",
+                  "exec"
+                ]
               },
               "provider": {
                 "type": "string"
@@ -51,7 +64,16 @@
       },
       "workspaceId": {
         "type": "string",
-        "description": "Default OB1 workspace ID."
+        "description": "Default OB1 workspace ID. In 'per-agent' mode (see workspaceMode) this is used as a fallback when no agent id is available."
+      },
+      "workspaceMode": {
+        "type": "string",
+        "enum": ["shared", "per-agent"],
+        "description": "How to derive the OB1 workspace_id for each request. 'shared' (default) sends every request to the configured workspaceId. 'per-agent' uses each OpenClaw agent's id as its own workspace, isolating memory per agent."
+      },
+      "workspacePrefix": {
+        "type": "string",
+        "description": "Optional prefix applied to the per-agent workspace_id (e.g. 'openclaw-' produces 'openclaw-nina'). Only used when workspaceMode is 'per-agent'."
       },
       "projectId": {
         "type": "string",
