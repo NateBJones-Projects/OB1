@@ -298,7 +298,7 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 
 ![Step 6](https://img.shields.io/badge/Step_6-Deploy_the_MCP_Server-1E88E5?style=for-the-badge)
 
-One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stats, and capture. This gives any MCP-connected AI the ability to read and write to your brain.
+One Edge Function. Four core MCP tools: semantic search, browse recent thoughts, stats, and capture. It also exposes read-only `search` and `fetch` aliases for ChatGPT compatibility. Full-MCP-capable AI clients can read and write to your brain; restricted ChatGPT sessions can still use the standard read-only search/fetch path.
 
 > [!WARNING]
 > **Tried this before and starting over?** If you have a `supabase/` folder in your home directory from a previous attempt, delete it first — it will silently hijack your setup. Run `rm -rf ~/supabase` (Mac/Linux) or `Remove-Item -Recurse ~\supabase` (Windows) to clean it out.
@@ -414,6 +414,8 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+>
+> Optional: if you have an Open Brain dashboard or another stable page for viewing individual thoughts, set `OPEN_BRAIN_CITATION_BASE_URL` to that base URL. ChatGPT's `search`/`fetch` compatibility tools use it when returning citation URLs.
 
 <!-- -->
 
@@ -594,6 +596,8 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+>
+> Optional: if you have an Open Brain dashboard or another stable page for viewing individual thoughts, set `OPEN_BRAIN_CITATION_BASE_URL` to that base URL. ChatGPT's `search`/`fetch` compatibility tools use it when returning citation URLs.
 
 <!-- -->
 
@@ -699,6 +703,8 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 
 > [!WARNING]
 > Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu). Works on the web at [chatgpt.com](https://chatgpt.com) only — not available on mobile.
+>
+> ChatGPT's custom MCP support is still beta, plan-sensitive, and sometimes model-sensitive. As of May 2026, OpenAI's docs list Developer Mode for Plus, Pro, Business, Enterprise, and Edu, while workspace app publishing and action controls are documented mainly for Business, Enterprise, and Edu. In practice, some Pro model variants expose fewer custom tools than thinking models.
 
 **Enable Developer Mode (one-time setup):**
 
@@ -720,6 +726,8 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 
 > [!TIP]
 > ChatGPT is less intuitive than Claude at picking the right MCP tool automatically. If it doesn't use your brain on its own, be explicit: "Use the Open Brain search_thoughts tool to find my notes about project planning." After it gets the pattern once or twice in a conversation, it usually picks up the habit.
+>
+> If ChatGPT says an Open Brain tool is unavailable and your Supabase Edge Function logs show zero requests, the connector did not reach your server. Refresh or recreate the ChatGPT app, start a fresh chat, select the Open Brain app in Developer Mode, and try a thinking model. On restricted Pro sessions, expect read tools, especially `search` and `fetch`, to be more reliable than the write tool (`capture_thought`).
 
 </details>
 
@@ -811,7 +819,7 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 </details>
 
-✅ **Done when:** You can start a conversation in your AI client and it has access to Open Brain tools (search_thoughts, list_thoughts, thought_stats, capture_thought).
+✅ **Done when:** You can start a conversation in your AI client and it has access to Open Brain tools (`search_thoughts`, `list_thoughts`, `thought_stats`, `capture_thought`). ChatGPT may also show `search` and `fetch` compatibility tools.
 
 ---
 
@@ -866,6 +874,10 @@ On the official macOS/Windows Claude Desktop app, make sure you added the connec
 **❌ ChatGPT doesn't use the Open Brain tools**
 
 First, confirm Developer Mode is enabled (Settings → Apps & Connectors → Advanced settings). Without it, ChatGPT only exposes limited MCP functionality that won't cover Open Brain's full toolset. Next, check that the connector is active for your current conversation — look for it in the tools/apps panel. If it's connected but ChatGPT ignores it, be direct: "Use the Open Brain search_thoughts tool to search for [topic]." ChatGPT often needs explicit tool references the first few times before it starts picking them up automatically.
+
+**❌ ChatGPT says an Open Brain tool is unavailable**
+
+Check Supabase dashboard → Edge Functions → `open-brain-mcp` → Logs. If no request appears when ChatGPT fails, your server is not the problem. ChatGPT did not expose that tool to the current chat. Redeploy the current MCP server, refresh or recreate the ChatGPT app so it pulls updated tool metadata, start a fresh chat, and try a thinking model. On Pro, the read-only `search`/`fetch` compatibility tools may work where `capture_thought` is hidden or blocked because full MCP/write access is plan-dependent.
 
 **❌ "Permission denied for table thoughts"**
 

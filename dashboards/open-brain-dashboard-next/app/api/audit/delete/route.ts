@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { ids } = (await request.json()) as { ids: number[] };
+    const { ids } = (await request.json()) as { ids: string[] };
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "No IDs provided" }, { status: 400 });
     }

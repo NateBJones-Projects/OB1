@@ -14,6 +14,7 @@
  *   CHAT_API_KEY - API key for chat service (defaults to EMBEDDING_API_KEY)
  *   CHAT_MODEL - Model name for metadata extraction (default: gpt-4o-mini)
  *   MCP_ACCESS_KEY - Authentication key for MCP endpoint
+ *   OPEN_BRAIN_CITATION_BASE_URL - Optional base URL for search/fetch citation links
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -49,6 +50,35 @@ const pool = new Pool({
   user: DB_USER,
   password: DB_PASSWORD,
 }, 20);
+
+type ThoughtMatch = {
+  id: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  similarity: number;
+  created_at: string;
+};
+
+type ThoughtRecord = {
+  id: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at?: string | null;
+};
+
+const CITATION_BASE_URL =
+  Deno.env.get("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts";
+
+function thoughtTitle(content: string, createdAt?: string): string {
+  const firstLine = content.replace(/\s+/g, " ").trim().slice(0, 80);
+  const datePrefix = createdAt ? new Date(createdAt).toLocaleDateString() : "Open Brain";
+  return firstLine ? `${datePrefix} - ${firstLine}` : `${datePrefix} thought`;
+}
+
+function thoughtUrl(id: string): string {
+  return `${CITATION_BASE_URL.replace(/\/$/, "")}/${id}`;
+}
 
 // --- Embedding & Metadata Extraction ---
 
@@ -112,6 +142,119 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
+// ChatGPT compatibility: restricted connector surfaces, company knowledge, and deep
+// research look for exact read-only `search` and `fetch` tool shapes.
+server.registerTool(
+  "search",
+  {
+    title: "Search Open Brain",
+    description:
+      "Search Open Brain memories by meaning. Use this read-only compatibility tool when ChatGPT needs search/fetch-style access to stored thoughts.",
+    annotations: {
+      readOnlyHint: true,
+    },
+    inputSchema: {
+      query: z.string().describe("The search query to run against Open Brain thoughts"),
+    },
+  },
+  async ({ query }) => {
+    try {
+      const qEmb = await getEmbedding(query);
+      const embStr = `[${qEmb.join(",")}]`;
+
+      const client = await pool.connect();
+      try {
+        const result = await client.queryObject<ThoughtMatch>(
+          `SELECT id, content, metadata, created_at,
+                  1 - (embedding <=> $1::vector) AS similarity
+           FROM thoughts
+           WHERE 1 - (embedding <=> $1::vector) >= $2
+           ORDER BY embedding <=> $1::vector
+           LIMIT $3`,
+          [embStr, 0.5, 10]
+        );
+
+        const results = result.rows.map((t) => ({
+          id: t.id,
+          title: thoughtTitle(t.content, t.created_at),
+          url: thoughtUrl(t.id),
+        }));
+
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify({ results }) }],
+        };
+      } finally {
+        client.release();
+      }
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "fetch",
+  {
+    title: "Fetch Open Brain Thought",
+    description:
+      "Fetch one Open Brain thought by ID after using search. Use this read-only compatibility tool to retrieve the full text and metadata for citation.",
+    annotations: {
+      readOnlyHint: true,
+    },
+    inputSchema: {
+      id: z.string().describe("The Open Brain thought ID returned by the search tool"),
+    },
+  },
+  async ({ id }) => {
+    try {
+      const client = await pool.connect();
+      try {
+        const result = await client.queryObject<ThoughtRecord>(
+          `SELECT id, content, metadata, created_at, updated_at
+           FROM thoughts
+           WHERE id = $1
+           LIMIT 1`,
+          [id]
+        );
+
+        const thought = result.rows[0];
+        if (!thought) {
+          return {
+            content: [{ type: "text" as const, text: `No thought found for ID ${id}.` }],
+            isError: true,
+          };
+        }
+
+        const document = {
+          id: thought.id,
+          title: thoughtTitle(thought.content, thought.created_at),
+          text: thought.content,
+          url: thoughtUrl(thought.id),
+          metadata: {
+            ...thought.metadata,
+            created_at: thought.created_at,
+            updated_at: thought.updated_at,
+          },
+        };
+
+        return {
+          content: [{ type: "text" as const, text: JSON.stringify(document) }],
+        };
+      } finally {
+        client.release();
+      }
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
 // Tool 1: Semantic Search (replaces supabase.rpc with raw SQL)
 server.registerTool(
   "search_thoughts",
@@ -119,6 +262,9 @@ server.registerTool(
     title: "Search Thoughts",
     description:
       "Search captured thoughts by meaning. Use this when the user asks about a topic, person, or idea they've previously captured.",
+    annotations: {
+      readOnlyHint: true,
+    },
     inputSchema: {
       query: z.string().describe("What to search for"),
       limit: z.number().optional().default(10),
@@ -132,13 +278,8 @@ server.registerTool(
 
       const client = await pool.connect();
       try {
-        const result = await client.queryObject<{
-          content: string;
-          metadata: Record<string, unknown>;
-          similarity: number;
-          created_at: string;
-        }>(
-          `SELECT content, metadata, created_at,
+        const result = await client.queryObject<ThoughtMatch>(
+          `SELECT id, content, metadata, created_at,
                   1 - (embedding <=> $1::vector) AS similarity
            FROM thoughts
            WHERE 1 - (embedding <=> $1::vector) >= $2
@@ -197,6 +338,9 @@ server.registerTool(
     title: "List Recent Thoughts",
     description:
       "List recently captured thoughts with optional filters by type, topic, person, or time range.",
+    annotations: {
+      readOnlyHint: true,
+    },
     inputSchema: {
       limit: z.number().optional().default(10),
       type: z.string().optional().describe("Filter by type: observation, task, idea, reference, person_note"),
@@ -283,6 +427,9 @@ server.registerTool(
   {
     title: "Thought Statistics",
     description: "Get a summary of all captured thoughts: totals, types, top topics, and people.",
+    annotations: {
+      readOnlyHint: true,
+    },
     inputSchema: {},
   },
   async () => {
@@ -365,6 +512,12 @@ server.registerTool(
     title: "Capture Thought",
     description:
       "Save a new thought to the Open Brain. Generates an embedding and extracts metadata automatically.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+    },
     inputSchema: {
       content: z.string().describe("The thought to capture"),
     },
@@ -377,7 +530,7 @@ server.registerTool(
       ]);
 
       const embStr = `[${embedding.join(",")}]`;
-      const meta = { ...metadata, source: "mcp" };
+      const meta: Record<string, unknown> = { ...metadata, source: "mcp" };
 
       const client = await pool.connect();
       try {

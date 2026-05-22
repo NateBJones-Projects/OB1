@@ -171,6 +171,10 @@ server.registerTool(
   {
     title: "Human-Readable Tool Name",
     description: "When should the AI use this tool? Be specific about triggers.",
+    annotations: {
+      readOnlyHint: true, // Set false for tools that create, update, or delete data.
+      // For write tools, also include openWorldHint and destructiveHint.
+    },
     inputSchema: {
       param_name: z.string().describe("What this parameter is for"),
       optional_param: z.number().optional().default(10),
@@ -210,8 +214,9 @@ server.registerTool(
 2. **Every tool must have a try/catch** that returns `isError: true` on failure.
 3. **Tool descriptions should describe WHEN to use the tool**, not what it does technically. The AI reads these to decide which tool to call.
 4. **Use Zod for input validation.** Every parameter needs `.describe()` for the AI to understand it.
-5. **Minimum tools per extension:** one for adding data, one for retrieving/searching data.
-6. **The service role key bypasses RLS.** If the extension uses RLS and needs user-scoped queries, the tool must accept a `user_id` parameter or derive it from context.
+5. **Every tool must include MCP annotations.** Use `readOnlyHint: true` for retrieval/search/reporting tools. For write tools, use `readOnlyHint: false`, `openWorldHint: false` when the write is scoped to your own tables, and `destructiveHint: false` unless the tool deletes, overwrites, or performs irreversible actions. ChatGPT uses this metadata to distinguish read tools from write actions.
+6. **Minimum tools per extension:** one for adding data, one for retrieving/searching data.
+7. **The service role key bypasses RLS.** If the extension uses RLS and needs user-scoped queries, the tool must accept a `user_id` parameter or derive it from context.
 
 ### Extensions That Need OpenRouter
 

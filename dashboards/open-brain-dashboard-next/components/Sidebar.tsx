@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RestrictedToggle } from "@/components/RestrictedToggle";
@@ -8,6 +9,7 @@ const nav = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
   { href: "/kanban", label: "Workflow", icon: KanbanIcon },
+  { href: "/agent-memory", label: "Agent Memory", icon: MemoryIcon },
   { href: "/search", label: "Search", icon: SearchIcon },
   { href: "/audit", label: "Audit", icon: AuditIcon },
   { href: "/duplicates", label: "Duplicates", icon: DuplicatesIcon },
@@ -26,19 +28,29 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
 
   return (
     <aside
-      className={`fixed left-0 top-0 h-screen w-56 bg-bg-surface border-r border-border flex flex-col z-50
+      className={`ob1-glass-panel fixed left-0 top-0 h-screen w-56 border-y-0 border-l-0 flex flex-col z-50
         hidden md:flex
         ${isOpen ? "!flex" : ""}
       `}
     >
       <div className="px-5 py-6 border-b border-border">
-        <Link href="/" className="flex items-center gap-2.5" onClick={onClose}>
-          <div className="w-8 h-8 rounded-lg bg-violet flex items-center justify-center">
-            <span className="text-white text-sm font-bold">OB</span>
+        <Link href="/" className="flex items-center gap-3" onClick={onClose}>
+          <div className="flex h-9 w-9 items-center justify-center border border-violet/35 bg-violet-surface p-1.5">
+            <Image
+              src="/brand/ob1-logo.png"
+              alt=""
+              width={28}
+              height={28}
+              unoptimized
+              className="h-full w-full object-contain opacity-95"
+            />
           </div>
-          <span className="text-text-primary font-semibold text-lg tracking-tight">
-            Open Brain
-          </span>
+          <div className="min-w-0">
+            <span className="block text-text-primary font-semibold text-lg tracking-tight">
+              Open Brain
+            </span>
+            <span className="ob1-brand-kicker">Nate B. Jones</span>
+          </div>
         </Link>
       </div>
 
@@ -53,8 +65,8 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
               onClick={onClose}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
-                  ? "bg-violet-surface text-violet border border-violet/20"
-                  : "text-text-secondary hover:text-text-primary hover:bg-bg-hover"
+                  ? "border border-violet/25 bg-violet-surface text-violet"
+                  : "border border-transparent text-text-secondary hover:text-text-primary hover:bg-bg-hover"
               }`}
             >
               <Icon active={active} />
@@ -65,6 +77,12 @@ export function Sidebar({ isOpen = false, onClose }: SidebarProps) {
       </nav>
 
       <div className="px-3 py-3 border-t border-border space-y-2">
+        <div className="px-3 pb-2">
+          <p className="ob1-brand-stamp">NBJ / OB1</p>
+          <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-text-muted/70">
+            Personal continuity layer
+          </p>
+        </div>
         <RestrictedToggle />
         <form action="/api/logout" method="POST">
           <button
@@ -130,6 +148,15 @@ function KanbanIcon({ active }: { active: boolean }) {
       <rect x="1" y="2" width="4" height="14" rx="1" stroke="currentColor" strokeWidth="1.5" />
       <rect x="7" y="2" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.5" />
       <rect x="13" y="2" width="4" height="6" rx="1" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function MemoryIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M9 2.25c3.3 0 6 1.2 6 2.7v8.1c0 1.5-2.7 2.7-6 2.7s-6-1.2-6-2.7v-8.1c0-1.5 2.7-2.7 6-2.7Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M15 5c0 1.5-2.7 2.7-6 2.7S3 6.5 3 5M15 9c0 1.5-2.7 2.7-6 2.7S3 10.5 3 9" stroke="currentColor" strokeWidth="1.5" />
     </svg>
   );
 }

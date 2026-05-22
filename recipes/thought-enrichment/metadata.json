@@ -1,0 +1,18 @@
+{
+  "name": "Thought Enrichment Pipeline",
+  "description": "Retroactively classifies existing thoughts with type, importance, sensitivity, topics, tags, and more using LLM-based enrichment and regex-based sensitivity detection.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter API", "Supabase"],
+    "tools": ["Node.js 18+"]
+  },
+  "tags": ["enrichment", "classification", "backfill", "metadata", "llm", "openrouter"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes"
+}

@@ -20,7 +20,7 @@ import { KanbanCardModal } from "@/components/KanbanCardModal";
 const AUTO_ARCHIVE_DAYS = 30;
 
 async function apiUpdateKanban(
-  thoughtId: number,
+  thoughtId: string,
   updates: Record<string, unknown>
 ): Promise<void> {
   const res = await fetch("/api/kanban/update", {
@@ -112,7 +112,7 @@ export function KanbanBoard() {
     const { active, over } = event;
     if (!over) return;
 
-    const thoughtId = active.id as number;
+    const thoughtId = String(active.id);
     const newStatus = over.id as string;
 
     // Find which column the thought is currently in
@@ -138,7 +138,7 @@ export function KanbanBoard() {
     });
   }
 
-  async function handlePriorityChange(thoughtId: number, newImportance: number) {
+  async function handlePriorityChange(thoughtId: string, newImportance: number) {
     previousThoughts.current = [...thoughts];
     setThoughts((prev) =>
       prev.map((t) =>
@@ -155,7 +155,7 @@ export function KanbanBoard() {
     }
   }
 
-  async function handleArchive(thoughtId: number) {
+  async function handleArchive(thoughtId: string) {
     previousThoughts.current = [...thoughts];
     setThoughts((prev) =>
       prev.map((t) =>
@@ -174,7 +174,7 @@ export function KanbanBoard() {
     }
   }
 
-  async function handleDelete(thoughtId: number) {
+  async function handleDelete(thoughtId: string) {
     previousThoughts.current = [...thoughts];
     setThoughts((prev) => prev.filter((t) => t.id !== thoughtId));
 
@@ -193,7 +193,7 @@ export function KanbanBoard() {
   }
 
   async function handleModalSave(
-    thoughtId: number,
+    thoughtId: string,
     updates: Record<string, unknown>
   ) {
     previousThoughts.current = [...thoughts];

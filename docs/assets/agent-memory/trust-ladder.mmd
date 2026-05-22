@@ -1,0 +1,10 @@
+flowchart BT
+  Generated["Generated: agent work note"] --> Evidence["Evidence-only"]
+  Inferred["Inferred: model conclusion"] --> Evidence
+  Observed["Observed: extracted from source"] --> Evidence
+  Imported["Imported: trusted source"] --> Instruction["Can become instruction"]
+  Confirmed["User-confirmed decision"] --> Instruction
+  Evidence --> Review["Human review"]
+  Review --> Confirmed
+  Evidence --> SearchOnly["Explicit search or inspector only"]
+  Instruction --> AutoRecall["Eligible for automatic instruction use"]

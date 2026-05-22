@@ -1,0 +1,9 @@
+flowchart TD
+  Finished["Task finishes"] --> Payload["Runtime sends write-back payload"]
+  Payload --> Validate["Validate schema, auth, idempotency"]
+  Validate --> Filter["Block secrets, raw transcripts, reasoning, huge code"]
+  Filter --> Categorize["Create decisions, outputs, lessons, constraints, failures"]
+  Categorize --> Sidecar["Store thought plus agent_memory sidecar"]
+  Sidecar --> ReviewState["Set review state and use policy"]
+  ReviewState --> Queue["High-impact or inferred memory goes to review queue"]
+  ReviewState --> Audit["Write audit event"]

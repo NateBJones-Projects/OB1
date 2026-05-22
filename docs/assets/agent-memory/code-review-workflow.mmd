@@ -1,0 +1,9 @@
+flowchart TD
+  PR["Pull request or diff"] --> Recall["Recall repo conventions, risky files, prior reviews"]
+  Recall --> Review["OpenClaw review agent"]
+  Review --> Findings["Review findings and fixes"]
+  Findings --> WriteBack["Write lessons, false positives, tests, maintainer corrections"]
+  WriteBack --> Queue["Review queue"]
+  Queue --> Confirmed["Confirmed repo memory"]
+  Confirmed --> NextPR["Next PR review improves"]
+  NextPR --> Recall

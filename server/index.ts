@@ -14,6 +14,35 @@ const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+type ThoughtMatch = {
+  id: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  similarity: number;
+  created_at: string;
+};
+
+type ThoughtRecord = {
+  id: string;
+  content: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at?: string | null;
+};
+
+const CITATION_BASE_URL =
+  Deno.env.get("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts";
+
+function thoughtTitle(content: string, createdAt?: string): string {
+  const firstLine = content.replace(/\s+/g, " ").trim().slice(0, 80);
+  const datePrefix = createdAt ? new Date(createdAt).toLocaleDateString() : "Open Brain";
+  return firstLine ? `${datePrefix} - ${firstLine}` : `${datePrefix} thought`;
+}
+
+function thoughtUrl(id: string): string {
+  return `${CITATION_BASE_URL.replace(/\/$/, "")}/${id}`;
+}
+
 async function getEmbedding(text: string): Promise<number[]> {
   const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
     method: "POST",
@@ -74,6 +103,109 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
+// ChatGPT compatibility: restricted connector surfaces, company knowledge, and deep
+// research look for exact read-only `search` and `fetch` tool shapes.
+server.registerTool(
+  "search",
+  {
+    title: "Search Open Brain",
+    description:
+      "Search Open Brain memories by meaning. Use this read-only compatibility tool when ChatGPT needs search/fetch-style access to stored thoughts.",
+    annotations: {
+      readOnlyHint: true,
+    },
+    inputSchema: {
+      query: z.string().describe("The search query to run against Open Brain thoughts"),
+    },
+  },
+  async ({ query }) => {
+    try {
+      const qEmb = await getEmbedding(query);
+      const { data, error } = await supabase.rpc("match_thoughts", {
+        query_embedding: qEmb,
+        match_threshold: 0.5,
+        match_count: 10,
+        filter: {},
+      });
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Search error: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      const results = ((data || []) as ThoughtMatch[]).map((t) => ({
+        id: t.id,
+        title: thoughtTitle(t.content, t.created_at),
+        url: thoughtUrl(t.id),
+      }));
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ results }) }],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.registerTool(
+  "fetch",
+  {
+    title: "Fetch Open Brain Thought",
+    description:
+      "Fetch one Open Brain thought by ID after using search. Use this read-only compatibility tool to retrieve the full text and metadata for citation.",
+    annotations: {
+      readOnlyHint: true,
+    },
+    inputSchema: {
+      id: z.string().describe("The Open Brain thought ID returned by the search tool"),
+    },
+  },
+  async ({ id }) => {
+    try {
+      const { data, error } = await supabase
+        .from("thoughts")
+        .select("id, content, metadata, created_at, updated_at")
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Fetch error: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      const thought = data as ThoughtRecord;
+      const document = {
+        id: thought.id,
+        title: thoughtTitle(thought.content, thought.created_at),
+        text: thought.content,
+        url: thoughtUrl(thought.id),
+        metadata: {
+          ...thought.metadata,
+          created_at: thought.created_at,
+          updated_at: thought.updated_at,
+        },
+      };
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(document) }],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
 // Tool 1: Semantic Search
 server.registerTool(
   "search_thoughts",
@@ -81,6 +213,9 @@ server.registerTool(
     title: "Search Thoughts",
     description:
       "Search captured thoughts by meaning. Use this when the user asks about a topic, person, or idea they've previously captured.",
+    annotations: {
+      readOnlyHint: true,
+    },
     inputSchema: {
       query: z.string().describe("What to search for"),
       limit: z.number().optional().default(10),
@@ -112,12 +247,7 @@ server.registerTool(
 
       const results = data.map(
         (
-          t: {
-            content: string;
-            metadata: Record<string, unknown>;
-            similarity: number;
-            created_at: string;
-          },
+          t: ThoughtMatch,
           i: number
         ) => {
           const m = t.metadata || {};
@@ -161,6 +291,9 @@ server.registerTool(
     title: "List Recent Thoughts",
     description:
       "List recently captured thoughts with optional filters by type, topic, person, or time range.",
+    annotations: {
+      readOnlyHint: true,
+    },
     inputSchema: {
       limit: z.number().optional().default(10),
       type: z.string().optional().describe("Filter by type: observation, task, idea, reference, person_note"),
@@ -233,6 +366,9 @@ server.registerTool(
   {
     title: "Thought Statistics",
     description: "Get a summary of all captured thoughts: totals, types, top topics, and people.",
+    annotations: {
+      readOnlyHint: true,
+    },
     inputSchema: {},
   },
   async () => {
@@ -305,6 +441,12 @@ server.registerTool(
     title: "Capture Thought",
     description:
       "Save a new thought to the Open Brain. Generates an embedding and extracts metadata automatically. Use this when the user wants to save something to their brain directly from any AI client — notes, insights, decisions, or migrated content from other systems.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+    },
     inputSchema: {
       content: z.string().describe("The thought to capture — a clear, standalone statement that will make sense when retrieved later by any AI"),
     },
@@ -366,9 +508,86 @@ server.registerTool(
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-brain-key, accept, mcp-session-id",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-brain-key, accept, mcp-session-id, mcp-protocol-version, last-event-id",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
 };
+
+// JSON-RPC error code for unauthorized requests.
+// Per the JSON-RPC 2.0 spec, the range -32099 to -32000 is reserved for
+// implementation-defined server errors. -32001 is the conventional
+// "Unauthorized" code used by MCP clients/servers in the wild.
+//
+// Why a JSON-RPC envelope (HTTP 200) instead of a bare HTTP 401?
+// Strict MCP hosts (Codex CLI, Claude Code) treat bare HTTP 4xx responses
+// as transport-level failures and tear the connection down rather than
+// surfacing the failure to the application layer. Wrapping the auth
+// rejection in a JSON-RPC error keeps the connection alive and lets
+// clients recover (e.g. prompt the user for a new key, refetch a stale
+// cache) instead of dying.
+const JSON_RPC_UNAUTHORIZED_CODE = -32001;
+const UNAUTHORIZED_MESSAGE = "Unauthorized: missing or invalid authentication.";
+
+/**
+ * Read the request body as text without consuming the original request's
+ * body stream for downstream handlers. Returns null on bodyless methods
+ * or read failure.
+ */
+async function readBodyText(req: Request): Promise<string | null> {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE") {
+    return null;
+  }
+  try {
+    return await req.text();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort extraction of the JSON-RPC `id` from a raw request body.
+ * Returns null when the body is missing, not JSON, or not a JSON-RPC
+ * shape with an id. Per the JSON-RPC 2.0 spec, id may be a string,
+ * number, or null — we preserve any of those; anything else becomes null.
+ */
+function extractJsonRpcId(bodyText: string | null): string | number | null {
+  if (!bodyText) return null;
+  try {
+    const parsed = JSON.parse(bodyText);
+    if (parsed && typeof parsed === "object" && "id" in parsed) {
+      const id = (parsed as { id: unknown }).id;
+      if (typeof id === "string" || typeof id === "number" || id === null) {
+        return id;
+      }
+    }
+  } catch {
+    // fall through — malformed body
+  }
+  return null;
+}
+
+/**
+ * Build a JSON-RPC 2.0 error envelope response for auth failures.
+ * Returns HTTP 200 — the JSON-RPC layer expresses the error so that
+ * strict MCP clients keep the connection alive instead of treating
+ * the failure as a transport-level fault.
+ */
+function unauthorizedResponse(id: string | number | null): Response {
+  const body = {
+    jsonrpc: "2.0",
+    error: {
+      code: JSON_RPC_UNAUTHORIZED_CODE,
+      message: UNAUTHORIZED_MESSAGE,
+    },
+    id,
+  };
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+    },
+  });
+}
 
 const app = new Hono();
 
@@ -381,7 +600,14 @@ app.all("*", async (c) => {
   // Accept access key via header OR URL query parameter
   const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
+    // Return a JSON-RPC 2.0 error envelope (HTTP 200) instead of a bare
+    // HTTP 401 so strict MCP hosts treat this as an application-level
+    // error rather than a transport fault and keep the connection alive.
+    // Best-effort echo of the inbound request id keeps the response
+    // correlated; malformed/missing bodies fall back to id: null.
+    const bodyText = await readBodyText(c.req.raw);
+    const id = extractJsonRpcId(bodyText);
+    return unauthorizedResponse(id);
   }
 
   // Fix: Claude Desktop connectors don't send the Accept header that

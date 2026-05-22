@@ -1,0 +1,19 @@
+Welcome to the OB1 Agent Dashboard walkthrough.
+
+This is Nate B. Jones continuity in product form: a personal Open Brain that can be used for real work, OpenClaw testing, and visual launch demos without turning into a wall of text.
+
+Start on the Dashboard. This page is the operator view. It shows the size of the memory graph, the type mix, top topics, active workflow counts, and recent activity. You can see immediately that this OB1 is not just storing notes. It is tracking decisions, lessons, references, tasks, ideas, and audit candidates.
+
+The Thoughts page is the canonical memory list. It is intentionally dense. You can filter by type, source, and importance, then open any record. This matters because OB1 is not trying to hide memory inside a chat transcript. The durable knowledge is inspectable.
+
+Workflow turns task and idea thoughts into a board. This is where continuity becomes practical. OpenClaw launch items, screenshot work, evaluation work, plugin distribution, and personal agent setup all have status and priority. Another agent can pick up the work without reading a raw conversation.
+
+Agent Memory is the governed write-back surface. Agent-written memories do not become instructions by default. Generated and inferred memories start as evidence. A human can confirm, downgrade, restrict, stale, or reject them.
+
+Recall Trace is the debugging surface. It shows what the agent asked for, what OB1 returned, the use policy attached to each memory, and which memories were used or ignored. This is how we tell whether a bad output came from the prompt, the model, retrieval, stale memory, or a bad write-back.
+
+Duplicates keeps the memory graph clean. Similar memories are compared side by side with quality scores so we can merge or dismiss repeated ideas before the graph gets noisy.
+
+Audit is the safety pass. It catches low-quality thoughts, bad assumptions, and risky memory-policy ideas before they influence the system. That is the whole point of OB1 Agent Memory: not remembering everything, but remembering the right things in a way users can inspect and govern.
+
+The launch story is simple. OpenClaw is the flagship runtime. OB1 is the continuity layer. The dashboard makes that continuity visible, editable, and trustworthy.

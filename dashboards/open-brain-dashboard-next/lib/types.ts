@@ -1,5 +1,5 @@
 export interface Thought {
-  id: number;
+  id: string;
   uuid?: string;
   content: string;
   type: string;
@@ -64,8 +64,8 @@ export function getPriorityLevel(importance: number) {
 }
 
 export interface Reflection {
-  id: number;
-  thought_id: number;
+  id: string | number;
+  thought_id: string;
   trigger_context: string;
   options: unknown[];
   factors: unknown[];
@@ -104,8 +104,8 @@ export interface StatsResponse {
 }
 
 export interface DuplicatePair {
-  thought_id_a: number;
-  thought_id_b: number;
+  thought_id_a: string;
+  thought_id_b: string;
   similarity: number;
   content_a: string;
   content_b: string;
@@ -142,7 +142,7 @@ export interface ReflectionInput {
 }
 
 export interface IngestionItem {
-  id: number;
+  id: number | string;
   job_id: number;
   content: string;
   type: string;
@@ -163,10 +163,156 @@ export type AddToBrainMode = "auto" | "single" | "extract";
 
 export interface AddToBrainResult {
   path: "single" | "extract";
-  thought_id?: number;
+  thought_id?: string;
   job_id?: number;
   type?: string;
   status?: string;
   extracted_count?: number | null;
   message: string;
+}
+
+export type AgentMemoryReviewAction =
+  | "confirm"
+  | "edit"
+  | "evidence_only"
+  | "restrict_scope"
+  | "mark_stale"
+  | "merge"
+  | "reject"
+  | "dispute"
+  | "supersede";
+
+export interface AgentMemory {
+  memory_id: string;
+  summary: string;
+  content: string;
+  source: {
+    kind: string;
+    uri: string | null;
+    title: string | null;
+    timestamp: string | null;
+  };
+  provenance: {
+    status: string;
+    confidence: number;
+    created_by: string;
+    model: string | null;
+    runtime: string | null;
+  };
+  scope: {
+    workspace_id: string;
+    project_id: string | null;
+    channel_id: string | null;
+    visibility: string;
+  };
+  use_policy: {
+    can_use_as_instruction: boolean;
+    can_use_as_evidence: boolean;
+    requires_user_confirmation: boolean;
+  };
+  freshness: {
+    created_at: string;
+    last_confirmed_at: string | null;
+    stale_after: string | null;
+  };
+  related_artifacts: Array<{ kind: string; uri: string }>;
+}
+
+export interface AgentMemoryListResponse {
+  memories: AgentMemory[];
+  count: number;
+}
+
+export interface AgentMemorySourceRef {
+  id: string;
+  memory_id: string;
+  source_kind: string;
+  uri: string | null;
+  title: string | null;
+  source_timestamp: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AgentMemoryArtifact {
+  id: string;
+  memory_id: string;
+  artifact_kind: string;
+  uri: string;
+  description: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface AgentMemoryRecord {
+  id: string;
+  thought_id: string | null;
+  workspace_id: string;
+  project_id: string | null;
+  channel_kind: string | null;
+  channel_id: string | null;
+  channel_thread_id: string | null;
+  visibility: string;
+  memory_type: string;
+  summary: string;
+  content: string;
+  lifecycle_status: string;
+  provenance_status: string;
+  confidence: number;
+  created_by: string;
+  runtime_name: string | null;
+  runtime_version: string | null;
+  provider: string | null;
+  model: string | null;
+  task_id: string | null;
+  flow_id: string | null;
+  can_use_as_instruction: boolean;
+  can_use_as_evidence: boolean;
+  requires_user_confirmation: boolean;
+  review_status: string;
+  last_confirmed_at: string | null;
+  stale_after: string | null;
+  idempotency_key: string | null;
+  content_hash: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  agent_memory_source_refs?: AgentMemorySourceRef[];
+  agent_memory_artifacts?: AgentMemoryArtifact[];
+}
+
+export interface AgentMemoryTraceItem {
+  id: string;
+  trace_id: string;
+  memory_id: string;
+  rank: number;
+  similarity: number | null;
+  ranking_score: number | null;
+  returned: boolean;
+  used: boolean | null;
+  ignored_reason: string | null;
+  use_policy_snapshot: Record<string, unknown>;
+  created_at: string;
+  agent_memories?: AgentMemoryRecord;
+}
+
+export interface AgentMemoryTraceResponse {
+  trace: {
+    id: string;
+    request_id: string;
+    workspace_id: string;
+    project_id: string | null;
+    runtime_name: string | null;
+    runtime_version: string | null;
+    task_id: string | null;
+    flow_id: string | null;
+    channel_kind: string | null;
+    channel_id: string | null;
+    query: string;
+    schema_version: string;
+    request_payload: Record<string, unknown>;
+    response_policy: Record<string, unknown>;
+    created_at: string;
+  };
+  items: AgentMemoryTraceItem[];
 }
