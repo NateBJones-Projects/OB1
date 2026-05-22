@@ -1,11 +1,22 @@
 "use client";
 
+import type { ComponentType } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RestrictedToggle } from "@/components/RestrictedToggle";
+import { EXTENSIONS, type ExtensionIcon } from "@/extensions.config";
 
-const nav = [
+type IconComponent = ComponentType<{ active: boolean }>;
+
+const EXTENSION_ICONS: Record<ExtensionIcon, IconComponent> = {
+  clock: ClockIcon,
+  folder: FolderIcon,
+  plug: PlugIcon,
+  sparkles: SparklesIcon,
+};
+
+const coreNav: { href: string; label: string; icon: IconComponent }[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
   { href: "/kanban", label: "Workflow", icon: KanbanIcon },
@@ -13,7 +24,20 @@ const nav = [
   { href: "/search", label: "Search", icon: SearchIcon },
   { href: "/audit", label: "Audit", icon: AuditIcon },
   { href: "/duplicates", label: "Duplicates", icon: DuplicatesIcon },
+];
+
+const trailingNav: { href: string; label: string; icon: IconComponent }[] = [
   { href: "/ingest", label: "Add", icon: AddIcon },
+];
+
+const nav: { href: string; label: string; icon: IconComponent }[] = [
+  ...coreNav,
+  ...EXTENSIONS.map((e) => ({
+    href: e.href,
+    label: e.label,
+    icon: EXTENSION_ICONS[e.icon],
+  })),
+  ...trailingNav,
 ];
 
 interface SidebarProps {
@@ -166,6 +190,40 @@ function AddIcon({ active }: { active: boolean }) {
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
       <circle cx="9" cy="9" r="7.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M9 5.5v7M5.5 9h7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ClockIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M9 4.5V9l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function FolderIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M2 5.5A1.5 1.5 0 013.5 4h3l1.5 2h6.5A1.5 1.5 0 0116 7.5v6A1.5 1.5 0 0114.5 15h-11A1.5 1.5 0 012 13.5v-8z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PlugIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M6 2v4M12 2v4M4 6h10v3a5 5 0 01-5 5 5 5 0 01-5-5V6zM9 14v2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function SparklesIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M9 2l1.5 4L14.5 7.5 10.5 9 9 13 7.5 9 3.5 7.5 7.5 6 9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M14 12l.7 1.8 1.8.7-1.8.7L14 17l-.7-1.8-1.8-.7 1.8-.7L14 12z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
     </svg>
   );
 }
