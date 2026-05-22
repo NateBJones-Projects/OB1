@@ -3,7 +3,7 @@
  * Backfill provenance on existing Open Brain thoughts.
  *
  * Scans thoughts where source_type matches a derived-artifact pattern (default:
- * any source_type ending in '_pointer' or '_digest' or '_summary') and flips
+ * any source_type ending in '_pointer') and flips
  * derivation_layer to 'derived' with derivation_method='synthesis'.
  *
  * If the artifact on disk exposes source thought IDs — e.g., a wiki that cites

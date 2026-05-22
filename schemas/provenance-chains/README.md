@@ -11,7 +11,7 @@ Open Brain captures atomic thoughts, but as soon as you start synthesizing — w
 - `derivation_layer` (TEXT): `'primary'` (atomic capture) or `'derived'` (regenerable artifact). Defaults to `'primary'` so all existing rows keep working.
 - `supersedes` (UUID): optional pointer to a prior thought this one replaces — e.g., a regenerated digest replacing yesterday's.
 
-It also installs three helper functions (all `SECURITY DEFINER`, all **granted to `service_role` only** — call them from your edge function, not from client code):
+It also installs four helper functions (all `SECURITY DEFINER`, all **granted to `service_role` only** — call them from your edge function, not from client code):
 
 - `trace_provenance(thought_id UUID, max_depth INT, node_cap INT)` — walks `derived_from` upward and returns a flat ancestor rowset with depth, cycle detection, and restricted-tier redaction.
 - `find_derivatives(thought_id UUID, limit INT)` — reverse lookup via the GIN index; "what derived artifacts cite this atomic thought?" Restricted rows are always filtered out; there is no client-visible override.
@@ -78,7 +78,7 @@ supabase db push
 
 ![Step 2](https://img.shields.io/badge/Step_2-Verify-1E88E5?style=for-the-badge)
 
-3. Verify the columns exist:
+1. Verify the columns exist:
 
 ```sql
 SELECT column_name, data_type, is_nullable
@@ -87,13 +87,13 @@ WHERE table_name = 'thoughts'
   AND column_name IN ('derived_from', 'derivation_method', 'derivation_layer', 'supersedes');
 ```
 
-4. Verify every existing row has `derivation_layer = 'primary'`:
+1. Verify every existing row has `derivation_layer = 'primary'`:
 
 ```sql
 SELECT derivation_layer, count(*) FROM public.thoughts GROUP BY 1;
 ```
 
-5. Sanity-check the helper functions:
+1. Sanity-check the helper functions:
 
 ```sql
 -- Should return one row with depth=0 when the thought exists.
@@ -120,7 +120,7 @@ After running the migration:
 
 - `public.thoughts` has four new columns: `derived_from JSONB`, `derivation_method TEXT`, `derivation_layer TEXT NOT NULL DEFAULT 'primary'`, `supersedes UUID`.
 - Every existing row has `derivation_layer = 'primary'` and the three other columns NULL — no data loss, no behavior change for existing MCP tools.
-- Two helper SQL functions exist: `trace_provenance` and `find_derivatives`. Both are `SECURITY DEFINER`, `STABLE`, **granted to `service_role` only** (clients must reach them via the open-brain edge function, not PostgREST as `authenticated`), and redact restricted thoughts.
+- Four helper SQL functions exist: `trace_provenance`, `find_derivatives`, `merge_thought_provenance_metadata`, and `merge_thought_eval_metadata`. They are `SECURITY DEFINER`, **granted to `service_role` only** (clients must reach them via the open-brain edge function, not PostgREST as `authenticated`), and the query helpers redact or filter restricted thoughts.
 - Three indexes exist: `idx_thoughts_derived_from` (GIN), `idx_thoughts_derivation_layer` (btree), and `idx_thoughts_supersedes` (partial btree).
 - PostgREST schema cache has been reloaded (`NOTIFY pgrst, 'reload schema'`).
 

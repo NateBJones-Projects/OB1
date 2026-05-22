@@ -4,7 +4,7 @@
 
 ## What It Does
 
-The [Provenance Chains schema](../../schemas/provenance-chains/) adds four columns (`derived_from`, `derivation_method`, `derivation_layer`, `supersedes`) and two SQL helper functions to `public.thoughts`. This recipe is the operational layer on top:
+The [Provenance Chains schema](../../schemas/provenance-chains/) adds four columns (`derived_from`, `derivation_method`, `derivation_layer`, `supersedes`) and helper SQL functions to `public.thoughts`. This recipe is the operational layer on top:
 
 1. **`backfill.mjs`** — One-time script to mark existing derived artifacts (weekly digests, wikis, lint reports, etc.) as `derivation_layer='derived'` and, where the saved artifact exposes thought IDs, populate `derived_from`.
 2. **`eval.mjs`** — Nightly (or on-demand) grader that scores each derived thought on existence / relevance / sufficiency using an LLM, and writes the scores into the thought's metadata so dashboards can surface low-quality chains. Three grader backends: `openrouter` (hosted, default), `stdin` (manual), and `queue` (emit prompts → another worker grades → apply back).
@@ -47,7 +47,7 @@ Legacy names (still accepted with a deprecation warning):
 
 ![Step 2](https://img.shields.io/badge/Step_2-Configure_Credentials-1E88E5?style=for-the-badge)
 
-2. Export your Supabase credentials (or put them in a `.env` file your shell sources). The canonical names match every other OB1 recipe:
+1. Export your Supabase credentials (or put them in a `.env` file your shell sources). The canonical names match every other OB1 recipe:
 
    ```bash
    export SUPABASE_URL="https://<project-ref>.supabase.co"
@@ -63,7 +63,7 @@ Legacy names (still accepted with a deprecation warning):
 
 ![Step 3](https://img.shields.io/badge/Step_3-Dry_Run_Backfill-1E88E5?style=for-the-badge)
 
-3. Preview what the backfill would change. The default pattern matches any `source_type` ending in `_pointer`; adjust `--patterns` if your recipes use different suffixes like `_digest` or `_summary`:
+1. Preview what the backfill would change. The default pattern matches any `source_type` ending in `_pointer`; adjust `--patterns` if your recipes use different suffixes like `_digest` or `_summary`:
 
    ```bash
    node backfill.mjs --dry-run --patterns _pointer,_digest,_summary
@@ -73,7 +73,7 @@ Legacy names (still accepted with a deprecation warning):
 
 ![Step 4](https://img.shields.io/badge/Step_4-Run_Backfill-1E88E5?style=for-the-badge)
 
-4. When the dry-run output looks right, run it for real. If your artifacts live in a specific directory, pass `--root`:
+1. When the dry-run output looks right, run it for real. If your artifacts live in a specific directory, pass `--root`:
 
    ```bash
    node backfill.mjs --patterns _pointer,_digest,_summary --root ./artifacts
@@ -85,7 +85,7 @@ Legacy names (still accepted with a deprecation warning):
 
 ![Step 5](https://img.shields.io/badge/Step_5-Evaluate_Quality-1E88E5?style=for-the-badge)
 
-5. Score the backfilled chains. For a quick smoke test with the default OpenRouter grader:
+1. Score the backfilled chains. For a quick smoke test with the default OpenRouter grader:
 
    ```bash
    node eval.mjs --limit 3
@@ -104,7 +104,7 @@ Legacy names (still accepted with a deprecation warning):
 
 ![Step 6](https://img.shields.io/badge/Step_6-Install_MCP_Tools-1E88E5?style=for-the-badge)
 
-6. Open your `open-brain-mcp` Edge Function (usually `supabase/functions/open-brain-mcp/index.ts`) and paste the two `server.registerTool(...)` blocks from [`mcp-tools.ts`](./mcp-tools.ts) alongside your other tool registrations.
+1. Open your `open-brain-mcp` server (in this repo, [`server/index.ts`](../../server/index.ts); in a deployed Supabase copy, usually `supabase/functions/open-brain-mcp/index.ts`) and paste the two `server.registerTool(...)` blocks from [`mcp-tools.ts`](./mcp-tools.ts) alongside your other tool registrations.
 
    Deploy the function:
 

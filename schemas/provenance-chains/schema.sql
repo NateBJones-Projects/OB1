@@ -1,6 +1,6 @@
 -- Provenance Chains — Derivation tracking for Open Brain thoughts
 --
--- Adds four columns plus two helper SQL functions so Open Brain can answer
+-- Adds four columns plus helper SQL functions so Open Brain can answer
 -- "show me the atomic thoughts that produced this derived artifact" and
 -- "what downstream artifacts cite this atomic thought?" at the database layer.
 --
