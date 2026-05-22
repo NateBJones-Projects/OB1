@@ -11,8 +11,15 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import {
+  fetchWithTimeout,
+  resolveTimeoutMs,
+  DEFAULT_SUPABASE_TIMEOUT_MS,
+} from "./lib/memory-core.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const SUPABASE_TIMEOUT_MS = resolveTimeoutMs(process.env.FETCH_TIMEOUT_MS, DEFAULT_SUPABASE_TIMEOUT_MS);
 
 // Load env
 function loadEnv() {
@@ -69,10 +76,31 @@ async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchBatch(offset, retries = 4) {
-  const url = `${BASE}/thoughts?select=id,metadata->>type&type=eq.reference&limit=${BATCH_SIZE}&offset=${offset}`;
+// Cursor-based pagination on id. Offset pagination is unsafe here:
+// every successful PATCH removes a row from the `type=eq.reference`
+// filter, so `offset += rows.length` would skip unprocessed rows. The
+// cursor pattern is id > afterId ORDER BY id ASC. `includeCount` is
+// used once on the first call to populate the total for the progress
+// bar — every subsequent call omits the count=exact header so
+// PostgreSQL does not COUNT(*) the filtered set per page (LOW-7).
+async function fetchBatch(afterId, { includeCount = false } = {}, retries = 4) {
+  const url = `${BASE}/thoughts?select=id,metadata->>type&type=eq.reference&id=gt.${afterId}&order=id.asc&limit=${BATCH_SIZE}`;
+  const batchHeaders = includeCount ? { ...headers, Prefer: "count=exact" } : { ...headers };
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const r = await fetch(url, { headers: { ...headers, Prefer: "count=exact" } });
+    let r;
+    try {
+      r = await fetchWithTimeout(url, { headers: batchHeaders }, SUPABASE_TIMEOUT_MS);
+    } catch (err) {
+      // Treat AbortError/timeouts and other network errors as transient.
+      const msg = err?.message || String(err);
+      if (attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
+        process.stderr.write(`\n[retry] fetch afterId ${afterId} ${msg.slice(0, 120)}, waiting ${delay}ms\n`);
+        await sleep(delay);
+        continue;
+      }
+      throw err;
+    }
     if (r.ok) {
       const contentRange = r.headers.get("content-range");
       const total = contentRange ? parseInt(contentRange.split("/")[1], 10) : null;
@@ -83,22 +111,34 @@ async function fetchBatch(offset, retries = 4) {
     const isTransient = r.status === 502 || r.status === 503 || r.status === 504 || r.status === 429;
     if (isTransient && attempt < retries) {
       const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
-      process.stderr.write(`\n[retry] fetch offset ${offset} got ${r.status}, waiting ${delay}ms\n`);
+      process.stderr.write(`\n[retry] fetch afterId ${afterId} got ${r.status}, waiting ${delay}ms\n`);
       await sleep(delay);
       continue;
     }
-    throw new Error(`Fetch failed at offset ${offset}: ${r.status} ${body.slice(0, 200)}`);
+    throw new Error(`Fetch failed after id ${afterId}: ${r.status} ${body.slice(0, 200)}`);
   }
 }
 
 async function updateRow(id, newType, retries = 6) {
   const url = `${BASE}/thoughts?id=eq.${id}`;
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const r = await fetch(url, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ type: newType }),
-    });
+    let r;
+    try {
+      r = await fetchWithTimeout(url, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ type: newType }),
+      }, SUPABASE_TIMEOUT_MS);
+    } catch (err) {
+      const msg = err?.message || String(err);
+      if (attempt < retries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 16000);
+        process.stderr.write(`\n[retry] id ${id} ${msg.slice(0, 120)}, waiting ${delay}ms (attempt ${attempt + 1}/${retries})\n`);
+        await sleep(delay);
+        continue;
+      }
+      throw err;
+    }
     if (r.ok) return;
     const body = await r.text();
     const isTransient = r.status === 502 || r.status === 503 || r.status === 504 || r.status === 429;
@@ -126,8 +166,14 @@ async function main() {
   console.log(`Batch size: ${BATCH_SIZE}`);
   console.log("");
 
-  let offset = 0;
+  // Cursor replaces offset. afterId starts at 0 (all thought ids are
+  // positive) and advances to the last id seen in each page, so a
+  // PATCH that removes rows from the `type=eq.reference` filter cannot
+  // cause the cursor to skip un-processed rows.
+  let afterId = 0;
+  let processedRows = 0;
   let total = null;
+  let firstCountDone = false;
   let totalUpdated = 0;
   let totalSkippedInvalidType = 0;
   let totalSkippedAlreadyCorrect = 0;
@@ -137,7 +183,10 @@ async function main() {
   const typeDistribution = {};
 
   while (true) {
-    const { rows, total: fetchedTotal } = await fetchBatch(offset);
+    const { rows, total: fetchedTotal } = await fetchBatch(afterId, {
+      includeCount: !firstCountDone,
+    });
+    firstCountDone = true;
 
     if (total === null && fetchedTotal !== null) {
       total = fetchedTotal;
@@ -179,10 +228,12 @@ async function main() {
       totalUpdated += updates.length;
     }
 
-    offset += rows.length;
+    processedRows += rows.length;
+    // Advance cursor past the highest id seen (rows are ordered by id ASC).
+    afterId = rows[rows.length - 1].id;
 
-    const pct = total ? ((offset / total) * 100).toFixed(1) : "?";
-    process.stdout.write(`\rProgress: ${offset}/${total ?? "?"} (${pct}%) — updated so far: ${totalUpdated}`);
+    const pct = total ? ((processedRows / total) * 100).toFixed(1) : "?";
+    process.stdout.write(`\rProgress: ${processedRows}/${total ?? "?"} (${pct}%) — updated so far: ${totalUpdated}`);
 
     if (rows.length < BATCH_SIZE) break;
   }
@@ -190,7 +241,7 @@ async function main() {
   console.log("\n");
   console.log("=== BACKFILL COMPLETE ===");
   console.log("");
-  console.log(`Rows processed:              ${offset}`);
+  console.log(`Rows processed:              ${processedRows}`);
   console.log(`Rows updated:                ${totalUpdated}${DRY_RUN ? " (dry run, not written)" : ""}`);
   console.log(`Skipped (already reference): ${totalSkippedAlreadyCorrect}`);
   console.log(`Skipped (null/empty type):   ${totalSkippedNullType}`);
