@@ -6,21 +6,24 @@ Built by Nate B. Jones / OB1. Follow Nate for practical AI systems, agent workfl
 
 ## Install
 
-Current OpenClaw `2026.5.2` installs the ClawHub-hosted package cleanly from the published tarball:
-
-```bash
-curl -fsSL \
-  https://clawhub.ai/api/npm/@natebjones/ob1-agent-memory/-/natebjones-ob1-agent-memory-0.1.5.tgz \
-  -o natebjones-ob1-agent-memory-0.1.5.tgz
-
-openclaw plugins install ./natebjones-ob1-agent-memory-0.1.5.tgz
-```
-
-The package is also published on ClawHub as `@natebjones/ob1-agent-memory`. When OpenClaw's `clawhub:` resolver accepts npm-pack artifact metadata directly, this should become the normal one-line install:
+Recommended for OpenClaw `2026.5.7` and newer:
 
 ```bash
 openclaw plugins install clawhub:@natebjones/ob1-agent-memory
 ```
+
+OpenClaw `2026.5.2` predates the current ClawHub npm-pack resolver metadata
+path. Use the published tarball fallback on that host version:
+
+```bash
+curl -fsSL \
+  https://clawhub.ai/api/npm/@natebjones/ob1-agent-memory/-/natebjones-ob1-agent-memory-0.1.6.tgz \
+  -o natebjones-ob1-agent-memory-0.1.6.tgz
+
+openclaw plugins install ./natebjones-ob1-agent-memory-0.1.6.tgz
+```
+
+The package is published on ClawHub as `@natebjones/ob1-agent-memory`.
 
 For local linked development:
 

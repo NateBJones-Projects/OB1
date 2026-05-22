@@ -130,6 +130,20 @@ Prepared on 2026-05-22:
 - `clawhub package publish --dry-run --json` passed for
   `@natebjones/ob1-agent-memory` version `0.1.5`.
 
+## Prepared 0.1.6 ClawHub Install Fix
+
+Prepared on 2026-05-22:
+
+- Package version bumped to `0.1.6`.
+- `openclaw` stays in `peerDependencies` so OpenClaw can symlink the host SDK
+  during plugin install.
+- `peerDependenciesMeta.openclaw.optional` prevents npm from auto-installing a
+  real nested `node_modules/openclaw` before OpenClaw creates the host SDK
+  symlink.
+- The recommended install path is the one-line ClawHub resolver on OpenClaw
+  `2026.5.7` and newer.
+- OpenClaw `2026.5.2` should continue using the published tarball fallback.
+
 License note: the OB1 repository is `FSL-1.1-MIT`. ClawHub requires public
 skills to be `MIT-0`, so the standalone skill files in
 [../../skills/openclaw-agent-memory](../../skills/openclaw-agent-memory/) are
@@ -162,8 +176,8 @@ npx -y clawhub@0.12.2 package publish integrations/openclaw-agent-memory/plugin 
   --family code-plugin \
   --name @natebjones/ob1-agent-memory \
   --display-name "NBJ OB1 Agent Memory for OpenClaw" \
-  --version 0.1.5 \
-  --changelog "OpenClaw/Claude compatibility fix: recall and write-back now expose explicit tool parameter properties instead of patternProperties-only schemas." \
+  --version 0.1.6 \
+  --changelog "ClawHub install fix: mark the OpenClaw peer dependency optional so npm does not materialize a nested OpenClaw package before the host SDK symlink is created." \
   --tags latest,nbj,nate-jones,ob1,openbrain,agent-memory,openclaw,provenance \
   --source-repo NateBJones-Projects/OB1 \
   --source-commit "$(git rev-parse HEAD)" \
@@ -199,8 +213,8 @@ npx -y clawhub@0.12.2 package publish integrations/openclaw-agent-memory/plugin 
   --family code-plugin \
   --name @natebjones/ob1-agent-memory \
   --display-name "NBJ OB1 Agent Memory for OpenClaw" \
-  --version 0.1.5 \
-  --changelog "OpenClaw/Claude compatibility fix: recall and write-back now expose explicit tool parameter properties instead of patternProperties-only schemas." \
+  --version 0.1.6 \
+  --changelog "ClawHub install fix: mark the OpenClaw peer dependency optional so npm does not materialize a nested OpenClaw package before the host SDK symlink is created." \
   --tags latest,nbj,nate-jones,ob1,openbrain,agent-memory,openclaw,provenance \
   --source-repo NateBJones-Projects/OB1 \
   --source-commit "$(git rev-parse HEAD)" \
@@ -239,7 +253,7 @@ openclaw plugins install clawhub:@natebjones/ob1-agent-memory
 
 - Plugin manifest validates.
 - Plugin manifest declares `contracts.tools` for every `openbrain_*` tool. OpenClaw rejects tool registration without the manifest contract.
-- Plugin config accepts `endpoint`, `workspaceId`, and `accessKey`. Prefer an OpenClaw SecretRef backed by a file, env, or exec provider so the access key does not live in plaintext config.
+- Plugin config accepts `endpoint`, `workspaceId`, and `accessKey`. Prefer an OpenClaw SecretRef backed by a file or exec provider so the access key does not live in plaintext config.
 - Tool entry uses `definePluginEntry`, `typebox` parameters, `label`, `execute(_id, params)`, and returns `details`.
 - Package includes compiled runtime output at `plugin/dist/index.js`; ClawHub rejects TypeScript-only plugin entrypoints.
 - Local linked install is tested in an isolated profile with `openclaw --profile ob1-agent-memory plugins install integrations/openclaw-agent-memory/plugin --link`.
@@ -257,7 +271,7 @@ openclaw plugins install clawhub:@natebjones/ob1-agent-memory
 
 ## Release Notes
 
-See [RELEASE_NOTES_0.1.5.md](./RELEASE_NOTES_0.1.5.md).
+See [RELEASE_NOTES_0.1.6.md](./RELEASE_NOTES_0.1.6.md).
 
 Public release copy should always include a short Nate Jones CTA. Keep it useful-first, not hype-first: Nate gives away practical AI systems like this, and the next step is following or subscribing for more.
 

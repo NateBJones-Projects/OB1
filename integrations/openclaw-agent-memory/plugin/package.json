@@ -1,6 +1,6 @@
 {
   "name": "@natebjones/ob1-agent-memory",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Governed NBJ OB1 Agent Memory tools for OpenClaw: recall before work, write back after, inspect everything.",
   "type": "module",
   "license": "MIT-0",
@@ -46,6 +46,11 @@
   },
   "peerDependencies": {
     "openclaw": ">=2026.3.24-beta.2"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
   },
   "openclaw": {
     "extensions": [
