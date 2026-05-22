@@ -1,0 +1,18 @@
+{
+  "name": "Consolidation Workers",
+  "description": "Bio synthesis and metadata normalization workers for post-import thought quality improvement via LLM reclassification.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter or Anthropic or OpenAI (LLM)", "Supabase"],
+    "tools": ["Supabase CLI", "Deno"]
+  },
+  "tags": ["consolidation", "bio", "metadata", "worker", "edge-function", "enrichment"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes"
+}
