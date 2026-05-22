@@ -20,7 +20,7 @@ A pattern for using LLM-extracted metadata to route unstructured text into the c
 Before you start, make sure you have:
 
 - A **Supabase** project with the database tables created (SQL provided below)
-- An **OpenAI-compatible API key** for LLM calls and embeddings (OpenAI, OpenRouter, Anthropic, etc.)
+- **Either an OpenAI API key OR an OpenRouter API key** (matches canonical OB1 setup from `docs/01-getting-started.md`) for LLM calls and embeddings
 - **Node.js 18+** or **Deno** installed on your machine
 - The `@supabase/supabase-js` package installed (`npm install @supabase/supabase-js`)
 
@@ -165,6 +165,79 @@ Swap out the `throw` with your embedding API call. We used `text-embedding-3-sma
 
 > [!TIP]
 > You can use OpenRouter as a proxy to access multiple LLM providers with one API key. That's what I use — it lets me swap models without changing code.
+
+### Option A: OpenAI direct
+
+```typescript
+const OPENAI_KEY = "sk-...";
+
+async function extractMetadata(text: string) {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+        { role: "user", content: text },
+      ],
+    }),
+  });
+  return JSON.parse((await response.json()).choices[0].message.content);
+}
+
+async function getEmbedding(text: string): Promise<number[]> {
+  const response = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${OPENAI_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "text-embedding-3-small", input: text }),
+  });
+  return (await response.json()).data[0].embedding;
+}
+```
+
+> You can also use environment variables for the key and URL rather than hardcoding them — whatever works for your runtime.
+
+### Option B: OpenRouter (matches canonical OB1 setup)
+
+If you set up OpenRouter in `docs/01-getting-started.md` Step 4, you already have everything you need. Replace the `extractMetadata()` function in your `index.ts` with this:
+
+```typescript
+const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY; // or wherever you store secrets
+
+async function extractMetadata(text: string) {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "openai/gpt-4o-mini",
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: EXTRACTION_SYSTEM_PROMPT },
+        { role: "user", content: text },
+      ],
+    }),
+  });
+  return JSON.parse((await response.json()).choices[0].message.content);
+}
+
+async function getEmbedding(text: string): Promise<number[]> {
+  const response = await fetch("https://openrouter.ai/api/v1/embeddings", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
+  });
+  return (await response.json()).data[0].embedding;
+}
+```
+
+Key differences from OpenAI direct:
+- **Base URL:** `https://openrouter.ai/api/v1` instead of `https://api.openai.com/v1`
+- **Model strings:** `openai/gpt-4o-mini` and `openai/text-embedding-3-small` (prefixed with the provider)
+- **Same everything else:** Same `Authorization: Bearer` header pattern, same JSON shapes, same `response_format: { type: "json_object" }` support
+
+This is the exact same provider/config pair the core OB1 MCP server (`supabase/functions/open-brain-mcp/index.ts`) uses, so if you have OB1 running, these snippets reuse your existing setup.
 
 ✅ **Done when:** Both functions make real API calls and return data instead of throwing errors.
 

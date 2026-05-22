@@ -81,7 +81,17 @@ Only extract what is explicitly there.`;
 
 /**
  * Call your LLM of choice to extract structured metadata from raw text.
- * Replace this with your own LLM integration (OpenAI, Anthropic, OpenRouter, etc.)
+ *
+ * OpenAI direct:
+ *   POST https://api.openai.com/v1/chat/completions
+ *   model: "gpt-4o-mini"
+ *
+ * OpenRouter (canonical OB1 setup):
+ *   POST https://openrouter.ai/api/v1/chat/completions
+ *   model: "openai/gpt-4o-mini"
+ *
+ * Either way: send EXTRACTION_SYSTEM_PROMPT as system message,
+ * text as user message, request JSON response format.
  */
 async function extractMetadata(text: string): Promise<ExtractedMetadata> {
   // YOUR LLM CALL HERE — send EXTRACTION_SYSTEM_PROMPT as system message,
@@ -109,6 +119,12 @@ async function extractMetadata(text: string): Promise<ExtractedMetadata> {
 /**
  * Generate an embedding vector for the input text.
  * Used for semantic search across thoughts and interactions.
+ *
+ * OpenAI direct: POST https://api.openai.com/v1/embeddings
+ *   model: "text-embedding-3-small" (1536 dimensions)
+ *
+ * OpenRouter (canonical OB1 setup): POST https://openrouter.ai/api/v1/embeddings
+ *   model: "openai/text-embedding-3-small" (1536 dimensions)
  */
 async function getEmbedding(text: string): Promise<number[]> {
   // YOUR EMBEDDING CALL HERE — e.g. OpenAI text-embedding-3-small
