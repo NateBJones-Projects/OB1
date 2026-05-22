@@ -331,8 +331,9 @@ async function processSource(source, options, atomicDir) {
           console.log(`  - [${c.memory.memoryId}] ${preview}...`);
         }
       }
+    } else {
+      writeReport(sourceDir, report);
     }
-    writeReport(sourceDir, report);
     return report;
   }
 
