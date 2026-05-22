@@ -1,0 +1,29 @@
+{
+  "name": "Edge Function Cost Optimization",
+  "description": "Cuts Supabase Edge Function invocations ~73% by consolidating multiple MCP servers into one, adding Mcp-Session-Id reuse to collapse the 4-step MCP handshake into a single tools/call, and caching hot read paths. Keeps you on the free tier (500K invocations/month).",
+  "category": "recipes",
+  "author": {
+    "name": "Justin T. Smith",
+    "github": "JustinTSmith"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase Edge Functions"],
+    "tools": ["Supabase CLI", "Deno 2.x"]
+  },
+  "tags": [
+    "performance",
+    "cost",
+    "edge-functions",
+    "mcp",
+    "free-tier",
+    "consolidation",
+    "caching",
+    "session-reuse"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}

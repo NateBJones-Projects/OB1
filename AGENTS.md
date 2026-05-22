@@ -1,5 +1,46 @@
 # OB1 Agent Instructions
 
+## Parallel Agent Worktrees
+
+When multiple AI agents or assistant chats work on this repo, do not put them in the same checkout.
+
+### Setup pattern
+
+- Treat the main repo checkout as the canonical repo for pulling, inspection, and creating worktrees.
+- Create one Git worktree per active agent, task, or PR-sized workstream.
+- Give each worktree a descriptive folder name and a matching branch name.
+- Start every agent task by naming the exact absolute worktree path it owns.
+- The assigned worktree path is the boundary. The chat is not the boundary.
+
+### Agent assignment template
+
+Start each parallel-agent task with:
+
+```text
+Repository worktree:
+/ABSOLUTE/PATH/TO/PROJECT-WORKTREE
+
+Branch:
+codex/SHORT-TASK-NAME
+
+Task:
+DESCRIBE THE EXACT WORK.
+```
+
+### Rules
+
+- Do not switch branches in the canonical repo while another agent may be working.
+- Do not edit sibling worktrees unless explicitly asked.
+- Before staging or committing, run `git status --short` and stage only files that belong to the current task.
+- If `main` or another branch changed underneath the worktree, pause before merging or rebasing unless the task explicitly says to finish the PR end to end.
+- After a branch is merged and the worktree is clean, remove the finished worktree with `git worktree remove /ABSOLUTE/PATH/TO/PROJECT-WORKTREE`.
+
+### Quick checks
+
+- If another chat suddenly changed branches, both chats were probably in the same working directory.
+- If `git worktree add` says a branch is already checked out, create a new branch name or remove the old clean worktree.
+- If cleanup fails, inspect `git status --short` and preserve uncommitted work.
+
 ## Required Step: Update Linear
 
 - For feature work tied to a Linear issue, update Linear at the start of the work, at meaningful checkpoints, and before handing back to the user.

@@ -164,7 +164,7 @@ The dry run (`--dry-run`) also runs the scanner, so you can review what would be
 The script uses a hybrid chunking strategy to turn notes into atomic thoughts:
 
 1. **Short notes** (under 500 words) become a single thought.
-2. **Notes with headings** are split at `##` boundaries — each section becomes one thought.
+2. **Notes with headings** are split at `##` (H2) boundaries — each section becomes one thought.
 3. **Long sections** (over 1000 words) are sent to an LLM (gpt-4o-mini via OpenRouter) which distills them into 1-3 standalone thoughts.
 
 Use `--no-llm` to skip step 3 if you want to avoid LLM costs. Heading-based splitting still works.
@@ -227,6 +227,22 @@ After a successful import, searching your Open Brain for topics from your vault 
 ```
 
 You can filter by source to find only Obsidian-imported thoughts: search with `{"source": "obsidian"}` as a metadata filter.
+
+### Customizing the source label
+
+The default `source` value is `"obsidian"` — useful when you want to filter all
+Obsidian-imported thoughts as one group. If you have multiple upstream tools
+feeding into Obsidian-style markdown (e.g. an Apple Journal exporter, a
+Day One exporter, an old Roam dump), pass `--source-label` to distinguish
+them in OB1:
+
+```bash
+python import-obsidian.py /path/to/journal-vault --source-label apple-journal
+python import-obsidian.py /path/to/dayone-vault   --source-label day-one
+```
+
+After this, your metadata filter becomes `{"source": "apple-journal"}` to
+retrieve only Apple Journal entries, etc.
 
 ## Troubleshooting
 

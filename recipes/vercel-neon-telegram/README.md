@@ -164,11 +164,11 @@ claude mcp add --transport http open-brain \
 4. Redeploy: `npx vercel --prod`
 5. Register the webhook:
 
-```bash
-npm run set-telegram-webhook
-```
+   ```bash
+   npm run set-telegram-webhook
+   ```
 
-1. Send a message to your bot — it should reply with a classification
+6. Send a message to your bot — it should reply with a classification
 
 ### 10. Add CLI capture (optional)
 

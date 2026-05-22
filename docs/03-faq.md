@@ -188,7 +188,10 @@ When you generate a new key on openrouter.ai/keys, the old key is revoked immedi
 
    ```bash
    supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-new-key
+   supabase functions deploy open-brain-mcp --no-verify-jwt
    ```
+
+   `secrets set` stores the new value, but Edge Functions read environment variables once at cold start and cache them. Already-running ("warm") instances keep using the old key until they recycle — which can take minutes and produce intermittent 401s in the meantime. Redeploying forces a fresh boot so the new key takes effect immediately. If you've deployed extension functions that also read `OPENROUTER_API_KEY`, redeploy each of them too (or run `supabase functions deploy` with no arg to redeploy all).
 
 2. **Local `.env` files** — Any recipes or integrations you run locally (e.g., `recipes/chatgpt-conversation-import/.env`). Open each one and replace the old key value.
 

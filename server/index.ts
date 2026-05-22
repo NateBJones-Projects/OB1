@@ -512,6 +512,83 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
 };
 
+// JSON-RPC error code for unauthorized requests.
+// Per the JSON-RPC 2.0 spec, the range -32099 to -32000 is reserved for
+// implementation-defined server errors. -32001 is the conventional
+// "Unauthorized" code used by MCP clients/servers in the wild.
+//
+// Why a JSON-RPC envelope (HTTP 200) instead of a bare HTTP 401?
+// Strict MCP hosts (Codex CLI, Claude Code) treat bare HTTP 4xx responses
+// as transport-level failures and tear the connection down rather than
+// surfacing the failure to the application layer. Wrapping the auth
+// rejection in a JSON-RPC error keeps the connection alive and lets
+// clients recover (e.g. prompt the user for a new key, refetch a stale
+// cache) instead of dying.
+const JSON_RPC_UNAUTHORIZED_CODE = -32001;
+const UNAUTHORIZED_MESSAGE = "Unauthorized: missing or invalid authentication.";
+
+/**
+ * Read the request body as text without consuming the original request's
+ * body stream for downstream handlers. Returns null on bodyless methods
+ * or read failure.
+ */
+async function readBodyText(req: Request): Promise<string | null> {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE") {
+    return null;
+  }
+  try {
+    return await req.text();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Best-effort extraction of the JSON-RPC `id` from a raw request body.
+ * Returns null when the body is missing, not JSON, or not a JSON-RPC
+ * shape with an id. Per the JSON-RPC 2.0 spec, id may be a string,
+ * number, or null — we preserve any of those; anything else becomes null.
+ */
+function extractJsonRpcId(bodyText: string | null): string | number | null {
+  if (!bodyText) return null;
+  try {
+    const parsed = JSON.parse(bodyText);
+    if (parsed && typeof parsed === "object" && "id" in parsed) {
+      const id = (parsed as { id: unknown }).id;
+      if (typeof id === "string" || typeof id === "number" || id === null) {
+        return id;
+      }
+    }
+  } catch {
+    // fall through — malformed body
+  }
+  return null;
+}
+
+/**
+ * Build a JSON-RPC 2.0 error envelope response for auth failures.
+ * Returns HTTP 200 — the JSON-RPC layer expresses the error so that
+ * strict MCP clients keep the connection alive instead of treating
+ * the failure as a transport-level fault.
+ */
+function unauthorizedResponse(id: string | number | null): Response {
+  const body = {
+    jsonrpc: "2.0",
+    error: {
+      code: JSON_RPC_UNAUTHORIZED_CODE,
+      message: UNAUTHORIZED_MESSAGE,
+    },
+    id,
+  };
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+    },
+  });
+}
+
 const app = new Hono();
 
 // CORS preflight — required for browser/Electron-based clients (Claude Desktop, claude.ai)
@@ -523,7 +600,14 @@ app.all("*", async (c) => {
   // Accept access key via header OR URL query parameter
   const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
+    // Return a JSON-RPC 2.0 error envelope (HTTP 200) instead of a bare
+    // HTTP 401 so strict MCP hosts treat this as an application-level
+    // error rather than a transport fault and keep the connection alive.
+    // Best-effort echo of the inbound request id keeps the response
+    // correlated; malformed/missing bodies fall back to id: null.
+    const bodyText = await readBodyText(c.req.raw);
+    const id = extractJsonRpcId(bodyText);
+    return unauthorizedResponse(id);
   }
 
   // Fix: Claude Desktop connectors don't send the Accept header that

@@ -8,14 +8,10 @@ A self-improving, time-aware personal assistant that runs in the background via 
 
 > [!IMPORTANT]
 > **This recipe requires [Claude Code](https://claude.ai/download).** It uses Claude Code-specific features — skills, the `/loop` command, and MCP server connections — that aren't available in other AI coding tools. If you're using a different agent, this one isn't for you (yet).
-
-<!-- -->
-
+> <!-- md028 -->
 > [!TIP]
 > **You don't have to set this up manually.** This guide is detailed enough that Claude Code can do most of the setup for you. If you'd rather not walk through every step yourself, skip to [Quick Setup with Claude Code](#quick-setup-with-claude-code) — paste one prompt and Claude handles the plugin install, skill file creation, schema setup, and permissions configuration. Come back to the step-by-step sections if you want to understand what it built or customize further.
-
-<!-- -->
-
+> <!-- md028 -->
 > [!NOTE]
 > **This will not be perfect on day one.** That's by design. Life Engine is built to iterate — your first morning briefing will be rough, your tenth will be dialed in, and by week four the system is suggesting its own improvements based on what you actually use. The value comes from the feedback loop between you and the agent, powered by the structured context your Open Brain provides. Treat the first run as a starting point, not a finished product.
 
