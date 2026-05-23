@@ -12,11 +12,17 @@ ALTER TABLE thoughts ADD COLUMN IF NOT EXISTS importance SMALLINT DEFAULT 3;
 ALTER TABLE thoughts ADD COLUMN IF NOT EXISTS quality_score NUMERIC(5,2) DEFAULT 50;
 ALTER TABLE thoughts ADD COLUMN IF NOT EXISTS source_type TEXT;
 ALTER TABLE thoughts ADD COLUMN IF NOT EXISTS enriched BOOLEAN DEFAULT false;
+-- status / status_updated_at are written by the upsert_thought RPC below.
+-- They are also defined by schemas/workflow-status/migration.sql; both files
+-- use ADD COLUMN IF NOT EXISTS so applying either (or both) is safe.
+ALTER TABLE thoughts ADD COLUMN IF NOT EXISTS status TEXT DEFAULT NULL;
+ALTER TABLE thoughts ADD COLUMN IF NOT EXISTS status_updated_at TIMESTAMPTZ DEFAULT now();
 
 -- Indexes for the new columns
 CREATE INDEX IF NOT EXISTS idx_thoughts_type ON thoughts (type);
 CREATE INDEX IF NOT EXISTS idx_thoughts_importance ON thoughts (importance DESC);
 CREATE INDEX IF NOT EXISTS idx_thoughts_source_type ON thoughts (source_type);
+CREATE INDEX IF NOT EXISTS idx_thoughts_status ON thoughts (status) WHERE status IS NOT NULL;
 
 -- Full-text search index (speeds up search_thoughts_text)
 CREATE INDEX IF NOT EXISTS idx_thoughts_content_tsvector
