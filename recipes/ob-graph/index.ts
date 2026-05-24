@@ -2,7 +2,9 @@
  * OB-Graph: Knowledge Graph MCP Server for Open Brain
  *
  * Provides tools for building and querying a knowledge graph on top of
- * PostgreSQL. Uses a nodes + edges model with recursive CTEs for traversal.
+ * PostgreSQL. Uses a nodes + edges model: traverse_graph is a recursive CTE
+ * (enumerates acyclic paths); find_shortest_path is an iterative plpgsql BFS
+ * with a seen-set.
  *
  * Tools:
  *   - create_node       — Add a node to the graph
@@ -58,7 +60,7 @@ app.post("*", async (c) => {
   }
 
   const server = new McpServer(
-    { name: "ob-graph", version: "1.0.0" },
+    { name: "ob-graph", version: "1.0.1" },
   );
 
   // ==========================================================================
@@ -532,6 +534,6 @@ app.post("*", async (c) => {
   return transport.handleRequest(c);
 });
 
-app.get("*", (c) => c.json({ status: "ok", service: "OB-Graph MCP", version: "1.0.0" }));
+app.get("*", (c) => c.json({ status: "ok", service: "OB-Graph MCP", version: "1.0.1" }));
 
 Deno.serve(app.fetch);

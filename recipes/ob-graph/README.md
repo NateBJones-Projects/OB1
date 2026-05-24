@@ -14,7 +14,7 @@ Adds two tables (`graph_nodes`, `graph_edges`) and an MCP server with 10 tools f
 - **Querying** relationships — get direct neighbors, multi-hop traversal, and shortest-path between any two nodes
 - **Linking** to existing thoughts — nodes can optionally reference a thought via `thought_id`
 
-All graph traversal runs in PostgreSQL using recursive CTEs — no external graph database needed.
+All graph traversal runs in PostgreSQL — `traverse_graph` uses a recursive CTE (enumerating acyclic paths) and `find_shortest_path` uses an iterative BFS with a seen-set. No external graph database needed.
 
 ## Prerequisites
 
@@ -57,8 +57,9 @@ The schema creates:
 |--------|---------|
 | `graph_nodes` | Entities in your knowledge graph |
 | `graph_edges` | Directed relationships between nodes |
-| `traverse_graph()` | Recursive CTE function for multi-hop traversal |
-| `find_shortest_path()` | BFS shortest path between two nodes |
+| `traverse_graph()` | Recursive CTE for multi-hop traversal (one row per acyclic path) |
+| `find_shortest_path()` | Iterative BFS shortest path between two nodes |
+| `reconstruct_bfs_path()` | Internal helper that walks the BFS parent map (service_role only) |
 | RLS policies | User-scoped data isolation on both tables |
 | Indexes | Fast lookups by user, type, label, source/target |
 
@@ -162,31 +163,39 @@ Done when: Your AI can create nodes, connect them with edges, and traverse the g
 
 ## How the Graph Traversal Works
 
-OB-Graph uses PostgreSQL recursive CTEs instead of a dedicated graph database. Here's the pattern:
+OB-Graph uses two different traversal strategies, each matched to what the operation actually needs:
+
+**`traverse_graph` — recursive CTE (one row per acyclic path).** The recursive CTE enumerates every acyclic path from the start node up to `p_max_depth` hops. Parallel edges and alternate routes are preserved as separate rows — if `A → B` exists with two different `relationship_type`s, you get two rows for B. A per-path cycle check (`NOT n.id = ANY(gw.path)`) prevents infinite recursion; `p_max_depth` bounds the search on dense graphs.
+
+**`find_shortest_path` — iterative plpgsql BFS with a seen-set.** Shortest path has a "one result per reachable node" semantics by definition, so a BFS with a global seen-set is the right fit. Each call maintains a frontier (the current BFS layer), a seen-set of every node visited so far, and a JSONB parent-pointer map used to reconstruct the path. Each node is visited at most once, which keeps pathfinding bounded even on graphs with cycles or hub nodes.
 
 ```sql
-WITH RECURSIVE graph_walk AS (
-    -- Base case: start node
-    SELECT id, label, 0 AS depth, ARRAY[id] AS path
-    FROM graph_nodes WHERE id = start_id
+-- Pseudocode for the BFS used by find_shortest_path
+v_frontier := ARRAY[start];
+v_seen     := ARRAY[start];
+v_parent_map := '{}'::jsonb;
 
-    UNION ALL
+WHILE depth < max_depth AND frontier is non-empty LOOP
+    -- Collect unseen neighbours of the current frontier, remembering the
+    -- (parent, relation) that first reached each. DISTINCT ON enforces
+    -- BFS's "first discovery wins" rule.
+    next_ids, next_map := SELECT ... FROM graph_edges
+                          WHERE source_node_id = ANY(v_frontier)
+                            AND NOT target_node_id = ANY(v_seen);
 
-    -- Recursive case: follow edges, prevent cycles via path check
-    SELECT n.id, n.label, gw.depth + 1, gw.path || n.id
-    FROM graph_walk gw
-    JOIN graph_edges e ON e.source_node_id = gw.id
-    JOIN graph_nodes n ON n.id = e.target_node_id
-    WHERE gw.depth < max_depth
-      AND NOT n.id = ANY(gw.path)  -- cycle prevention
-)
-SELECT * FROM graph_walk;
+    v_parent_map := v_parent_map || next_map;
+    v_seen       := v_seen || next_ids;
+    v_frontier   := next_ids;
+    depth        := depth + 1;
+END LOOP;
+
+-- Walk parent pointers back from target to start for path reconstruction.
 ```
 
-This approach works well for knowledge graphs with thousands of nodes. It stays within Supabase's free tier limits (no extra services or extensions required) and gives you traversal, pathfinding, and neighbor queries — the core operations you need for relationship exploration.
+This split works well for knowledge graphs with thousands of nodes. It stays within Supabase's free tier limits (no extra services or extensions required) and gives you traversal, pathfinding, and neighbor queries — the core operations you need for relationship exploration.
 
 > [!NOTE]
-> Recursive CTEs are bounded by `max_depth` and cycle prevention. For very large graphs (100k+ edges), consider adding a `weight` threshold filter to prune low-confidence edges during traversal.
+> `traverse_graph` can be expensive on dense graphs because it enumerates every acyclic path. Keep `p_max_depth` modest (2–3 is usually enough for exploration), or narrow with `p_relationship_type`. `find_shortest_path` is bounded by the seen-set; for very large graphs (100k+ edges), consider adding a `weight` threshold filter to prune low-confidence edges before calling the functions.
 
 ## Expected Outcome
 
