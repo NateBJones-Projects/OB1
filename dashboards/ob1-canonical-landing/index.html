@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+  <title>Open Brain &mdash; One database. Any AI.</title>
+  <meta name="description" content="Open Brain is the infrastructure layer for persistent AI memory. One Supabase database, one MCP server &mdash; shared context across Claude, ChatGPT, Cursor, and any AI you use.">
+  <meta name="keywords" content="open brain, AI memory, persistent AI context, MCP protocol, Supabase pgvector, AI agent memory, cross-AI memory, personal knowledge base, OB1">
+  <meta name="author" content="Nate B. Jones">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">
+  <meta name="theme-color" content="#e05a20">
+  <link rel="canonical" href="https://openbrain.fyi/">
+
+  <link rel="icon" type="image/png" sizes="32x32" href="/imgs/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="180x180" href="/imgs/apple-touch-icon.png">
+  <link rel="apple-touch-icon" href="/imgs/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <link rel="sitemap" type="application/xml" href="/sitemap.xml">
+  <link rel="alternate" type="text/plain" href="https://openbrain.fyi/llms.txt" title="LLM-readable summary">
+  <link rel="preconnect" href="https://github.com" crossorigin>
+
+  <!-- IndieWeb rel=me -->
+  <link rel="me" href="https://github.com/NateBJones-Projects">
+  <link rel="me" href="https://x.com/natebjones">
+  <link rel="me" href="https://natesnewsletter.substack.com/">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="Open Brain">
+  <meta property="og:title" content="Open Brain">
+  <meta property="og:description" content="One database. Any AI. The infrastructure layer for persistent AI memory.">
+  <meta property="og:url" content="https://openbrain.fyi/">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://openbrain.fyi/imgs/og.png">
+  <meta property="og:image:alt" content="Open Brain &mdash; One database. Any AI.">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:type" content="image/png">
+  <meta property="article:published_time" content="2026-03-11T00:00:00Z">
+  <meta property="article:modified_time" content="2026-05-02T00:00:00Z">
+  <meta property="article:author" content="Nate B. Jones">
+  <meta property="article:section" content="Open Source">
+  <meta property="article:tag" content="open-brain">
+  <meta property="article:tag" content="AI-memory">
+  <meta property="article:tag" content="MCP-protocol">
+  <meta property="article:tag" content="Supabase">
+  <meta property="article:tag" content="pgvector">
+
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Open Brain">
+  <meta name="twitter:description" content="One database. Any AI. The infrastructure layer for persistent AI memory.">
+  <meta name="twitter:site" content="@natebjones">
+  <meta name="twitter:creator" content="@natebjones">
+  <meta name="twitter:image" content="https://openbrain.fyi/imgs/og.png">
+  <meta name="twitter:image:alt" content="Open Brain &mdash; One database. Any AI.">
+
+  <!-- JSON-LD: TechArticle -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Open Brain",
+    "alternativeHeadline": "One database. Any AI.",
+    "description": "Open Brain is an open protocol and database architecture for persistent AI memory. One Supabase database with pgvector, one MCP server deployed as an Edge Function — shared context across Claude, ChatGPT, Cursor, and any AI that speaks MCP.",
+    "inLanguage": "en",
+    "url": "https://openbrain.fyi/",
+    "mainEntityOfPage": { "@type": "WebPage", "@id": "https://openbrain.fyi/" },
+    "datePublished": "2026-03-11",
+    "dateModified": "2026-05-02",
+    "author": {
+      "@type": "Person",
+      "name": "Nate B. Jones",
+      "url": "https://natesnewsletter.substack.com/"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "NateBJones Projects",
+      "url": "https://github.com/NateBJones-Projects"
+    },
+    "keywords": ["open brain", "AI memory", "MCP protocol", "Supabase", "pgvector", "persistent AI context", "AI agent memory"],
+    "image": {
+      "@type": "ImageObject",
+      "url": "https://openbrain.fyi/imgs/og.png",
+      "width": 1200,
+      "height": 630
+    },
+    "license": "https://github.com/NateBJones-Projects/OB1/blob/main/LICENSE.md",
+    "copyrightHolder": { "@type": "Person", "name": "Nate B. Jones" },
+    "copyrightYear": 2026,
+    "citation": [
+      { "@type": "WebPage", "name": "Model Context Protocol", "url": "https://modelcontextprotocol.io/" },
+      { "@type": "WebPage", "name": "Supabase", "url": "https://supabase.com" },
+      { "@type": "WebPage", "name": "pgvector", "url": "https://github.com/pgvector/pgvector" }
+    ]
+  }
+  </script>
+
+  <!-- JSON-LD: DefinedTerm -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "DefinedTerm",
+    "name": "Open Brain",
+    "alternateName": ["OB1", "open-brain"],
+    "description": "An open protocol and database architecture that gives any AI tool persistent memory of its user — one Supabase database with pgvector, connected via MCP, shared across all AI clients.",
+    "url": "https://openbrain.fyi/",
+    "inDefinedTermSet": {
+      "@type": "DefinedTermSet",
+      "name": "Open Brain",
+      "url": "https://openbrain.fyi/"
+    },
+    "sameAs": [
+      "https://github.com/NateBJones-Projects/OB1",
+      "https://discord.gg/Cgh9WJEkeG",
+      "https://natesnewsletter.substack.com/"
+    ]
+  }
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d1117;
+      --bg-alt: #161b22;
+      --surface2: #21262d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #e05a20;
+      --accent-hover: #f07840;
+      --border: #30363d;
+      --green: #3fb950;
+      --red: #f85149;
+      --code-bg: #0d1117;
+      --code-text: #e6edf3;
+      /* Brand blues extracted from OB1 logo gradient */
+      --brand-blue-deep: #0f1b33;
+      --brand-blue-mid: #1a3a6e;
+      --brand-blue-bright: #2563b8;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+      --max-width: 960px;
+      --radius: 10px;
+    }
+
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+    body {
+      font-family: var(--font);
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+    /* Skip link (a11y) */
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      background: var(--accent);
+      color: var(--bg);
+      padding: 0.5rem 1rem;
+      z-index: 100;
+    }
+    .skip-link:focus { left: 0; }
+
+    .container { max-width: var(--max-width); margin: 0 auto; padding: 0 1.5rem; }
+
+    /* Nav */
+    nav {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+      position: sticky;
+      top: 0;
+      background: rgba(13, 17, 23, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 10;
+    }
+    nav .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    nav .logo {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    nav .links { display: flex; align-items: center; gap: 1.5rem; font-size: 0.9rem; }
+    nav .links a { color: var(--text-muted); }
+    nav .links a:hover { color: var(--text); text-decoration: none; }
+
+    /* GitHub star button */
+    .gh-star {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-alt);
+      color: var(--text) !important;
+      font-weight: 600;
+      font-size: 0.8rem;
+      transition: border-color 0.1s ease, transform 0.05s ease;
+    }
+    .gh-star:hover {
+      border-color: var(--accent);
+      text-decoration: none;
+      transform: translateY(-1px);
+    }
+    .gh-star svg { flex: 0 0 auto; color: #eab308; }
+    .gh-star span { white-space: nowrap; }
+
+    /* Byline */
+    .byline {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0.75rem 0 1.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.9rem;
+      align-items: center;
+      justify-content: center;
+    }
+    .byline .sep { color: var(--border); }
+    .byline a { color: var(--text); text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 2px; }
+    .byline a:hover { color: var(--accent-hover); text-decoration-color: var(--accent-hover); }
+    .byline .tag {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      background: var(--bg-alt);
+      color: var(--accent);
+      border: 1px solid var(--border);
+    }
+
+    /* Canonical note */
+    .canonical-note {
+      margin-top: 2.5rem;
+      padding: 1rem 1.25rem;
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .canonical-note strong { color: var(--text); }
+    .canonical-note a { text-decoration: underline; text-underline-offset: 2px; }
+
+    /* Sections */
+    section { padding: 4rem 0; }
+    section.alt { background: var(--bg-alt); }
+
+    h1 { font-size: 2.75rem; line-height: 1.15; letter-spacing: -0.02em; font-weight: 800; }
+    h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 1.5rem; letter-spacing: -0.01em; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+
+    p { margin-bottom: 1rem; }
+    p:last-child { margin-bottom: 0; }
+
+    /* Hero */
+    .hero {
+      padding: 5rem 0 4rem;
+      text-align: center;
+      background: linear-gradient(160deg, var(--brand-blue-deep) 0%, var(--bg) 55%);
+    }
+    .hero h1 { margin-bottom: 1rem; }
+    .hero-logo {
+      display: block;
+      margin: 0 auto 2rem;
+      max-width: 420px;
+      width: 100%;
+      height: auto;
+      border-radius: 10px;
+    }
+    .hero .subtitle {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      max-width: 680px;
+      margin: 0 auto 1.5rem;
+    }
+    .hero .hook {
+      font-size: 1rem;
+      color: var(--text-muted);
+      max-width: 620px;
+      margin: 0 auto 2.5rem;
+    }
+
+    /* Video wrapper — 16:9 responsive */
+    .video-wrap {
+      position: relative;
+      padding-bottom: 56.25%;
+      height: 0;
+      overflow: hidden;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: #000;
+      margin: 2rem 0;
+    }
+    .video-wrap iframe,
+    .video-wrap video {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      border: 0;
+    }
+    video.inline-video {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: #000;
+      margin: 2rem 0;
+    }
+
+    /* Pillars */
+    .pillars {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+      text-align: left;
+    }
+    .pillar {
+      padding: 1.5rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-alt);
+    }
+    section.alt .pillar { background: var(--bg); }
+    .pillar h3 { color: var(--accent); font-size: 1rem; }
+    .pillar p { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0; }
+
+    /* Buttons */
+    .cta-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: background 0.15s, color 0.15s;
+    }
+    /* Dark text on orange: 5.7:1 contrast passes WCAG AA */
+    .btn-primary { background: var(--accent); color: var(--bg); }
+    .btn-primary:hover { background: var(--accent-hover); text-decoration: none; color: var(--bg); }
+    .btn-secondary {
+      background: transparent;
+      color: var(--accent-hover);
+      border: 1px solid var(--accent);
+    }
+    .btn-secondary:hover { background: var(--accent); color: var(--bg); text-decoration: none; }
+    .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+    .btn-primary:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+
+    /* Numbered steps */
+    .step-list { list-style: none; counter-reset: steps; margin: 1.5rem 0 2rem; }
+    .step-list li {
+      counter-increment: steps;
+      padding: 1rem 1rem 1rem 3.5rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.75rem;
+      background: var(--bg-alt);
+      position: relative;
+      font-size: 0.95rem;
+    }
+    .step-list li::before {
+      content: counter(steps);
+      position: absolute;
+      left: 1rem;
+      top: 1.1rem;
+      width: 1.75rem;
+      height: 1.75rem;
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .step-list li strong { color: var(--text); }
+    .step-list li p { color: var(--text-muted); font-size: 0.875rem; margin-top: 0.25rem; margin-bottom: 0; }
+
+    /* AI assistant cards */
+    .assistant-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin: 1.5rem 0 2rem;
+    }
+    .assistant-card {
+      padding: 1.25rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-alt);
+      text-align: center;
+    }
+    section.alt .assistant-card { background: var(--bg); }
+    .assistant-card h3 { font-size: 0.95rem; color: var(--text); margin-bottom: 0.35rem; }
+    .assistant-card p { font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem; }
+    .assistant-card a { font-size: 0.85rem; font-weight: 600; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; margin-bottom: 1.5rem; }
+    th, td {
+      text-align: left;
+      padding: 0.65rem 0.9rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.875rem;
+    }
+    th { font-weight: 600; color: var(--text-muted); font-size: 0.775rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    td.num { font-family: var(--mono); text-align: center; color: var(--accent); font-weight: 700; width: 36px; }
+    td .contrib { font-size: 0.8rem; color: var(--text-muted); }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-beginner { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+    .badge-intermediate { background: rgba(224, 90, 32, 0.15); color: var(--accent); }
+    .badge-advanced { background: rgba(248, 81, 73, 0.15); color: var(--red); }
+
+    /* Section sub-heading */
+    .sub-h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin: 2.5rem 0 0.75rem;
+    }
+    .sub-h3:first-of-type { margin-top: 0; }
+
+    pre {
+      background: var(--code-bg);
+      color: var(--code-text);
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      line-height: 1.5;
+      border: 1px solid var(--border);
+    }
+    code { font-family: var(--mono); font-size: 0.88em; color: var(--accent); }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .footer-grid {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 2rem;
+      flex-wrap: wrap;
+    }
+    .footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .footer-meta p { margin-bottom: 0.25rem; }
+    .footer-meta a { text-decoration: underline; text-underline-offset: 2px; }
+    .footer-links a { text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--border); }
+    .footer-links a:hover { text-decoration-color: var(--accent-hover); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      h1 { font-size: 2rem; }
+      .hero { padding: 3rem 0 2.5rem; }
+      .pillars { grid-template-columns: 1fr; }
+      .assistant-cards { grid-template-columns: 1fr; }
+      nav .links { display: none; }
+      nav .links.mobile-compact { display: flex; gap: 0.75rem; }
+      .footer-grid { flex-direction: column; }
+      pre { font-size: 0.75rem; }
+      table { font-size: 0.8rem; }
+      th, td { padding: 0.5rem 0.6rem; }
+    }
+    @media (max-width: 520px) {
+      nav .links.mobile-compact a:not(.gh-star) { display: none; }
+      nav .container { gap: 0.5rem; }
+    }
+  </style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to content</a>
+
+<nav aria-label="Main navigation">
+  <div class="container">
+    <a href="/" class="logo" aria-label="Open Brain home">
+      <img src="/imgs/ob1-logo.png" alt="" width="32" height="32" style="border-radius:6px;flex:0 0 auto;">
+      <span>Open Brain</span>
+    </a>
+    <div class="links mobile-compact">
+      <a href="#how-it-works">How it works</a>
+      <a href="#extensions">Extensions</a>
+      <a href="#community">Community</a>
+      <a href="https://github.com/NateBJones-Projects/OB1" class="gh-star" target="_blank" rel="noopener" aria-label="Star NateBJones-Projects/OB1 on GitHub">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+        </svg>
+        <span>Star on GitHub</span>
+      </a>
+    </div>
+  </div>
+</nav>
+
+<main id="main-content">
+
+<section class="hero">
+  <div class="container">
+    <img src="/imgs/ob1-logo-wide.png" alt="" width="1200" height="360" class="hero-logo" decoding="async" fetchpriority="high">
+    <h1>One brain. Any AI.</h1>
+    <p class="byline">
+      By <a href="https://natesnewsletter.substack.com/" target="_blank" rel="noopener author">Nate B. Jones</a>
+      <span class="sep">&middot;</span>
+      Published <time datetime="2026-03-11">March 11, 2026</time>
+      <span class="sep">&middot;</span>
+      Updated <time datetime="2026-05-02">May 2, 2026</time>
+      <span class="sep">&middot;</span>
+      <span class="tag">FSL-1.1-MIT</span>
+    </p>
+    <p class="subtitle">The infrastructure layer for your thinking. One database, one protocol &mdash; shared context across every AI tool you use.</p>
+    <p class="hook">Every AI you use has a different memory of you. Open Brain fixes that: one Supabase database with vector search, one MCP server, persistent context for Claude, ChatGPT, Cursor, and whatever ships next month.</p>
+    <div class="cta-row">
+      <a href="https://github.com/NateBJones-Projects/OB1/blob/main/docs/01-getting-started.md" class="btn btn-primary" target="_blank" rel="noopener">Build Your Open Brain &rarr;</a>
+      <a href="#extensions" class="btn btn-secondary">Browse Extensions</a>
+    </div>
+    <video class="inline-video" controls preload="metadata" aria-label="Open Brain demo">
+      <source src="https://github.com/user-attachments/assets/80a79b09-f323-42c6-b11b-de10bb6fa36f" type="video/mp4">
+      <a href="https://github.com/NateBJones-Projects/OB1" target="_blank" rel="noopener">Watch the demo on GitHub</a>
+    </video>
+  </div>
+</section>
+
+<section class="alt" id="how-it-works">
+  <div class="container">
+    <h2>How it works</h2>
+    <p>Three layers. Each is a standard service you control &mdash; no proprietary middleware, no monthly SaaS fee for the core.</p>
+    <div class="pillars">
+      <div class="pillar">
+        <h3>One database</h3>
+        <p>Supabase + pgvector stores everything &mdash; thoughts, memories, context. SQL schema you own, vector search out of the box, row-level security built in.</p>
+      </div>
+      <div class="pillar">
+        <h3>Open protocol</h3>
+        <p>MCP (Model Context Protocol) connects any AI client to your database. Runs as a Supabase Edge Function. No local server, no middleware, no Zapier chains.</p>
+      </div>
+      <div class="pillar">
+        <h3>Build your way</h3>
+        <p>Six guided extensions take you from beginner to advanced. The community contributes import recipes, dashboards, integrations, and agent skills.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="get-started">
+  <div class="container">
+    <h2>Get started in 45 minutes</h2>
+    <p>No coding experience required. Two services: <strong>Supabase</strong> (your database, free tier) and <strong>OpenRouter</strong> (~$5 in credits, lasts months). Then connect any AI client via MCP.</p>
+
+    <video class="inline-video" controls preload="none" playsinline aria-label="Getting started with Open Brain">
+      <source src="https://github.com/user-attachments/assets/85208d73-112b-4204-82fd-d03b6c397a8b" type="video/mp4">
+      <a href="https://vimeo.com/1174979042/f883f6489a" target="_blank" rel="noopener">Watch on Vimeo</a>
+    </video>
+
+    <ol class="step-list">
+      <li>
+        <strong>Create your Supabase project</strong>
+        <p>Free tier, no credit card required. Enable pgvector and run the core schema. Takes about five minutes.</p>
+      </li>
+      <li>
+        <strong>Deploy the MCP Edge Function</strong>
+        <p>One-command deploy to Supabase Edge Functions. Paste the URL into your AI client as a custom connector. No local server needed.</p>
+      </li>
+      <li>
+        <strong>Connect your AI clients</strong>
+        <p>Add the connector URL in Claude Desktop, Cursor, or any MCP-compatible client. All of them now share the same memory of you.</p>
+      </li>
+      <li>
+        <strong>Start building extensions</strong>
+        <p>Work through the six-extension learning path, or browse community contributions to import your data and add new capabilities.</p>
+      </li>
+    </ol>
+
+    <div class="cta-row" style="margin-bottom:2rem;">
+      <a href="https://github.com/NateBJones-Projects/OB1/blob/main/docs/01-getting-started.md" class="btn btn-primary" target="_blank" rel="noopener">Read the setup guide &rarr;</a>
+      <a href="https://vimeo.com/1174979042/f883f6489a" class="btn btn-secondary" target="_blank" rel="noopener">Watch the walkthrough (~27 min)</a>
+    </div>
+
+    <p><strong>Prefer building with an AI coding tool?</strong> Use the <a href="https://github.com/NateBJones-Projects/OB1/blob/main/docs/04-ai-assisted-setup.md" target="_blank" rel="noopener">AI-Assisted Setup guide</a> &mdash; point Cursor, Claude Code, or another coding tool at this repo and go. Same system, different workflow.</p>
+
+    <p style="margin-top:1rem;"><strong>Stuck?</strong> The <a href="https://github.com/NateBJones-Projects/OB1/blob/main/docs/03-faq.md" target="_blank" rel="noopener">FAQ</a> covers the most common gotchas. Or ask one of the dedicated AI assistants that know this system inside and out:</p>
+
+    <div class="assistant-cards">
+      <div class="assistant-card">
+        <h3>Claude Skill</h3>
+        <p>For Claude Desktop and Claude Code users</p>
+        <a href="https://www.notion.so/product-templates/Open-Brain-Companion-Claude-Skill-31a5a2ccb526802797caeb37df3ba3cb?source=copy_link" target="_blank" rel="noopener">Open Claude Skill &rarr;</a>
+      </div>
+      <div class="assistant-card">
+        <h3>ChatGPT GPT</h3>
+        <p>For ChatGPT users</p>
+        <a href="https://chatgpt.com/g/g-69a892b6a7708191b00e48ff655d5597-nate-jones-open-brain-assistant" target="_blank" rel="noopener">Open Custom GPT &rarr;</a>
+      </div>
+      <div class="assistant-card">
+        <h3>Gemini GEM</h3>
+        <p>For Gemini users</p>
+        <a href="https://gemini.google.com/gem/1fDsAENjhdku-3RufY7ystbS1Md8MtDCg?usp=sharing" target="_blank" rel="noopener">Open Gemini GEM &rarr;</a>
+      </div>
+    </div>
+
+    <p><strong>Five companion prompts</strong> help you go further once the system is live: migrate your existing memories, discover use cases, and build the capture habit. Available in the <a href="https://github.com/NateBJones-Projects/OB1/blob/main/docs/02-companion-prompts.md" target="_blank" rel="noopener">Companion Prompts guide</a> and via <a href="https://natesnewsletter.substack.com/" target="_blank" rel="noopener">Nate&rsquo;s Substack</a>.</p>
+  </div>
+</section>
+
+<section class="alt" id="extensions">
+  <div class="container">
+    <h2>Extensions &mdash; The learning path</h2>
+    <p>Build these in order. Each teaches new concepts through something you will actually use. By the end, your agent manages your household, your schedule, your meals, your professional network, and your career &mdash; all interconnected.</p>
+
+    <video class="inline-video" controls preload="none" playsinline aria-label="Open Brain extensions overview">
+      <source src="https://github.com/user-attachments/assets/cc477f00-bb6b-4f96-9f7d-a6bcd0cf8b60" type="video/mp4">
+      <a href="https://github.com/NateBJones-Projects/OB1/tree/main/extensions" target="_blank" rel="noopener">Browse extensions on GitHub</a>
+    </video>
+
+    <table>
+      <thead>
+        <tr><th>#</th><th>Extension</th><th>What you build</th><th>Level</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">1</td>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/extensions/household-knowledge/" target="_blank" rel="noopener">Household Knowledge Base</a></td>
+          <td>Home facts your agent can recall instantly</td>
+          <td><span class="badge badge-beginner">Beginner</span></td>
+        </tr>
+        <tr>
+          <td class="num">2</td>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/extensions/home-maintenance/" target="_blank" rel="noopener">Home Maintenance Tracker</a></td>
+          <td>Scheduling and history for home upkeep</td>
+          <td><span class="badge badge-beginner">Beginner</span></td>
+        </tr>
+        <tr>
+          <td class="num">3</td>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/extensions/family-calendar/" target="_blank" rel="noopener">Family Calendar</a></td>
+          <td>Multi-person schedule coordination</td>
+          <td><span class="badge badge-intermediate">Intermediate</span></td>
+        </tr>
+        <tr>
+          <td class="num">4</td>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/extensions/meal-planning/" target="_blank" rel="noopener">Meal Planning</a></td>
+          <td>Recipes, meal plans, shared grocery lists</td>
+          <td><span class="badge badge-intermediate">Intermediate</span></td>
+        </tr>
+        <tr>
+          <td class="num">5</td>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/extensions/professional-crm/" target="_blank" rel="noopener">Professional CRM</a></td>
+          <td>Contact tracking wired into your thoughts</td>
+          <td><span class="badge badge-intermediate">Intermediate</span></td>
+        </tr>
+        <tr>
+          <td class="num">6</td>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/extensions/job-hunt/" target="_blank" rel="noopener">Job Hunt Pipeline</a></td>
+          <td>Application tracking and interview pipeline</td>
+          <td><span class="badge badge-advanced">Advanced</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>Extensions compound. Your CRM knows about thoughts you have captured. Your meal planner checks who is home this week. Your job hunt contacts automatically become professional network contacts. This is what happens when your agent can see across your whole system.</p>
+
+    <h2 style="margin-top:3rem;" id="primitives">Primitives &mdash; Concepts that compound</h2>
+    <p>Some patterns show up in multiple extensions. Learn them once, apply them everywhere.</p>
+
+    <video class="inline-video" controls preload="none" playsinline aria-label="Open Brain primitives overview">
+      <source src="https://github.com/user-attachments/assets/f488e495-fe2a-4ccc-a834-fc6ab5a0ed41" type="video/mp4">
+      <a href="https://github.com/NateBJones-Projects/OB1/tree/main/primitives" target="_blank" rel="noopener">Browse primitives on GitHub</a>
+    </video>
+
+    <table>
+      <thead>
+        <tr><th>Primitive</th><th>What it teaches</th><th>Used by</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/primitives/rls/" target="_blank" rel="noopener">Row Level Security</a></td>
+          <td>PostgreSQL policies for multi-user data isolation</td>
+          <td>Extensions 4, 5, 6</td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/primitives/shared-mcp/" target="_blank" rel="noopener">Shared MCP Server</a></td>
+          <td>Giving others scoped access to parts of your brain</td>
+          <td>Extension 4</td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/primitives/content-fingerprint-dedup/" target="_blank" rel="noopener">Content Fingerprint Dedup</a></td>
+          <td>SHA-256 deduplication preventing duplicate thoughts across all import recipes</td>
+          <td>All import recipes</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="community">
+  <div class="container">
+    <h2>Community contributions</h2>
+    <p>Beyond the learning path, the community builds real tools that real people use. Every contribution is reviewed, approved, and merged by the maintainer team.</p>
+
+    <video class="inline-video" controls preload="none" playsinline aria-label="Open Brain community contributions overview">
+      <source src="https://github.com/user-attachments/assets/9454662f-2648-4928-8723-f7d52e94e9b8" type="video/mp4">
+      <a href="https://github.com/NateBJones-Projects/OB1" target="_blank" rel="noopener">Browse contributions on GitHub</a>
+    </video>
+
+    <p class="sub-h3">Import your data</p>
+    <p>Pull your digital life into Open Brain. Each recipe handles a specific data source &mdash; parsing, deduplication, embedding, and ingestion included.</p>
+    <table>
+      <thead>
+        <tr><th>Recipe</th><th>What it does</th><th>Contributor</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/chatgpt-conversation-import/" target="_blank" rel="noopener">ChatGPT Import</a></td>
+          <td>Parse ChatGPT data exports, filter trivial conversations, summarize via LLM</td>
+          <td class="contrib"><a href="https://github.com/matthallett1" target="_blank" rel="noopener">@matthallett1</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/perplexity-conversation-import/" target="_blank" rel="noopener">Perplexity Import</a></td>
+          <td>Import Perplexity AI search history and memory entries</td>
+          <td class="contrib"><a href="https://github.com/demarant" target="_blank" rel="noopener">@demarant</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/obsidian-vault-import/" target="_blank" rel="noopener">Obsidian Vault Import</a></td>
+          <td>Parse and import Obsidian vault notes with full metadata</td>
+          <td class="contrib">Community</td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/x-twitter-import/" target="_blank" rel="noopener">X/Twitter Import</a></td>
+          <td>Import tweets, DMs, and Grok chats from X data exports</td>
+          <td class="contrib"><a href="https://github.com/alanshurafa" target="_blank" rel="noopener">@alanshurafa</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/instagram-import/" target="_blank" rel="noopener">Instagram Import</a></td>
+          <td>Import DMs, comments, and captions from Instagram exports</td>
+          <td class="contrib"><a href="https://github.com/alanshurafa" target="_blank" rel="noopener">@alanshurafa</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/google-activity-import/" target="_blank" rel="noopener">Google Activity Import</a></td>
+          <td>Import Search, Gmail, Maps, YouTube, Chrome history from Takeout</td>
+          <td class="contrib"><a href="https://github.com/alanshurafa" target="_blank" rel="noopener">@alanshurafa</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/grok-export-import/" target="_blank" rel="noopener">Grok Import</a></td>
+          <td>Import Grok conversation exports with MongoDB-style date handling</td>
+          <td class="contrib"><a href="https://github.com/alanshurafa" target="_blank" rel="noopener">@alanshurafa</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/journals-blogger-import/" target="_blank" rel="noopener">Journals/Blogger Import</a></td>
+          <td>Import Atom XML blog archives from Blogger/Journals</td>
+          <td class="contrib"><a href="https://github.com/alanshurafa" target="_blank" rel="noopener">@alanshurafa</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/email-history-import/" target="_blank" rel="noopener">Email History Import</a></td>
+          <td>Pull your Gmail archive into searchable thoughts</td>
+          <td class="contrib"><a href="https://github.com/matthallett1" target="_blank" rel="noopener">@matthallett1</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="sub-h3">Tools &amp; workflows</p>
+    <p>Standalone capabilities that make your Open Brain smarter.</p>
+    <table>
+      <thead>
+        <tr><th>Recipe</th><th>What it does</th><th>Contributor</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/life-engine/" target="_blank" rel="noopener">Life Engine</a></td>
+          <td>Self-improving personal assistant &mdash; calendar, habits, health, proactive briefings via Telegram or Discord</td>
+          <td class="contrib"><a href="https://github.com/justfinethanku" target="_blank" rel="noopener">@justfinethanku</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/auto-capture/" target="_blank" rel="noopener">Auto-Capture Protocol</a></td>
+          <td>Stores ACT NOW items and session summaries to Open Brain at session close</td>
+          <td class="contrib"><a href="https://github.com/jaredirish" target="_blank" rel="noopener">@jaredirish</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/panning-for-gold/" target="_blank" rel="noopener">Panning for Gold</a></td>
+          <td>Mine brain dumps and voice transcripts for actionable ideas &mdash; battle-tested across 13+ sessions</td>
+          <td class="contrib"><a href="https://github.com/jaredirish" target="_blank" rel="noopener">@jaredirish</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/claudeception/" target="_blank" rel="noopener">Claudeception</a></td>
+          <td>Self-improving system that creates new skills from work sessions &mdash; skills that create other skills</td>
+          <td class="contrib"><a href="https://github.com/jaredirish" target="_blank" rel="noopener">@jaredirish</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/research-to-decision-workflow/" target="_blank" rel="noopener">Research-to-Decision Workflow</a></td>
+          <td>Chains canonical skills into research, synthesis, meeting, and memo workflows</td>
+          <td class="contrib"><a href="https://github.com/NateBJones" target="_blank" rel="noopener">@NateBJones</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/recipes/daily-digest/" target="_blank" rel="noopener">Daily Digest</a></td>
+          <td>Automated daily summary of recent thoughts delivered via email or Slack</td>
+          <td class="contrib">OB1 Team</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="sub-h3">Agent skills</p>
+    <p>Plain-text skill packs for Claude Code, Codex, and other AI clients. Drop them in and go.</p>
+    <table>
+      <thead>
+        <tr><th>Skill</th><th>What it does</th><th>Contributor</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/skills/auto-capture/" target="_blank" rel="noopener">Auto-Capture</a></td>
+          <td>Captures ACT NOW items and session summaries to Open Brain when a session ends</td>
+          <td class="contrib"><a href="https://github.com/jaredirish" target="_blank" rel="noopener">@jaredirish</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/skills/competitive-analysis/" target="_blank" rel="noopener">Competitive Analysis</a></td>
+          <td>Competitor briefs, pricing comparisons, market maps, and strategic recommendations</td>
+          <td class="contrib"><a href="https://github.com/NateBJones" target="_blank" rel="noopener">@NateBJones</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/skills/research-synthesis/" target="_blank" rel="noopener">Research Synthesis</a></td>
+          <td>Synthesizes source sets into findings, contradictions, confidence markers, and next questions</td>
+          <td class="contrib"><a href="https://github.com/NateBJones" target="_blank" rel="noopener">@NateBJones</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/skills/meeting-synthesis/" target="_blank" rel="noopener">Meeting Synthesis</a></td>
+          <td>Converts meeting notes or transcripts into decisions, action items, and follow-up artifacts</td>
+          <td class="contrib"><a href="https://github.com/NateBJones" target="_blank" rel="noopener">@NateBJones</a></td>
+        </tr>
+        <tr>
+          <td><a href="https://github.com/NateBJones-Projects/OB1/tree/main/skills/deal-memo-drafting/" target="_blank" rel="noopener">Deal Memo Drafting</a></td>
+          <td>Turns existing diligence materials into structured deal, IC, or partnership memos</td>
+          <td class="contrib"><a href="https://github.com/NateBJones" target="_blank" rel="noopener">@NateBJones</a></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p class="sub-h3">Dashboards &amp; integrations</p>
+    <div class="pillars">
+      <div class="pillar">
+        <h3>SvelteKit dashboard</h3>
+        <p>MCP proxy and Supabase auth. Host on Vercel or Netlify. By <a href="https://github.com/headcrest" target="_blank" rel="noopener">@headcrest</a>.</p>
+      </div>
+      <div class="pillar">
+        <h3>Next.js dashboard</h3>
+        <p>8 pages, dark theme, smart ingest, quality auditing. By <a href="https://github.com/alanshurafa" target="_blank" rel="noopener">@alanshurafa</a>.</p>
+      </div>
+      <div class="pillar">
+        <h3>Kubernetes deployment</h3>
+        <p>Fully self-hosted K8s with PostgreSQL + pgvector &mdash; no Supabase required. By <a href="https://github.com/velo" target="_blank" rel="noopener">@velo</a>.</p>
+      </div>
+    </div>
+
+    <div class="cta-row">
+      <a href="https://github.com/NateBJones-Projects/OB1" class="btn btn-primary" target="_blank" rel="noopener">Browse all contributions &rarr;</a>
+      <a href="https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md" class="btn btn-secondary" target="_blank" rel="noopener">Contribute</a>
+    </div>
+
+    <aside class="canonical-note" role="note">
+      <strong>Canonical reference.</strong> This page is the authoritative landing for Open Brain.
+      The <a href="https://github.com/NateBJones-Projects/OB1" target="_blank" rel="noopener">GitHub repository</a>
+      is the source of truth for setup guides, extensions, and community contributions.
+      Questions and real-time help: <a href="https://discord.gg/Cgh9WJEkeG" target="_blank" rel="noopener">Discord</a>.
+      Updates and deep dives: <a href="https://natesnewsletter.substack.com/" target="_blank" rel="noopener">Substack</a>.
+      Last revised: <time datetime="2026-05-02">2026-05-02</time>.
+      <a href="https://github.com/NateBJones-Projects/OB1/commits/main/README.md" target="_blank" rel="noopener">Revision history &rarr;</a>
+    </aside>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-meta">
+        <p>Open Brain &middot; <a href="https://github.com/NateBJones-Projects/OB1/blob/main/LICENSE.md" target="_blank" rel="noopener license">FSL-1.1-MIT</a></p>
+        <p>Created by <a href="https://natesnewsletter.substack.com/" target="_blank" rel="noopener author">Nate B. Jones</a>. Maintained by Nate&rsquo;s team and <a href="https://github.com/matthallett1" target="_blank" rel="noopener">Matt Hallett</a>.</p>
+        <p style="margin-top: 0.5rem;">See also: <a href="https://modelcontextprotocol.io/" target="_blank" rel="noopener">Model Context Protocol</a> &middot; <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a> &middot; <a href="https://github.com/pgvector/pgvector" target="_blank" rel="noopener">pgvector</a></p>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/NateBJones-Projects/OB1/blob/main/docs/01-getting-started.md" target="_blank" rel="noopener">Setup Guide</a>
+        <a href="https://github.com/NateBJones-Projects/OB1" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">Contribute</a>
+        <a href="https://discord.gg/Cgh9WJEkeG" target="_blank" rel="noopener">Discord</a>
+        <a href="https://natesnewsletter.substack.com/" target="_blank" rel="noopener">Substack</a>
+        <a href="https://github.com/NateBJones-Projects/OB1/commits/main/README.md" target="_blank" rel="noopener">Revisions</a>
+        <a href="/llms.txt">llms.txt</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

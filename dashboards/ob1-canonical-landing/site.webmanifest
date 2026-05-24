@@ -1,0 +1,32 @@
+{
+  "name": "Open Brain",
+  "short_name": "Open Brain",
+  "description": "The infrastructure layer for persistent AI memory.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "minimal-ui",
+  "orientation": "any",
+  "theme_color": "#e05a20",
+  "background_color": "#0d1117",
+  "lang": "en-US",
+  "categories": ["reference", "developer-tools"],
+  "icons": [
+    {
+      "src": "/imgs/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/imgs/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/imgs/ob1-logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
