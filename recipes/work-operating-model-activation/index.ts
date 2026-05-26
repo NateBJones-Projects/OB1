@@ -20,6 +20,58 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !MCP_ACCESS_KEY || !DEFAULT_U
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const app = new Hono();
 
+// CORS + JSON-RPC envelope for browser-based MCP clients (e.g. claude.ai web UI).
+// Without these the OPTIONS preflight fails and the unauthorized path returns a
+// bare error object that is not a valid JSON-RPC 2.0 response.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-brain-key, accept, mcp-session-id, mcp-protocol-version, last-event-id",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+};
+
+const JSON_RPC_UNAUTHORIZED_CODE = -32001;
+const UNAUTHORIZED_MESSAGE = "Unauthorized: missing or invalid authentication.";
+
+async function readBodyText(req: Request): Promise<string | null> {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE") return null;
+  try {
+    return await req.text();
+  } catch {
+    return null;
+  }
+}
+
+function extractJsonRpcId(bodyText: string | null): string | number | null {
+  if (!bodyText) return null;
+  try {
+    const parsed = JSON.parse(bodyText);
+    if (parsed && typeof parsed === "object" && "id" in parsed) {
+      const id = (parsed as { id: unknown }).id;
+      if (typeof id === "string" || typeof id === "number" || id === null) return id;
+    }
+  } catch {
+    // malformed body - id stays null
+  }
+  return null;
+}
+
+function unauthorizedResponse(id: string | number | null): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: "2.0",
+      error: { code: JSON_RPC_UNAUTHORIZED_CODE, message: UNAUTHORIZED_MESSAGE },
+      id,
+    }),
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json", ...corsHeaders },
+    },
+  );
+}
+
+app.options("*", (c) => c.text("ok", 200, corsHeaders));
+
 const LAYERS = [
   "operating_rhythms",
   "recurring_decisions",
@@ -832,6 +884,17 @@ app.get("/health", (c) =>
 );
 
 app.all("*", async (c) => {
+  const provided =
+    c.req.header("x-brain-key") ||
+    c.req.header("x-access-key") ||
+    new URL(c.req.url).searchParams.get("key");
+
+  if (!provided || provided !== MCP_ACCESS_KEY) {
+    const bodyText = await readBodyText(c.req.raw);
+    const id = extractJsonRpcId(bodyText);
+    return unauthorizedResponse(id);
+  }
+
   if (!c.req.header("accept")?.includes("text/event-stream")) {
     const headers = new Headers(c.req.raw.headers);
     headers.set("Accept", "application/json, text/event-stream");
@@ -843,15 +906,6 @@ app.all("*", async (c) => {
       duplex: "half",
     });
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
-  }
-
-  const key =
-    c.req.query("key") ||
-    c.req.header("x-brain-key") ||
-    c.req.header("x-access-key");
-
-  if (!key || key !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Unauthorized" }, 401);
   }
 
   const transport = new StreamableHTTPTransport();
