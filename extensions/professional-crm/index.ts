@@ -694,10 +694,7 @@ app.post("*", async (c) => {
     },
   );
 
-  const transport = new StreamableHTTPTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
-  });
+  const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);
 });
