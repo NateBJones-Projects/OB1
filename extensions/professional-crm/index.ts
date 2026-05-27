@@ -17,7 +17,21 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 
+// CORS headers — Claude Desktop / claude.ai connectors send a preflight
+// OPTIONS request before opening the MCP stream; without these the
+// connector probe fails and Claude reports "Couldn't reach the MCP server"
+// or falls back to inferring an OAuth flow.
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-access-key, accept, mcp-session-id",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
+};
+
 const app = new Hono();
+
+// CORS preflight
+app.options("*", (c) => c.text("ok", 200, corsHeaders));
 
 // POST /mcp - Main MCP endpoint
 app.post("*", async (c) => {
@@ -37,7 +51,7 @@ app.post("*", async (c) => {
   const key = c.req.query("key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_ACCESS_KEY");
   if (!key || key !== expected) {
-    return c.json({ error: "Unauthorized" }, 401);
+    return c.json({ error: "Unauthorized" }, 401, corsHeaders);
   }
 
   const supabase = createClient(
@@ -53,7 +67,7 @@ app.post("*", async (c) => {
 
   const userId = Deno.env.get("DEFAULT_USER_ID");
   if (!userId) {
-    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500);
+    return c.json({ error: "DEFAULT_USER_ID not configured" }, 500, corsHeaders);
   }
 
   const server = new McpServer({ name: "professional-crm", version: "1.1.0" });
@@ -699,6 +713,6 @@ app.post("*", async (c) => {
   return transport.handleRequest(c);
 });
 
-app.get("*", (c) => c.json({ status: "ok", service: "Professional CRM", version: "1.1.0" }));
+app.get("*", (c) => c.json({ status: "ok", service: "Professional CRM", version: "1.1.0" }, 200, corsHeaders));
 
 Deno.serve(app.fetch);
