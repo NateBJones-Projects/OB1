@@ -1,0 +1,42 @@
+name: open-brain-qdrant
+
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.16.3
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-storage:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/6333' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mcp-server:
+    build: ./server
+    ports:
+      - "3100:3100"
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      MCP_ACCESS_KEY: ${MCP_ACCESS_KEY}
+      PORT: 3100
+      IDENTITY_MODE: local
+      LOCAL_OWNER_ID: local-user
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SHARED_CREDENTIALS_FILE: /root/.aws/credentials
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-amazon.titan-embed-text-v2:0}
+      METADATA_MODEL: ${METADATA_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}
+    volumes:
+      - type: bind
+        source: ${AWS_HOME}
+        target: /root/.aws
+        read_only: true
+    depends_on:
+      qdrant:
+        condition: service_healthy
+
+volumes:
+  qdrant-storage:
