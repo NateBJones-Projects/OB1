@@ -23,12 +23,14 @@ Never built an Open Brain? Start here:
 
 ## Recent Contributions
 
-The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-05-22.
+The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-05-30.
 
 <!-- recent-contributions:start -->
 
 | Contribution | What changed | Creator |
 | ------------ | ------------ | ------- |
+| [Fix OB1 Agent Memory ClawHub install metadata](integrations/openclaw-agent-memory/) | Fixes OB1 Agent Memory ClawHub install metadata. | [@justfinethanku](https://github.com/justfinethanku) |
+| [Fix OB1 Agent Memory OpenClaw tool schemas](integrations/openclaw-agent-memory/) | Fixes OB1 Agent Memory OpenClaw tool schemas. | [@justfinethanku](https://github.com/justfinethanku) |
 | [Provenance chains — derivation tracking](recipes/provenance-chains/) | Provenance chains — derivation tracking. | [@alanshurafa](https://github.com/alanshurafa) |
 | [Open Brain Dashboard Pro — Next.js 16 + iron-session](dashboards/open-brain-dashboard-pro/) | Open Brain Dashboard Pro — Next.js 16 + iron-session. | [@alanshurafa](https://github.com/alanshurafa) |
 | [Atomizer — generic + Gmail re-atomization toolkit](recipes/atomizer/) | Atomizer — generic + Gmail re-atomization toolkit. | [@alanshurafa](https://github.com/alanshurafa) |
@@ -47,8 +49,6 @@ The 20 most recent merged PRs. This list is generated from GitHub and refreshes 
 | [Add wiki compiler orchestration recipe](recipes/wiki-compiler/) | Adds wiki compiler orchestration recipe. | [@justfinethanku](https://github.com/justfinethanku) |
 | [Wiki synthesis + autobiography pipeline](recipes/wiki-synthesis/) | Wiki synthesis + autobiography pipeline. | [@alanshurafa](https://github.com/alanshurafa) |
 | [Entity wiki pages from knowledge graph](recipes/entity-wiki/) | Entity wiki pages from knowledge graph. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Typed reasoning edges + Opus/Haiku classifier](schemas/typed-reasoning-edges/) | Typed reasoning edges + Opus/Haiku classifier. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Entity extraction worker](integrations/entity-extraction-worker/) | Entity extraction worker. | [@alanshurafa](https://github.com/alanshurafa) |
 
 <!-- recent-contributions:end -->
 
