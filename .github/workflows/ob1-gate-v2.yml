@@ -1,5 +1,9 @@
 name: OB1 PR Gate
 
+# This workflow used to live at `.github/workflows/ob1-gate.yml`.
+# It was renamed to force GitHub Actions to register a fresh workflow after
+# the old workflow id began creating runs with zero jobs.
+#
 # Branch protection recommendation:
 # After this action is working, enable branch protection on main:
 # - Require the "OB1 PR Gate" workflow to pass its checks

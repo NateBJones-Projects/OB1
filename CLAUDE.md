@@ -79,13 +79,14 @@ DESCRIBE THE EXACT WORK.
 - **Title format:** `[category] Short description` (e.g., `[recipes] Email history import via Gmail API`, `[skills] Panning for Gold standalone skill pack`)
 - **Branch convention:** `contrib/<github-username>/<short-description>`
 - **Commit prefixes:** `[category]` matching the contribution type
-- Every PR must pass the automated review checks in `.github/workflows/ob1-review.yml` before human review
+- Every PR must pass the automated review checks in `.github/workflows/ob1-gate-v2.yml` before human review
 - See `CONTRIBUTING.md` for the full review process, metadata.json template, and README requirements
 
 ## Key Files
 
 - `CONTRIBUTING.md` — Source of truth for contribution rules, metadata format, and the review process
-- `.github/workflows/ob1-review.yml` — Automated PR review
+- `.github/workflows/ob1-gate-v2.yml` — Automated PR gate
+- `.github/workflows/claude-review.yml` — Maintainer-triggered Claude PR review
 - `.github/metadata.schema.json` — JSON schema for metadata.json validation
 - `.github/PULL_REQUEST_TEMPLATE.md` — PR description template
 - `LICENSE.md` — FSL-1.1-MIT terms
