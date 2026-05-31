@@ -642,7 +642,15 @@ the immediate injection; the tables are the training material.
 5. **Use domain language in Stage 4** — "character sheet", not "characters
    table columns".
 
-6. **⚠️ Since 30/05/2026: Supabase requires explicit GRANT for Data API**
+6. **⚠️ Schema guessing is the same error as credential guessing**
+   Before any INSERT/UPDATE on ANY table: discover the schema from the
+   database via `information_schema.columns` + `pg_constraint`. Never
+   try field variations to guess constraints. The `CHECK` constraint
+   definition reveals valid values in one query. This applies to files
+   too — if `patch`/`write_file` breaks formatting, re-read the file
+   before attempting corrections.
+
+7. **⚠️ Since 30/05/2026: Supabase requires explicit GRANT for Data API**
    New tables in the `public` schema need:
    ```sql
    GRANT SELECT, INSERT, UPDATE, DELETE ON public.<table> TO service_role;

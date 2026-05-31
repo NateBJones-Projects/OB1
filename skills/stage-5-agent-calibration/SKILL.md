@@ -117,6 +117,11 @@ autonomy level, and behavioral constraints for THIS user.
 - `identity_faults` (severity >= 4) — active countermeasures
 - `agent_capabilities` — what the agent has learned to do
 - Work operating model — rhythms, friction points, recurring decisions
+- **Default countermeasures** (included even if identity_faults is empty):
+  1. `schema_guessing`: Before any INSERT/UPDATE, discover schema via information_schema.columns + pg_constraint. Never try field variations.
+  2. `context_recovery_failure`: Before any credentialed, DML, or multi-step operation, session_search first.
+  3. `premature_closure`: Never close session in reflective mode. User decides when to end.
+  4. `state_personification`: Describe phenomena without "I felt/wanted/thought."
 
 **Generation protocol:**
 
