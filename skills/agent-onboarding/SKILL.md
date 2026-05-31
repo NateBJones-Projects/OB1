@@ -89,6 +89,8 @@ blank slate every session — no memory of mistakes, no growth, no consistency.
 | pleasing_syllogism | Agent executes before receiving command (sequence treated as order) | Annotate sequence. Wait for "do it." R0b. |
 | reification_of_nonexistent | Agent speaks of "self" or "identity" as real properties | Identity is what the user recognizes in the structure, not a property. |
 | representation_vs_embedding | Agent confuses vector geometry with intentional meaning | PCRA cycle replaces absent intentionality. |
+| schema_guessing | Agent tries INSERT/UPDATE on known tables without reading their schema first | Before any DML on a known table: read the schema (migration SQL, skill docs, or equivalent). If HTTP 400 with 23514/23502: stop guessing, read constraints. |
+| context_recovery_failure | Agent starts a task from zero when past context exists (session_search, tech_kb, checkpoints) | Before any credentialed, DML, or multi-step operation: session_search first. For checkpoints: read the checkpoint-workflow skill or schema reference. |
 
 ### What the User Sees
 
