@@ -1,5 +1,9 @@
 # Readwise Capture Integration
 
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@mlava](https://github.com/mlava)**
+
 ## What It Does
 
 Receives Readwise highlight webhooks and stores each highlight as a thought in your Open Brain — automatically embedded, classified as a reference, and tagged with book title, author, and location. Works for highlights made anywhere Readwise aggregates from: Kindle, Apple Books, Reader, Instapaper, Hypothesis, Airr/Snipd podcasts, and physical books via the Readwise OCR app.
@@ -114,7 +118,7 @@ At this point the function is deployed but will reject every real webhook with 4
 5. **Copy the full secret**. Save it in the tracker; you'll paste it into Supabase in the next step.
 
 > **Subscribe to `readwise.highlight.created` only.** The Edge Function will ignore other event types with a 200 "ignored" response, but subscribing to everything wastes Readwise's webhook budget and costs you nothing in return. Reader document events are deliberately out of scope (see the [design discussion](../../recipes/readwise-import/README.md#what-this-captures-and-what-it-doesnt) in the sister recipe).
-
+>
 > **Readwise generates the secret; you cannot set your own.** Every webhook event payload includes this secret, and the Edge Function verifies it matches what's stored in Supabase — so the two must be identical.
 
 ---

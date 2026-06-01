@@ -1,5 +1,9 @@
 # Readwise Books Cache
 
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@mlava](https://github.com/mlava)**
+
 > Side-table cache of Readwise book-level metadata so highlights stored in `thoughts` can reference a `book_id` without denormalising title and author into every highlight row.
 
 ## What It Does

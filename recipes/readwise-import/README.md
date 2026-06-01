@@ -1,5 +1,9 @@
 # Readwise Import
 
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@mlava](https://github.com/mlava)**
+
 ## What It Does
 
 One-shot backfill of your Readwise highlight history into Open Brain. The script pages through Readwise's `/api/v2/export/` endpoint, upserts each book into the `readwise_books` cache table, batch-embeds highlight text via OpenRouter, and inserts each highlight as a thought with `source_type = 'readwise'`.
