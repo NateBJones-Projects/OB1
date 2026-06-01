@@ -1,5 +1,9 @@
 # Thought Audit
 
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@txcfi-scott](https://github.com/txcfi-scott)**
+
 > Append-only audit table capturing every `capture` / `update` / `delete` on the thoughts table, plus an `author_session_id` convention for multi-participant attribution.
 
 ## What It Does
