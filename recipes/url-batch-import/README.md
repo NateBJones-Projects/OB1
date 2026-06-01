@@ -49,6 +49,7 @@ GENERATED DURING SETUP
    ```
 
    Your `.env` should contain:
+
    ```bash
    export SUPABASE_URL=https://YOUR_REF.supabase.co
    export SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -188,6 +189,7 @@ Each chunk's progress is tracked in the sync-log, so resuming from a crash withi
 Each imported article becomes one row in the `thoughts` table:
 
 - `content`: Self-contained summary with context
+
   ```
   [URL Import | AI and the Future of Work | techcrunch.com | 2026-05-31]
 
@@ -197,6 +199,7 @@ Each imported article becomes one row in the `thoughts` table:
 - `embedding`: 1536-dim vector for semantic search (from first 8000 chars of summary)
 
 - `metadata`: Structured fields:
+
   ```json
   {
     "source": "url-import",
@@ -250,6 +253,7 @@ Solution: Your Supabase setup doesn't have the `content_fingerprint` column on `
 
 **Issue: Processing is very slow**
 Solution: The script includes 500ms pauses between API calls to avoid rate-limiting. For 1000+ URLs, this is normal (~8 min runtime). You can batch with `--offset` and `--limit` to parallelize across separate terminal sessions:
+
    ```bash
    # Terminal 1
    deno run ... import-urls.ts --input=urls.txt --offset=0 --limit=100
@@ -257,4 +261,5 @@ Solution: The script includes 500ms pauses between API calls to avoid rate-limit
    # Terminal 2 (in parallel)
    deno run ... import-urls.ts --input=urls.txt --offset=100 --limit=100
    ```
+
    Sync-log prevents duplicates across parallel runs.
