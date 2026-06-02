@@ -1,0 +1,20 @@
+{
+  "name": "Recency-Boosted match_thoughts",
+  "description": "Adds match_thoughts_recency — a variant of the core match_thoughts RPC that blends cosine similarity with an exponential recency decay. Defaults are backward-compatible with pure similarity.",
+  "category": "schemas",
+  "author": {
+    "name": "Scott Hutchinson",
+    "github": "txcfi-scott"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": []
+  },
+  "tags": ["search", "recency", "ranking", "pgvector", "rpc"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-04-23",
+  "updated": "2026-04-23"
+}

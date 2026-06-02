@@ -37,7 +37,15 @@
  * REQUIRED ENV VARS
  *   OPEN_BRAIN_URL            e.g. https://YOUR-PROJECT.supabase.co
  *   OPEN_BRAIN_SERVICE_KEY    service_role key (server-side only!)
- *   ANTHROPIC_API_KEY         sk-ant-...
+ *
+ *   And ONE of (OpenRouter is preferred to match the rest of OB1's recipes):
+ *     OPENROUTER_API_KEY      sk-or-v1-...   (routes to Anthropic models)
+ *     ANTHROPIC_API_KEY       sk-ant-...     (direct, retained for back-compat)
+ *
+ *   When using OpenRouter, the default models (claude-haiku-4-5-20251001
+ *   and claude-opus-4-7) are auto-prefixed with "anthropic/". Pass an
+ *   already-prefixed string (e.g. "anthropic/claude-haiku-4-5") via
+ *   --filter-model / --classify-model to override.
  *
  * USAGE
  *   node classify-edges.mjs --dry-run
@@ -81,7 +89,14 @@ const PRICING = {
 const _warnedUnknownPricing = new Set();
 
 function estimateCost(model, inTokens, outTokens) {
-  const p = PRICING[model];
+  // Normalize "anthropic/claude-haiku-4-5" → "claude-haiku-4-5" so a
+  // model passed via --filter-model with the OpenRouter prefix still
+  // finds its pricing row. PRICING keys remain bare Anthropic names
+  // because OpenRouter passes Anthropic's per-token rates through with
+  // only a small surcharge — close enough for the --max-cost-usd cap
+  // (which is a soft pre-flight bound, not exact billing).
+  const key = normalizeModelForPricing(model);
+  const p = PRICING[key];
   if (!p) {
     if (!_warnedUnknownPricing.has(model)) {
       _warnedUnknownPricing.add(model);
@@ -113,7 +128,7 @@ function assertPricingKnown(args) {
   if (args.hybrid) used.add(args.filterModel);
   used.add(args.singleModel || args.classifyModel);
 
-  const unknown = [...used].filter((m) => !PRICING[m]);
+  const unknown = [...used].filter((m) => !PRICING[normalizeModelForPricing(m)]);
   if (unknown.length === 0) return;
 
   if (args.noCostCap) {
@@ -241,8 +256,16 @@ function printHelp() {
 function loadEnv() {
   const env = process.env;
   const missing = [];
-  for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY", "ANTHROPIC_API_KEY"]) {
+  for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY"]) {
     if (!env[k]) missing.push(k);
+  }
+  // Need at least one LLM provider key. Prefer OpenRouter to match the
+  // multi-provider pattern in entity-extraction-worker (and so a single
+  // OPENROUTER_API_KEY can serve every recipe in OB1).
+  const hasOpenrouter = Boolean(env.OPENROUTER_API_KEY);
+  const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
+  if (!hasOpenrouter && !hasAnthropic) {
+    missing.push("OPENROUTER_API_KEY or ANTHROPIC_API_KEY");
   }
   if (missing.length > 0) {
     throw new Error(`Missing env vars: ${missing.join(", ")}`);
@@ -254,8 +277,40 @@ function loadEnv() {
   return {
     OPEN_BRAIN_URL: base,
     OPEN_BRAIN_SERVICE_KEY: env.OPEN_BRAIN_SERVICE_KEY,
-    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
+    OPENROUTER_API_KEY: env.OPENROUTER_API_KEY || "",
+    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY || "",
+    LLM_PROVIDER: hasOpenrouter ? "openrouter" : "anthropic",
   };
+}
+
+// ── LLM provider helpers ──────────────────────────────────────────────────
+//
+// Both providers accept the same conceptual call (system prompt + user
+// message + max_tokens) but differ in payload shape, response shape, and
+// auth headers. resolveModel/resolveProvider/normalizeModelForPricing
+// keep that switch contained so callLlmOnce stays readable.
+
+/**
+ * When the operator passes a bare Anthropic model name like
+ * "claude-haiku-4-5-20251001" but the active provider is OpenRouter,
+ * prefix it with "anthropic/" so OpenRouter routes correctly. Already-
+ * prefixed names ("anthropic/...", "openai/...", etc.) pass through.
+ */
+function resolveModel(model, provider) {
+  if (provider !== "openrouter") return model;
+  if (!model) return model;
+  if (model.includes("/")) return model;
+  return `anthropic/${model}`;
+}
+
+/**
+ * For PRICING lookup, the keys live as bare Anthropic model names.
+ * Strip a leading "anthropic/" prefix before consulting the table so a
+ * model passed as "anthropic/claude-haiku-4-5" still finds its row.
+ */
+function normalizeModelForPricing(model) {
+  if (!model) return model;
+  return model.startsWith("anthropic/") ? model.slice("anthropic/".length) : model;
 }
 
 // ── Supabase REST client ───────────────────────────────────────────────────
@@ -424,6 +479,17 @@ function backoffDelayMs(attempt) {
 }
 
 async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
+  // Provider router. OpenRouter takes priority when both keys are set
+  // (matches entity-extraction-worker preference order). The shared
+  // retry policy in callAnthropic treats 429 + 5xx as retryable for
+  // both providers, which their public docs confirm.
+  if (env.LLM_PROVIDER === "openrouter") {
+    return callOpenRouterOnce(env, model, system, userMsg, maxTokens);
+  }
+  return callAnthropicDirectOnce(env, model, system, userMsg, maxTokens);
+}
+
+async function callAnthropicDirectOnce(env, model, system, userMsg, maxTokens) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -455,6 +521,45 @@ async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
   };
 }
 
+async function callOpenRouterOnce(env, model, system, userMsg, maxTokens) {
+  // OpenRouter speaks OpenAI-flavored chat completions. The Anthropic
+  // "system" parameter becomes the first message with role:"system";
+  // response.choices[0].message.content carries the text; usage uses
+  // prompt_tokens / completion_tokens. Auto-prefix bare Anthropic
+  // model names with "anthropic/" so callers don't have to.
+  const routedModel = resolveModel(model, "openrouter");
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: routedModel,
+      max_tokens: maxTokens,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userMsg },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    const err = new Error(`OpenRouter ${routedModel}: ${res.status} ${body.slice(0, 400)}`);
+    err.status = res.status;
+    err.retryable = shouldRetryAnthropicStatus(res.status);
+    throw err;
+  }
+  const body = await res.json();
+  const raw = body?.choices?.[0]?.message?.content?.trim() ?? "";
+  const usage = body?.usage || {};
+  return {
+    raw,
+    inTokens: usage.prompt_tokens || 0,
+    outTokens: usage.completion_tokens || 0,
+  };
+}
+
 async function callAnthropic(env, model, system, userMsg, maxTokens) {
   let lastErr;
   for (let attempt = 0; attempt <= ANTHROPIC_RETRY_MAX; attempt++) {
@@ -468,7 +573,7 @@ async function callAnthropic(env, model, system, userMsg, maxTokens) {
       }
       const delay = backoffDelayMs(attempt);
       console.warn(
-        `[classify-edges] Anthropic ${model} ${e.status || "network"}: retry ${attempt + 1}/${ANTHROPIC_RETRY_MAX} in ${delay}ms`,
+        `[classify-edges] LLM ${model} ${e.status || "network"}: retry ${attempt + 1}/${ANTHROPIC_RETRY_MAX} in ${delay}ms`,
       );
       await new Promise((r) => setTimeout(r, delay));
     }

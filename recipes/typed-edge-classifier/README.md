@@ -1,5 +1,9 @@
 # Typed Edge Classifier
 
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@sahwan11](https://github.com/sahwan11)**
+
 > An Opus/Haiku hybrid LLM classifier that reads pairs of thoughts and writes typed reasoning edges (`supports`, `contradicts`, `evolved_into`, `supersedes`, `depends_on`, `related_to`) into the `thought_edges` table.
 
 ## What It Does
@@ -12,7 +16,7 @@ Walks candidate pairs of thoughts (pairs that share at least N entities via `tho
 - [`schemas/typed-reasoning-edges/`](../../schemas/typed-reasoning-edges/) applied (this recipe writes to `thought_edges`)
 - [`entity-extraction` schema (PR #197)](https://github.com/NateBJones-Projects/OB1/pull/197) applied — this is where candidate pairs come from (thoughts that share entities via `thought_entities`). You can skip this if you only ever pass explicit `--pair UUID_A,UUID_B`.
 - Node.js 18+
-- Anthropic API key
+- An LLM API key — `OPENROUTER_API_KEY` (preferred — one key covers every OB1 recipe) or `ANTHROPIC_API_KEY` (direct, retained for back-compat)
 
 ## Credential Tracker
 
@@ -26,8 +30,10 @@ FROM YOUR OPEN BRAIN SETUP
   Project URL:           ____________   -> OPEN_BRAIN_URL
   Service-role secret:   ____________   -> OPEN_BRAIN_SERVICE_KEY
 
-ANTHROPIC
-  API key:               ____________   -> ANTHROPIC_API_KEY
+LLM PROVIDER (pick ONE)
+  OpenRouter key:        ____________   -> OPENROUTER_API_KEY   (preferred)
+  -- OR --
+  Anthropic key:         ____________   -> ANTHROPIC_API_KEY    (direct)
 
 COST CAP FOR FIRST RUN
   Max USD:               ____________   (recommend $1-2 for a dry run first)
@@ -38,13 +44,20 @@ COST CAP FOR FIRST RUN
 ## Steps
 
 1. Copy `classify-edges.mjs` into a local directory you control (or clone this recipe's folder)
-2. Set the three required environment variables:
+2. Set the required environment variables. `OPEN_BRAIN_URL` and `OPEN_BRAIN_SERVICE_KEY` are always required; provide ONE LLM provider key:
 
    ```bash
    export OPEN_BRAIN_URL="https://YOUR-PROJECT.supabase.co"
    export OPEN_BRAIN_SERVICE_KEY="..."   # service_role key — server-side only
+
+   # Option A — OpenRouter (preferred; one key works across every OB1 recipe)
+   export OPENROUTER_API_KEY="sk-or-v1-..."
+
+   # Option B — Anthropic direct (retained for back-compat)
    export ANTHROPIC_API_KEY="sk-ant-..."
    ```
+
+   When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are auto-prefixed with `anthropic/` so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`).
 
 3. Run a **dry run** first with a small limit and a low cost cap:
 
@@ -231,8 +244,8 @@ For now: flag off by default, behavior documented, decision deferred to dev-revi
 
 ## Troubleshooting
 
-**Issue: `Missing env vars: OPEN_BRAIN_URL, OPEN_BRAIN_SERVICE_KEY, ANTHROPIC_API_KEY`**
-Solution: Export all three before running. The service-role key is required because the classifier writes to `thought_edges` directly via PostgREST; the anon key won't have permission. Never commit this key or paste it into any browser-facing app.
+**Issue: `Missing env vars: OPEN_BRAIN_URL, OPEN_BRAIN_SERVICE_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY`**
+Solution: Export `OPEN_BRAIN_URL` + `OPEN_BRAIN_SERVICE_KEY` plus one LLM provider key (either `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`). The service-role key is required because the classifier writes to `thought_edges` directly via PostgREST; the anon key won't have permission. Never commit any of these keys or paste them into a browser-facing app.
 
 **Issue: `Candidate sampling requires thought_entities (from schemas/entity-extraction/)`**
 Solution: Either apply the `entity-extraction` schema (so this recipe has a pool to sample from), or skip sampling entirely by passing `--pair UUID_A,UUID_B` for each pair you want classified.
@@ -240,8 +253,8 @@ Solution: Either apply the `entity-extraction` schema (so this recipe has a pool
 **Issue: Classifier returns `filter_rejected` for most pairs**
 Solution: That's usually correct — most co-mentioning pairs don't have a reasoning relation. If you're sure there are real relations being missed, try `--no-hybrid` to send every pair to Opus directly. Be warned: cost goes up roughly 15-20x.
 
-**Issue: `Anthropic claude-opus-4-7: 429` (rate limit)**
-Solution: The classifier now retries 429 and 5xx responses automatically with exponential backoff + jitter (base 1s, doubles each attempt, capped at 60s, up to 5 retries per call). You will see `[classify-edges] Anthropic ... 429: retry N/5 in Nms` lines on each retry. If retries still run out, drop `--parallelism` to 1 or 2; sustained 429s usually mean the account-level rate limit is saturated, not a transient burst.
+**Issue: `Anthropic claude-opus-4-7: 429` or `OpenRouter anthropic/claude-opus-4-7: 429` (rate limit)**
+Solution: The classifier retries 429 and 5xx responses automatically with exponential backoff + jitter (base 1s, doubles each attempt, capped at 60s, up to 5 retries per call). You will see `[classify-edges] LLM ... 429: retry N/5 in Nms` lines on each retry. If retries still run out, drop `--parallelism` to 1 or 2; sustained 429s usually mean the account-level rate limit is saturated, not a transient burst.
 
 **Issue: Duplicate-key errors on insert**
 Solution: Should not occur in this recipe — the classifier calls the `thought_edges_upsert` RPC (from `schemas/typed-reasoning-edges/schema.sql`) which uses `INSERT ... ON CONFLICT DO UPDATE`. Repeat classifications of the same `(from, to, relation)` bump `support_count`, take the max confidence, and refresh the temporal bounds (GREATEST for `valid_until`, LEAST for `valid_from`, NULL-safe). If you see a duplicate-key error, the RPC is not installed — re-apply `schemas/typed-reasoning-edges/schema.sql`.
