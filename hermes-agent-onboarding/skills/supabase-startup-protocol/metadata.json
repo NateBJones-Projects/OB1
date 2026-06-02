@@ -1,0 +1,20 @@
+{
+  "name": "Supabase Startup Protocol",
+  "description": "Mandatory session open AND close protocol. Scans Supabase on startup, creates session checkpoints after each task, and consolidates at session end. No work action may occur before the scan. v2.3.0 includes PGRST301 resolution for redact_secrets environments.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "2.3.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "tags": ["supabase", "startup", "shutdown", "protocol", "session-init", "checkpoint"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

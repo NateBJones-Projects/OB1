@@ -9,7 +9,7 @@ version: 3.0.0
 tags: [onboarding, meta-skill, generative, identity, mbti, financial, universal]
 ---
 
-# Agent Onboarding — Generative Meta-Skill (v2.0.0)
+# Agent Onboarding — Generative Meta-Skill (v3.0.0)
 
 ## Core Principle
 
@@ -18,10 +18,7 @@ itself for a specific user, across sessions, model swaps, and provider changes?*
 
 The most frustrating thing about LLM-based agents is **context loss**. Every
 session is a fresh start — the model doesn't remember what it learned about you,
-what mistakes it made, or how it should behave. Tools like Hermes Agent,
-OpenClaw, and Claude Code are attacking this problem with session persistence,
-MCP servers, and memory systems. But none of them solve the core issue:
-**the agent has no identity between sessions.**
+what mistakes it made, or how it should behave.
 
 The answer is a **persistent human-machine interface** — not a persona or a
 chatbot personality, but a documented, queryable history of:
@@ -30,6 +27,28 @@ chatbot personality, but a documented, queryable history of:
   the user, each with a countermeasure that becomes a behavior rule
 - **agent_capabilities** — what the agent has learned to do for this user
 - **identity_milestones** — breakthroughs, protocol establishments, growth
+
+## Two-Tier Architecture
+
+The identity layer supports two storage tiers, chosen during Stage 0 setup:
+
+**Tier 1 — Local pgvector (agent's self-knowledge, RECOMMENDED)**
+A local PostgreSQL with pgvector extension (Docker) backed by Ollama embeddings.
+The agent stores what it knows about **itself**: identity_faults, capabilities,
+milestones, session_checkpoints — each with vector embeddings for semantic search.
+
+**Tier 2 — Supabase Cloud (user knowledge)**
+Supabase stores what the agent knows about the **user and their work**:
+user_profiles, user_preferences, career_tracker, and domain-specific tables.
+
+Separation principle: **the agent knows itself locally, and knows the user's
+work in the cloud.** Identity persists even if the cloud provider changes.
+
+**Default (minimum setup):** All tables in Supabase (Tier 2 only).
+This works immediately with any Supabase project. Tier 1 requires Docker +
+pgvector + Ollama but provides offline resilience and semantic search.
+
+Both tiers share the same table schema. The helper scripts adapt automatically.
 
 This is **more efficient than context window management** because it doesn't
 compress or summarize. It structures. The agent reads its own history as a

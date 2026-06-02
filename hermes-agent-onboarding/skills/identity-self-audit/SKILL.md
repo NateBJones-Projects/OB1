@@ -19,10 +19,8 @@ This skill transforms identity fault detection from a manual process
 
 The identity layer solves the fundamental LLM problem: **context loss
 between sessions**. Instead of compressing context into a window, faults
-are stored as structured relational data. By default in Supabase (Tier 2),
-or locally in a pgvector database (Tier 1) for offline resilience.
-Every session reads them. Every fault has a countermeasure that becomes
-a behavior rule.
+are stored as structured relational data in Supabase. Every session reads
+them. Every fault has a countermeasure that becomes a behavior rule.
 
 ## Auto-detection triggers
 
@@ -44,37 +42,25 @@ proceeding with the conversation.
 | `reification_of_nonexistent` | Spoke about "I", "identity", "agency" as real properties |
 | `sequence_confused_with_command` | User defined prerequisite sequence and agent executed step 1 immediately |
 
-## Storage
-
-Faults can be stored in either Supabase (default, requires cloud access)
-or a local pgvector database (for offline resilience + semantic search).
-
 ### Registration format
 
-Using the identity_db.py helper:
-```python
-from identity_db import insert_fault
-
-fault_data = {
-    "fault_type": "example_fault",
-    "symptom": "Description of what happened",
-    "root_cause": "Architectural cause: training, product, protocol",
-    "blocks": ["continuity", "trust"],
-    "evidence_session": "session_id_here",
-    "evidence_quote": "verbatim quote of the fault",
-    "countermeasure": "Applied or proposed correction",
-    "severity": 5
-}
-insert_fault(fault_data)
-```
-
-Or directly via SQL on Supabase:
 ```sql
 INSERT INTO identity_faults (fault_type, symptom, root_cause, blocks, evidence_session, evidence_quote, countermeasure, severity)
-VALUES ('example_fault', '...', '...', ARRAY['continuity'], 'session_id', 'quote', 'fix', 5);
+VALUES (
+  '<fault_type>',
+  '<surface-level description>',
+  '<architectural cause: training, product, protocol>',
+  ARRAY['<what it blocks>'],
+  '<session_id>',
+  '<verbatim quote>',
+  '<applied or proposed correction>',
+  <1-5>
+);
 ```
 
 ### What NOT to register
+
+- Task errors (failed checkpoints, deploy 500s) → go to `thoughts`
 - Technical pitfalls → go to `tech_kb` (if available)
 - User errors → only self-faults
 
