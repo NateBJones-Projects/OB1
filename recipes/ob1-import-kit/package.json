@@ -1,0 +1,20 @@
+{
+  "name": "ob1-import-kit",
+  "version": "1.0.0",
+  "description": "Offline Open Brain import preparation kit for validating and normalizing extracted thought records.",
+  "private": true,
+  "type": "module",
+  "main": "import-kit.js",
+  "bin": {
+    "ob1-import-kit": "./import-kit.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test.js",
+    "validate": "node import-kit.js validate fixtures/sample-records.json",
+    "normalize": "node import-kit.js normalize fixtures/sample-records.json"
+  },
+  "license": "FSL-1.1-MIT"
+}
