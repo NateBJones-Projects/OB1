@@ -1,0 +1,21 @@
+{
+  "name": "OB1 File Converter",
+  "description": "Offline recipe for converting local text, Markdown, and JSON exports into extracted-record JSON artifacts before Open Brain import.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_skills": [],
+  "tags": ["import", "converter", "cli", "chunking", "dry-run"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-06-06",
+  "updated": "2026-06-06"
+}
