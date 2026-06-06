@@ -82,9 +82,11 @@ You need the numeric ID of the chat where captures will live. Pick one option be
 1. Open the chat where you want captures to happen (a DM with your bot, or a group the bot's in).
 2. Send any message in that chat.
 3. In a browser, visit (replace `YOUR_BOT_TOKEN` with your real token, no angle brackets):
+
    ```
    https://api.telegram.org/botYOUR_BOT_TOKEN/getUpdates
    ```
+
 4. Find the first `"chat": { "id": ... }` block in the JSON. That number is your `TELEGRAM_CAPTURE_CHAT_ID`.
    - DM: positive integer, e.g. `987654321`
    - Group/supergroup: negative integer, e.g. `-1001234567890`
@@ -353,6 +355,7 @@ supabase functions deploy telegram-capture --no-verify-jwt
 > `--no-verify-jwt` is required. Telegram won't send a Supabase JWT with its webhook calls. Authentication is handled inside the function by the secret-token check from Step 4, so you're not actually dropping auth, just moving it.
 
 Your function URL will look like:
+
 ```
 https://YOUR_PROJECT_REF.supabase.co/functions/v1/telegram-capture
 ```
