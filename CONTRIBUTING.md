@@ -51,6 +51,10 @@ Every contribution lives in its own subfolder under the right category (e.g., `r
 - **Your actual code** — SQL files, edge function code, frontend code, config files, whatever it takes
 - **NO credentials, API keys, or secrets.** The automated review will reject them. Use environment variables and document what the user needs to set.
 
+### Import Recipe Metadata
+
+If your contribution imports external data into `public.thoughts`, follow the [Ingestion Metadata Contract](docs/ingestion-metadata-contract.md). New importers should preserve source provenance, importer version, hashes, sensitivity tier, and enough source context for users to verify or clean up the import later. Do not store raw archives, secrets, signed URLs, local absolute paths, or large transcript blobs in metadata.
+
 ## README Standards
 
 Your contribution's README must include these sections:
