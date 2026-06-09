@@ -1,0 +1,21 @@
+{
+  "name": "Session Boot Sequence with Priority-Based Loading",
+  "description": "Configure your AI agent to load the right context at the right time using a P1-P4 priority system. P1 rules load every session, P2 reference loads when relevant, P3 runbooks load before touching specific systems, P4 integrations load only when needed.",
+  "category": "recipes",
+  "author": {
+    "name": "Bill Gleeson",
+    "github": "gleesonb-aurea"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code, Cursor, Claude Desktop, or similar AI agent"]
+  },
+  "requires_skills": [],
+  "tags": ["priority-loading", "boot-sequence", "session-management", "context-drift", "refresh"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-06-09",
+  "updated": "2026-06-09"
+}
