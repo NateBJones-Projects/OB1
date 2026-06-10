@@ -255,9 +255,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.thought_edges_upsert IS
-  'Insert or (on duplicate key) bump support_count + refresh temporal bounds. ' ||
-  'Call via POST /rpc/thought_edges_upsert. Use instead of a plain INSERT when ' ||
-  'you want repeated classifications of the same pair to accumulate evidence.';
+  'Insert or (on duplicate key) bump support_count + refresh temporal bounds. Call via POST /rpc/thought_edges_upsert. Use instead of a plain INSERT when you want repeated classifications of the same pair to accumulate evidence.';
 
 REVOKE ALL ON FUNCTION public.thought_edges_upsert(
   UUID, UUID, TEXT, NUMERIC, INT, TEXT, TIMESTAMPTZ, TIMESTAMPTZ, JSONB

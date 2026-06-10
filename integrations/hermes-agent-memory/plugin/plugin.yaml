@@ -1,0 +1,8 @@
+name: ob1
+version: 0.1.0
+description: "OpenBrain (OB1) — Nate Jones' governed memory system. Auto-recall before each turn, auto-writeback after, full governance (review queue, use_policy, recall traces, instruction-vs-evidence) via the OB1 Agent Memory API on Supabase."
+pip_dependencies: []
+requires_env:
+  - OPENBRAIN_KEY
+hooks:
+  - on_turn_start

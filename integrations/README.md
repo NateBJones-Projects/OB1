@@ -9,6 +9,7 @@ MCP server extensions, webhook receivers, and capture sources beyond your AI too
 | [Open Brain REST](open-brain-rest/) | Supabase Edge Function REST gateway for the dashboard's thoughts, workflow, search, audit, and duplicate-review surfaces |
 | [Agent Memory API](agent-memory-api/) | Runtime-neutral recall, write-back, review, inspector, and recall-trace API for OB1 Agent Memory |
 | [OpenClaw Agent Memory](openclaw-agent-memory/) | OpenClaw plugin and publishing package for using OB1 Agent Memory from OpenClaw workflows |
+| [Hermes Agent Memory](hermes-agent-memory/) | Native Hermes Agent `MemoryProvider` for OB1 Agent Memory — auto-recall, auto-writeback, governance parity with the OpenClaw plugin |
 | [Slack Capture](slack-capture/) | Type thoughts in a Slack channel, automatically embedded and stored |
 | [Discord Capture](discord-capture/) | Capture thoughts from a Discord server |
 

@@ -251,6 +251,112 @@ function toolResult(value) {
     details: value
   };
 }
+var nullableString = Type.Union([Type.String(), Type.Literal(null)]);
+var optionalNullableString = Type.Optional(nullableString);
+var stringArrayRecord = Type.Record(Type.String(), Type.Array(Type.String()));
+var channelParameters = Type.Object({
+  kind: optionalNullableString,
+  id: optionalNullableString,
+  thread_id: optionalNullableString
+});
+var runtimeParameters = Type.Object({
+  name: Type.Optional(Type.String()),
+  version: optionalNullableString
+});
+var modelIntentParameters = Type.Object({
+  provider: optionalNullableString,
+  model: optionalNullableString
+});
+var recallParameters = Type.Object({
+  schema_version: Type.Optional(Type.Union([
+    Type.Literal("openbrain.agent_memory.recall.v1"),
+    Type.Literal("openbrain.openclaw.recall.v1")
+  ])),
+  workspace_id: Type.Optional(Type.String()),
+  project_id: optionalNullableString,
+  task_id: optionalNullableString,
+  flow_id: optionalNullableString,
+  task_type: optionalNullableString,
+  channel: Type.Optional(channelParameters),
+  runtime: Type.Optional(runtimeParameters),
+  model_intent: Type.Optional(modelIntentParameters),
+  query: Type.String(),
+  entities: Type.Optional(stringArrayRecord),
+  scope: Type.Optional(Type.Object({
+    visibility: optionalNullableString,
+    project_only: Type.Optional(Type.Boolean()),
+    include_unconfirmed: Type.Optional(Type.Boolean()),
+    include_stale: Type.Optional(Type.Boolean())
+  })),
+  limits: Type.Optional(Type.Object({
+    max_items: Type.Optional(Type.Number({ minimum: 1, maximum: 50 })),
+    max_tokens: Type.Optional(Type.Number({ minimum: 256, maximum: 2e4 })),
+    recency_days: Type.Optional(Type.Union([Type.Number({ minimum: 1 }), Type.Literal(null)]))
+  })),
+  sensitivity: Type.Optional(Type.Record(Type.String(), Type.Boolean()))
+});
+var memoryPayloadParameters = Type.Object({
+  decisions: Type.Optional(Type.Array(Type.String())),
+  outputs: Type.Optional(Type.Array(Type.String())),
+  lessons: Type.Optional(Type.Array(Type.String())),
+  constraints: Type.Optional(Type.Array(Type.String())),
+  unresolved_questions: Type.Optional(Type.Array(Type.String())),
+  next_steps: Type.Optional(Type.Array(Type.String())),
+  failures: Type.Optional(Type.Array(Type.String())),
+  artifacts: Type.Optional(Type.Array(Type.Object({
+    kind: Type.String(),
+    uri: Type.String(),
+    description: optionalNullableString
+  }))),
+  entities: Type.Optional(stringArrayRecord)
+});
+var writebackParameters = Type.Object({
+  schema_version: Type.Optional(Type.Union([
+    Type.Literal("openbrain.agent_memory.writeback.v1"),
+    Type.Literal("openbrain.openclaw.writeback.v1")
+  ])),
+  workspace_id: Type.Optional(Type.String()),
+  project_id: optionalNullableString,
+  task_id: optionalNullableString,
+  flow_id: optionalNullableString,
+  step_id: optionalNullableString,
+  idempotency_key: optionalNullableString,
+  content_hash: optionalNullableString,
+  channel: Type.Optional(channelParameters),
+  runtime: Type.Optional(runtimeParameters),
+  models_used: Type.Optional(Type.Array(Type.Object({
+    provider: Type.String(),
+    model: Type.String(),
+    role: Type.String()
+  }))),
+  source_refs: Type.Optional(Type.Array(Type.Object({
+    kind: Type.String(),
+    uri: optionalNullableString,
+    title: optionalNullableString,
+    timestamp: optionalNullableString
+  }))),
+  memory_payload: memoryPayloadParameters,
+  provenance: Type.Optional(Type.Object({
+    default_status: Type.Optional(Type.Union([
+      Type.Literal("observed"),
+      Type.Literal("inferred"),
+      Type.Literal("user_confirmed"),
+      Type.Literal("imported"),
+      Type.Literal("generated")
+    ])),
+    confidence: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
+    requires_review: Type.Optional(Type.Boolean())
+  })),
+  retention: Type.Optional(Type.Object({
+    ttl_days: Type.Optional(Type.Union([Type.Number({ minimum: 1 }), Type.Literal(null)])),
+    stale_after_days: Type.Optional(Type.Union([Type.Number({ minimum: 1 }), Type.Literal(null)]))
+  })),
+  visibility: Type.Optional(Type.Object({
+    workspace: optionalNullableString,
+    project: optionalNullableString,
+    channel: optionalNullableString
+  }))
+});
 function registerTool(api, tool) {
   api.registerTool({
     name: tool.name,

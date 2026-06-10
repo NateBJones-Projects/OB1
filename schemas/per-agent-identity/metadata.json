@@ -1,0 +1,20 @@
+{
+  "name": "Per-Agent Identity",
+  "description": "Adds optional hashed per-agent memory keys and a SECURITY DEFINER lookup RPC so multi-agent Open Brain deployments can derive stable authenticated agent identity without trusting prompt-supplied agent IDs.",
+  "category": "schemas",
+  "author": {
+    "name": "Jeremy Lahners",
+    "github": "jeremylahners"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["SQL Editor", "SHA-256 hashing in trusted server code"]
+  },
+  "tags": ["agent-memory", "identity", "security", "multi-agent", "keys"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-05-18",
+  "updated": "2026-05-18"
+}
