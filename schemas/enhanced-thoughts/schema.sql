@@ -33,6 +33,18 @@ CREATE INDEX IF NOT EXISTS idx_thoughts_content_tsvector
 --    Supports boolean operators via websearch_to_tsquery
 --    ("quoted phrases", AND, OR, -NOT) with ILIKE fallback,
 --    pagination, and result count.
+--
+--    v1.1: p_filter now recognizes three reserved control keys that
+--    are applied at the data layer instead of as metadata containment:
+--      start_date / end_date  — ISO 8601 timestamps; filter created_at
+--                               to the [start_date, end_date] range.
+--      exclude_restricted     — boolean; when true, drop rows whose
+--                               sensitivity_tier is 'restricted'.
+--    These keys are stripped from the containment predicate so they do
+--    not accidentally require a literal metadata key of the same name.
+--    All other p_filter keys keep their original `metadata @> filter`
+--    containment behavior. Ported from ExoCortex search-text date
+--    filters; UUID id contract preserved.
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION search_thoughts_text(
@@ -58,6 +70,21 @@ LANGUAGE plpgsql
 STABLE
 SET statement_timeout = '25s'
 AS $$
+DECLARE
+  -- Reserved control keys, peeled off p_filter so they are not treated
+  -- as metadata containment requirements.
+  v_exclude_restricted BOOLEAN :=
+    coalesce((p_filter->>'exclude_restricted')::boolean, false);
+  v_start_date TIMESTAMPTZ :=
+    CASE WHEN nullif(p_filter->>'start_date', '') IS NOT NULL
+      THEN (p_filter->>'start_date')::timestamptz ELSE NULL END;
+  v_end_date TIMESTAMPTZ :=
+    CASE WHEN nullif(p_filter->>'end_date', '') IS NOT NULL
+      THEN (p_filter->>'end_date')::timestamptz ELSE NULL END;
+  -- Containment filter with the reserved keys removed.
+  v_meta_filter JSONB :=
+    coalesce(p_filter, '{}'::jsonb)
+      - 'start_date' - 'end_date' - 'exclude_restricted';
 BEGIN
   RETURN QUERY
   WITH query_input AS (
@@ -72,7 +99,11 @@ BEGIN
     CROSS JOIN query_input q
     WHERE q.raw_query <> ''
       AND to_tsvector('simple', coalesce(t.content, '')) @@ q.ts_query
-      AND t.metadata @> coalesce(p_filter, '{}'::jsonb)
+      AND t.metadata @> v_meta_filter
+      AND (NOT v_exclude_restricted
+           OR coalesce(t.sensitivity_tier, 'standard') <> 'restricted')
+      AND (v_start_date IS NULL OR t.created_at >= v_start_date)
+      AND (v_end_date IS NULL OR t.created_at <= v_end_date)
     LIMIT 2000
   ),
   -- Phase 2: ILIKE fallback when tsvector finds fewer than needed
@@ -83,7 +114,11 @@ BEGIN
     WHERE q.raw_query <> ''
       AND (SELECT count(*) FROM tsvector_hits) < (p_limit + p_offset)
       AND t.content ILIKE '%' || q.raw_query || '%'
-      AND t.metadata @> coalesce(p_filter, '{}'::jsonb)
+      AND t.metadata @> v_meta_filter
+      AND (NOT v_exclude_restricted
+           OR coalesce(t.sensitivity_tier, 'standard') <> 'restricted')
+      AND (v_start_date IS NULL OR t.created_at >= v_start_date)
+      AND (v_end_date IS NULL OR t.created_at <= v_end_date)
       AND NOT EXISTS (SELECT 1 FROM tsvector_hits th WHERE th.hit_id = t.id)
     LIMIT 500
   ),
@@ -355,6 +390,34 @@ WHERE source_type IS NULL AND metadata->>'source' IS NOT NULL;
 -- 6. ENHANCED UPSERT RPC
 --    Keeps structured dashboard columns in sync when callers use
 --    the base upsert_thought RPC with metadata payloads.
+--
+--    v1.1 behavior deltas (ported from ExoCortex, UUID-adapted; the
+--    {id, fingerprint} return contract and status handling from v1 are
+--    preserved unchanged so existing callers and schemas/workflow-status
+--    are not affected):
+--
+--    a) Original-fingerprint fallback dedup. When a thought's content is
+--       later corrected, its content_fingerprint changes. A reimport of
+--       the ORIGINAL source text would previously insert a stale sibling
+--       row that "outvotes" the correction. Update paths (REST/MCP) may
+--       append the pre-edit fingerprint to an append-only array
+--       metadata.original_fingerprints[]. This RPC now treats an incoming
+--       fingerprint that matches that array as a dedup hit on the
+--       corrected row (merge metadata; never insert; never touch content).
+--       Exact content_fingerprint match still wins over the fallback.
+--
+--    b) User-edit guard. Keys listed in metadata.user_edits are owned by
+--       the human. On the merge path they are stripped from the incoming
+--       patch so a later automated import cannot resurrect stale values
+--       over a correction. original_fingerprints and user_edits are
+--       system-managed: the merge never lets an incoming payload rewrite
+--       them, and inserts drop them unless well-formed.
+--
+--    The dedup fallback path cannot be expressed in ON CONFLICT, so the
+--    function now does an explicit lookup (exact fingerprint, then
+--    original-fingerprint fallback) and branches into INSERT vs UPDATE.
+--    Importance keeps v1's 0-100 clamp (NOT ExoCortex's 0-6) so existing
+--    rows are not retroactively rescaled — see README "Changes from v1".
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.upsert_thought(p_content TEXT, p_payload JSONB DEFAULT '{}')
@@ -370,6 +433,10 @@ DECLARE
   v_quality_score NUMERIC(5,2);
   v_sensitivity_tier TEXT;
   v_status TEXT;
+  v_existing_metadata JSONB;
+  v_user_edits JSONB := '{}'::jsonb;
+  v_protected_keys TEXT[] := ARRAY[]::text[];
+  v_inserted BOOLEAN := false;
 BEGIN
   v_metadata := COALESCE(p_payload->'metadata', '{}'::jsonb);
   v_type := COALESCE(NULLIF(v_metadata->>'type', ''), 'observation');
@@ -395,44 +462,123 @@ BEGIN
     'UTF8'
   )), 'hex');
 
-  INSERT INTO public.thoughts (
-    content,
-    content_fingerprint,
-    metadata,
-    type,
-    source_type,
-    importance,
-    quality_score,
-    sensitivity_tier,
-    status,
-    status_updated_at
-  )
-  VALUES (
-    p_content,
-    v_fingerprint,
-    v_metadata,
-    v_type,
-    v_source_type,
-    v_importance,
-    v_quality_score,
-    v_sensitivity_tier,
-    v_status,
-    CASE WHEN v_status IS NULL THEN NULL ELSE now() END
-  )
-  ON CONFLICT (content_fingerprint) WHERE content_fingerprint IS NOT NULL DO UPDATE
-  SET updated_at = now(),
-      metadata = public.thoughts.metadata || COALESCE(EXCLUDED.metadata, '{}'::jsonb),
-      type = COALESCE(EXCLUDED.type, public.thoughts.type),
-      source_type = COALESCE(EXCLUDED.source_type, public.thoughts.source_type),
-      importance = COALESCE(EXCLUDED.importance, public.thoughts.importance),
-      quality_score = COALESCE(EXCLUDED.quality_score, public.thoughts.quality_score),
-      sensitivity_tier = COALESCE(EXCLUDED.sensitivity_tier, public.thoughts.sensitivity_tier),
-      status = COALESCE(EXCLUDED.status, public.thoughts.status),
+  -- (a) Exact-fingerprint lookup first (the v1 ON CONFLICT key).
+  SELECT t.id, t.metadata
+    INTO v_id, v_existing_metadata
+  FROM public.thoughts t
+  WHERE t.content_fingerprint = v_fingerprint
+  FOR UPDATE;
+
+  -- (a) Original-fingerprint fallback: land on the corrected row instead
+  -- of inserting a stale sibling that outvotes the correction.
+  IF v_id IS NULL THEN
+    SELECT t.id, t.metadata
+      INTO v_id, v_existing_metadata
+    FROM public.thoughts t
+    WHERE jsonb_typeof(t.metadata->'original_fingerprints') = 'array'
+      AND t.metadata->'original_fingerprints' ? v_fingerprint
+    ORDER BY t.created_at ASC, t.id ASC
+    LIMIT 1
+    FOR UPDATE;
+  END IF;
+
+  IF v_id IS NULL THEN
+    -- INSERT path. Imports cannot mint malformed protections: drop
+    -- user_edits / original_fingerprints from the inserted metadata
+    -- unless they are well-formed (a round-tripped export keeps valid
+    -- stamps).
+    IF v_metadata ? 'user_edits'
+       AND jsonb_typeof(v_metadata->'user_edits') <> 'object' THEN
+      v_metadata := v_metadata - 'user_edits';
+    END IF;
+    IF v_metadata ? 'original_fingerprints'
+       AND jsonb_typeof(v_metadata->'original_fingerprints') <> 'array' THEN
+      v_metadata := v_metadata - 'original_fingerprints';
+    END IF;
+
+    -- Race guard: the explicit lookup above is not atomic with this INSERT,
+    -- so a concurrent call with the same content_fingerprint can slip in
+    -- between. v1 got this for free from ON CONFLICT; here we catch the
+    -- unique_violation, re-read the row the other txn inserted, and fall
+    -- through to the UPDATE/merge path so the contract (always return an
+    -- existing-or-new {id, fingerprint}) holds.
+    BEGIN
+      INSERT INTO public.thoughts (
+        content,
+        content_fingerprint,
+        metadata,
+        type,
+        source_type,
+        importance,
+        quality_score,
+        sensitivity_tier,
+        status,
+        status_updated_at
+      )
+      VALUES (
+        p_content,
+        v_fingerprint,
+        v_metadata,
+        v_type,
+        v_source_type,
+        v_importance,
+        v_quality_score,
+        v_sensitivity_tier,
+        v_status,
+        CASE WHEN v_status IS NULL THEN NULL ELSE now() END
+      )
+      RETURNING id INTO v_id;
+      v_inserted := true;
+    EXCEPTION WHEN unique_violation THEN
+      -- Another transaction inserted this fingerprint first. Adopt its row
+      -- and continue into the merge branch below.
+      SELECT t.id, t.metadata
+        INTO v_id, v_existing_metadata
+      FROM public.thoughts t
+      WHERE t.content_fingerprint = v_fingerprint
+      FOR UPDATE;
+      -- Restore the caller's incoming metadata for the merge step (the
+      -- INSERT-path malformed-protection stripping above does not apply on
+      -- the merge path, which has its own user-edit guard).
+      v_metadata := COALESCE(p_payload->'metadata', '{}'::jsonb);
+    END;
+  END IF;
+
+  IF NOT v_inserted THEN
+    -- (b) User-edit guard: strip human-owned keys (and the system-managed
+    -- user_edits / original_fingerprints maps) from the incoming patch so
+    -- the merge can never resurrect stale values over a correction.
+    v_user_edits := COALESCE(v_existing_metadata->'user_edits', '{}'::jsonb);
+    IF jsonb_typeof(v_user_edits) <> 'object' THEN
+      v_user_edits := '{}'::jsonb;
+    END IF;
+    IF v_user_edits <> '{}'::jsonb THEN
+      SELECT COALESCE(array_agg(k), ARRAY[]::text[])
+        INTO v_protected_keys
+        FROM jsonb_object_keys(v_user_edits) k;
+      v_metadata := v_metadata - v_protected_keys;
+    END IF;
+    v_metadata := v_metadata - 'user_edits';
+    v_metadata := v_metadata - 'original_fingerprints';
+
+    -- Recompute status the same way the v1 ON CONFLICT branch did, but
+    -- against the existing row's values fetched above.
+    UPDATE public.thoughts SET
+      updated_at = now(),
+      metadata = public.thoughts.metadata || v_metadata,
+      type = COALESCE(v_type, public.thoughts.type),
+      source_type = COALESCE(v_source_type, public.thoughts.source_type),
+      importance = COALESCE(v_importance, public.thoughts.importance),
+      quality_score = COALESCE(v_quality_score, public.thoughts.quality_score),
+      sensitivity_tier = COALESCE(v_sensitivity_tier, public.thoughts.sensitivity_tier),
+      status = COALESCE(v_status, public.thoughts.status),
       status_updated_at = CASE
-        WHEN EXCLUDED.status IS DISTINCT FROM public.thoughts.status THEN now()
+        WHEN COALESCE(v_status, public.thoughts.status)
+             IS DISTINCT FROM public.thoughts.status THEN now()
         ELSE public.thoughts.status_updated_at
       END
-  RETURNING id INTO v_id;
+    WHERE public.thoughts.id = v_id;
+  END IF;
 
   v_result := jsonb_build_object('id', v_id, 'fingerprint', v_fingerprint);
   RETURN v_result;
@@ -440,6 +586,123 @@ END;
 $$ LANGUAGE plpgsql;
 
 GRANT EXECUTE ON FUNCTION public.upsert_thought(TEXT, JSONB) TO service_role;
+
+-- ============================================================
+-- 7. SUPERSEDED-AWARE SEMANTIC SEARCH RPC (opt-in variant)
+--    match_thoughts_superseded_aware — same shape as the core
+--    match_thoughts from docs/01-getting-started.md plus a new
+--    superseded_by UUID column. Thoughts that have been replaced
+--    (the TARGET of a 'supersedes' edge in schemas/typed-reasoning-edges)
+--    receive a 0.8x similarity penalty so fresh thoughts rank above
+--    their stale predecessors. Superseded rows are NEVER excluded —
+--    only ranked down — so agents can still read historical context.
+--
+--    The core match_thoughts RPC is NOT replaced: callers opt into this
+--    variant by name, mirroring the house pattern from
+--    schemas/recency-boosted-match-thoughts.
+--
+--    Supersession source of truth (verified against the repo, not the
+--    ExoCortex inventory): public.thought_edges, relation = 'supersedes',
+--    where from_thought_id is the newer replacement (A) and to_thought_id
+--    is the older/stale thought (B) — see schemas/typed-reasoning-edges
+--    relation vocabulary. superseded_by returns the newest superseder's id
+--    (from_thought_id of the most recent 'supersedes' edge pointing at the
+--    row, by edge created_at), or NULL.
+--
+--    PREREQUISITE: schemas/typed-reasoning-edges must be applied (it
+--    creates public.thought_edges). If that table is absent this function
+--    is not created and a NOTICE is raised; the rest of this migration
+--    still applies. Re-run after installing typed-reasoning-edges to add
+--    it.
+--
+--    PERFORMANCE (ported from the ExoCortex rerank-plan fix): the inner
+--    query oversamples 3x using the vector index (its LIMIT is an
+--    optimization fence, so the planner runs it with the same fast plan as
+--    the core match_thoughts), then a LATERAL probe looks up supersession
+--    per candidate row and the small window is re-ranked by penalized
+--    similarity. This avoids the materialization regression that ordering
+--    by a penalized expression over the full table would cause.
+-- ============================================================
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'thought_edges'
+  ) THEN
+    RAISE NOTICE
+      'enhanced-thoughts: skipping match_thoughts_superseded_aware — '
+      'public.thought_edges not found. Apply schemas/typed-reasoning-edges '
+      'first, then re-run this migration to install it.';
+    RETURN;
+  END IF;
+
+  EXECUTE $fn$
+    CREATE OR REPLACE FUNCTION public.match_thoughts_superseded_aware(
+      query_embedding vector(1536),
+      match_threshold float DEFAULT 0.7,
+      match_count int DEFAULT 10,
+      filter jsonb DEFAULT '{}'::jsonb
+    )
+    RETURNS TABLE (
+      id uuid,
+      content text,
+      metadata jsonb,
+      similarity float,
+      created_at timestamptz,
+      superseded_by uuid
+    )
+    LANGUAGE sql
+    STABLE
+    SET statement_timeout = '30s'
+    AS $body$
+      SELECT
+        sub.id,
+        sub.content,
+        sub.metadata,
+        CASE
+          WHEN sl.newest_superseder IS NOT NULL THEN sub.base_similarity * 0.8
+          ELSE sub.base_similarity
+        END AS similarity,
+        sub.created_at,
+        sl.newest_superseder AS superseded_by
+      FROM (
+        -- Core single-phase NN query, oversampled 3x for re-ranking. The
+        -- LIMIT fences this subquery so the planner runs it with the same
+        -- fast plan the core match_thoughts uses.
+        SELECT
+          t.id,
+          t.content,
+          t.metadata,
+          t.created_at,
+          1 - (t.embedding <=> query_embedding) AS base_similarity
+        FROM public.thoughts t
+        WHERE t.embedding IS NOT NULL
+          AND (filter = '{}'::jsonb OR t.metadata @> filter)
+          AND 1 - (t.embedding <=> query_embedding) >= match_threshold
+        ORDER BY t.embedding <=> query_embedding
+        LIMIT greatest(1, least(match_count, 200)) * 3
+      ) sub
+      LEFT JOIN LATERAL (
+        -- Newest superseder: the from_thought_id of the most recent
+        -- 'supersedes' edge pointing at this thought. Ordered by the edge's
+        -- created_at (UUID ids are not a recency signal), tie-broken by the
+        -- monotonic BIGSERIAL edge id so the result is deterministic.
+        SELECT te.from_thought_id AS newest_superseder
+        FROM public.thought_edges te
+        WHERE te.relation = 'supersedes'
+          AND te.to_thought_id = sub.id
+        ORDER BY te.created_at DESC, te.id DESC
+        LIMIT 1
+      ) sl ON true
+      ORDER BY similarity DESC, sub.base_similarity DESC
+      LIMIT greatest(1, least(match_count, 200));
+    $body$;
+  $fn$;
+
+  EXECUTE 'GRANT EXECUTE ON FUNCTION public.match_thoughts_superseded_aware('
+       || 'vector(1536), float, int, jsonb) TO service_role';
+END $$;
 
 -- Reload PostgREST schema cache
 NOTIFY pgrst, 'reload schema';
