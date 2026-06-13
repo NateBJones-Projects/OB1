@@ -229,7 +229,7 @@ export async function triggerIngest(
   apiKey: string,
   text: string,
   opts?: { dry_run?: boolean }
-): Promise<{ job_id: number; status: string }> {
+): Promise<{ job_id: string; status: string }> {
   return apiFetch(apiKey, "/ingest", {
     method: "POST",
     body: JSON.stringify({ text, ...opts }),
