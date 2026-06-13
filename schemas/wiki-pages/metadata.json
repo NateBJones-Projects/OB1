@@ -1,0 +1,20 @@
+{
+  "name": "Persistent Wiki Pages",
+  "description": "Durable, revision-tracked, human-override-safe wiki pages. Three tables (wiki_pages, wiki_sections, wiki_section_revisions) plus three RPCs (wiki_upsert_page, wiki_write_section, wiki_accept_pending) give each page per-section ownership and an append-only history. The headline is the regen guard: a machine write to a human-owned section parks a pending draft instead of overwriting it, and a human accepts pending via wiki_accept_pending — same trust model as a human-in-the-loop. UUID id chains throughout (wiki_sections.page_id and wiki_section_revisions.section_id are UUID FKs; evidence_thought_ids is UUID[] referencing public.thoughts). Distinct from the wiki-compiler / wiki-synthesis recipes, which compile throwaway markdown artifacts with no persistence or override guard.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["wiki", "pages", "revisions", "human-in-the-loop", "regeneration", "persistence", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-06-13",
+  "updated": "2026-06-13"
+}
