@@ -39,7 +39,15 @@ CREATE INDEX IF NOT EXISTS idx_thoughts_content_tsvector
 --      start_date / end_date  — ISO 8601 timestamps; filter created_at
 --                               to the [start_date, end_date] range.
 --      exclude_restricted     — boolean; when true, drop rows whose
---                               sensitivity_tier is 'restricted'.
+--                               sensitivity_tier is 'restricted'. A row is
+--                               treated as restricted if EITHER the promoted
+--                               sensitivity_tier column OR
+--                               metadata->>'sensitivity_tier' is 'restricted',
+--                               so rows captured before this schema (or by
+--                               canonical flows that store the tier only in
+--                               metadata, as provenance-chains reads it) do not
+--                               leak through on the column default of
+--                               'standard'.
 --    These keys are stripped from the containment predicate so they do
 --    not accidentally require a literal metadata key of the same name.
 --    All other p_filter keys keep their original `metadata @> filter`
@@ -101,7 +109,8 @@ BEGIN
       AND to_tsvector('simple', coalesce(t.content, '')) @@ q.ts_query
       AND t.metadata @> v_meta_filter
       AND (NOT v_exclude_restricted
-           OR coalesce(t.sensitivity_tier, 'standard') <> 'restricted')
+           OR (coalesce(t.sensitivity_tier, 'standard') <> 'restricted'
+               AND coalesce(t.metadata->>'sensitivity_tier', 'standard') <> 'restricted'))
       AND (v_start_date IS NULL OR t.created_at >= v_start_date)
       AND (v_end_date IS NULL OR t.created_at <= v_end_date)
     LIMIT 2000
@@ -116,7 +125,8 @@ BEGIN
       AND t.content ILIKE '%' || q.raw_query || '%'
       AND t.metadata @> v_meta_filter
       AND (NOT v_exclude_restricted
-           OR coalesce(t.sensitivity_tier, 'standard') <> 'restricted')
+           OR (coalesce(t.sensitivity_tier, 'standard') <> 'restricted'
+               AND coalesce(t.metadata->>'sensitivity_tier', 'standard') <> 'restricted'))
       AND (v_start_date IS NULL OR t.created_at >= v_start_date)
       AND (v_end_date IS NULL OR t.created_at <= v_end_date)
       AND NOT EXISTS (SELECT 1 FROM tsvector_hits th WHERE th.hit_id = t.id)
@@ -404,7 +414,12 @@ WHERE source_type IS NULL AND metadata->>'source' IS NOT NULL;
 --       metadata.original_fingerprints[]. This RPC now treats an incoming
 --       fingerprint that matches that array as a dedup hit on the
 --       corrected row (merge metadata; never insert; never touch content).
---       Exact content_fingerprint match still wins over the fallback.
+--       Exact content_fingerprint match still wins over the fallback. On this
+--       fallback path p_content is the OLD pre-correction text, so the return
+--       payload reports matched_via = 'original_fingerprint' to tell callers
+--       that recompute an embedding/content from p_content (e.g.
+--       integrations/open-brain-rest) NOT to overwrite the corrected row with
+--       those stale values. Other paths report 'fingerprint' or 'inserted'.
 --
 --    b) User-edit guard. Keys listed in metadata.user_edits are owned by
 --       the human. On the merge path they are stripped from the incoming
@@ -450,6 +465,17 @@ DECLARE
   v_user_edits JSONB := '{}'::jsonb;
   v_protected_keys TEXT[] := ARRAY[]::text[];
   v_inserted BOOLEAN := false;
+  -- How the row was resolved, surfaced in the return payload so callers that
+  -- recompute an embedding/content from p_content can tell when they are
+  -- looking at a CORRECTED row reached via the original-fingerprint fallback
+  -- (p_content is the OLD, pre-correction text) and skip overwriting the
+  -- corrected row's embedding/content with stale values. Values:
+  --   'inserted'             — brand-new row (p_content is authoritative)
+  --   'fingerprint'          — exact content_fingerprint dedup hit
+  --   'original_fingerprint' — landed on a corrected row via the
+  --                            metadata.original_fingerprints[] fallback;
+  --                            p_content is STALE, do not overwrite content/embedding
+  v_matched_via TEXT := 'inserted';
 BEGIN
   v_metadata := COALESCE(p_payload->'metadata', '{}'::jsonb);
 
@@ -502,8 +528,17 @@ BEGIN
   WHERE t.content_fingerprint = v_fingerprint
   FOR UPDATE;
 
+  IF v_id IS NOT NULL THEN
+    v_matched_via := 'fingerprint';
+  END IF;
+
   -- (a) Original-fingerprint fallback: land on the corrected row instead
-  -- of inserting a stale sibling that outvotes the correction.
+  -- of inserting a stale sibling that outvotes the correction. p_content
+  -- here is the OLD pre-correction text, so this is a PURE dedup hit: the
+  -- row's content/embedding belong to the correction and must not be
+  -- overwritten with the stale incoming text. The merge below never touches
+  -- content, and the 'original_fingerprint' signal in the return payload
+  -- tells the caller to skip recomputing the embedding from p_content.
   IF v_id IS NULL THEN
     SELECT t.id, t.metadata
       INTO v_id, v_existing_metadata
@@ -513,6 +548,9 @@ BEGIN
     ORDER BY t.created_at ASC, t.id ASC
     LIMIT 1
     FOR UPDATE;
+    IF v_id IS NOT NULL THEN
+      v_matched_via := 'original_fingerprint';
+    END IF;
   END IF;
 
   IF v_id IS NULL THEN
@@ -564,7 +602,9 @@ BEGIN
       v_inserted := true;
     EXCEPTION WHEN unique_violation THEN
       -- Another transaction inserted this fingerprint first. Adopt its row
-      -- and continue into the merge branch below.
+      -- and continue into the merge branch below. This is an exact-fingerprint
+      -- dedup hit (same content), so the caller may still write content/embedding.
+      v_matched_via := 'fingerprint';
       SELECT t.id, t.metadata
         INTO v_id, v_existing_metadata
       FROM public.thoughts t
@@ -655,7 +695,15 @@ BEGIN
     WHERE public.thoughts.id = v_id;
   END IF;
 
-  v_result := jsonb_build_object('id', v_id, 'fingerprint', v_fingerprint);
+  -- {id, fingerprint} is the unchanged v1 contract; matched_via is additive
+  -- (existing callers that read only id/fingerprint are unaffected) and lets a
+  -- caller skip overwriting a corrected row's content/embedding with stale text
+  -- when the match came via the original-fingerprint fallback.
+  v_result := jsonb_build_object(
+    'id', v_id,
+    'fingerprint', v_fingerprint,
+    'matched_via', v_matched_via
+  );
   RETURN v_result;
 END;
 $$ LANGUAGE plpgsql;
