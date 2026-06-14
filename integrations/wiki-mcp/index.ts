@@ -381,7 +381,7 @@ function buildServer(): McpServer {
           };
         }
 
-        const result =
+        const result: Record<string, unknown> =
           data && typeof data === "object"
             ? (data as Record<string, unknown>)
             : { result: data };

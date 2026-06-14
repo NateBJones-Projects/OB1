@@ -139,3 +139,7 @@ Solution: This is by design. The target section is human-owned (`origin='manual'
 ## Attribution
 
 Ported from a multi-client persistent-wiki design so any Open Brain user can opt in to the wiki tools without touching the core server.
+
+## More from Nate
+
+Open Brain is built in the open by Nate B. Jones — more practical systems like this on his [Substack](https://substack.com/@natesnewsletter) and at [natebjones.com](https://natebjones.com).
