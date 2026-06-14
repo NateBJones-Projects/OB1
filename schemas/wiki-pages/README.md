@@ -216,3 +216,7 @@ The `pgcrypto` extension is not enabled. The script runs `CREATE EXTENSION IF NO
 
 **PostgREST does not see the new RPCs.**
 The migration emits `NOTIFY pgrst, 'reload schema'`. If it does not take effect, reload from Dashboard → Project Settings → API → Reload schema.
+
+## More from Nate
+
+Open Brain is built in the open by Nate B. Jones — more practical systems like this on his [Substack](https://substack.com/@natesnewsletter) and at [natebjones.com](https://natebjones.com).

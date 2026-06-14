@@ -153,7 +153,11 @@ REVOKE ALL ON public.wiki_section_revisions FROM PUBLIC, anon, authenticated;
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.wiki_pages TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.wiki_sections TO service_role;
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.wiki_section_revisions TO service_role;
+-- Revision history is append-only: SELECT + INSERT only, never UPDATE/DELETE, so
+-- the advertised immutable history cannot be rewritten outside the RPCs. (Rows
+-- are still removed by the ON DELETE CASCADE when their parent section is
+-- deleted — that is a section deletion, not history mutation.)
+GRANT SELECT, INSERT ON public.wiki_section_revisions TO service_role;
 
 COMMENT ON TABLE public.wiki_pages IS
   'Persistent wiki pages. One row per page, keyed by slug. No thought/entity FK — a page is identified by its slug.';
@@ -251,33 +255,39 @@ BEGIN
     RAISE EXCEPTION 'invalid section origin: %', p_origin;
   END IF;
 
-  -- Lock the existing section row (if any) for the duration of the transaction
-  -- so concurrent writers cannot race the ownership check.
-  SELECT * INTO v_row
-  FROM public.wiki_sections
-  WHERE page_id = p_page_id AND section_key = v_key
-  FOR UPDATE;
+  -- New section: insert race-safely. Two concurrent first writes to the same
+  -- (page_id, section_key) both reach this INSERT; the unique constraint
+  -- serializes them, so ON CONFLICT DO NOTHING lets the loser fall through to
+  -- the existing-section path instead of raising a unique violation. The winner
+  -- gets a row back here and snapshots the first revision.
+  INSERT INTO public.wiki_sections (
+    page_id, section_key, heading, display_order, origin, body_md,
+    generation_source, evidence_thought_ids, created_by, updated_by
+  )
+  VALUES (
+    p_page_id, v_key, nullif(trim(coalesce(p_heading, '')), ''),
+    coalesce(p_display_order, 100), p_origin, coalesce(p_body_md, ''),
+    coalesce(p_generation_source, '{}'::jsonb),
+    coalesce(p_evidence_thought_ids, ARRAY[]::UUID[]),
+    v_actor, v_actor
+  )
+  ON CONFLICT (page_id, section_key) DO NOTHING
+  RETURNING * INTO v_row;
 
-  -- New section: insert and snapshot the first revision.
-  IF v_row.id IS NULL THEN
-    INSERT INTO public.wiki_sections (
-      page_id, section_key, heading, display_order, origin, body_md,
-      generation_source, evidence_thought_ids, created_by, updated_by
-    )
-    VALUES (
-      p_page_id, v_key, nullif(trim(coalesce(p_heading, '')), ''),
-      coalesce(p_display_order, 100), p_origin, coalesce(p_body_md, ''),
-      coalesce(p_generation_source, '{}'::jsonb),
-      coalesce(p_evidence_thought_ids, ARRAY[]::UUID[]),
-      v_actor, v_actor
-    )
-    RETURNING * INTO v_row;
-
+  IF v_row.id IS NOT NULL THEN
     INSERT INTO public.wiki_section_revisions (section_id, body_md, origin, actor)
     VALUES (v_row.id, v_row.body_md, p_origin, v_actor);
 
     RETURN jsonb_build_object('section_id', v_row.id, 'action', 'created');
   END IF;
+
+  -- The section already existed (ON CONFLICT fired). Lock the existing row for
+  -- the duration of the transaction so concurrent writers cannot race the
+  -- ownership check below.
+  SELECT * INTO v_row
+  FROM public.wiki_sections
+  WHERE page_id = p_page_id AND section_key = v_key
+  FOR UPDATE;
 
   -- THE REGEN RULE: a machine ('generated') may never overwrite a section a
   -- human owns ('manual' or locked). The new draft parks in the pending buffer
