@@ -427,32 +427,65 @@ DECLARE
   v_result JSONB;
   v_id UUID;
   v_metadata JSONB;
+  -- "explicit_*" vars are NULL when the payload OMITS the field, and the
+  -- caller-supplied value when it is present. They drive the merge path so an
+  -- omitted field PRESERVES the existing column instead of resetting it to a
+  -- hardcoded default (the v1.1 silent-overwrite / privacy-downgrade bug).
+  v_explicit_type TEXT;
+  v_explicit_source_type TEXT;
+  v_explicit_importance SMALLINT;
+  v_explicit_quality_score NUMERIC(5,2);
+  v_explicit_sensitivity_tier TEXT;
+  -- "insert_*" vars fold the INSERT-only defaults in. Used only on the INSERT
+  -- (new-row) path, never to overwrite an existing column on merge.
+  v_insert_type TEXT;
+  v_insert_source_type TEXT;
+  v_insert_importance SMALLINT;
+  v_insert_quality_score NUMERIC(5,2);
+  v_insert_sensitivity_tier TEXT;
   v_type TEXT;
-  v_source_type TEXT;
-  v_importance SMALLINT;
-  v_quality_score NUMERIC(5,2);
-  v_sensitivity_tier TEXT;
   v_status TEXT;
+  v_status_explicit BOOLEAN := false;
   v_existing_metadata JSONB;
   v_user_edits JSONB := '{}'::jsonb;
   v_protected_keys TEXT[] := ARRAY[]::text[];
   v_inserted BOOLEAN := false;
 BEGIN
   v_metadata := COALESCE(p_payload->'metadata', '{}'::jsonb);
-  v_type := COALESCE(NULLIF(v_metadata->>'type', ''), 'observation');
-  v_source_type := COALESCE(NULLIF(v_metadata->>'source_type', ''), NULLIF(v_metadata->>'source', ''), 'unknown');
-  v_importance := CASE
+
+  -- Explicit-incoming values: NULL when the key is absent/blank/unparseable,
+  -- so the merge path can distinguish "omitted" from "explicitly provided".
+  v_explicit_type := NULLIF(v_metadata->>'type', '');
+  v_explicit_source_type := COALESCE(
+    NULLIF(v_metadata->>'source_type', ''),
+    NULLIF(v_metadata->>'source', '')
+  );
+  v_explicit_importance := CASE
     WHEN COALESCE(v_metadata->>'importance', '') ~ '^[0-9]+(\.[0-9]+)?$'
       THEN LEAST(100, GREATEST(0, ROUND((v_metadata->>'importance')::numeric)))::smallint
-    ELSE 50
+    ELSE NULL
   END;
-  v_quality_score := CASE
+  v_explicit_quality_score := CASE
     WHEN COALESCE(v_metadata->>'quality_score', '') ~ '^[0-9]+(\.[0-9]+)?$'
       THEN LEAST(100, GREATEST(0, (v_metadata->>'quality_score')::numeric))
-    ELSE 70
+    ELSE NULL
   END;
-  v_sensitivity_tier := COALESCE(NULLIF(v_metadata->>'sensitivity_tier', ''), 'standard');
+  v_explicit_sensitivity_tier := NULLIF(v_metadata->>'sensitivity_tier', '');
+
+  -- INSERT-path values: apply the v1.1 hardcoded defaults for brand-new rows.
+  v_insert_type := COALESCE(v_explicit_type, 'observation');
+  v_insert_source_type := COALESCE(v_explicit_source_type, 'unknown');
+  v_insert_importance := COALESCE(v_explicit_importance, 50);
+  v_insert_quality_score := COALESCE(v_explicit_quality_score, 70);
+  v_insert_sensitivity_tier := COALESCE(v_explicit_sensitivity_tier, 'standard');
+
+  -- v_type drives status seeding below; on insert it is the resolved type.
+  v_type := v_insert_type;
   v_status := COALESCE(NULLIF(p_payload->>'status', ''), NULLIF(v_metadata->>'status', ''));
+  v_status_explicit := v_status IS NOT NULL;
+  -- INSERT-path auto-seed: task/idea get status 'new'. On the merge path this
+  -- is re-derived from the EFFECTIVE (post-user-edit-guard) type so a guard-
+  -- rejected incoming type cannot seed a 'new' status it never gets to set.
   IF v_status IS NULL AND v_type IN ('task', 'idea') THEN
     v_status := 'new';
   END IF;
@@ -519,11 +552,11 @@ BEGIN
         p_content,
         v_fingerprint,
         v_metadata,
-        v_type,
-        v_source_type,
-        v_importance,
-        v_quality_score,
-        v_sensitivity_tier,
+        v_insert_type,
+        v_insert_source_type,
+        v_insert_importance,
+        v_insert_quality_score,
+        v_insert_sensitivity_tier,
         v_status,
         CASE WHEN v_status IS NULL THEN NULL ELSE now() END
       )
@@ -557,20 +590,62 @@ BEGIN
         INTO v_protected_keys
         FROM jsonb_object_keys(v_user_edits) k;
       v_metadata := v_metadata - v_protected_keys;
+
+      -- Keep the promoted scalar column in sync with the metadata guard: if a
+      -- field is marked human-owned, drop the incoming scalar too so the
+      -- existing column is preserved (column and metadata stay in agreement
+      -- instead of the column overwriting while metadata.<key> is kept).
+      IF v_user_edits ? 'type' THEN
+        v_explicit_type := NULL;
+      END IF;
+      IF v_user_edits ? 'source_type' OR v_user_edits ? 'source' THEN
+        v_explicit_source_type := NULL;
+        -- source / source_type are aliases for one scalar column. If either
+        -- is human-owned, strip BOTH metadata keys so the unprotected alias
+        -- can't merge in and diverge from the preserved column.
+        v_metadata := v_metadata - 'source_type' - 'source';
+      END IF;
+      IF v_user_edits ? 'importance' THEN
+        v_explicit_importance := NULL;
+      END IF;
+      IF v_user_edits ? 'quality_score' THEN
+        v_explicit_quality_score := NULL;
+      END IF;
+      IF v_user_edits ? 'sensitivity_tier' THEN
+        v_explicit_sensitivity_tier := NULL;
+      END IF;
     END IF;
     v_metadata := v_metadata - 'user_edits';
     v_metadata := v_metadata - 'original_fingerprints';
 
-    -- Recompute status the same way the v1 ON CONFLICT branch did, but
-    -- against the existing row's values fetched above.
+    -- Re-derive the auto-seeded status from the EFFECTIVE type (the value the
+    -- merge will actually write: explicit-if-provided-and-not-guarded, else the
+    -- existing column). Without this, an incoming type that the user-edit guard
+    -- rejects could still leave v_status='new' seeded from it. An explicitly
+    -- supplied status is never overridden.
+    IF NOT v_status_explicit THEN
+      SELECT COALESCE(v_explicit_type, t.type)
+        INTO v_type
+      FROM public.thoughts t
+      WHERE t.id = v_id;
+      IF v_type IN ('task', 'idea') THEN
+        v_status := 'new';
+      ELSE
+        v_status := NULL;
+      END IF;
+    END IF;
+
+    -- Merge path: an OMITTED scalar field PRESERVES the existing column
+    -- (v_explicit_* is NULL when the payload did not provide it); an explicit
+    -- value still updates. Insert-only defaults never apply here.
     UPDATE public.thoughts SET
       updated_at = now(),
       metadata = public.thoughts.metadata || v_metadata,
-      type = COALESCE(v_type, public.thoughts.type),
-      source_type = COALESCE(v_source_type, public.thoughts.source_type),
-      importance = COALESCE(v_importance, public.thoughts.importance),
-      quality_score = COALESCE(v_quality_score, public.thoughts.quality_score),
-      sensitivity_tier = COALESCE(v_sensitivity_tier, public.thoughts.sensitivity_tier),
+      type = COALESCE(v_explicit_type, public.thoughts.type),
+      source_type = COALESCE(v_explicit_source_type, public.thoughts.source_type),
+      importance = COALESCE(v_explicit_importance, public.thoughts.importance),
+      quality_score = COALESCE(v_explicit_quality_score, public.thoughts.quality_score),
+      sensitivity_tier = COALESCE(v_explicit_sensitivity_tier, public.thoughts.sensitivity_tier),
       status = COALESCE(v_status, public.thoughts.status),
       status_updated_at = CASE
         WHEN COALESCE(v_status, public.thoughts.status)
