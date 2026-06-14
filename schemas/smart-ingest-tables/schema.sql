@@ -11,7 +11,10 @@ create extension if not exists pgcrypto;
 create table if not exists public.ingestion_jobs (
   id uuid primary key default gen_random_uuid(),
   source_type text not null default 'unknown',
-  source_label text not null,
+  -- Nullable: the smart-ingest Edge Function and dashboard ingest client create
+  -- jobs without a source_label. A NOT NULL here would make those inserts fail,
+  -- so createJob would return 0 and dry-run items would never persist.
+  source_label text,
   input_hash text not null,
   input_length integer not null default 0 check (input_length >= 0),
   dry_run boolean not null default true,
@@ -171,6 +174,10 @@ $$;
 -- so the function needs no elevated definer rights. This avoids the privilege
 -- escalation surface that SECURITY DEFINER would create if execute were ever
 -- broadened beyond service_role.
+-- search_path includes `extensions` so the unqualified digest() call below
+-- resolves whether pgcrypto was installed into `public` (older Supabase) or
+-- `extensions` (current Supabase default). `public` stays first so this
+-- schema's own objects always take precedence.
 create or replace function public.append_thought_evidence(
   p_thought_id uuid,
   p_evidence jsonb
@@ -178,7 +185,7 @@ create or replace function public.append_thought_evidence(
 returns jsonb
 language plpgsql
 security invoker
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   v_identity text;

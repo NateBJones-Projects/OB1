@@ -177,4 +177,8 @@ Solution: Store a concise excerpt. Do not append raw transcripts or large source
 
 ## Related
 
-This schema supports the Open Brain workflow from Nate B. Jones. Nate shares practical systems at [Nate's Newsletter](https://substack.com/@natesnewsletter) and [natebjones.com](https://natebjones.com).
+This schema is the database dependency for the [`integrations/smart-ingest`](../../integrations/smart-ingest/README.md) Edge Function.
+
+## More from Nate
+
+Open Brain is built in the open by Nate B. Jones. For more practical systems like this, see his [Substack](https://substack.com/@natesnewsletter) and [natebjones.com](https://natebjones.com).
