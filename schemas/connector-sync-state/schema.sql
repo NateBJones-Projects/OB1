@@ -142,6 +142,18 @@ COMMENT ON FUNCTION public.connector_sync_begin IS
 -- stamps success, resets the error count to 0, and clears the last error.
 -- counters/metadata are merged (||) so a caller can update only the keys it
 -- cares about; pass '{}'::jsonb to leave them unchanged.
+--
+-- No-regression guard: overlapping runs for the same (connector, surface,
+-- sync_key) can finish out of order. Without a guard, an older run that
+-- completes after a newer one would overwrite the newer cursor/high_watermark
+-- with stale values. high_watermark is a TIMESTAMPTZ, so it is monotonic — we
+-- only advance it when the incoming value is >= the stored one. cursor_value is
+-- an opaque token (page tokens, history ids) that is not safely comparable on
+-- its own, so we gate its advance on the same freshness signal: accept the
+-- incoming cursor only when this completion is at least as fresh as the stored
+-- high_watermark (or when there is nothing to compare against — no stored
+-- watermark, or the caller does not supply one). The existing "only advance
+-- when the caller supplies a new value" behaviour is preserved on top of this.
 
 CREATE OR REPLACE FUNCTION public.connector_sync_success(
   p_connector      TEXT,
@@ -170,9 +182,31 @@ BEGIN
     SET status           = 'success',
         last_finished_at = now(),
         last_success_at  = now(),
-        -- Only advance the cursor / watermark when the caller supplies a new one.
-        cursor_value     = COALESCE(EXCLUDED.cursor_value, public.connector_sync_state.cursor_value),
-        high_watermark   = COALESCE(EXCLUDED.high_watermark, public.connector_sync_state.high_watermark),
+        -- Advance the high_watermark only when the caller supplies a new one AND
+        -- it is not older than the stored one (monotonic; never regress).
+        high_watermark   = CASE
+                             WHEN EXCLUDED.high_watermark IS NULL
+                               THEN public.connector_sync_state.high_watermark
+                             WHEN public.connector_sync_state.high_watermark IS NULL
+                               THEN EXCLUDED.high_watermark
+                             WHEN EXCLUDED.high_watermark >= public.connector_sync_state.high_watermark
+                               THEN EXCLUDED.high_watermark
+                             ELSE public.connector_sync_state.high_watermark
+                           END,
+        -- Advance the cursor only when the caller supplies one AND this
+        -- completion is at least as fresh as the stored high_watermark. The
+        -- cursor is opaque, so the watermark is the freshness signal; if there
+        -- is nothing to compare against (no stored or no incoming watermark),
+        -- fall back to the prior "advance when supplied" behaviour.
+        cursor_value     = CASE
+                             WHEN EXCLUDED.cursor_value IS NULL
+                               THEN public.connector_sync_state.cursor_value
+                             WHEN EXCLUDED.high_watermark IS NULL
+                               OR public.connector_sync_state.high_watermark IS NULL
+                               OR EXCLUDED.high_watermark >= public.connector_sync_state.high_watermark
+                               THEN EXCLUDED.cursor_value
+                             ELSE public.connector_sync_state.cursor_value
+                           END,
         error_count      = 0,
         last_error       = NULL,
         counters         = public.connector_sync_state.counters || COALESCE(p_counters, '{}'::jsonb),
@@ -184,7 +218,7 @@ REVOKE ALL ON FUNCTION public.connector_sync_success(TEXT, TEXT, TEXT, TEXT, TIM
 GRANT EXECUTE ON FUNCTION public.connector_sync_success(TEXT, TEXT, TEXT, TEXT, TIMESTAMPTZ, JSONB) TO service_role;
 
 COMMENT ON FUNCTION public.connector_sync_success IS
-  'Record a clean run: advance cursor/high_watermark, stamp success, reset error_count, clear last_error, merge counters.';
+  'Record a clean run: advance cursor/high_watermark (no-regression guard — never moves them backward when an older overlapping run finishes late), stamp success, reset error_count, clear last_error, merge counters.';
 
 -- ─── Record a failed run ────────────────────────────────────────────────────
 -- Call when a run errors out. Stamps the error, increments error_count, and

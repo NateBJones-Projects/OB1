@@ -120,7 +120,13 @@ async function readCursor() {
   const res = await fetch(url, {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
   });
-  const rows = res.ok ? await res.json() : [];
+  // Fail loudly on a non-2xx read: treating an HTTP error as "no cursor" would
+  // silently reset the connector to fetchSince(null) and re-read the entire
+  // source. A missing row is fine (returns []); a failed request is not.
+  if (!res.ok) {
+    throw new Error(`read cursor failed: ${res.status} ${await res.text()}`);
+  }
+  const rows = await res.json();
   return rows[0] ?? { cursor_value: null, high_watermark: null };
 }
 
@@ -233,3 +239,7 @@ They are sharing a `(connector, surface, sync_key)` key. Give each independent s
 
 **Issue: PostgREST does not see the new RPCs.**
 The migration emits `NOTIFY pgrst, 'reload schema'`. If it does not take effect, reload from Dashboard → Project Settings → API → Reload schema.
+
+## More from Nate
+
+Open Brain is built in the open by Nate B. Jones — more practical systems like this on his [Substack](https://substack.com/@natesnewsletter) and at [natebjones.com](https://natebjones.com).
