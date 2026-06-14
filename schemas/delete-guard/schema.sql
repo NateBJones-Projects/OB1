@@ -44,7 +44,7 @@
 -- transaction succeeds) and are the durable, queryable forensic record.
 CREATE TABLE IF NOT EXISTS public.thoughts_delete_audit (
   audit_id            bigserial   PRIMARY KEY,
-  attempted_at        timestamptz NOT NULL DEFAULT timezone('utc'::text, now()),
+  attempted_at        timestamptz NOT NULL DEFAULT now(),
   operation           text        NOT NULL,
   thought_id          uuid,
   deleted_count       bigint,
@@ -96,14 +96,38 @@ COMMENT ON FUNCTION public.thoughts_delete_safe_jsonb(text) IS
   'Parses text as jsonb, returning NULL on empty/malformed input instead of raising. Used so forensic GUC capture never aborts an authorized override.';
 
 -- ─── Override authorization ─────────────────────────────────────────────────
--- Decides whether the CURRENT caller may use the mass-delete override. Returns
--- true only for a superuser or a member of a designated privileged role, so a
--- plain anon/authenticated PostgREST role cannot lift the guard just by setting
--- a GUC. This is the single place to widen the policy: change the role name or
--- add more pg_has_role() checks to match your install.
+-- Decides whether the CURRENT request may use the mass-delete override. Returns
+-- true only when the EFFECTIVE request role is genuinely trusted — a superuser
+-- or service_role — so a plain anon/authenticated PostgREST request cannot lift
+-- the guard just by setting a GUC. This is the single place to widen the policy.
+--
+-- Why the effective role, not session_user:
+--   In Supabase/PostgREST every API request logs in as the shared `authenticator`
+--   role, which must be GRANTed membership in anon, authenticated, AND
+--   service_role so it can `SET ROLE` into whichever the JWT names. So
+--   session_user is `authenticator` for every API request, and a membership test
+--   like pg_has_role(session_user, 'service_role', ...) can pass for an
+--   anon/authenticated request whenever that membership carries INHERIT — which
+--   silently lifts the guard for untrusted clients. The check must look at the
+--   role the request is actually RUNNING AS, not the login that could switch into
+--   service_role.
+--
+-- How we read the effective role inside a SECURITY DEFINER guard:
+--   The guard is SECURITY DEFINER, so current_user is rewritten to the definer
+--   (the table owner) and is useless here. But the `role` GUC — what PostgREST
+--   does `SET LOCAL ROLE` to from the verified JWT — is NOT reset by SECURITY
+--   DEFINER and is readable via current_setting('role'). Critically, a role can
+--   only land in that GUC by actually executing `SET ROLE`, which Postgres permits
+--   only for a role the caller is truly a member of. So an anon/authenticated
+--   request cannot make current_setting('role') report 'service_role' without
+--   genuinely holding service_role — which makes this signal unforgeable, unlike
+--   the request.jwt.claims GUC (a raw-SQL caller could set that to anything).
+--
+--   current_setting('role') returns 'none' when no SET ROLE is in effect (a direct
+--   connection, e.g. a superuser psql session or the Supabase SQL editor); in that
+--   case the effective role IS session_user, so we fall back to it.
 --
 -- Default privileged role: 'service_role' (Supabase's trusted server-side role).
--- It uses session_user — the real calling role — not any SECURITY DEFINER owner.
 CREATE OR REPLACE FUNCTION public.thoughts_delete_override_allowed()
 RETURNS boolean
 LANGUAGE plpgsql
@@ -111,28 +135,36 @@ STABLE
 SET search_path = public
 AS $$
 DECLARE
-  v_is_super boolean;
+  v_role_guc       text := current_setting('role', true);
+  v_effective_role text;
+  v_is_super       boolean;
 BEGIN
+  -- Effective role = the SET ROLE target if one is in effect, else session_user.
+  -- 'none' / '' / NULL all mean "no SET ROLE", i.e. a direct connection.
+  IF v_role_guc IS NULL OR v_role_guc = '' OR v_role_guc = 'none' THEN
+    v_effective_role := session_user;
+  ELSE
+    v_effective_role := v_role_guc;
+  END IF;
+
+  -- The privileged server-side role. A request only reaches this value by really
+  -- being service_role (direct login) or by SET ROLE service_role, which requires
+  -- genuine membership — so anon/authenticated can never satisfy it.
+  IF v_effective_role = 'service_role' THEN
+    RETURN true;
+  END IF;
+
+  -- Superuser (direct admin session). Look up the effective role's superuser bit.
   SELECT rolsuper INTO v_is_super
     FROM pg_roles
-   WHERE rolname = session_user;
+   WHERE rolname = v_effective_role;
 
-  IF COALESCE(v_is_super, false) THEN
-    RETURN true;
-  END IF;
-
-  -- Member of the privileged delete role (only if that role exists).
-  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role')
-     AND pg_has_role(session_user, 'service_role', 'USAGE') THEN
-    RETURN true;
-  END IF;
-
-  RETURN false;
+  RETURN COALESCE(v_is_super, false);
 END;
 $$;
 
 COMMENT ON FUNCTION public.thoughts_delete_override_allowed() IS
-  'Returns true if the current session_user may use the mass-delete override (superuser or member of service_role). Edit this function to change the override policy.';
+  'Returns true only if the EFFECTIVE request role (current_setting(role) SET ROLE target, else session_user) is service_role or a superuser. An anon/authenticated PostgREST request is always denied — even if authenticator inherits service_role and even if it forges request.jwt.claims — because the role GUC can only report service_role after a real SET ROLE that requires membership. Edit this function to change the override policy.';
 
 -- ─── Guard function ─────────────────────────────────────────────────────────
 -- Statement-level AFTER DELETE. The transition table `deleted_rows` holds every
@@ -240,8 +272,38 @@ CREATE TRIGGER trg_thoughts_delete_guard
   EXECUTE FUNCTION public.thoughts_delete_guard();
 
 -- ─── Permissions ────────────────────────────────────────────────────────────
--- The audit table is service-role only; no client should read or write it.
+-- The audit table is service-role only; no client should read or write it. It
+-- holds forensic data (request headers, JWT claims, client address), so leaking
+-- it to anon/authenticated would be a real exposure.
+--
+-- Why REVOKE FROM PUBLIC is not enough: a Supabase project commonly runs a
+-- blanket `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,
+-- authenticated` so new public tables are reachable from the API. Those are
+-- ROLE-SPECIFIC grants on anon/authenticated, which `REVOKE ... FROM PUBLIC` does
+-- NOT remove (PUBLIC and a named role are separate grant targets). So we must
+-- REVOKE from anon and authenticated explicitly, and additionally enable RLS with
+-- no permissive policy as a belt-and-suspenders default-deny. service_role has
+-- BYPASSRLS in Supabase, so its grant below still works; anon/authenticated end
+-- with no privileges AND no RLS policy → no access either way.
 REVOKE ALL ON public.thoughts_delete_audit FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    EXECUTE 'REVOKE ALL ON public.thoughts_delete_audit FROM anon';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    EXECUTE 'REVOKE ALL ON public.thoughts_delete_audit FROM authenticated';
+  END IF;
+END
+$$;
+
+-- Default-deny via RLS: no policy is created, so every non-BYPASSRLS, non-owner
+-- role is denied all row access regardless of any stray table grant. service_role
+-- keeps access through BYPASSRLS. The SECURITY DEFINER guard inserts as the table
+-- owner, which is exempt from RLS unless FORCE is set — so do NOT FORCE here, or
+-- the override audit INSERT would be blocked.
+ALTER TABLE public.thoughts_delete_audit ENABLE ROW LEVEL SECURITY;
+
 GRANT SELECT, INSERT ON public.thoughts_delete_audit TO service_role;
 
 -- Reload PostgREST's schema cache so the new table is visible to the API layer.

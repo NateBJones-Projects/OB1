@@ -88,7 +88,7 @@ DELETE FROM public.thoughts WHERE created_at < now() - interval '1 year';
 
 ### Overriding the guard for a legitimate bulk delete
 
-When you genuinely need to delete more than 50 rows, opt in for that transaction. The override requires **both** the opt-in flag **and** a privileged calling role (a superuser or a member of `service_role` — see [`thoughts_delete_override_allowed()`](./schema.sql)). Setting the flag from a plain `anon`/`authenticated` PostgREST role does **not** lift the guard. When both conditions hold, the delete proceeds and a single override row is written to `thoughts_delete_audit`:
+When you genuinely need to delete more than 50 rows, opt in for that transaction. The override requires **both** the opt-in flag **and** a genuinely trusted *effective* request role — either a request running as `service_role` (the role PostgREST switches into from a `service_role` JWT), or a direct connection as a superuser or `service_role` (superuser `psql`, the Supabase SQL editor, or a dedicated `service_role` login). See [`thoughts_delete_override_allowed()`](./schema.sql). Setting the flag from a plain `anon`/`authenticated` PostgREST request does **not** lift the guard — and crucially, it stays blocked even when Supabase's shared `authenticator` login inherits `service_role`, because the check reads the role the request is actually *running as* (the `SET ROLE` target, which a caller can only reach for a role it truly belongs to), not the login that *could* switch into `service_role`. When both conditions hold, the delete proceeds and a single override row is written to `thoughts_delete_audit`:
 
 ```sql
 BEGIN;
@@ -116,7 +116,7 @@ After running the migration:
 
 - A trigger `trg_thoughts_delete_guard` exists on `public.thoughts` (`AFTER DELETE`, `FOR EACH STATEMENT`, with an `OLD` transition table).
 - A function `public.thoughts_delete_guard()` exists (`SECURITY DEFINER`, `search_path = public`), plus a helper `public.thoughts_delete_override_allowed()`.
-- A table `public.thoughts_delete_audit` exists with `thought_id UUID` and the forensic columns, granted `SELECT, INSERT` to `service_role` and revoked from `PUBLIC`.
+- A table `public.thoughts_delete_audit` exists with `thought_id UUID` and the forensic columns, granted `SELECT, INSERT` to `service_role` and locked down for everyone else: privileges are revoked from `PUBLIC` *and* explicitly from `anon`/`authenticated` (so a blanket `ALTER DEFAULT PRIVILEGES … GRANT ALL … TO anon, authenticated` cannot expose it), with row-level security enabled and no permissive policy as a default-deny backstop.
 - Deleting 1–50 thoughts in a single statement behaves exactly as before.
 - A single statement deleting more than 50 thoughts is blocked and rolled back, with the block logged to the Postgres server log.
 - Setting `app.allow_mass_delete = 'on'` from a privileged role allows the bulk delete and records one `MASS_DELETE_OVERRIDE` row in `thoughts_delete_audit`.
@@ -158,3 +158,7 @@ That is the `SECURITY DEFINER` owner. Read `session_user_name` for the real call
 
 **Issue: PostgREST still does not see the new table.**
 The migration emits `NOTIFY pgrst, 'reload schema'`. If it does not take effect, reload from Dashboard → Project Settings → API → Reload schema.
+
+## More from Nate
+
+Open Brain is built in the open by Nate B. Jones — more practical systems like this on his [Substack](https://substack.com/@natesnewsletter) and at [natebjones.com](https://natebjones.com).
