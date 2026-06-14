@@ -85,10 +85,20 @@ This is a complete, dependency-free worker using the service-role key and Supaba
 // Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 // Optional env: WORK_TYPE, WORKER_ID, CLAIM_SIZE, TTL_SECONDS
 
+import { hostname } from "node:os";
+import { randomUUID } from "node:crypto";
+
 const SUPABASE_URL = requireEnv("SUPABASE_URL");           // e.g. https://YOUR-PROJECT.supabase.co
 const SERVICE_KEY  = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 const WORK_TYPE    = process.env.WORK_TYPE  ?? "enrichment";
-const WORKER_ID    = process.env.WORKER_ID  ?? `${WORK_TYPE}-${process.pid}`;
+// WORKER_ID MUST be globally unique across every running worker. A bare PID is
+// not safe: containers frequently share PIDs (often PID 1), so two workers on
+// different hosts can collide on the same id — and release_claims_for_worker()
+// matches purely on worker_id, so one worker's shutdown would then delete the
+// other's in-flight claims. The default below adds hostname + a random suffix.
+// If you set WORKER_ID yourself, guarantee uniqueness the same way.
+const WORKER_ID    = process.env.WORKER_ID
+  ?? `${WORK_TYPE}-${hostname()}-${process.pid}-${randomUUID().slice(0, 8)}`;
 const CLAIM_SIZE   = Number(process.env.CLAIM_SIZE  ?? 20);
 const TTL_SECONDS  = Number(process.env.TTL_SECONDS ?? 900);
 
@@ -114,8 +124,28 @@ async function rpc(fn, args) {
 
 // Your own query for thoughts that still need this work_type. Returns UUIDs.
 // Here we just pull recent thoughts as a placeholder.
+//
+// CRITICAL: exclude thoughts that already have a row in thought_work_claims for
+// this work_type. A claim row sticks around after release in a terminal
+// ('succeeded'/'failed') state, and it keeps occupying the (thought_id,
+// work_type) primary key — so claim_thoughts() will keep skipping it. If this
+// query does NOT filter those rows out, the loop re-fetches the same newest
+// page forever, claim_thoughts() returns nothing, and the worker backs off
+// indefinitely instead of paging back to older, still-unclaimed thoughts.
+//
+// We use a PostgREST embedded resource as a NOT-EXISTS filter: select thoughts
+// and left-join the claims for this work_type, then keep only thoughts whose
+// joined claim is null (no claim of any status). `claims` is the table's
+// auto-detected embedding via the thought_id foreign key.
 async function findCandidates(limit) {
-  const url = `${SUPABASE_URL}/rest/v1/thoughts?select=id&order=created_at.desc&limit=${limit}`;
+  const params = new URLSearchParams({
+    select: "id,claims:thought_work_claims(thought_id)",
+    "claims.work_type": `eq.${WORK_TYPE}`,
+    "claims.thought_id": "is.null", // keep only thoughts with NO claim row
+    order: "created_at.desc",
+    limit: String(limit),
+  });
+  const url = `${SUPABASE_URL}/rest/v1/thoughts?${params}`;
   const res = await fetch(url, {
     headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
   });
@@ -189,7 +219,9 @@ main().catch((err) => {
 });
 ```
 
-Start several workers (each picks up a distinct `WORKER_ID` from its PID), and they will split the queue between them:
+Start several workers (each derives a distinct, globally unique `WORKER_ID` from
+its hostname, PID, and a random suffix), and they will split the queue between
+them:
 
 ```bash
 SUPABASE_URL="https://YOUR-PROJECT.supabase.co" \
@@ -202,6 +234,28 @@ SUPABASE_SERVICE_ROLE_KEY="your-service-role-key" \
 WORK_TYPE="enrichment" CLAIM_SIZE=20 \
 node worker.mjs &
 ```
+
+### Sizing the TTL against the whole batch
+
+`claim_thoughts` stamps **every** id in a batch with the same `ttl_expires_at`
+at claim time, but the worker processes them serially. The TTL therefore has to
+outlast the time to process the *entire* batch, not just one thought — the last
+id in a `CLAIM_SIZE`-long batch is not touched until the previous ones finish,
+and its clock has been ticking the whole time.
+
+If `CLAIM_SIZE × per-thought time` exceeds `TTL_SECONDS`, the trailing ids
+expire while still held. The next `claim_thoughts` call reaps them as stale and
+hands them to another worker, which reprocesses them — duplicate work, and a
+later `release_thought` from the original holder returns `false` because it no
+longer owns the row. Keep the relationship safe with either lever:
+
+- **Set the TTL to cover the whole batch:** `TTL_SECONDS ≥ CLAIM_SIZE × (worst-case seconds per thought) × safety factor`. With the defaults (`CLAIM_SIZE=20`, `TTL_SECONDS=900`) that allows ~45s per thought before risk.
+- **Or claim smaller batches:** lower `CLAIM_SIZE` so a batch always finishes well inside the TTL.
+
+There is no mid-batch renewal RPC in this schema by design — keeping the claim
+path a single atomic statement is what makes the race guard simple to reason
+about. If your per-thought work is long or highly variable, prefer small batches
+(even `CLAIM_SIZE=1`) so each claim's TTL only has to cover one unit of work.
 
 ### Inspecting and clearing claims
 
@@ -221,7 +275,7 @@ WHERE work_type = 'enrichment' AND status IN ('succeeded', 'failed');
 
 After running the migration:
 
-- A table `public.thought_work_claims` exists with `thought_id UUID REFERENCES public.thoughts(id)`, a `(thought_id, work_type)` primary key, a `status` check constraint, RLS enabled, and `SELECT, INSERT, UPDATE, DELETE` granted to `service_role` only.
+- A table `public.thought_work_claims` exists with `thought_id UUID REFERENCES public.thoughts(id)`, a `(thought_id, work_type)` primary key, a `status` check constraint, RLS enabled, `SELECT, INSERT, UPDATE, DELETE` granted to `service_role` only, and all privileges explicitly revoked from `anon` and `authenticated`.
 - Two indexes exist: `idx_twc_status_ttl` (the reaper / work-type queries) and the partial `idx_twc_worker` (a worker's open claims).
 - Three RPCs exist — `claim_thoughts`, `release_thought`, `release_claims_for_worker` — each `SECURITY INVOKER`, executable by `service_role` only.
 - Running two workers against the same `work_type` divides the pool with no overlap: each thought is processed exactly once.
@@ -259,5 +313,15 @@ The TTL reaper only runs when `claim_thoughts` is next called for that `work_typ
 **Issue: `release_thought` returns `false`.**
 The row is not held by that `worker_id` in `claimed` status — it may have been TTL-reaped (TTL too short for the work), already released, or claimed by a different worker. Lengthen the TTL so it outlasts one unit of work.
 
+**Issue: workers keep backing off and never reach older unprocessed thoughts.**
+Your candidate query is re-fetching the same newest rows every loop, and they are all already in `thought_work_claims` (claimed or terminal). Because terminal rows keep occupying the `(thought_id, work_type)` primary key, `claim_thoughts` skips them forever. Make `findCandidates` exclude thoughts that already have a claim row for this `work_type` (the example uses a `thought_work_claims` embedding filtered to `thought_id=is.null`) so the query pages past them to genuinely unclaimed thoughts.
+
+**Issue: the same thought gets processed twice under one `work_type`.**
+The batch took longer to process than the TTL, so trailing ids in the batch expired mid-flight and were reaped and reclaimed by another worker. Raise `TTL_SECONDS` to cover the whole batch or lower `CLAIM_SIZE` (see [Sizing the TTL against the whole batch](#sizing-the-ttl-against-the-whole-batch)).
+
 **Issue: PostgREST still does not see the new RPCs.**
 The migration emits `NOTIFY pgrst, 'reload schema'`. If it does not take effect, reload from Dashboard → Project Settings → API → Reload schema.
+
+## More from Nate
+
+Open Brain is built in the open by Nate B. Jones — more practical systems like this on his [Substack](https://substack.com/@natesnewsletter) and at [natebjones.com](https://natebjones.com).

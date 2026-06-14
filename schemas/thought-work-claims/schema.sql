@@ -67,7 +67,10 @@ ALTER TABLE public.thought_work_claims ENABLE ROW LEVEL SECURITY;
 
 -- The claim table is operational coordination state, not memory content. Only
 -- the service role (server-side workers) touches it; no anon/authenticated
--- grants, and RLS denies everything else by default.
+-- grants, and RLS denies everything else by default. The explicit REVOKE makes
+-- the "service-role only" intent enforceable even if a default privilege or a
+-- prior grant ever leaked access to anon/authenticated.
+REVOKE ALL ON public.thought_work_claims FROM anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.thought_work_claims TO service_role;
 
 COMMENT ON TABLE public.thought_work_claims IS
@@ -120,7 +123,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.claim_thoughts(UUID[], TEXT, TEXT, INT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.claim_thoughts(UUID[], TEXT, TEXT, INT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_thoughts(UUID[], TEXT, TEXT, INT) TO service_role;
 
 COMMENT ON FUNCTION public.claim_thoughts IS
@@ -162,7 +165,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.release_thought(UUID, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.release_thought(UUID, TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.release_thought(UUID, TEXT, TEXT, TEXT, TEXT) TO service_role;
 
 COMMENT ON FUNCTION public.release_thought IS
@@ -192,7 +195,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.release_claims_for_worker(TEXT, TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.release_claims_for_worker(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.release_claims_for_worker(TEXT, TEXT) TO service_role;
 
 COMMENT ON FUNCTION public.release_claims_for_worker IS
