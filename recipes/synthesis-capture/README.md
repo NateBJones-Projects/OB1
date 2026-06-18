@@ -28,6 +28,8 @@ When your AI answers a complex question by combining multiple atomic thoughts, t
 > [!IMPORTANT]
 > This recipe **only persists** a synthesis — it does not generate one. The caller (your AI client, your script) must produce the synthesis prose and pass it in. Keeping the LLM off the hot path keeps the capture path cheap, deterministic, and free of server-side API keys.
 
+<!-- -->
+
 > [!NOTE]
 > **UUID vs BIGINT IDs.** The stock OB1 schema in the Getting Started guide uses `UUID` primary keys on `public.thoughts`. Some enhanced variants use `BIGINT`. Both handlers in this recipe accept either — source IDs are treated as opaque values and only compared by equality. If your install uses UUIDs, pass them as JSON strings (`"11111111-..."`), not numbers.
 
