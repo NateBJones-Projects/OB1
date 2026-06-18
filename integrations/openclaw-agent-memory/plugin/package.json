@@ -1,0 +1,73 @@
+{
+  "name": "@natebjones/ob1-agent-memory",
+  "version": "0.1.6",
+  "description": "Governed NBJ OB1 Agent Memory tools for OpenClaw: recall before work, write back after, inspect everything.",
+  "type": "module",
+  "license": "MIT-0",
+  "author": "Nate B. Jones / OB1",
+  "homepage": "https://github.com/NateBJones-Projects/OB1/tree/main/integrations/openclaw-agent-memory",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NateBJones-Projects/OB1.git",
+    "directory": "integrations/openclaw-agent-memory/plugin"
+  },
+  "keywords": [
+    "ob1",
+    "nbj",
+    "nate-jones",
+    "openbrain",
+    "openclaw",
+    "agent-memory",
+    "provenance",
+    "clawhub"
+  ],
+  "files": [
+    "README.md",
+    "openclaw.plugin.json",
+    "dist",
+    "scripts",
+    "src",
+    "skills",
+    "smoke"
+  ],
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --external:openclaw/* --external:typebox --outfile=dist/index.js",
+    "schema:check": "node scripts/check-tool-schemas.mjs",
+    "smoke:native": "bash smoke/native-openclaw-smoke.sh"
+  },
+  "dependencies": {
+    "typebox": "^1.1.37"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.3.24-beta.2"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "compat": {
+      "pluginApi": ">=2026.3.24-beta.2",
+      "minGatewayVersion": "2026.3.24-beta.2"
+    },
+    "build": {
+      "openclawVersion": "2026.3.24-beta.2",
+      "pluginSdkVersion": "2026.3.24-beta.2"
+    },
+    "install": {
+      "npmSpec": "@natebjones/ob1-agent-memory",
+      "defaultChoice": "npm",
+      "minHostVersion": ">=2026.3.24-beta.2"
+    }
+  }
+}

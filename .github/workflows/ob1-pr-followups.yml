@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows:
       - "OB1 PR Gate"
+      - ".github/workflows/ob1-gate-v2.yml"
       - ".github/workflows/ob1-gate.yml"
     types: [completed]
 

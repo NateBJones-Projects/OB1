@@ -1,0 +1,20 @@
+{
+  "name": "Provenance Chains",
+  "description": "Adds derivation tracking columns (derived_from, derivation_method, derivation_layer, supersedes) and helper SQL functions so thoughts can cite the atomic thoughts that produced them.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["provenance", "derivation", "reasoning-trace", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-17",
+  "updated": "2026-04-17"
+}

@@ -9,7 +9,7 @@
   "version": "1.0.0",
   "requires": {
     "open_brain": true,
-    "services": ["OpenAI-compatible API (LLM + embeddings)"],
+    "services": ["OpenAI-compatible API (LLM + embeddings) — OpenAI direct or OpenRouter (canonical OB1 setup)"],
     "tools": ["Node.js 18+ or Deno"]
   },
   "tags": [

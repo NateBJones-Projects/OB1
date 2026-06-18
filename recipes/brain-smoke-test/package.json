@@ -1,0 +1,20 @@
+{
+  "name": "ob1-brain-smoke-test",
+  "version": "1.0.0",
+  "description": "Open Brain Brain Smoke Test -- full-surface verification of an Open Brain install (read-only by default).",
+  "private": true,
+  "type": "module",
+  "main": "smoke-all.js",
+  "bin": {
+    "ob1-brain-smoke-test": "./smoke-all.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "smoke": "node smoke-all.js",
+    "smoke:json": "node smoke-all.js --json",
+    "smoke:destructive": "node smoke-all.js --destructive"
+  },
+  "license": "FSL-1.1-MIT"
+}

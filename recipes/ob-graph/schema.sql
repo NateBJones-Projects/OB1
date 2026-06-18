@@ -1,7 +1,9 @@
 -- OB-Graph: Knowledge Graph Layer for Open Brain
 -- Adds graph database functionality on top of PostgreSQL using a nodes + edges
--- pattern with recursive CTEs for traversal. Integrates with the core thoughts
--- table without modifying it.
+-- pattern. traverse_graph uses a recursive CTE (enumerates acyclic paths);
+-- find_shortest_path uses an iterative plpgsql BFS (one row per reachable
+-- node along the shortest path). Integrates with the core thoughts table
+-- without modifying it.
 
 -- ============================================================================
 -- Table: graph_nodes
@@ -97,6 +99,12 @@ CREATE TRIGGER update_graph_nodes_updated_at
 -- Function: traverse_graph
 -- Walks the graph from a starting node up to max_depth hops, returning all
 -- reachable nodes and the paths taken. Uses a recursive CTE.
+--
+-- Semantics: one row per acyclic path. If there are multiple paths to the
+-- same node (e.g. A→B via two different relationship_types, or A→B→D and
+-- A→C→D), each path is emitted as its own row. The per-path cycle check
+-- (NOT n.id = ANY(gw.path)) prevents infinite recursion; bound execution
+-- further with p_max_depth on dense graphs.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION traverse_graph(
     p_user_id UUID,
@@ -150,9 +158,55 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- ============================================================================
+-- Helper: reconstruct_bfs_path
+-- Walks a JSONB parent pointer map (built by the BFS functions below) from
+-- a target node back to the start, returning the full path as a UUID[].
+-- Kept as a separate SQL function so traverse_graph and find_shortest_path
+-- share the same reconstruction logic.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION reconstruct_bfs_path(
+    p_parent_map JSONB,
+    p_start_node_id UUID,
+    p_target_node_id UUID
+)
+RETURNS UUID[] AS $$
+DECLARE
+    v_path UUID[] := ARRAY[p_target_node_id]::UUID[];
+    v_current UUID := p_target_node_id;
+    v_entry JSONB;
+    v_guard INT := 0;
+BEGIN
+    -- v_guard caps the walk at a sane length so a malformed parent_map
+    -- (shouldn't happen, but defence-in-depth) can't spin forever.
+    WHILE v_current IS NOT NULL AND v_current <> p_start_node_id AND v_guard < 10000 LOOP
+        v_entry := p_parent_map -> (v_current::text);
+        IF v_entry IS NULL THEN
+            RETURN NULL;
+        END IF;
+        v_current := (v_entry ->> 'parent')::UUID;
+        v_path := v_current || v_path;
+        v_guard := v_guard + 1;
+    END LOOP;
+
+    IF v_current IS NULL OR v_current <> p_start_node_id THEN
+        RETURN NULL;
+    END IF;
+
+    RETURN v_path;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE;
+
+-- ============================================================================
 -- Function: find_shortest_path
--- BFS shortest path between two nodes. Returns the node IDs along the path
--- and the relationship types traversed.
+-- Shortest path between two nodes, following edges in either direction.
+-- Returns one row per step along the path (starting at step 1) with the node
+-- that was reached and the relationship used to get there.
+--
+-- Implemented as an iterative plpgsql BFS with a global seen-set. Each node
+-- is visited at most once, so the function stays bounded even when the graph
+-- contains cycles (A → B → A) or hub nodes with thousands of neighbours —
+-- both of which could cause the previous recursive-CTE version to blow past
+-- statement_timeout or exhaust memory.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION find_shortest_path(
     p_user_id UUID,
@@ -166,49 +220,137 @@ RETURNS TABLE (
     node_label TEXT,
     via_relationship TEXT
 ) AS $$
+DECLARE
+    v_depth INT := 0;
+    v_frontier UUID[] := ARRAY[p_start_node_id]::UUID[];
+    v_seen UUID[] := ARRAY[p_start_node_id]::UUID[];
+    v_parent_map JSONB := '{}'::jsonb;
+    v_next_ids UUID[];
+    v_next_map JSONB;
+    v_found BOOLEAN := false;
+    v_path UUID[];
+    v_start_exists BOOLEAN;
+    v_end_exists BOOLEAN;
 BEGIN
-    RETURN QUERY
-    WITH RECURSIVE bfs AS (
-        SELECT
-            n.id AS node_id,
-            n.label AS node_label,
-            0 AS depth,
-            ARRAY[n.id] AS path,
-            ARRAY[NULL::TEXT] AS relationships
+    IF p_start_node_id IS NULL OR p_end_node_id IS NULL THEN
+        RETURN;
+    END IF;
+
+    -- Validate both endpoints exist for this user. If either is missing or
+    -- belongs to someone else, RLS would have excluded it anyway; return an
+    -- empty result set rather than silently falling through the BFS.
+    SELECT EXISTS (
+        SELECT 1 FROM graph_nodes
+        WHERE id = p_start_node_id AND user_id = p_user_id
+    ) INTO v_start_exists;
+    SELECT EXISTS (
+        SELECT 1 FROM graph_nodes
+        WHERE id = p_end_node_id AND user_id = p_user_id
+    ) INTO v_end_exists;
+    IF NOT v_start_exists OR NOT v_end_exists THEN
+        RETURN;
+    END IF;
+
+    -- Trivial case: start == end. The original recursive-CTE version would
+    -- have emitted the single start node; preserve that shape.
+    IF p_start_node_id = p_end_node_id THEN
+        RETURN QUERY
+        SELECT 1::INT AS step,
+               n.id AS node_id,
+               n.label AS node_label,
+               NULL::TEXT AS via_relationship
         FROM graph_nodes n
         WHERE n.id = p_start_node_id
-          AND n.user_id = p_user_id
+          AND n.user_id = p_user_id;
+        RETURN;
+    END IF;
 
-        UNION ALL
+    -- Iterative BFS. Edges are followed in either direction (bidirectional
+    -- pathfinding, matching the original CTE's semantics). For each newly
+    -- discovered node we record the parent + relationship that first reached
+    -- it; DISTINCT ON (next_id) ensures only the first discovery wins.
+    WHILE v_depth < p_max_depth
+          AND NOT v_found
+          AND v_frontier IS NOT NULL
+          AND array_length(v_frontier, 1) IS NOT NULL LOOP
 
         SELECT
-            n.id,
-            n.label,
-            b.depth + 1,
-            b.path || n.id,
-            b.relationships || e.relationship_type
-        FROM bfs b
-        JOIN graph_edges e ON (e.source_node_id = b.node_id OR e.target_node_id = b.node_id) AND e.user_id = p_user_id
-        JOIN graph_nodes n ON n.id = CASE WHEN e.source_node_id = b.node_id THEN e.target_node_id ELSE e.source_node_id END
-            AND n.user_id = p_user_id
-        WHERE b.depth < p_max_depth
-          AND NOT n.id = ANY(b.path)
-    ),
-    shortest AS (
-        SELECT path, relationships
-        FROM bfs
-        WHERE node_id = p_end_node_id
-        ORDER BY depth
-        LIMIT 1
-    )
+            COALESCE(array_agg(next_id), ARRAY[]::UUID[]),
+            COALESCE(
+                jsonb_object_agg(
+                    next_id::text,
+                    jsonb_build_object('parent', parent_id, 'relation', relation_type)
+                ),
+                '{}'::jsonb
+            )
+        INTO v_next_ids, v_next_map
+        FROM (
+            SELECT DISTINCT ON (next_id) next_id, parent_id, relation_type
+            FROM (
+                SELECT
+                    e.target_node_id AS next_id,
+                    e.source_node_id AS parent_id,
+                    e.relationship_type AS relation_type
+                FROM graph_edges e
+                WHERE e.user_id = p_user_id
+                  AND e.source_node_id = ANY(v_frontier)
+                  AND NOT (e.target_node_id = ANY(v_seen))
+
+                UNION ALL
+
+                SELECT
+                    e.source_node_id AS next_id,
+                    e.target_node_id AS parent_id,
+                    e.relationship_type AS relation_type
+                FROM graph_edges e
+                WHERE e.user_id = p_user_id
+                  AND e.target_node_id = ANY(v_frontier)
+                  AND NOT (e.source_node_id = ANY(v_seen))
+            ) layer
+            JOIN graph_nodes n ON n.id = layer.next_id
+                              AND n.user_id = p_user_id
+            ORDER BY next_id
+        ) dedup;
+
+        IF v_next_ids IS NULL OR array_length(v_next_ids, 1) IS NULL THEN
+            EXIT;
+        END IF;
+
+        v_parent_map := v_parent_map || v_next_map;
+        v_seen := v_seen || v_next_ids;
+
+        IF p_end_node_id = ANY(v_next_ids) THEN
+            v_found := true;
+            EXIT;
+        END IF;
+
+        v_frontier := v_next_ids;
+        v_depth := v_depth + 1;
+    END LOOP;
+
+    IF NOT v_found THEN
+        RETURN;
+    END IF;
+
+    -- Reconstruct the path end → start by walking parent pointers, then emit
+    -- one row per step. Step 1 is the start node with NULL via_relationship;
+    -- each subsequent step carries the relationship used to arrive there.
+    v_path := reconstruct_bfs_path(v_parent_map, p_start_node_id, p_end_node_id);
+    IF v_path IS NULL THEN
+        RETURN;
+    END IF;
+
+    RETURN QUERY
     SELECT
-        row_number() OVER (ORDER BY u.ordinality)::INT AS step,
+        u.ordinality::INT AS step,
         gn.id AS node_id,
         gn.label AS node_label,
-        s.relationships[ordinality] AS via_relationship
-    FROM shortest s,
-         unnest(s.path) WITH ORDINALITY AS u(nid, ordinality)
-    JOIN graph_nodes gn ON gn.id = u.nid;
+        CASE WHEN u.ordinality = 1 THEN NULL
+             ELSE v_parent_map -> (u.nid::text) ->> 'relation'
+        END AS via_relationship
+    FROM unnest(v_path) WITH ORDINALITY AS u(nid, ordinality)
+    JOIN graph_nodes gn ON gn.id = u.nid AND gn.user_id = p_user_id
+    ORDER BY u.ordinality;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -217,3 +359,25 @@ $$ LANGUAGE plpgsql;
 -- ============================================================================
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.graph_nodes TO service_role;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.graph_edges TO service_role;
+
+-- ============================================================================
+-- Lock down internal helper
+-- reconstruct_bfs_path is plumbing for find_shortest_path (and any future
+-- BFS helper). It should not be exposed as a PostgREST RPC to anon or
+-- authenticated roles — only server-side callers (service_role) need it.
+-- ============================================================================
+REVOKE ALL ON FUNCTION public.reconstruct_bfs_path(jsonb, uuid, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.reconstruct_bfs_path(jsonb, uuid, uuid) TO service_role;
+
+-- ============================================================================
+-- Lock down RPC entry points
+-- find_shortest_path and traverse_graph are intended for server-side callers
+-- (edge functions using SUPABASE_SERVICE_ROLE_KEY). Revoke default PUBLIC
+-- EXECUTE so PostgREST rejects anon/authenticated calls at the entry point
+-- rather than crashing inside reconstruct_bfs_path on a permission error.
+-- ============================================================================
+REVOKE ALL ON FUNCTION public.find_shortest_path(uuid, uuid, uuid, int) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.find_shortest_path(uuid, uuid, uuid, int) TO service_role;
+
+REVOKE ALL ON FUNCTION public.traverse_graph(uuid, uuid, int, text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.traverse_graph(uuid, uuid, int, text) TO service_role;

@@ -1,0 +1,18 @@
+{
+  "name": "Open Brain Canonical Landing Page",
+  "description": "A cite-able single-page canonical landing for Open Brain — full SEO meta, JSON-LD structured data, GitHub star button, WCAG 2.1 AA pass, and crawler files (sitemap, robots.txt, llms.txt) ready for GitHub Pages at openbrain.fyi.",
+  "category": "dashboards",
+  "author": {
+    "name": "Sam Rogers",
+    "github": "snapsynapse"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true
+  },
+  "tags": ["landing-page", "github-pages", "seo", "canonical", "marketing"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-05-02",
+  "updated": "2026-05-02"
+}

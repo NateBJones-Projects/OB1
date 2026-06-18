@@ -1,0 +1,49 @@
+# local-brain-no-mcp -- docker compose overlay
+#
+# This file merges the official supabase/supabase docker-compose stack with
+# our additions (Ollama + EMBED_* env vars). Run from this directory:
+#
+#     ./setup.sh             # one-time
+#     docker compose up -d   # bring up the brain
+#
+# `include:` resolves paths relative to the parent compose file, so
+# supabase-docker/ must be a sibling directory (setup.sh handles this).
+# Requires Docker Compose v2.20 or newer.
+
+include:
+  - path: supabase-docker/docker/docker-compose.yml
+    env_file: supabase-docker/docker/.env
+
+services:
+  ollama:
+    image: ollama/ollama:0.6.5
+    container_name: ob1-ollama
+    restart: unless-stopped
+    networks:
+      - default
+    ports:
+      - "${OLLAMA_PORT:-11434}:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # Extend supabase's Edge Functions service so our handlers can find Ollama
+  # and know which model/dim to use. The functions volume mount comes from
+  # supabase's compose (./volumes/functions) -- setup.sh symlinks our handler
+  # dirs into there.
+  functions:
+    environment:
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      EMBED_MODEL: ${EMBED_MODEL:-nomic-embed-text}
+      EMBED_DIM: ${EMBED_DIM:-768}
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+volumes:
+  ollama_data:

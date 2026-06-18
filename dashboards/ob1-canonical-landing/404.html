@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found &mdash; Open Brain</title>
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#e05a20">
+  <link rel="icon" type="image/png" sizes="32x32" href="/imgs/favicon-32.png">
+  <link rel="apple-touch-icon" href="/imgs/apple-touch-icon.png">
+  <link rel="canonical" href="https://openbrain.fyi/">
+  <style>
+    :root {
+      --accent: #e05a20;
+      --bg: #0d1117;
+      --surface: #161b22;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --border: rgba(255,255,255,.08);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      background: linear-gradient(160deg, #0f1b33 0%, var(--bg) 60%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+    }
+    .logo-wrap { margin-bottom: 2rem; opacity: .6; }
+    .code {
+      font-size: clamp(4rem, 20vw, 8rem);
+      font-weight: 800;
+      line-height: 1;
+      color: var(--accent);
+      letter-spacing: -.04em;
+    }
+    h1 { font-size: clamp(1.25rem, 4vw, 1.75rem); font-weight: 600; margin: 1rem 0 0.5rem; }
+    p { color: var(--muted); font-size: 1rem; max-width: 38ch; line-height: 1.6; }
+    .home-link {
+      display: inline-block;
+      margin-top: 2rem;
+      padding: 0.65rem 1.4rem;
+      background: var(--accent);
+      color: var(--bg);
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      text-decoration: none;
+    }
+    .home-link:hover { opacity: .88; }
+  </style>
+</head>
+<body>
+  <div class="logo-wrap">
+    <img src="/imgs/ob1-logo.png" alt="" width="64" height="64" style="border-radius:10px;">
+  </div>
+  <div class="code">404</div>
+  <h1>Page not found</h1>
+  <p>This page doesn&rsquo;t exist. The brain has no memory of it.</p>
+  <a href="https://openbrain.fyi/" class="home-link">Return home &rarr;</a>
+</body>
+</html>

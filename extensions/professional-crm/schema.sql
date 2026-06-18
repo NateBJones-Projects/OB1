@@ -126,6 +126,67 @@ CREATE TRIGGER update_contact_last_contacted
     FOR EACH ROW
     EXECUTE FUNCTION update_last_contacted();
 
--- Sample data (optional - uncomment to insert examples)
--- INSERT INTO professional_contacts (user_id, name, company, title, email, how_we_met, tags) VALUES
--- (auth.uid(), 'Sarah Chen', 'DataCorp', 'VP of Engineering', 'sarah@datacorp.com', 'AI Summit 2026', ARRAY['ai', 'engineering']);
+-- Full-text search: GIN index on contacts for fast FTS queries
+ALTER TABLE professional_contacts ADD COLUMN IF NOT EXISTS fts tsvector
+    GENERATED ALWAYS AS (
+        to_tsvector('english',
+            coalesce(name, '') || ' ' ||
+            coalesce(company, '') || ' ' ||
+            coalesce(title, '') || ' ' ||
+            coalesce(notes, '') || ' ' ||
+            coalesce(how_we_met, '')
+        )
+    ) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_professional_contacts_fts
+    ON professional_contacts USING GIN (fts);
+
+-- Full-text search: GIN index on interactions for searching summaries
+ALTER TABLE contact_interactions ADD COLUMN IF NOT EXISTS fts tsvector
+    GENERATED ALWAYS AS (
+        to_tsvector('english', coalesce(summary, ''))
+    ) STORED;
+
+CREATE INDEX IF NOT EXISTS idx_contact_interactions_fts
+    ON contact_interactions USING GIN (fts);
+
+-- RPC function for full-text search with ranking (called by crm_search_contacts)
+CREATE OR REPLACE FUNCTION crm_search_contacts_fts(
+    search_query TEXT,
+    search_user_id UUID,
+    search_tags TEXT[] DEFAULT NULL,
+    max_results INT DEFAULT 20
+)
+RETURNS TABLE (
+    id UUID,
+    user_id UUID,
+    name TEXT,
+    company TEXT,
+    title TEXT,
+    email TEXT,
+    phone TEXT,
+    linkedin_url TEXT,
+    how_we_met TEXT,
+    tags TEXT[],
+    notes TEXT,
+    last_contacted TIMESTAMPTZ,
+    follow_up_date DATE,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ,
+    rank REAL
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT
+        pc.id, pc.user_id, pc.name, pc.company, pc.title, pc.email,
+        pc.phone, pc.linkedin_url, pc.how_we_met, pc.tags, pc.notes,
+        pc.last_contacted, pc.follow_up_date, pc.created_at, pc.updated_at,
+        ts_rank(pc.fts, to_tsquery('english', search_query)) AS rank
+    FROM professional_contacts pc
+    WHERE pc.user_id = search_user_id
+      AND pc.fts @@ to_tsquery('english', search_query)
+      AND (search_tags IS NULL OR pc.tags @> search_tags)
+    ORDER BY rank DESC
+    LIMIT max_results;
+END;
+$$ LANGUAGE plpgsql STABLE;

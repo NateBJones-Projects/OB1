@@ -1,0 +1,20 @@
+{
+  "name": "Agent Memory API",
+  "description": "Runtime-neutral Supabase Edge Function for OB1 Agent Memory recall, write-back, review, inspection, and recall traces.",
+  "category": "integrations",
+  "author": {
+    "name": "Nate Jones Team",
+    "github": "NateBJones"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": ["agent-memory", "api", "recall", "writeback", "openclaw"],
+  "difficulty": "advanced",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-03",
+  "updated": "2026-05-03"
+}

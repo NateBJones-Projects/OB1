@@ -1,0 +1,7 @@
+{
+  "voice_id": "CwhRBWXzGAHq8TQ4Fs17",
+  "voice_name": "Roger - Laid-Back, Casual, Resonant",
+  "model_id": "eleven_multilingual_v2",
+  "bytes": 2432984,
+  "source": "https://api.elevenlabs.io/v1/text-to-speech/:voice_id"
+}

@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-05-04T04:45:10Z",
+  "models": {
+    "gpt-image-2": {
+      "duration_ms": 161268.15,
+      "image_path": "/Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/promotional/generated-backgrounds/social-square/openai-gpt-image-2/image.png",
+      "status": "ok"
+    }
+  },
+  "prompt": "Square promotional background for an open-source agent memory tool. Dark textured surface, minimal technical diagram feel, soft olive-green glow, precise grid alignment, faint cards and provenance tags as abstract shapes, no readable text, no people, clean and trustworthy."
+}

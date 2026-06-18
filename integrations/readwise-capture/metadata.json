@@ -1,0 +1,20 @@
+{
+  "name": "Readwise Capture",
+  "description": "Receive Readwise highlight webhooks and store them as thoughts. Covers highlights from Kindle, Apple Books, Reader, Instapaper, Hypothesis, podcasts, and physical books in a single feed.",
+  "category": "integrations",
+  "author": {
+    "name": "Mark Lavercombe",
+    "github": "mlava"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Readwise"],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": ["readwise", "highlights", "capture", "reading", "webhook"],
+  "difficulty": "beginner",
+  "estimated_time": "20 minutes",
+  "created": "2026-04-24",
+  "updated": "2026-04-24"
+}

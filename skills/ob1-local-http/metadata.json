@@ -1,0 +1,30 @@
+{
+  "name": "OB1 Local HTTP",
+  "description": "Skill pack that lets Claude Code (or any AI coding tool that supports skills) capture and search thoughts against a self-hosted Open Brain over plain HTTPS, without using MCP. Pairs with the local-brain-no-mcp recipe.",
+  "category": "skills",
+  "author": {
+    "name": "dhanjit",
+    "github": "dhanjit"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": [
+      "Claude Code (or compatible skill-aware AI tool)",
+      "curl"
+    ]
+  },
+  "tags": [
+    "skill",
+    "local",
+    "no-mcp",
+    "curl",
+    "capture",
+    "search"
+  ],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-05-13",
+  "updated": "2026-05-13"
+}
