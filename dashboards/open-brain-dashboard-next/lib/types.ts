@@ -77,7 +77,7 @@ export interface Reflection {
 }
 
 export interface IngestionJob {
-  id: number;
+  id: string;
   source_label: string;
   status: string;
   extracted_count: number;
@@ -142,8 +142,8 @@ export interface ReflectionInput {
 }
 
 export interface IngestionItem {
-  id: number | string;
-  job_id: number;
+  id: string;
+  job_id: string;
   content: string;
   type: string;
   fingerprint: string;
@@ -164,7 +164,7 @@ export type AddToBrainMode = "auto" | "single" | "extract";
 export interface AddToBrainResult {
   path: "single" | "extract";
   thought_id?: string;
-  job_id?: number;
+  job_id?: string;
   type?: string;
   status?: string;
   extracted_count?: number | null;
