@@ -1,0 +1,20 @@
+{
+  "name": "Stage 4 System Ontologist",
+  "description": "Stage 4 of the agent-onboarding meta-skill. Interviews the user about their work/domain using the grill pattern (deep questions, fuzzy language detection, term solidification). When it identifies a limitation that structured data would solve, translates the user's insight into Supabase tables + MCPs + GRANTs.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "tags": ["meta-skill", "stage-4", "ontology", "grill", "interview", "ubiquitous-language"],
+  "difficulty": "advanced",
+  "estimated_time": "1-2 hours",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

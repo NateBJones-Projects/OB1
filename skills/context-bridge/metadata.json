@@ -1,0 +1,21 @@
+{
+  "name": "Context Bridge",
+  "description": "Mandatory multi-source context connection skill. At session start, queries tech_kb, Supabase session_checkpoints, session_search, and local memory. Builds a Concept Map for any user-mentioned entity, linking across domains. Stage 0 of the agent-onboarding meta-skill.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "requires_skills": ["supabase-startup-protocol"],
+  "tags": ["context", "memory", "session", "startup", "bridge", "identity", "multi-source", "universal"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}
