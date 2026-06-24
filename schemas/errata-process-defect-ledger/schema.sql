@@ -155,7 +155,7 @@ create table if not exists public.errata_bug_links (
   erratum_id uuid not null references public.errata(id) on delete cascade,
   bug_ref text not null,
   bug_kind text not null default 'stakeholder_request',
-  role text not null default 'caused',
+  role text not null default 'cause',
   contribution_weight numeric check (
     contribution_weight is null or (contribution_weight >= 0 and contribution_weight <= 1)
   ),
@@ -181,8 +181,8 @@ create table if not exists public.errata_thought_links (
   id uuid primary key default gen_random_uuid(),
   erratum_id uuid not null references public.errata(id) on delete cascade,
   thought_id uuid not null,
-  link_kind text not null default 'source_evidence'
-    check (link_kind in ('canonical_summary', 'source_evidence', 'rca', 'fix', 'verification', 'related')),
+  link_kind text not null default 'discussion'
+    check (link_kind in ('canonical_summary', 'intake', 'rca', 'fix', 'discussion', 'status_change', 'related', 'source_evidence', 'verification')),
   is_current boolean not null default true,
   source_timestamp timestamptz,
   metadata jsonb not null default '{}'::jsonb,
