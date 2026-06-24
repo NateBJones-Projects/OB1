@@ -84,7 +84,7 @@ server.registerTool(
     inputSchema: {
       query: z.string().describe("What to search for"),
       limit: z.number().optional().default(10),
-      threshold: z.number().optional().default(0.5),
+      threshold: z.number().optional().default(0.3),
     },
   },
   async ({ query, limit, threshold }) => {
