@@ -1,0 +1,21 @@
+{
+  "name": "Errata Process Defect Ledger",
+  "description": "Add a canonical Open Brain sidecar for systemic process mistakes, their caused bugs, impacted entities, and remediation links.",
+  "category": "schemas",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["SQL editor or psql"]
+  },
+  "requires_skills": [],
+  "tags": ["errata", "root-cause-analysis", "process", "defects", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-06-24",
+  "updated": "2026-06-24"
+}
