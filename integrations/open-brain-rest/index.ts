@@ -424,8 +424,17 @@ async function createThought(body: z.infer<typeof captureSchema>) {
       ? "new"
       : null;
 
-  const update = {
-    embedding,
+  // When upsert_thought resolved the row via the original-fingerprint fallback,
+  // `content`/`embedding` here were computed from the OLD pre-correction text
+  // (a reimport of the original source). The matched row is the CORRECTED one,
+  // so overwriting its embedding with the stale-text vector would silently
+  // desync it from its corrected content. Skip the embedding overwrite on that
+  // path — the RPC already merged metadata and left content untouched, so this
+  // becomes a pure dedup hit.
+  const matchedViaOriginalFingerprint =
+    upsert.data?.matched_via === "original_fingerprint";
+
+  const update: Record<string, unknown> = {
     metadata,
     type,
     source_type: sourceType,
@@ -435,6 +444,9 @@ async function createThought(body: z.infer<typeof captureSchema>) {
     status,
     status_updated_at: status ? new Date().toISOString() : null,
   };
+  if (!matchedViaOriginalFingerprint) {
+    update.embedding = embedding;
+  }
 
   const { error } = await supabase.from("thoughts").update(update).eq("id", thoughtId);
   if (error) throw new Error(error.message);
