@@ -1,0 +1,9 @@
+# Runtime / machine-specific artifacts — never commit
+.env
+*.log
+sync-log.json
+
+# Personal URL input lists — bring your own; not part of the recipe.
+# The committed sample below is the exception.
+*.csv
+!sample-urls.csv
