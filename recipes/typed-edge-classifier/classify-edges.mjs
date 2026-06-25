@@ -43,8 +43,9 @@
  *     ANTHROPIC_API_KEY       sk-ant-...     (direct, retained for back-compat)
  *
  *   When using OpenRouter, the default models (claude-haiku-4-5-20251001
- *   and claude-opus-4-7) are auto-prefixed with "anthropic/". Pass an
- *   already-prefixed string (e.g. "anthropic/claude-haiku-4-5") via
+ *   and claude-opus-4-7) are mapped to their OpenRouter slugs
+ *   ("anthropic/claude-haiku-4.5", "anthropic/claude-opus-4.7"). Pass an
+ *   already-prefixed string (e.g. "anthropic/claude-haiku-4.5") via
  *   --filter-model / --classify-model to override.
  *
  * USAGE
@@ -291,15 +292,34 @@ function loadEnv() {
 // keep that switch contained so callLlmOnce stays readable.
 
 /**
+ * Anthropic's canonical model names use dated API IDs ("claude-opus-4-7"
+ * -> "claude-opus-4-7-YYYYMMDD") or dashed shorthands, but OpenRouter
+ * exposes the same models under *dotted* slugs ("anthropic/claude-opus-4.7",
+ * "anthropic/claude-haiku-4.5"). A bare "anthropic/" prefix is therefore not
+ * enough — "anthropic/claude-haiku-4-5-20251001" 404s on OpenRouter. Map the
+ * model names OB1 ships as defaults to their OpenRouter slugs so the classifier
+ * works out-of-the-box on the recommended provider. PRICING lookups are
+ * unaffected: estimateCost() is always called with the raw (pre-resolve) name.
+ */
+const OPENROUTER_MODEL_MAP = {
+  "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
+  "claude-haiku-4-5": "anthropic/claude-haiku-4.5",
+  "claude-opus-4-7": "anthropic/claude-opus-4.7",
+  "claude-opus-4-6": "anthropic/claude-opus-4.6",
+};
+
+/**
  * When the operator passes a bare Anthropic model name like
  * "claude-haiku-4-5-20251001" but the active provider is OpenRouter,
- * prefix it with "anthropic/" so OpenRouter routes correctly. Already-
+ * translate it to OpenRouter's slug (preferring the explicit map above,
+ * falling back to an "anthropic/" prefix for names we don't know). Already-
  * prefixed names ("anthropic/...", "openai/...", etc.) pass through.
  */
 function resolveModel(model, provider) {
   if (provider !== "openrouter") return model;
   if (!model) return model;
   if (model.includes("/")) return model;
+  if (OPENROUTER_MODEL_MAP[model]) return OPENROUTER_MODEL_MAP[model];
   return `anthropic/${model}`;
 }
 
