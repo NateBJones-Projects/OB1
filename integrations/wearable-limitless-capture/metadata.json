@@ -1,0 +1,29 @@
+{
+  "name": "Limitless Wearable Capture",
+  "description": "Limitless Pendant adapter for the wearable-capture-core engine. Polls the Limitless lifelog API and atomizes each recording into a title atom plus one section atom per `##` heading (the label with its rolled-up utterances), attributed to its speakers — the device's own structure, no per-item LLM cost. Per-atom salted-fingerprint dedup and provenance via the core.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "0.2.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Limitless", "OpenRouter"],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": [
+    "wearable",
+    "limitless",
+    "lifelog",
+    "voice",
+    "capture",
+    "poller",
+    "atomic",
+    "provenance"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-06-16",
+  "updated": "2026-06-16"
+}
