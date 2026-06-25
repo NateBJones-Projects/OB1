@@ -1,0 +1,29 @@
+{
+  "name": "Omi Wearable Capture",
+  "description": "Poll the Omi pendant and atomize each conversation into Open Brain thoughts — title + overview, one task per action item, one per event, and ~60s transcript chunks attributed to their speakers — plus Omi's distilled memories as an edit-aware omi_memory stream. Uses the device's own structure (no per-item LLM cost); per-atom salted-fingerprint dedup and provenance via the wearable-capture-core engine.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "0.2.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Omi", "OpenRouter"],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": [
+    "wearable",
+    "omi",
+    "voice",
+    "capture",
+    "poller",
+    "atomic",
+    "provenance",
+    "memory"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-06-16",
+  "updated": "2026-06-16"
+}
