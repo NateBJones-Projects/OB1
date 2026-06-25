@@ -57,7 +57,7 @@ COST CAP FOR FIRST RUN
    export ANTHROPIC_API_KEY="sk-ant-..."
    ```
 
-   When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are auto-prefixed with `anthropic/` so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`).
+   When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are mapped to their OpenRouter slugs (`anthropic/claude-haiku-4.5`, `anthropic/claude-opus-4.7`) so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`).
 
 3. Run a **dry run** first with a small limit and a low cost cap:
 
