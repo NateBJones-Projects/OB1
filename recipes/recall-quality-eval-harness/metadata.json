@@ -1,0 +1,26 @@
+{
+  "name": "recall-quality-eval-harness",
+  "description": "A small recall evaluation harness for comparing recall quality and latency before changing a vector recall path.",
+  "category": "recipes",
+  "author": {
+    "name": "Tony Finley",
+    "github": "wefilmshit"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": [
+      "Postgres with pgvector",
+      "Python 3",
+      "psql"
+    ]
+  },
+  "tags": [
+    "recall",
+    "evaluation",
+    "quality"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes"
+}
