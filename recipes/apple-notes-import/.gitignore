@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+notes-export.json
+apple-notes-sync-log.json
+import-report.md
