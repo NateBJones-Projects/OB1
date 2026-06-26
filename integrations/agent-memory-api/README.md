@@ -27,7 +27,8 @@ This Edge Function exposes the v1 OB1 Agent Memory contract. OpenClaw is the fir
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - [`schemas/agent-memory`](../../schemas/agent-memory/) applied
 - Supabase CLI installed
-- `OPENROUTER_API_KEY` and `MCP_ACCESS_KEY` configured as Supabase secrets
+- `MCP_ACCESS_KEY` and one AI API key configured as Supabase secrets:
+  `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `AI_API_KEY` with `AI_API_BASE_URL`
 
 ## Credential Tracker
 
@@ -38,7 +39,8 @@ AGENT MEMORY API -- CREDENTIAL TRACKER
 FROM YOUR OPEN BRAIN SETUP
   Supabase Project ref:       ____________
   MCP Access Key:             ____________
-  OpenRouter API Key:         ____________
+  AI API Key Provider:        ____________
+  AI API Key Secret Name:     ____________
 
 GENERATED DURING SETUP
   Agent Memory API URL:       ____________
@@ -47,7 +49,17 @@ GENERATED DURING SETUP
 --------------------------------------
 ```
 
+OpenRouter remains the default provider. To route directly to OpenAI instead,
+set `OPENAI_API_KEY` and leave `OPENROUTER_API_KEY` unset. The function then
+uses `https://api.openai.com/v1` and `text-embedding-3-small` for recall
+embeddings. For another OpenAI-compatible endpoint, set `AI_API_BASE_URL`,
+`AI_API_KEY`, and `EMBEDDING_MODEL`.
+
 ## Steps
+
+1. Apply the Agent Memory schema.
+2. Deploy the Agent Memory API Edge Function.
+3. Test the health endpoint with your `MCP_ACCESS_KEY`.
 
 ![Step 1](https://img.shields.io/badge/Step_1-Install_the_Schema-1E88E5?style=for-the-badge)
 
