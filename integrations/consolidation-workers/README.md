@@ -27,7 +27,7 @@ For the full tool and worker inventory, see `docs/05-tool-audit.md` in the repos
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - **Enhanced thoughts schema** applied — install `schemas/enhanced-thoughts` for the `type`, `importance`, `sensitivity_tier`, and `source_type` columns
-- **Knowledge graph schema** applied — install `schemas/knowledge-graph` for the `consolidation_log` table
+- **Knowledge graph schema** applied — install `schemas/entity-extraction` for the `consolidation_log` table
 - At least one LLM API key: OpenRouter (recommended), OpenAI, or Anthropic
 - Supabase CLI installed for deployment
 
@@ -196,7 +196,7 @@ Solution: Candidates must have `type = 'reference'` with confidence < 0.7, or `i
 Solution: Verify your API keys are set correctly. Check the Supabase function logs for specific error messages. The worker tries OpenRouter first, then OpenAI, then Anthropic.
 
 **Issue: consolidation_log insert fails**
-Solution: Ensure the knowledge graph schema is applied. The `consolidation_log` table is created by `schemas/knowledge-graph`. This is a non-fatal error — the thought updates still succeed.
+Solution: Ensure the knowledge graph schema is applied. The `consolidation_log` table is created by `schemas/entity-extraction`. This is a non-fatal error — the thought updates still succeed.
 
 ## Architecture
 
