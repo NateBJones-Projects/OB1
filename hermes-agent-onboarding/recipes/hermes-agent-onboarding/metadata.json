@@ -1,0 +1,32 @@
+{
+  "name": "Hermes Agent Onboarding",
+  "description": "Generative 6-stage meta-skill that transforms a blank AI agent into a customized ecosystem for ANY user. Stages: Agent Identity Layer → User Profile (MBTI) → Work Operating Model → Financial Profile → Domain Ontology → Agent Calibration. Includes 10 reusable skills for Supabase-backed persistent identity.",
+  "category": "recipes",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "3.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool", "Supabase CLI", "Node.js 18+"]
+  },
+  "requires_skills": [
+    "agent-onboarding",
+    "identity-self-audit",
+    "identity-cqrs",
+    "context-bridge",
+    "supabase-startup-protocol",
+    "checkpoint-workflow",
+    "mbti-guru-hermes",
+    "stage-3-financial",
+    "stage-4-system-ontologist",
+    "stage-5-agent-calibration"
+  ],
+  "tags": ["onboarding", "meta-skill", "identity", "mbti", "financial", "ontology", "calibration", "universal"],
+  "difficulty": "advanced",
+  "estimated_time": "2-3 hours",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}
