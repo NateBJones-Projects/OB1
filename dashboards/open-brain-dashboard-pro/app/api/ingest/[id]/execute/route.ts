@@ -16,9 +16,11 @@ export async function POST(
 
   const { id } = await params;
 
-  // WR-04 / BL-03: Validate id is a positive integer before forwarding
-  const idNum = Number(id);
-  if (!Number.isInteger(idNum) || idNum <= 0) {
+  // WR-04 / BL-03: Validate id is a UUID before forwarding. OB1 ingestion job
+  // ids are UUIDs, not integers — the old positive-integer check rejected them.
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
@@ -34,7 +36,7 @@ export async function POST(
     // BL-03: Re-verify the session owns this job by fetching it first.
     // The REST gateway filters by the session's x-brain-key, so a 404/403 here
     // indicates the job is not visible to the caller.
-    const verifyRes = await fetch(`${API_URL}/ingestion-jobs/${idNum}`, {
+    const verifyRes = await fetch(`${API_URL}/ingestion-jobs/${id}`, {
       headers: { "x-brain-key": apiKey, "Content-Type": "application/json" },
     });
     if (!verifyRes.ok) {
@@ -43,7 +45,7 @@ export async function POST(
       // of a misleading "denied" message.
       if (verifyRes.status >= 500) {
         console.error(
-          `[ingest/[id]/execute] preflight upstream 5xx for job ${idNum}:`,
+          `[ingest/[id]/execute] preflight upstream 5xx for job ${id}:`,
           verifyRes.status
         );
         return NextResponse.json(
@@ -62,7 +64,7 @@ export async function POST(
       );
     }
 
-    const res = await fetch(`${API_URL}/ingestion-jobs/${idNum}/execute`, {
+    const res = await fetch(`${API_URL}/ingestion-jobs/${id}/execute`, {
       method: "POST",
       headers: { "x-brain-key": apiKey, "Content-Type": "application/json" },
     });
