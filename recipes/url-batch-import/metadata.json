@@ -1,0 +1,21 @@
+{
+  "name": "URL Batch Import",
+  "description": "Fetch a list of URLs (news articles, blog posts, web pages), extract and summarize content with an LLM, and import as searchable thoughts into Open Brain.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Edwards",
+    "github": "kae36"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Deno"]
+  },
+  "requires_skills": [],
+  "tags": ["web", "url", "import", "news", "articles", "batch", "summarize"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}
