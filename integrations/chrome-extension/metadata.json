@@ -1,0 +1,20 @@
+{
+  "name": "Chrome Extension — Browser Capture & Search",
+  "description": "Save thoughts from any webpage and search your entire Open Brain directly from your browser. Includes right-click context menu, omnibox search, auto-capture of selected text, source tracking, and keyboard shortcuts.",
+  "category": "integrations",
+  "author": {
+    "name": "Karin Gutenbrunner",
+    "github": "konepone"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter API"],
+    "tools": ["Chrome or Chromium-based browser"]
+  },
+  "tags": ["chrome", "browser", "extension", "capture", "search", "semantic-search"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-03-15",
+  "updated": "2026-03-15"
+}
