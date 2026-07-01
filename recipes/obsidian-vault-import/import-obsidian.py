@@ -214,6 +214,18 @@ def extract_date(meta: dict, path: Path) -> str:
         return datetime.now(tz=timezone.utc).strftime('%Y-%m-%d')
 
 
+def resolve_type(meta: dict, default_type: str) -> str:
+    """Resolve a thought's type. Frontmatter 'type:' wins; else default_type.
+
+    Returns '' when neither is set, so the caller can omit metadata.type
+    entirely and preserve the prior (no-type) behavior for plain vaults.
+    """
+    val = meta.get('type')
+    if isinstance(val, str) and val.strip():
+        return val.strip()
+    return (default_type or '').strip()
+
+
 def word_count(text: str) -> int:
     return len(text.split())
 
@@ -512,6 +524,15 @@ def main():
                              "upstream tools and you want to filter by origin "
                              "in OB1 — e.g. 'apple-journal', 'day-one', "
                              "'roam-export'.")
+    parser.add_argument("--default-type", type=str, default="",
+                        help="Fallback value for metadata.type when a note's "
+                             "frontmatter doesn't declare a 'type:'. Empty by "
+                             "default (no type key written), preserving prior "
+                             "behavior. A note's own frontmatter 'type:' always "
+                             "takes precedence. Useful for single-purpose vaults "
+                             "— e.g. '--default-type journal' for a journal "
+                             "export so every entry is typed without per-note "
+                             "frontmatter.")
     args = parser.parse_args()
 
     vault_root = Path(args.vault_path).expanduser().resolve()
@@ -710,6 +731,7 @@ def main():
     for i, note in enumerate(filtered):
         chunks = chunk_note(note, use_llm, openrouter_key, verbose=args.verbose)
         note_date = extract_date(note['meta'], note['full_path'])
+        note_type = resolve_type(note['meta'], args.default_type)
 
         for chunk in chunks:
             # Format content with context prefix
@@ -738,6 +760,10 @@ def main():
             }
             if chunk['section']:
                 thought['metadata']['section'] = chunk['section']
+            # Stamp type only when resolved, so plain vaults keep prior
+            # (no-type) behavior and downstream defaults still apply.
+            if note_type:
+                thought['metadata']['type'] = note_type
 
             all_thoughts.append(thought)
 
@@ -773,7 +799,8 @@ def main():
             print("\nSample thoughts:")
             for t in all_thoughts[:5]:
                 preview = t['content'][:120] + "..." if len(t['content']) > 120 else t['content']
-                print(f"  [{t['metadata']['folder']}] {preview}")
+                type_part = f" | type={t['metadata']['type']}" if t['metadata'].get('type') else ""
+                print(f"  [{t['metadata']['folder']}{type_part}] {preview}")
         if args.report:
             _write_report(all_thoughts, filtered, vault_root, args, skip_reasons, dry_run=True)
         return
