@@ -23,32 +23,32 @@ Never built an Open Brain? Start here:
 
 ## Recent Contributions
 
-The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-05-22.
+The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-07-01.
 
 <!-- recent-contributions:start -->
 
 | Contribution | What changed | Creator |
 | ------------ | ------------ | ------- |
-| [Provenance chains — derivation tracking](recipes/provenance-chains/) | Provenance chains — derivation tracking. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Open Brain Dashboard Pro — Next.js 16 + iron-session](dashboards/open-brain-dashboard-pro/) | Open Brain Dashboard Pro — Next.js 16 + iron-session. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Atomizer — generic + Gmail re-atomization toolkit](recipes/atomizer/) | Atomizer — generic + Gmail re-atomization toolkit. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Brain smoke test — install verification harness](recipes/brain-smoke-test/) | Brain smoke test — install verification harness. | [@alanshurafa](https://github.com/alanshurafa) |
-| [CRM improvements: crm_ prefix, FTS search, meeting prep, stale detection](extensions/professional-crm/) | CRM improvements: crm_ prefix, FTS search, meeting prep, stale detection. | [@pintomatic](https://github.com/pintomatic) |
-| [Edge function cost optimization — 73% invocation reduction](recipes/edge-function-cost-optimization/) | Edge function cost optimization — 73% invocation reduction. | [@JustinTSmith](https://github.com/JustinTSmith) |
-| [Obsidian-vault-import: --source-label to override metadata.source](recipes/obsidian-vault-import/) | Obsidian-vault-import: --source-label to override metadata.source. | [@dhanjit](https://github.com/dhanjit) |
-| [Preserve full frontmatter in obsidian-vault-import metadata](recipes/obsidian-vault-import/) | Preserves full frontmatter in obsidian-vault-import metadata. | [@dhanjit](https://github.com/dhanjit) |
-| [Load .env into wiki-compiler child processes](recipes/wiki-compiler/) | Loads .env into wiki-compiler child processes. | [@mlava](https://github.com/mlava) |
-| [Enable standalone output for Docker builds](dashboards/open-brain-dashboard-next/) | Enables standalone output for Docker builds. | [@Mavrick-F](https://github.com/Mavrick-F) |
-| [Fix outdated primitives section in README](README.md) | Fixes outdated primitives section in README. | [@jjshanks](https://github.com/jjshanks) |
-| [Document Edge Function redeploy step in OpenRouter rotation FAQ](docs/03-faq.md) | Documents Edge Function redeploy step in OpenRouter rotation FAQ. | [@Silverhawk-bit](https://github.com/Silverhawk-bit) |
-| [Return JSON-RPC error envelopes on auth failure](server/index.ts) | Returns JSON-RPC error envelopes on auth failure. | [@txcfi-scott](https://github.com/txcfi-scott) |
-| [Markdownlint sweep for existing recipe/schema docs](schemas/workflow-status/) | Markdownlint sweep for existing recipe/schema docs. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Improve ChatGPT MCP compatibility](primitives/remote-mcp/) | Improves ChatGPT MCP compatibility. | [@justfinethanku](https://github.com/justfinethanku) |
-| [Add wiki compiler orchestration recipe](recipes/wiki-compiler/) | Adds wiki compiler orchestration recipe. | [@justfinethanku](https://github.com/justfinethanku) |
-| [Wiki synthesis + autobiography pipeline](recipes/wiki-synthesis/) | Wiki synthesis + autobiography pipeline. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Entity wiki pages from knowledge graph](recipes/entity-wiki/) | Entity wiki pages from knowledge graph. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Typed reasoning edges + Opus/Haiku classifier](schemas/typed-reasoning-edges/) | Typed reasoning edges + Opus/Haiku classifier. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Entity extraction worker](integrations/entity-extraction-worker/) | Entity extraction worker. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Enhanced MCP server (alpha tool suite)](integrations/enhanced-mcp/) | Enhanced MCP server (alpha tool suite). | [@alanshurafa](https://github.com/alanshurafa) |
+| [Chrome extension — Gemini bulk history sync (Phase B/C)](integrations/chrome-capture-extension/) | Chrome extension — Gemini bulk history sync (Phase B/C). | [@alanshurafa](https://github.com/alanshurafa) |
+| [Add config-driven extension hook for sidebar](dashboards/open-brain-dashboard-next/) | Adds config-driven extension hook for sidebar. | [@msykes](https://github.com/msykes) |
+| [Consolidation workers (bio + metadata)](integrations/consolidation-workers/) | Consolidation workers (bio + metadata). | [@alanshurafa](https://github.com/alanshurafa) |
+| [CRM person tiers — relationship tier schema + dashboard page](schemas/crm-person-tiers/) | CRM person tiers — relationship tier schema + dashboard page. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Brain stats daily + heatmap filter](schemas/brain-stats-daily/) | Brain stats daily + heatmap filter. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Thought enrichment pipeline](recipes/thought-enrichment/) | Thought enrichment pipeline. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Smart ingest pipeline tables](schemas/smart-ingest/) | Smart ingest pipeline tables. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Gmail smart pull — sensitivity routing + contact entities](recipes/gmail-smart-pull/) | Gmail smart pull — sensitivity routing + contact entities. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Auto-capture Claude Code adapter](skills/auto-capture-claude-code/) | Auto-capture Claude Code adapter. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Fix typed-reasoning-edges COMMENT ON syntax error](https://github.com/NateBJones-Projects/OB1/pull/303) | Fixes typed-reasoning-edges COMMENT ON syntax error. | [@lucifer](https://github.com/lucifer) |
+| [Delete_thought MCP](integrations/delete-thought-mcp/) | Delete_thought MCP. | [@txcfi-scott](https://github.com/txcfi-scott) |
+| [Fix per-request McpServer instantiation for stable MCP connections](integrations/kubernetes-deployment/) | Fixes per-request McpServer instantiation for stable MCP connections. | [@yuens1002](https://github.com/yuens1002) |
+| [Brain health monitoring views](recipes/brain-health-monitoring/) | Brain health monitoring views. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Brain backup and export](recipes/brain-backup/) | Brain backup and export. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Enhanced thoughts columns and utility RPCs](schemas/enhanced-thoughts/) | Enhanced thoughts columns and utility RPCs. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Open-brain-dashboard-next: add Cloudflare Workers deploy support](dashboards/open-brain-dashboard-next/) | Open-brain-dashboard-next: add Cloudflare Workers deploy support. | [@tswicegood](https://github.com/tswicegood) |
+| [Smart ingest Edge Function](integrations/smart-ingest/) | Smart ingest Edge Function. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Feat(integrations): add hermes-agent-memory native provider for OB1](integrations/hermes-agent-memory/) | Feat(integrations): add hermes-agent-memory native provider for OB1. | [@MicScalise](https://github.com/MicScalise) |
+| [Fix invalid \|\| concatenation in typed-reasoning-edges COMMENT](schemas/typed-reasoning-edges/) | Fixes invalid \|\| concatenation in typed-reasoning-edges COMMENT. | [@spiritualsystems](https://github.com/spiritualsystems) |
 
 <!-- recent-contributions:end -->
 
