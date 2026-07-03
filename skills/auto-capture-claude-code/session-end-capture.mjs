@@ -93,8 +93,69 @@ function appendLog(sessionId, projectName, turns, disposition) {
 
 // ── Transcript parsing (simplified) ─────────────────────────────────────────
 
-function parseTranscript(transcriptPath) {
-  const raw = fs.readFileSync(transcriptPath, "utf8");
+// Claude Code writes transcripts as JSONL: one JSON object per line, with
+// conversation entries of type "user" / "assistant" whose message.content is
+// either a plain string or an array of content blocks (text, tool_use,
+// tool_result, thinking, ...). Only the text blocks are conversation.
+const MAX_TURN_CHARS = 4000;
+
+// Harness-injected user entries (command output, system reminders, hook
+// feedback) are not things the human typed — exclude them from turns.
+function isHarnessInjection(text) {
+  return /^\s*<(local-command-stdout|command-name|command-message|system-reminder|bash-input|bash-stdout|task-notification)/.test(text)
+    || text.startsWith("Caveat:");
+}
+
+function extractText(content) {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter(b => b && b.type === "text" && typeof b.text === "string")
+    .map(b => b.text)
+    .join("\n");
+}
+
+function parseJsonlTranscript(raw) {
+  let sessionId = "unknown";
+  let createdAt = "";
+  let gitBranch = "";
+  let cwd = "";
+
+  const turns = [];
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let entry;
+    try { entry = JSON.parse(trimmed); } catch { continue; }
+
+    if (entry.sessionId && sessionId === "unknown") sessionId = entry.sessionId;
+
+    if (entry.type !== "user" && entry.type !== "assistant") continue;
+    if (entry.isSidechain || entry.isMeta) continue;
+
+    if (!createdAt && entry.timestamp) createdAt = entry.timestamp;
+    if (!gitBranch && entry.gitBranch) gitBranch = entry.gitBranch;
+    if (!cwd && entry.cwd) cwd = entry.cwd;
+
+    let text = extractText(entry.message?.content).trim();
+    if (!text) continue; // tool_result-only / tool_use-only entries
+    if (entry.type === "user" && isHarnessInjection(text)) continue;
+
+    if (text.length > MAX_TURN_CHARS) {
+      text = `${text.slice(0, MAX_TURN_CHARS)}\n[... truncated]`;
+    }
+
+    turns.push({ role: entry.type === "user" ? "human" : "assistant", content: text });
+  }
+
+  const userTurns = turns.filter(t => t.role === "human").length;
+
+  return { sessionId, createdAt, gitBranch, cwd, turns, userTurns };
+}
+
+// Legacy fallback for plain-text transcripts with "Human:"/"Assistant:" markers.
+function parseTextTranscript(raw) {
   const lines = raw.split("\n");
 
   let sessionId = "unknown";
@@ -134,6 +195,15 @@ function parseTranscript(transcriptPath) {
   const userTurns = turns.filter(t => t.role === "human").length;
 
   return { sessionId, createdAt, gitBranch, cwd, turns, userTurns };
+}
+
+function parseTranscript(transcriptPath) {
+  const raw = fs.readFileSync(transcriptPath, "utf8");
+  const firstLine = raw.split("\n").find(l => l.trim());
+  if (firstLine && firstLine.trim().startsWith("{")) {
+    return parseJsonlTranscript(raw);
+  }
+  return parseTextTranscript(raw);
 }
 
 // Neutralize literal occurrences of the delimiter tags inside user content
