@@ -1,0 +1,20 @@
+{
+  "name": "Auto-Capture Codex Adapter",
+  "description": "Codex CLI adapter for the auto-capture skill. Captures Codex sessions to Open Brain at session end via a Stop hook, parsing Codex's rollout transcript format.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Codex CLI", "Node.js 18+"]
+  },
+  "requires_skills": ["auto-capture"],
+  "tags": ["skill", "capture", "codex", "hooks", "session-end", "ambient"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-05"
+}
