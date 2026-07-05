@@ -2,7 +2,7 @@
 /**
  * Open Brain — Grok SessionEnd Capture Hook
  *
- * Grok adapter for the auto-capture-claude-code skill. Reads Grok's
+ * Grok adapter for the auto-capture skill. Reads Grok's
  * chat_history.jsonl at session end and POSTs formatted transcripts to the
  * Open Brain REST ingest endpoint.
  */
@@ -301,7 +301,7 @@ async function main() {
   const sessionId =
     input.sessionId || input.session_id || process.env.GROK_SESSION_ID || "unknown";
   const cwd =
-    input.cwd || input.workspaceRoot || process.env.GROK_WORKSPACE_ROOT || process.env.CLAUDE_PROJECT_DIR || "";
+    input.cwd || input.workspaceRoot || process.env.GROK_WORKSPACE_ROOT || "";
   const reason = input.reason || input.sessionEndReason || "";
   const projectName = cwd ? path.basename(cwd) : "unknown";
 
