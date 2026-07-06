@@ -37,15 +37,17 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const sanitized: number[] = [];
+    const UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const sanitized: string[] = [];
     for (const raw of ids) {
-      if (!Number.isInteger(raw) || (raw as number) <= 0) {
+      if (typeof raw !== "string" || !UUID_RE.test(raw)) {
         return NextResponse.json(
-          { error: "All IDs must be positive integers" },
+          { error: "All IDs must be valid UUIDs" },
           { status: 400 }
         );
       }
-      sanitized.push(raw as number);
+      sanitized.push(raw);
     }
 
     // BL-03: Re-verify each thought actually has quality_score < 30 before deleting
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
       sanitized.map((id) => fetchThought(apiKey, id, excludeRestricted))
     );
 
-    const verifiedIds: number[] = [];
+    const verifiedIds: string[] = [];
     let rejected = 0;
     for (let i = 0; i < verifyResults.length; i++) {
       const r = verifyResults[i];
