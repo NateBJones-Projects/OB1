@@ -13,7 +13,7 @@
 Omi records your spoken conversations and returns them already structured — a
 title, an overview, a category, action items, events, and the raw transcript
 segments. This integration is an **adapter** on top of
-[`wearable-capture-core`](../wearable-capture-core/): it pulls recent Omi
+[`wearable-capture-core`](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core): it pulls recent Omi
 conversations on a schedule and **atomizes** each one using Omi's _own_
 structure, so there's **no per-item LLM classification cost**. The shared core
 owns the write path — per-atom dedup on a salted fingerprint, provenance
@@ -48,7 +48,7 @@ secure — the function reaches out to Omi, not the other way around.
 
 ## Prerequisites
 
-- **[Wearable Capture Core](../wearable-capture-core/) installed first.** This
+- **[Wearable Capture Core](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core) installed first.** This
   adapter imports the shared engine from `../_shared/wearable-sync.ts`. Follow
   that integration's README to copy `wearable-sync.ts` into
   `supabase/functions/_shared/` and set `OPENROUTER_API_KEY`. (For convenience,
@@ -95,7 +95,7 @@ Fill these in as you go — you'll need them in Steps 2 and 5:
 This adapter is built on the **Wearable Capture Core** engine and won't deploy
 without it.
 
-Follow [`wearable-capture-core`](../wearable-capture-core/) now if you haven't:
+Follow [`wearable-capture-core`](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core) now if you haven't:
 
 1. Copy `wearable-sync.ts` into `supabase/functions/_shared/wearable-sync.ts`.
 2. `supabase secrets set OPENROUTER_API_KEY="sk-or-v1-your-openrouter-key"`.
@@ -375,7 +375,7 @@ existing `thoughts` table via the shared `wearable-sync` engine.
 | Component                            | Type                                | What it does                                                                                                                                                                             |
 | ------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `wearable-omi-capture` Edge Function | Supabase poller (not an MCP server) | On a cron, atomizes recent Omi conversations (title + overview, action items, events, transcript chunks) and captures Omi memories, handing them to the core for dedup + embed + insert. |
-| `wearable-sync.ts`                   | Shared Deno module (`_shared/`)     | The engine this adapter is built on — per-atom dedup, provenance, embedding (OpenRouter), insert. See [wearable-capture-core](../wearable-capture-core/).                                |
+| `wearable-sync.ts`                   | Shared Deno module (`_shared/`)     | The engine this adapter is built on — per-atom dedup, provenance, embedding (OpenRouter), insert. See [wearable-capture-core](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core).                                |
 | `thoughts` table                     | Existing Open Brain primitive       | No schema changes — additive rows only.                                                                                                                                                  |
 
 **External services called:** `api.omi.me/v1/dev` (list conversations +
@@ -392,9 +392,9 @@ read from `thoughts`, audit those per the
 
 ## Related
 
-- [Wearable Capture Core](../wearable-capture-core/) — the shared engine this
+- [Wearable Capture Core](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core) — the shared engine this
   adapter is built on (**install first**).
-- [Limitless Wearable Capture](../wearable-limitless-capture/) — sibling adapter
+- [Limitless Wearable Capture](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-limitless-capture) — sibling adapter
   for the Limitless Pendant.
 - [Telegram Capture](../telegram-capture/) — webhook-based quick capture (push,
   not poll).
