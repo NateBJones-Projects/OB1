@@ -32,10 +32,14 @@ export default async function RootLayout({
     process.env.RESTRICTED_PASSPHRASE_HASH &&
       process.env.RESTRICTED_PASSPHRASE_HASH.length > 0
   );
-  // Feature detection: the CRM sidebar entry only appears when the brain
-  // exposed the /crm surface at login (probed and cached in the session).
+  // Feature detection, cached at login (and refreshable via the "Re-check
+  // now" button on each surface's setup state — see
+  // app/api/capabilities/recheck/route.ts). Nav visibility itself defaults to
+  // always-on; these flags only drive the open-proposals badge here and the
+  // NEXT_PUBLIC_OPTIONAL_NAV=auto hide-until-enabled branch inside Sidebar.
   const session = await getSession();
   const crmEnabled = session.crmEnabled === true;
+  const wikiEnabled = session.wikiEnabled === true;
 
   // Open-proposals badge: a best-effort read that never blocks the shell. An
   // older brain without the count route (or any transient error) degrades to no
@@ -60,7 +64,12 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-screen flex bg-bg-primary text-text-primary">
-        <Sidebar restrictedConfigured={restrictedConfigured} crmEnabled={crmEnabled} openProposals={openProposals} />
+        <Sidebar
+          restrictedConfigured={restrictedConfigured}
+          crmEnabled={crmEnabled}
+          wikiEnabled={wikiEnabled}
+          openProposals={openProposals}
+        />
         <main className="flex-1 ml-56 min-h-screen">
           <div className="max-w-6xl mx-auto px-8 py-8">
             {children}
