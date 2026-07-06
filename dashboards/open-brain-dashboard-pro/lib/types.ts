@@ -323,3 +323,95 @@ export interface AddToBrainResult {
   extracted_count?: number | null;
   message: string;
 }
+
+// ─── Wiki (optional) ─────────────────────────────────────────────────────────
+// Present only on brains with the wiki-pages schema and the /wiki gateway routes.
+// Every id is a UUID string. Keys match the REST contract literally.
+
+export type WikiPageKind = "topic" | "entity" | "autobiography" | "custom";
+export type WikiPageStatus = "active" | "archived";
+export type WikiSectionOrigin = "manual" | "generated";
+
+/** A page as it appears in the list response (no sections). */
+export interface WikiPageSummary {
+  id: string;
+  slug: string;
+  title: string;
+  page_kind: WikiPageKind;
+  status: WikiPageStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+  section_count: number;
+}
+
+/** A page as it appears on the detail response (no section_count there). */
+export interface WikiPage {
+  id: string;
+  slug: string;
+  title: string;
+  page_kind: WikiPageKind;
+  status: WikiPageStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WikiSection {
+  id: string;
+  section_key: string;
+  heading: string | null;
+  display_order: number;
+  origin: WikiSectionOrigin;
+  locked: boolean;
+  body_md: string;
+  pending_generated_md: string | null;
+  pending_generated_at: string | null;
+  generation_source: Record<string, unknown>;
+  evidence_thought_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WikiPageListResponse {
+  data: WikiPageSummary[];
+  total: number;
+  page: number;
+  per_page: number;
+}
+
+export interface WikiPageDetailResponse {
+  page: WikiPage;
+  sections: WikiSection[];
+}
+
+export interface WikiCreatePageResponse {
+  page_id: string;
+  created: boolean;
+}
+
+/** PUT a section returns which write path the regen guard took. */
+export interface WikiWriteSectionResponse {
+  section_id: string;
+  action: "created" | "updated" | "pending";
+}
+
+export interface WikiAcceptPendingResponse {
+  section_id: string;
+  action: "accepted" | "no_pending";
+}
+
+export interface WikiRejectPendingResponse {
+  section_id: string;
+  action: "rejected" | "no_pending";
+}
+
+export interface WikiLockResponse {
+  section_id: string;
+  locked: boolean;
+}
+
+export interface WikiArchivePageResponse {
+  slug: string;
+  status: "archived";
+}

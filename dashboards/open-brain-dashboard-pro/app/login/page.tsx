@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { checkHealth, crmAvailable, ApiError } from "@/lib/api";
+import { checkHealth, crmAvailable, wikiAvailable, ApiError } from "@/lib/api";
 import { LoginForm } from "./LoginForm";
 
 async function loginAction(formData: FormData) {
@@ -29,10 +29,15 @@ async function loginAction(formData: FormData) {
   // Never fatal: a brain without the crm-core schema simply gets crmEnabled=false.
   const crmEnabled = await crmAvailable(key);
 
+  // Same for the optional wiki surface. Never fatal: a brain without the
+  // wiki-pages schema returns 404 on /wiki/pages, so this comes back false.
+  const wikiEnabled = await wikiAvailable(key);
+
   const session = await getSession();
   session.apiKey = key;
   session.loggedIn = true;
   session.crmEnabled = crmEnabled;
+  session.wikiEnabled = wikiEnabled;
   await session.save();
 
   redirect("/");
