@@ -1,0 +1,18 @@
+{
+  "name": "Brain Stats Daily + Heatmap RPCs",
+  "description": "Server-side daily-bucket aggregation RPCs for dashboard heatmaps. Includes JSONB variants that bypass PostgREST's 1000-row cap so multi-year windows work end-to-end, plus a lifelog variant that buckets by metadata life-date fields.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true
+  },
+  "tags": ["schema", "statistics", "heatmap", "dashboard", "rpc", "aggregation"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-04-21",
+  "updated": "2026-04-21"
+}
