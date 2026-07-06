@@ -28,7 +28,7 @@ Agent Memory stays in `integrations/agent-memory-api`. This gateway only handles
 
 ## Expected outcome
 
-After setup, the dashboard reaches every base-thoughts surface (stats, browse, search, workflow, duplicates, audit) plus the optional CRM contact/proposal routes through this gateway, and the smoke harness passes end to end. If you expose MCP tools alongside this gateway, review your tool surface with the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md).
+After setup, the dashboard reaches every base-thoughts surface (stats, browse, search, workflow, duplicates, audit) plus the optional CRM and wiki routes through this gateway, and the smoke harnesses pass end to end. If you expose MCP tools alongside this gateway, review your tool surface with the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md).
 
 ## Required Secrets
 
@@ -89,6 +89,23 @@ These require the `crm-core` (and, for engagement, `crm-engagement`) schemas. On
 
 Accepting a contact edit or adding a method keeps the contact's searchable **card thought** (`crm_contacts.card_thought_id`) in sync. Write-back reuses the gateway's existing embedding path and is best-effort: it never fails the write, and degrades to a text-searchable card when no `OPENROUTER_API_KEY` is set.
 
+### Wiki (optional)
+
+These require the `wiki-pages` schema. On a brain without it the routes return a clean `404`: the gateway maps PostgREST's schema-cache errors (`PGRST205` "Could not find the table" from the direct-table list query, `PGRST202` "Could not find the function" from the RPC-backed routes) as well as raw Postgres `42P01`/`42883` "does not exist" errors to 404. The dashboard hides the section via feature detection (`GET /wiki/pages?per_page=1`).
+
+| Endpoint | Method | Purpose |
+| --- | --- | --- |
+| `/wiki/pages` | GET | List active pages (optional `page_kind` filter), each with a `section_count` |
+| `/wiki/pages` | POST | Create/update a page by slug (`wiki_upsert_page`) |
+| `/wiki/pages/:slug` | GET | Fetch one page plus its non-deleted sections, ordered like the wiki-mcp tools |
+| `/wiki/pages/:slug/sections/:sectionKey` | PUT | Write a section as a manual (human) edit, through the regen guard (`wiki_write_section`) |
+| `/wiki/sections/:id/accept-pending` | POST | Promote a parked machine draft to the live body (`wiki_accept_pending`) |
+| `/wiki/sections/:id/reject-pending` | POST | Discard a parked machine draft without applying it (`wiki_reject_pending`) |
+| `/wiki/sections/:id/lock` | POST | Freeze/unfreeze a section against machine overwrites |
+| `/wiki/pages/:slug` | DELETE | Archive a page (`status='archived'`) — never a hard delete |
+
+`GET /wiki/pages` only lists `status='active'` pages, matching `wiki_list_pages`. `GET /wiki/pages/:slug` fetches by slug with no status filter (same as `wiki_get_page` in `integrations/wiki-mcp`), so an archived page stays individually reachable by slug — and its sections stay editable via the `PUT` route, which also skips the status filter — even though it drops out of the list. Section writes from this REST surface always use `p_origin='manual'` — a human editing through the dashboard takes ownership of the section, same as an in-app manual edit; automated/generator writes still go through `wiki-mcp`'s `wiki_write_section` tool with `p_origin='generated'` and are subject to the regen guard.
+
 ## Deploy
 
 From a Supabase workdir, copy or symlink this folder to `supabase/functions/open-brain-rest`, then deploy:
@@ -124,6 +141,16 @@ node integrations/open-brain-rest/smoke/crm-smoke.mjs
 ```
 
 It creates one contact, exercises detail, list, patch, methods, notes, tasks, dates, interactions, history, timeline, field lock, and the proposal count, then archives the contact and deletes its card thought.
+
+The wiki surface has its own harness (needs the `wiki-pages` schema):
+
+```bash
+OB1_REST_URL="https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-rest" \
+OB1_REST_KEY="YOUR_MCP_ACCESS_KEY" \
+node integrations/open-brain-rest/smoke/wiki-smoke.mjs
+```
+
+It creates one page, exercises list (with `section_count`), get-by-slug, a two-write section edit (created then updated), lock/unlock, and a reject-pending negative check (no pending draft to reject), then archives the page.
 
 ## Dashboard Demo Seed
 
