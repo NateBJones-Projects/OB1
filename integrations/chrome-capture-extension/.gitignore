@@ -1,0 +1,20 @@
+# Runtime captures and local dev artifacts
+data/captures/
+data/logs/
+
+# Chrome Web Store build artifacts
+*.zip
+*.crx
+*.pem
+dist/
+build/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Secrets — never commit
+.env
+.env.local

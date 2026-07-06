@@ -11,16 +11,28 @@ name: OB1 PR Gate
 # This means: automated agent passes → human admin approves → merge allowed
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  event_guard:
+    name: OB1 Gate Event Guard
+    if: github.event_name != 'pull_request_target'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain non-review gate run
+        run: |
+          echo "OB1 PR Gate received a ${GITHUB_EVENT_NAME} event."
+          echo "The contribution review only runs for pull_request_target events."
+
   review:
     name: OB1 Review
+    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR head safely
@@ -30,7 +42,9 @@ jobs:
           fetch-depth: 0
 
       - name: Fetch base branch
-        run: git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+        run: |
+          git fetch origin "${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}" --depth=1
+          git show "origin/${{ github.event.pull_request.base.ref }}:.github/metadata.schema.json" > /tmp/ob1-metadata.schema.json
 
       - name: Install metadata schema validator
         run: python3 -m pip install check-jsonschema
@@ -53,11 +67,11 @@ jobs:
 
       - name: Run review checks
         id: review
+        env:
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          CONTRIB_DIRS: ${{ steps.changed.outputs.contrib_dirs }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
-          CHANGED_FILES="${{ steps.changed.outputs.files }}"
-          CONTRIB_DIRS="${{ steps.changed.outputs.contrib_dirs }}"
-          PR_TITLE="${{ github.event.pull_request.title }}"
-
           pass_count=0
           fail_count=0
           results=""
@@ -144,7 +158,7 @@ jobs:
               continue
             fi
 
-            if ! schema_output=$(check-jsonschema --schemafile .github/metadata.schema.json "$dir/metadata.json" 2>&1); then
+            if ! schema_output=$(check-jsonschema --schemafile /tmp/ob1-metadata.schema.json "$dir/metadata.json" 2>&1); then
               indented_output=$(printf '%s\n' "$schema_output" | sed 's/^/      /')
               rule3_detail="${rule3_detail}  - \`$dir/metadata.json\` failed schema validation\n${indented_output}\n"
               rule3_pass=false
@@ -628,6 +642,15 @@ jobs:
           REVIEW_COMMENT: ${{ steps.review.outputs.comment }}
           REVIEW_FAILED: ${{ steps.review.outputs.failed }}
           SECRET_BLOCKED: ${{ steps.review.outputs.secret_blocked }}
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+          CONTRIB_DIRS: ${{ steps.changed.outputs.contrib_dirs }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR_LOGIN: ${{ github.event.pull_request.user.login }}
+          PR_AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
         run: |
           set -euo pipefail
 
@@ -635,17 +658,17 @@ jobs:
 
           printf '%s\n' "$REVIEW_COMMENT" > gate-artifact/ob1-review-summary.md
           printf '%s\n' "$REVIEW_COMMENT" >> "$GITHUB_STEP_SUMMARY"
-          printf '%s\n' "${{ steps.changed.outputs.files }}" > gate-artifact/changed-files.txt
-          printf '%s\n' "${{ steps.changed.outputs.contrib_dirs }}" > gate-artifact/contribution-dirs.txt
+          printf '%s\n' "$CHANGED_FILES" > gate-artifact/changed-files.txt
+          printf '%s\n' "$CONTRIB_DIRS" > gate-artifact/contribution-dirs.txt
 
           jq -n \
-            --argjson pr_number "${{ github.event.pull_request.number }}" \
-            --arg pr_url "${{ github.event.pull_request.html_url }}" \
-            --arg title "${{ github.event.pull_request.title }}" \
-            --arg head_sha "${{ github.event.pull_request.head.sha }}" \
-            --arg author_login "${{ github.event.pull_request.user.login }}" \
-            --arg author_association "${{ github.event.pull_request.author_association }}" \
-            --arg is_draft "${{ github.event.pull_request.draft }}" \
+            --argjson pr_number "$PR_NUMBER" \
+            --arg pr_url "$PR_URL" \
+            --arg title "$PR_TITLE" \
+            --arg head_sha "$PR_HEAD_SHA" \
+            --arg author_login "$PR_AUTHOR_LOGIN" \
+            --arg author_association "$PR_AUTHOR_ASSOCIATION" \
+            --arg is_draft "$PR_DRAFT" \
             --arg failed "$REVIEW_FAILED" \
             --arg secret_blocked "$SECRET_BLOCKED" \
             '{
