@@ -79,6 +79,31 @@
       "items": { "type": "string" },
       "description": "Slugs of primitives this contribution depends on (e.g., [\"rls\", \"shared-mcp\"]). Primarily used by extensions."
     },
+    "contributors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "contribution"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contributor's display name."
+          },
+          "github": {
+            "type": "string",
+            "description": "Contributor's GitHub username (without @)."
+          },
+          "contribution": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What this contributor added or changed."
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Additional contributors beyond the primary author, each with a note on their specific contribution."
+    },
     "requires_skills": {
       "type": "array",
       "items": { "type": "string" },
