@@ -62,6 +62,14 @@ Gather or confirm:
 6. Optionally use Open Brain.
    - Search for prior related meetings or project notes before starting.
    - Capture key decisions or the final synthesis after the work is complete.
+   - Preserve provenance when capturing the synthesis: if the Open Brain setup
+     has the provenance-chains capability (a `capture_derived_thought` tool, or
+     `derived_from`/`derivation_layer` columns), capture it as a derived
+     artifact — `derivation_layer='derived'`, `derivation_method='synthesis'`,
+     and `derived_from` = the UUIDs of the prior Open Brain thoughts you
+     retrieved and built on (omit if the meeting notes were the only source).
+     Falls back to a plain capture, and is a no-op, when that capability isn't
+     present. (Individual decisions captured as new atomic facts stay primary.)
 
 ## Evidence and Judgment Rules
 

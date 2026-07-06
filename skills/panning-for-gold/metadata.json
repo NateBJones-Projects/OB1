@@ -6,7 +6,7 @@
     "name": "Jared Irish",
     "github": "jaredirish"
   },
-  "version": "2.0.0",
+  "version": "2.0.1",
   "requires": {
     "open_brain": true,
     "services": [],
@@ -16,5 +16,5 @@
   "difficulty": "intermediate",
   "estimated_time": "5 minutes",
   "created": "2026-03-27",
-  "updated": "2026-03-27"
+  "updated": "2026-07-05"
 }
