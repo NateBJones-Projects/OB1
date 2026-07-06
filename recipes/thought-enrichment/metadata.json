@@ -9,10 +9,10 @@
   "version": "1.0.0",
   "requires": {
     "open_brain": true,
-    "services": ["OpenRouter API", "Supabase"],
+    "services": ["OpenRouter API", "Anthropic API", "Supabase"],
     "tools": ["Node.js 18+"]
   },
-  "tags": ["enrichment", "classification", "backfill", "metadata", "llm", "openrouter"],
+  "tags": ["enrichment", "classification", "backfill", "metadata", "llm", "openrouter", "anthropic"],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes"
 }
