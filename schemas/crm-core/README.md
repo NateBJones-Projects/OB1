@@ -40,7 +40,11 @@ Three behaviours fall out of this:
 Tables:
 
 - `crm_contacts` — the editable contact record (scalar fields plus per-field
-  provenance in `field_provenance`).
+  provenance in `field_provenance`). Also carries an optional `card_thought_id`
+  (`UUID REFERENCES public.thoughts(id) ON DELETE SET NULL`): the anchor for a
+  live, searchable per-contact card thought that the gateway write-back layer
+  keeps in sync. It stays `NULL` until that layer runs, so the column is inert
+  on its own.
 - `crm_contact_methods` — emails / phones / urls / addresses, each with a
   `current` / `superseded` / `rejected` status so old values stay as history.
 - `crm_contact_aliases` — alternate names for duplicate-safe future merges.

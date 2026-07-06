@@ -118,6 +118,19 @@ COMMENT ON COLUMN public.crm_contacts.relationship_note IS
 COMMENT ON COLUMN public.crm_contacts.field_provenance IS
   'Per editable field: {origin: manual|import|extraction|projection|generated, actor, run_id, at, locked}. Manual origin out-ranks machine writers (auto-protection); locked additionally blocks manual bulk overwrites.';
 
+-- ─── card_thought_id — the contact's live, searchable card thought ───────────
+-- Additive upgrade: crm_contacts is created above with CREATE TABLE IF NOT
+-- EXISTS, which is a no-op on installs that already have the table, so the new
+-- column is added here via ALTER ... ADD COLUMN IF NOT EXISTS to reach both
+-- fresh and existing installs. The card thought is written and re-embedded by
+-- the REST write-back layer (not by this schema) and carries
+-- metadata.generated_by='crm-write-back' so entity extraction skips it.
+ALTER TABLE public.crm_contacts
+  ADD COLUMN IF NOT EXISTS card_thought_id UUID REFERENCES public.thoughts(id) ON DELETE SET NULL;
+
+COMMENT ON COLUMN public.crm_contacts.card_thought_id IS
+  'Live, searchable card thought for this contact (source_type crm_contact_card): a summary re-embedded on every accepted change. Written by the REST write-back layer, not by this schema; carries metadata.generated_by=''crm-write-back'' so entity extraction skips it. ON DELETE SET NULL so removing the card thought never removes the contact.';
+
 -- ─── crm_contact_methods — emails / phones / urls / addresses ───────────────
 -- status lifecycle: 'current' is the live truth; 'superseded'/'rejected' rows
 -- stay as queryable history. The dedupe unique index applies to CURRENT rows
