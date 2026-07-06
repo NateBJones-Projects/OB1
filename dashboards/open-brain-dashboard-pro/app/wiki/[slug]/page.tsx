@@ -5,6 +5,7 @@ import { FormattedDate } from "@/components/FormattedDate";
 import { WikiSectionPanel } from "./WikiSectionPanel";
 import { AddSectionForm } from "./AddSectionForm";
 import { ArchivePageButton } from "./ArchivePageButton";
+import { RegenerateProfileButton } from "./RegenerateProfileButton";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,13 @@ export default async function WikiPageDetail({
             </div>
             <p className="text-text-muted text-xs mt-1 font-mono">{page.slug}</p>
           </div>
-          {!archived && <ArchivePageButton slug={page.slug} />}
+          <div className="flex items-start gap-2">
+            {/* The user-profile page is built by the wiki-profile consolidation
+                worker; give it a one-click regenerate. Other slugs have no
+                backing generator, so the button only renders here. */}
+            {page.slug === "user-profile" && <RegenerateProfileButton />}
+            {!archived && <ArchivePageButton slug={page.slug} />}
+          </div>
         </div>
       </div>
 
