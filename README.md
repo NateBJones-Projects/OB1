@@ -184,7 +184,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
 - **Primitives** should be referenced by 2+ extensions to justify extraction
 - **Recipes, schemas, dashboards, integrations, and skills** are open for community contributions
 - Every PR runs through an automated review agent that checks structure, secrets, SQL safety, dependencies, and documentation quality
-- If the agent passes, a human admin reviews for quality and clarity
+- If the agent passes, a human maintainer reviews for quality and clarity
 - Your contribution needs a README with real instructions and a `metadata.json` with structured info
 
 ## Community
@@ -196,7 +196,7 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for the full details. The short version:
 
 Created by [Nate B. Jones](https://github.com/NateBJones).
 
-The OB1 repo team: [Jonathan Edwards](https://github.com/justfinethanku), Repo Manager; [Matt Hallett](https://github.com/matthallett1), Community Admin; [Alan Shurafa](https://github.com/alanshurafa), Community Reviewer. PRs are reviewed by the automated agent + human admins.
+The OB1 repo team: [Jonathan Edwards](https://github.com/justfinethanku), Repo Manager; [Matt Hallett](https://github.com/matthallett1), Community Admin; [Alan Shurafa](https://github.com/alanshurafa), Community Maintainer. PRs are reviewed by the automated agent + human maintainers.
 
 ## License
 
