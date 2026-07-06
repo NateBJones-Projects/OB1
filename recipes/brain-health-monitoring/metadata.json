@@ -1,0 +1,17 @@
+{
+  "name": "Brain Health Monitoring",
+  "description": "SQL views and runbook for monitoring source volumes, enrichment gaps, ingestion pipeline health, stalled queues, and knowledge graph coverage.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "tools": ["Supabase SQL Editor or psql"]
+  },
+  "tags": ["monitoring", "ops", "health", "observability", "views"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes"
+}

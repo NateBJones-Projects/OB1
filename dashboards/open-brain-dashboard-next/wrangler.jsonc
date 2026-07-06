@@ -1,0 +1,10 @@
+{
+  "name": "ob-dashboard",
+  "compatibility_date": "2026-04-25",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "main": ".open-next/worker.js",
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  }
+}
