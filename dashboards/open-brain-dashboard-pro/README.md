@@ -61,6 +61,10 @@ Screenshots go in `docs/screenshots/` and should be referenced from this README 
 - **Node.js 20+**
 - A host for the dashboard: Vercel or Netlify free tier works; self-hosting on a Node.js 20+ runtime is also fine
 
+## One-Command Install
+
+If you are standing up a brand-new brain rather than pointing this dashboard at an existing one, the [`brain-bootstrap` recipe](../../recipes/brain-bootstrap/) does the whole backend in a single script: it applies the core schema plus the wiki and CRM schemas in dependency order, deploys the `open-brain-rest`, `wiki-mcp`, `crm-mcp`, and `wiki-profile` Edge Functions, sets the secrets, and smoke-verifies each surface. It finishes by printing the exact `NEXT_PUBLIC_API_URL` and `SESSION_SECRET` for this dashboard and a Deploy-to-Vercel link that pre-sets the **Root Directory** to `dashboards/open-brain-dashboard-pro` and pre-fills the API URL. Run that first, then use the values it prints below.
+
 ## Configuration
 
 All configuration is through environment variables. **The app refuses to start if required variables are missing.**
