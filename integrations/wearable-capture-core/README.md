@@ -3,8 +3,8 @@
 > **A reusable engine that turns any always-on wearable into Open Brain thoughts
 > — at the granularity of atoms, not one summary per recording.** Write a small
 > adapter for your device; the core handles auth, atomic dedup, provenance,
-> embedding, and writes. Powers the [Omi](../wearable-omi-capture/) and
-> [Limitless](../wearable-limitless-capture/) capture integrations.
+> embedding, and writes. Powers the [Omi](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-omi-capture) and
+> [Limitless](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-limitless-capture) capture integrations.
 
 ---
 
@@ -190,8 +190,8 @@ Supabase runtime, so you don't set those yourself.
 This package is the engine only — it captures nothing on its own. Add at least
 one device:
 
-- **[Omi](../wearable-omi-capture/)** — Omi pendant conversations.
-- **[Limitless](../wearable-limitless-capture/)** — Limitless Pendant lifelogs.
+- **[Omi](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-omi-capture)** — Omi pendant conversations.
+- **[Limitless](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-limitless-capture)** — Limitless Pendant lifelogs.
 
 …or write your own adapter for any polling wearable by implementing the
 five-method `WearableAdapter` interface above.
@@ -271,9 +271,9 @@ are called by the adapters, not the core.
 
 ## Related
 
-- [Omi Wearable Capture](../wearable-omi-capture/) — adapter for the Omi
+- [Omi Wearable Capture](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-omi-capture) — adapter for the Omi
   pendant.
-- [Limitless Wearable Capture](../wearable-limitless-capture/) — adapter for the
+- [Limitless Wearable Capture](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-limitless-capture) — adapter for the
   Limitless Pendant.
 - [Smart Ingest](../smart-ingest/) — LLM extraction + dedup for raw documents
   (heavier path).
