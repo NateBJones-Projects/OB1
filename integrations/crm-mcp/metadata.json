@@ -1,0 +1,20 @@
+{
+  "name": "CRM MCP",
+  "description": "Standalone MCP Edge Function exposing nine CRM truth-layer tools: search/get contact, next actions, prepare briefing, add note/task, log interaction, resolve proposal, and set field. Machine writes propose; a human accepts — an agent can never silently overwrite a human-curated contact field.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "schemas/crm-core", "schemas/crm-engagement"],
+    "tools": ["Supabase CLI", "Deno"]
+  },
+  "tags": ["mcp", "crm", "contacts", "edge-function", "truth-layer", "human-in-the-loop"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-06-14",
+  "updated": "2026-06-14"
+}
