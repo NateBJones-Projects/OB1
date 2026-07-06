@@ -3,6 +3,7 @@ import { fetchWikiPages, ApiError } from "@/lib/api";
 import { requireSessionOrRedirect, getSession } from "@/lib/auth";
 import { FormattedDate } from "@/components/FormattedDate";
 import { NewPageForm } from "./NewPageForm";
+import { RegenerateProfileButton } from "./[slug]/RegenerateProfileButton";
 import { SetupState } from "@/components/SetupState";
 import type { WikiPageKind } from "@/lib/types";
 
@@ -67,6 +68,13 @@ export default async function WikiPage({
 
   const totalPages = Math.ceil(data.total / data.per_page);
 
+  // Offer the create-profile CTA only on the unfiltered first page: that view
+  // reliably contains user-profile when it exists (a kind filter or a later
+  // page could hide it and show a false CTA). A false positive would be
+  // harmless anyway — the worker upserts the page idempotently — but noisy.
+  const showProfileCta =
+    page === 1 && kind === "" && !data.data.some((p) => p.slug === "user-profile");
+
   function pageUrl(p: number) {
     const sp = new URLSearchParams();
     sp.set("page", String(p));
@@ -112,6 +120,22 @@ export default async function WikiPage({
           </Link>
         ))}
       </div>
+
+      {/* Create-your-profile CTA — shown until the wiki-profile worker (or a
+          manual create) has produced the user-profile page. The worker
+          bootstraps the page itself via wiki_upsert_page, so this POSTs to the
+          same regenerate route as the button on the page header. */}
+      {showProfileCta && (
+        <div className="bg-violet-surface border border-violet/20 rounded-lg px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-text-primary text-sm font-medium">Create your profile</p>
+            <p className="text-text-secondary text-xs mt-0.5">
+              Synthesize a User Profile wiki page from your thoughts.
+            </p>
+          </div>
+          <RegenerateProfileButton label="Create profile" successHref="/wiki/user-profile" />
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-bg-surface border border-border rounded-lg overflow-hidden">
