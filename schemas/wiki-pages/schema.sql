@@ -34,11 +34,16 @@
 --   * wiki_accept_pending promotes a parked draft to the live body, snapshots a
 --     revision, and keeps the section human-owned (the machine still proposes
 --     next time; it never auto-applies).
+--   * wiki_reject_pending discards a parked draft instead. It touches only the
+--     pending buffer — body_md, origin, locked, and heading are untouched — so
+--     no revision is written (a revision is a body_md change record, and reject
+--     makes none).
 --
 -- Same trust model as a human-in-the-loop: machine writes propose, a human
--- accepts. This is durable, revision-tracked, override-safe page storage —
--- distinct from the wiki-compiler / wiki-synthesis recipes, which compile
--- throwaway markdown artifacts with no persistence or human-override guard.
+-- accepts or rejects. This is durable, revision-tracked, override-safe page
+-- storage — distinct from the wiki-compiler / wiki-synthesis recipes, which
+-- compile throwaway markdown artifacts with no persistence or human-override
+-- guard.
 --
 -- ── ID contract ─────────────────────────────────────────────────────────────
 -- OB1's canonical public.thoughts.id is a UUID. Every id here is UUID-aligned:
@@ -384,6 +389,52 @@ GRANT EXECUTE ON FUNCTION public.wiki_accept_pending(UUID, TEXT) TO service_role
 
 COMMENT ON FUNCTION public.wiki_accept_pending IS
   'Promote a parked pending draft to the live section body, snapshot a revision, and keep the section human-owned. No-op when there is no pending draft.';
+
+-- ─── Reject a parked draft (a deliberate human decision) ────────────────────
+-- The mirror image of wiki_accept_pending: discard pending_generated_md instead
+-- of promoting it. Rejecting never touches body_md, origin, locked, or heading —
+-- it only clears the pending buffer, so it does not snapshot a revision (a
+-- revision row exists for every body_md change, and reject makes none). If there
+-- is no pending draft this is a no-op.
+
+CREATE OR REPLACE FUNCTION public.wiki_reject_pending(
+  p_section_id UUID,
+  p_actor      TEXT DEFAULT 'unknown'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  v_actor TEXT := coalesce(nullif(trim(p_actor), ''), 'unknown');
+  v_row   public.wiki_sections%ROWTYPE;
+BEGIN
+  SELECT * INTO v_row FROM public.wiki_sections WHERE id = p_section_id FOR UPDATE;
+  IF v_row.id IS NULL THEN RAISE EXCEPTION 'section not found: %', p_section_id; END IF;
+  IF v_row.pending_generated_md IS NULL THEN
+    RETURN jsonb_build_object('section_id', v_row.id, 'action', 'no_pending');
+  END IF;
+
+  -- Discard the parked draft. body_md, origin, locked, and heading are left
+  -- exactly as they were — reject only clears the pending buffer, it never
+  -- mutates the live section content or its ownership.
+  UPDATE public.wiki_sections
+  SET pending_generated_md = NULL,
+      pending_generated_at = NULL,
+      updated_at           = timezone('utc', now()),
+      updated_by           = v_actor
+  WHERE id = v_row.id;
+
+  RETURN jsonb_build_object('section_id', v_row.id, 'action', 'rejected');
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.wiki_reject_pending(UUID, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.wiki_reject_pending(UUID, TEXT) TO service_role;
+
+COMMENT ON FUNCTION public.wiki_reject_pending IS
+  'Discard a parked pending draft, leaving body_md, origin, locked, and heading untouched. No revision is written (body_md does not change). No-op when there is no pending draft.';
 
 -- ─── One fictional seed page (idempotent) ───────────────────────────────────
 -- A single generic example so a fresh install has something to look at. Guarded
