@@ -2,9 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { MarkdownBody } from "@/components/MarkdownBody";
 import { FormattedDate } from "@/components/FormattedDate";
 import type { WikiSection } from "@/lib/types";
+
+// Matches /thoughts/[id]'s own id guard — only ids shaped like this are
+// linkable there, so only ids shaped like this get a link here.
+const LINKABLE_THOUGHT_ID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // An origin chip that reads the ownership at a glance: a manual section is "yours"
 // (violet), a generated section is machine-owned (neutral). A lock badge rides
@@ -248,21 +254,31 @@ export function WikiSectionPanel({
         <div className="px-4 py-3 border-b border-border bg-bg-elevated/50">
           <p className="text-text-muted text-xs uppercase tracking-wider mb-1.5">Sources</p>
           <ul className="flex flex-wrap gap-1.5">
-            {evidenceIds.map((tid) => (
-              <li key={tid}>
-                {/* Inert on purpose — do NOT link to /thoughts/{tid}. That route
-                    parseInt()s its param, so a digit-leading UUID silently opens
-                    an unrelated numeric thought (parseInt('3fa85f64-…') === 3).
-                    Mirrors FieldEvidence's inert rendering; linking awaits a
-                    UUID-capable /thoughts/[id] route. Full UUID on hover. */}
-                <span
-                  title={tid}
-                  className="text-xs px-2 py-0.5 rounded bg-bg-surface border border-border text-text-secondary font-mono cursor-default"
-                >
-                  {tid.slice(0, 8)}…
-                </span>
-              </li>
-            ))}
+            {evidenceIds.map((tid) =>
+              LINKABLE_THOUGHT_ID_RE.test(tid) ? (
+                <li key={tid}>
+                  <Link
+                    href={`/thoughts/${tid}`}
+                    title={tid}
+                    className="text-xs px-2 py-0.5 rounded bg-bg-surface border border-border text-text-secondary font-mono hover:text-violet hover:border-violet/30 transition-colors"
+                  >
+                    {tid.slice(0, 8)}…
+                  </Link>
+                </li>
+              ) : (
+                <li key={tid}>
+                  {/* Defensive fallback — non-UUID ids (e.g. legacy numeric
+                      ids) render inert rather than linking to a route that
+                      only resolves UUID-shaped ids. Full id on hover. */}
+                  <span
+                    title={tid}
+                    className="text-xs px-2 py-0.5 rounded bg-bg-surface border border-border text-text-secondary font-mono cursor-default"
+                  >
+                    {tid.slice(0, 8)}…
+                  </span>
+                </li>
+              )
+            )}
           </ul>
         </div>
       )}
