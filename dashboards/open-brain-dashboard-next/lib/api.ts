@@ -23,7 +23,13 @@ function headers(apiKey: string): HeadersInit {
   };
 }
 
-async function apiFetch<T>(
+/**
+ * Authenticated JSON fetch against the open-brain-rest Edge Function.
+ *
+ * Exported so dashboard extensions (see EXTENSIONS.md) can reuse the auth
+ * header + error-translation plumbing without duplicating it.
+ */
+export async function apiFetch<T>(
   apiKey: string,
   path: string,
   init?: RequestInit
