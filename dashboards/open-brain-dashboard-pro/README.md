@@ -17,6 +17,18 @@ Seven server-rendered pages backed by iron-session auth and the Open Brain REST 
 | **Ingest** (`/ingest`) | Smart-ingest UI with dry-run preview, extracted-item cards, execute button, and job history. |
 | **Settings** (`/settings`) | Connection status, thought type breakdown, top topics, and masked API key prefix. |
 
+## CRM (optional)
+
+If your brain runs the CRM truth layer (the `crm-core` + `crm-engagement` schemas and the `/crm/*` routes on `open-brain-rest`), the dashboard grows a contacts surface:
+
+| Page | What you get |
+|------|--------------|
+| **Contacts** (`/contacts`) | Searchable contact list and a "new contact" form. |
+| **Contact** (`/contacts/:id`) | Editable fact panel with per-field origin, locks, and evidence; contact methods and aliases; this contact's open proposals with accept/reject; a notes / tasks / important-dates panel; and an activity view with a merged timeline and the raw change log. |
+| **Proposals** (`/proposals`) | Inbox of machine-suggested field changes filtered by status, with per-row accept/reject and bulk accept/reject for a whole import run. |
+
+The Contacts and Proposals nav entries, and the open-proposals badge on the sidebar, appear **only when the brain exposes the `/crm` surface**. The dashboard probes for it once at login and caches the result in the session, so a brain without the CRM layer never shows these entries and behaves exactly as before. Each CRM read also degrades on its own: if an individual route is missing or errors, that panel renders empty instead of blanking the page.
+
 ## Screenshots
 
 Screenshots go in `docs/screenshots/` and should be referenced from this README once you add them.
@@ -85,6 +97,7 @@ The dashboard calls these endpoints on your Open Brain REST gateway (all authent
 | `/thought/:id/connections` | GET | Detail page connections panel | Optional — panel hides if it errors |
 | `/duplicates`, `/duplicates/resolve` | GET / POST | Duplicates page | Optional — page shows an error otherwise |
 | `/ingest`, `/ingestion-jobs`, `/ingestion-jobs/:id`, `/ingestion-jobs/:id/execute` | POST / GET | Ingest page | Optional — page still loads without jobs |
+| `/crm/*` (contacts, proposals, notes, tasks, important-dates, timeline, history, …) | GET / POST / PATCH | Contacts, Proposals, contact detail panels | Optional — CRM surface is hidden unless `/crm` is detected at login |
 
 > **On `/reflections/*`:** The ExoCortex upstream dashboard staged a reflections feature. This fork does not yet ship a reflections UI surface, but the architecture is ready: if you add a reflection panel later and your gateway doesn't serve `/reflections/*`, expect a 404 that the UI should swallow. The existing optional endpoints already degrade this way — the Connections panel, Duplicates page, and Ingest history all swallow fetch errors and render an empty/neutral state instead of crashing.
 
