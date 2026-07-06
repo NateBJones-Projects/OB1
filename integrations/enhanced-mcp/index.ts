@@ -37,7 +37,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // ── Types ─────────────────────────────────────────────────────────────────
 
 type ThoughtRow = {
-  id: number;
+  id: string;
   content: string;
   content_fingerprint?: string | null;
   type: string;
@@ -52,7 +52,7 @@ type ThoughtRow = {
 };
 
 type UpsertThoughtResult = {
-  thought_id: number;
+  thought_id: string;
   action: string;
   content_fingerprint: string;
 };
@@ -387,17 +387,12 @@ server.registerTool(
     description:
       "Fetch a thought by ID with its full metadata and provenance.",
     inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID"),
+      id: z.string().uuid().describe("Thought ID (UUID)"),
     }),
   },
   async (params) => {
     try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const id = asString((params as Record<string, unknown>).id, "").trim();
 
       if (!id) {
         return toolFailure("id is required");
@@ -455,7 +450,7 @@ server.registerTool(
     description:
       "Update the content of an existing thought. Re-generates embedding and metadata.",
     inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID to update"),
+      id: z.string().uuid().describe("Thought ID (UUID) to update"),
       content: z
         .string()
         .min(1)
@@ -464,12 +459,7 @@ server.registerTool(
   },
   async (params) => {
     try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const id = asString((params as Record<string, unknown>).id, "").trim();
       const content = asString(
         (params as Record<string, unknown>).content,
         "",
@@ -915,22 +905,16 @@ server.registerTool(
       "Find thoughts related to a given thought via the knowledge graph connections.",
     inputSchema: z.object({
       thought_id: z
-        .number()
-        .int()
-        .min(1)
-        .describe("Thought ID to find connections for"),
+        .string()
+        .uuid()
+        .describe("Thought ID (UUID) to find connections for"),
       limit: z.number().int().min(1).max(20).default(10).optional(),
     }),
   },
   async (params) => {
     try {
       const raw = params as Record<string, unknown>;
-      const thoughtId = asInteger(
-        raw.thought_id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const thoughtId = asString(raw.thought_id, "").trim();
       const limit = asInteger(raw.limit, 10, 1, 20);
 
       if (!thoughtId) {
@@ -1267,7 +1251,7 @@ server.registerTool(
       if (thoughtLinks && thoughtLinks.length > 0) {
         const thoughtIds = (
           thoughtLinks as Record<string, unknown>[]
-        ).map((tl) => tl.thought_id as number);
+        ).map((tl) => tl.thought_id as string);
         const { data: thoughtRows, error: tError } = await supabase
           .from("thoughts")
           .select("id, content, type, created_at, sensitivity_tier")
@@ -1279,10 +1263,10 @@ server.registerTool(
         if (tError) {
           console.error("thoughts fetch failed", tError);
         } else if (thoughtRows) {
-          const roleMap = new Map<number, string>();
+          const roleMap = new Map<string, string>();
           for (const tl of thoughtLinks as Record<string, unknown>[]) {
             roleMap.set(
-              tl.thought_id as number,
+              tl.thought_id as string,
               tl.mention_role as string,
             );
           }
@@ -1293,7 +1277,7 @@ server.registerTool(
               type: t.type,
               created_at: t.created_at,
               mention_role:
-                roleMap.get(t.id as number) ?? "mentioned",
+                roleMap.get(t.id as string) ?? "mentioned",
             }),
           );
         }
