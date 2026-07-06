@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { fetchCrmProposals, resolveCrmProposal, resolveCrmProposalsByRun, ApiError } from "@/lib/api";
-import { requireSessionOrRedirect } from "@/lib/auth";
+import { requireSessionOrRedirect, getSession } from "@/lib/auth";
 import { FormattedDate } from "@/components/FormattedDate";
 import { ProposalDecision } from "./ProposalDecision";
 import type { ResolveResult } from "./ProposalDecision";
 import { RunBulkActions } from "./RunBulkActions";
+import { SetupState } from "@/components/SetupState";
 
 export const dynamic = "force-dynamic";
 
@@ -99,10 +100,20 @@ export default async function ProposalsPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const { apiKey } = await requireSessionOrRedirect();
+  const session = await getSession();
   const params = await searchParams;
   const page = parseInt(params.page || "1", 10);
   const status = params.status || "open";
   const runId = params.run_id || undefined;
+
+  // If we already know from login (or a re-check) the brain has no CRM
+  // surface, short-circuit to the setup state without a doomed fetch.
+  // `crmEnabled === false` is the only negative signal we trust; `undefined`
+  // (old cookie, pre-dating this field) falls through to the fetch below,
+  // whose 404 handling covers the schema-missing case anyway.
+  if (session.crmEnabled === false) {
+    return <SetupState surface="crm" />;
+  }
 
   let data;
   try {
@@ -110,6 +121,11 @@ export default async function ProposalsPage({
   } catch (err) {
     if (err instanceof ApiError) {
       console.error("[proposals] upstream", err.status, err.upstreamBody);
+      // 404 → the brain doesn't have the crm-core schema/routes. Show the
+      // same setup state as the cached-negative case.
+      if (err.status === 404) {
+        return <SetupState surface="crm" />;
+      }
     } else {
       console.error("[proposals]", err);
     }

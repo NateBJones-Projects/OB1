@@ -3,6 +3,7 @@ import { fetchWikiPages, ApiError } from "@/lib/api";
 import { requireSessionOrRedirect, getSession } from "@/lib/auth";
 import { FormattedDate } from "@/components/FormattedDate";
 import { NewPageForm } from "./NewPageForm";
+import { SetupState } from "@/components/SetupState";
 import type { WikiPageKind } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -14,26 +15,6 @@ function KindBadge({ kind }: { kind: string }) {
     <span className="inline-block text-xs px-2 py-0.5 rounded border border-border bg-bg-elevated text-text-muted capitalize">
       {kind}
     </span>
-  );
-}
-
-// Shared inline empty-state shown when the wiki schema/routes are absent. Kept
-// deliberately minimal and self-contained: a later PR replaces this with a
-// shared setup-state component, so there is nothing here to migrate but one <p>.
-function WikiNotInstalled() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold mb-1">Wiki</h1>
-      </div>
-      <div className="bg-bg-surface border border-border rounded-lg p-8">
-        <p className="text-text-secondary text-sm max-w-prose">
-          Wiki schema not installed — apply <code className="font-mono text-xs px-1 py-0.5 rounded bg-bg-elevated border border-border text-text-primary">schemas/wiki-pages</code>{" "}
-          to your brain and deploy the <code className="font-mono text-xs px-1 py-0.5 rounded bg-bg-elevated border border-border text-text-primary">/wiki</code>{" "}
-          gateway routes to enable persistent wiki pages. See the repo README for the setup steps.
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -54,7 +35,7 @@ export default async function WikiPage({
   // negative signal we trust; `undefined` (old cookie) falls through to the fetch,
   // whose 404 handling covers the schema-missing case anyway.
   if (session.wikiEnabled === false) {
-    return <WikiNotInstalled />;
+    return <SetupState surface="wiki" />;
   }
 
   let data;
@@ -68,9 +49,9 @@ export default async function WikiPage({
     if (err instanceof ApiError) {
       console.error("[wiki] upstream", err.status, err.upstreamBody);
       // 404 → the brain doesn't have the wiki schema/routes. Show the same
-      // inline empty-state as the cached-negative case.
+      // setup state as the cached-negative case.
       if (err.status === 404) {
-        return <WikiNotInstalled />;
+        return <SetupState surface="wiki" />;
       }
     } else {
       console.error("[wiki]", err);

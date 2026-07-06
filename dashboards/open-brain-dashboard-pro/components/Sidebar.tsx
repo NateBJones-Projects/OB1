@@ -26,10 +26,12 @@ const nav: NavItem[] = [
 export function Sidebar({
   restrictedConfigured = false,
   crmEnabled = false,
+  wikiEnabled = false,
   openProposals = 0,
 }: {
   restrictedConfigured?: boolean;
   crmEnabled?: boolean;
+  wikiEnabled?: boolean;
   openProposals?: number;
 }) {
   const pathname = usePathname();
@@ -37,16 +39,31 @@ export function Sidebar({
   // Hide sidebar on login page
   if (pathname === "/login") return null;
 
-  // CRM is optional: its nav entries appear only when the brain exposes /crm
-  // (probed at login). Insert after "Thoughts" so it reads Dashboard → Thoughts
-  // → Contacts → Proposals → …
-  const items: NavItem[] = [...nav];
-  if (crmEnabled) {
-    items.splice(2, 0,
-      { href: "/contacts", label: "Contacts", icon: ContactsIcon },
-      { href: "/proposals", label: "Proposals", icon: ProposalsIcon, badge: openProposals },
-    );
-  }
+  // CRM and Wiki are optional backends. Default behavior is to ALWAYS show
+  // their nav entries — a user who's never applied the schema should still
+  // discover the surface exists and be taught how to turn it on (see
+  // components/SetupState.tsx). Set NEXT_PUBLIC_OPTIONAL_NAV=auto to restore
+  // the old hide-until-enabled behavior, gated on the login-time probe cached
+  // in the session. NEXT_PUBLIC_* vars are inlined at build time, so this
+  // branch is fixed for the life of a given build/deploy.
+  const autoHide = process.env.NEXT_PUBLIC_OPTIONAL_NAV === "auto";
+  const showCrm = !autoHide || crmEnabled;
+  const showWiki = !autoHide || wikiEnabled;
+
+  // Insert after "Thoughts" so it reads Dashboard → Thoughts → Contacts →
+  // Proposals → Wiki → …. The open-proposals badge only ever reflects a real
+  // count, so it stays gated on crmEnabled regardless of autoHide.
+  const items: NavItem[] = [
+    ...nav.slice(0, 2),
+    ...(showCrm
+      ? [
+          { href: "/contacts", label: "Contacts", icon: ContactsIcon },
+          { href: "/proposals", label: "Proposals", icon: ProposalsIcon, badge: crmEnabled ? openProposals : undefined },
+        ]
+      : []),
+    ...(showWiki ? [{ href: "/wiki", label: "Wiki", icon: WikiIcon }] : []),
+    ...nav.slice(2),
+  ];
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-56 bg-bg-surface border-r border-border flex flex-col z-40">
@@ -184,6 +201,15 @@ function ProposalsIcon({ active }: { active: boolean }) {
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
       <path d="M2 5.5h14v9H2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
       <path d="M2 5.5L9 10l7-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function WikiIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M9 4.5c-1.2-1-3-1.5-5-1.5v10c2 0 3.8.5 5 1.5V4.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M9 4.5c1.2-1 3-1.5 5-1.5v10c-2 0-3.8.5-5 1.5V4.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
   );
 }

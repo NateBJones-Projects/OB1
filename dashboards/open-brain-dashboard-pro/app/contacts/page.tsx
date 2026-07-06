@@ -2,6 +2,7 @@ import Link from "next/link";
 import { fetchCrmContacts, ApiError } from "@/lib/api";
 import { requireSessionOrRedirect, getSession } from "@/lib/auth";
 import { FormattedDate } from "@/components/FormattedDate";
+import { SetupState } from "@/components/SetupState";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,15 @@ export default async function ContactsPage({
   const q = params.q || "";
   const tier = params.privacy_tier || "";
 
+  // If we already know from login (or a re-check) the brain has no CRM
+  // surface, short-circuit to the setup state without a doomed fetch.
+  // `crmEnabled === false` is the only negative signal we trust; `undefined`
+  // (old cookie, pre-dating this field) falls through to the fetch below,
+  // whose 404 handling covers the schema-missing case anyway.
+  if (session.crmEnabled === false) {
+    return <SetupState surface="crm" />;
+  }
+
   let data;
   try {
     data = await fetchCrmContacts(apiKey, {
@@ -46,6 +56,11 @@ export default async function ContactsPage({
   } catch (err) {
     if (err instanceof ApiError) {
       console.error("[contacts] upstream", err.status, err.upstreamBody);
+      // 404 → the brain doesn't have the crm-core schema/routes. Show the
+      // same setup state as the cached-negative case.
+      if (err.status === 404) {
+        return <SetupState surface="crm" />;
+      }
     } else {
       console.error("[contacts]", err);
     }
