@@ -39,7 +39,7 @@ run self-heals on the next pass — no local state file.
 
 ## Prerequisites
 
-- **The [wearable-capture-core](../wearable-capture-core/) engine installed
+- **The [wearable-capture-core](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core) engine installed
   first.** This adapter imports it from `../_shared/wearable-sync.ts`; without
   it, the function won't deploy. Follow that README through Step 2 (it also sets
   `OPENROUTER_API_KEY`, which this adapter relies on for embeddings). (For
@@ -86,7 +86,7 @@ Fill these in as you go — you'll need them in Steps 2 and 5:
 
 This adapter is built on the shared engine and can't run without it.
 
-Follow the [wearable-capture-core README](../wearable-capture-core/) through
+Follow the [wearable-capture-core README](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core) through
 **Step 2**. That gives you:
 
 - `supabase/functions/_shared/wearable-sync.ts` (the engine this function
@@ -333,7 +333,7 @@ the existing `thoughts` table.
 | Component                                  | Type                                                                         | What it does                                                                                                                     |
 | ------------------------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
 | `wearable-limitless-capture` Edge Function | Supabase scheduled poller (not an MCP server)                                | Pulls recent lifelogs from the Limitless API and atomizes each into a title atom + one section atom per heading via the adapter. |
-| `wearable-sync.ts`                         | Shared Deno module (from [wearable-capture-core](../wearable-capture-core/)) | Per-atom dedup, provenance, embedding (OpenRouter), and insert into `thoughts`.                                                  |
+| `wearable-sync.ts`                         | Shared Deno module (from [wearable-capture-core](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core)) | Per-atom dedup, provenance, embedding (OpenRouter), and insert into `thoughts`.                                                  |
 | `thoughts` table                           | Existing Open Brain primitive                                                | No schema changes — additive rows only.                                                                                          |
 
 **External services called:** `api.limitless.ai/v1` (lifelog list, by the
@@ -349,9 +349,9 @@ read from `thoughts`, audit those per the
 
 ## Related
 
-- [Wearable Capture Core](../wearable-capture-core/) — the engine this adapter
+- [Wearable Capture Core](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-capture-core) — the engine this adapter
   is built on (install first).
-- [Omi Wearable Capture](../wearable-omi-capture/) — sibling adapter for the Omi
+- [Omi Wearable Capture](https://github.com/NateBJones-Projects/OB1/tree/main/integrations/wearable-omi-capture) — sibling adapter for the Omi
   pendant.
 - [Smart Ingest](../smart-ingest/) — LLM extraction + dedup for raw documents
   (heavier path).
