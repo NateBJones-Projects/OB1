@@ -74,7 +74,7 @@ fails the existence check, or gives up.
 ### Workarounds (until a base update lands)
 
 - **Manual ID injection:** the human user pastes IDs into the prompt.
-  ExoCortex dashboards, direct SQL, or a custom recipe can surface IDs for
+  External dashboards, direct SQL, or a custom recipe can surface IDs for
   copy/paste.
 - **Custom read tool:** deploy a variant of `search_thoughts` that returns
   structured JSON including `id`, then reference it instead. The
