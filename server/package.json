@@ -1,0 +1,14 @@
+{
+  "name": "ob1-server-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node test-stateless.mjs"
+  },
+  "devDependencies": {
+    "@hono/mcp": "^0.1.5",
+    "@hono/node-server": "^1.19.11",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "hono": "^4.12.9"
+  }
+}
