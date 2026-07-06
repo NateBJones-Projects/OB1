@@ -18,6 +18,15 @@ import type {
   CrmNote,
   CrmTask,
   CrmImportantDate,
+  WikiPageKind,
+  WikiPageListResponse,
+  WikiPageDetailResponse,
+  WikiCreatePageResponse,
+  WikiWriteSectionResponse,
+  WikiAcceptPendingResponse,
+  WikiRejectPendingResponse,
+  WikiLockResponse,
+  WikiArchivePageResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -531,4 +540,99 @@ export async function fetchCrmTimeline(
     sp.set("exclude_restricted", String(params.exclude_restricted));
   const qs = sp.toString();
   return apiFetch(apiKey, `/crm/contacts/${id}/timeline${qs ? `?${qs}` : ""}`);
+}
+
+// ─── Wiki (optional) ─────────────────────────────────────────────────────────
+// These hit the /wiki/* gateway routes, present only when the wiki-pages schema
+// is installed. `wikiAvailable` probes once so the UI can hide the section (or
+// show the inline "schema not installed" empty-state) entirely. A brain WITHOUT
+// the schema returns 404 on GET /wiki/pages, so the probe simply comes back
+// false. Section identifiers are UUIDs; a page slug is arbitrary user text and
+// is always percent-encoded before it goes into a path segment.
+
+/** Feature detection: true when the brain exposes the wiki surface. */
+export async function wikiAvailable(apiKey: string): Promise<boolean> {
+  try {
+    await apiFetch<unknown>(apiKey, "/wiki/pages?per_page=1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchWikiPages(
+  apiKey: string,
+  params?: { page_kind?: string; page?: number; per_page?: number }
+): Promise<WikiPageListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.page_kind) sp.set("page_kind", params.page_kind);
+  // IN-07: preserve explicit numeric values (page/per_page are always >= 1 here,
+  // but keep the guard consistent with the rest of this module).
+  if (params?.page !== undefined) sp.set("page", String(params.page));
+  if (params?.per_page !== undefined) sp.set("per_page", String(params.per_page));
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/wiki/pages${qs ? `?${qs}` : ""}`);
+}
+
+export async function createWikiPage(
+  apiKey: string,
+  data: { slug: string; title: string; page_kind?: WikiPageKind; metadata?: Record<string, unknown> }
+): Promise<WikiCreatePageResponse> {
+  return apiFetch(apiKey, "/wiki/pages", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function fetchWikiPage(
+  apiKey: string,
+  slug: string
+): Promise<WikiPageDetailResponse> {
+  return apiFetch(apiKey, `/wiki/pages/${encodeURIComponent(slug)}`);
+}
+
+export async function writeWikiSection(
+  apiKey: string,
+  slug: string,
+  sectionKey: string,
+  data: { body_md: string; heading?: string; display_order?: number }
+): Promise<WikiWriteSectionResponse> {
+  return apiFetch(
+    apiKey,
+    `/wiki/pages/${encodeURIComponent(slug)}/sections/${encodeURIComponent(sectionKey)}`,
+    { method: "PUT", body: JSON.stringify(data) }
+  );
+}
+
+export async function acceptWikiPending(
+  apiKey: string,
+  sectionId: string
+): Promise<WikiAcceptPendingResponse> {
+  return apiFetch(apiKey, `/wiki/sections/${encodeURIComponent(sectionId)}/accept-pending`, {
+    method: "POST",
+  });
+}
+
+export async function rejectWikiPending(
+  apiKey: string,
+  sectionId: string
+): Promise<WikiRejectPendingResponse> {
+  return apiFetch(apiKey, `/wiki/sections/${encodeURIComponent(sectionId)}/reject-pending`, {
+    method: "POST",
+  });
+}
+
+export async function setWikiSectionLock(
+  apiKey: string,
+  sectionId: string,
+  locked: boolean
+): Promise<WikiLockResponse> {
+  return apiFetch(apiKey, `/wiki/sections/${encodeURIComponent(sectionId)}/lock`, {
+    method: "POST",
+    body: JSON.stringify({ locked }),
+  });
+}
+
+export async function archiveWikiPage(
+  apiKey: string,
+  slug: string
+): Promise<WikiArchivePageResponse> {
+  return apiFetch(apiKey, `/wiki/pages/${encodeURIComponent(slug)}`, { method: "DELETE" });
 }
