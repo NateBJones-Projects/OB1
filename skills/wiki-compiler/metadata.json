@@ -1,0 +1,21 @@
+{
+  "name": "Wiki Compiler",
+  "description": "Triggerable operator for the Wiki Compiler recipe. Bootstraps credentials, verifies the entity-extraction and typed-reasoning-edges schemas, runs the compile pipeline (entity extraction -> typed edges -> entity wiki -> topic wiki), drains the extraction queue, and recovers from known failure modes (OpenRouter dated model-id 400s, extraction 502s, missing .env.local).",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter (or Anthropic) API", "Supabase CLI (authenticated, project linked)"],
+    "tools": ["Node.js 18+", "Claude Code or similar AI coding tool with reusable skills/system prompts"]
+  },
+  "requires_skills": [],
+  "tags": ["workflow", "wiki", "knowledge-graph", "compiled-views", "orchestration", "supabase-cli"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-07-08",
+  "updated": "2026-07-08"
+}
