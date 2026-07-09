@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { fetchWikiPage, ApiError } from "@/lib/api";
+import { fetchWikiPageBySlug, ApiError } from "@/lib/api";
 import { requireSessionOrRedirect } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -10,27 +10,25 @@ export const dynamic = "force-dynamic";
 export default async function WikiArticlePage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 }) {
   const { apiKey } = await requireSessionOrRedirect();
-  const { id } = await params;
-  if (!/^\d+$/.test(id) || !Number.isSafeInteger(Number(id))) notFound();
+  const { slug } = await params;
+  if (!/^[a-zA-Z0-9_-]+$/.test(slug)) notFound();
 
-  let page: Awaited<ReturnType<typeof fetchWikiPage>>;
+  let page: Awaited<ReturnType<typeof fetchWikiPageBySlug>>;
   try {
-    page = await fetchWikiPage(apiKey, Number(id));
+    page = await fetchWikiPageBySlug(apiKey, slug);
   } catch (err) {
-    // 404 = no such id; 403 = restricted (shouldn't occur — we fetch with
-    // exclude_restricted=false — but guard so it degrades to not-found, not 500).
+    // 403 = restricted (shouldn't occur — browse fetches with exclude_restricted=false);
+    // degrade to not-found rather than surfacing a 500.
     if (err instanceof ApiError && (err.status === 404 || err.status === 403)) notFound();
     throw err;
   }
-  if (page.source_type !== "wiki_entity" && page.source_type !== "wiki_topic") {
-    notFound();
-  }
+  if (!page) notFound();
 
-  const meta = page.metadata as Record<string, unknown>;
-  const title = (meta.wiki_title as string) || (meta.wiki_slug as string) || `#${page.id}`;
+  const meta = (page.metadata ?? {}) as Record<string, unknown>;
+  const title = (meta.wiki_title as string) || (meta.wiki_slug as string) || slug;
 
   return (
     <article className="space-y-6">

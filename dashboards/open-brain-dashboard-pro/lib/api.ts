@@ -289,10 +289,23 @@ export async function fetchWikiPages(
   return all;
 }
 
-/** Fetch one wiki page by its thought id (restricted included — all behind login). */
-export async function fetchWikiPage(
+/**
+ * Fetch one wiki page by its metadata.wiki_slug. Looks it up through the browse
+ * endpoint (both kinds) rather than /thought/:id — the gateway's single-thought
+ * route is numeric-only and this Open Brain instance uses UUID thought ids, so
+ * id-based fetch cannot work. Returns null if no page has that slug.
+ */
+export async function fetchWikiPageBySlug(
   apiKey: string,
-  id: number
-): Promise<Thought> {
-  return fetchThought(apiKey, id, false);
+  slug: string
+): Promise<Thought | null> {
+  const [entities, topics] = await Promise.all([
+    fetchWikiPages(apiKey, "wiki_entity"),
+    fetchWikiPages(apiKey, "wiki_topic"),
+  ]);
+  return (
+    [...entities, ...topics].find(
+      (t) => ((t.metadata ?? {}) as Record<string, unknown>).wiki_slug === slug
+    ) ?? null
+  );
 }

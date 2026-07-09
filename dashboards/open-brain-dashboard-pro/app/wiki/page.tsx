@@ -10,6 +10,10 @@ function title(t: Thought): string {
   return (m.wiki_title as string) || (m.wiki_slug as string) || `#${t.id}`;
 }
 
+function slugOf(t: Thought): string {
+  return ((t.metadata ?? {}) as Record<string, unknown>).wiki_slug as string;
+}
+
 function excerpt(t: Thought): string {
   return (t.content ?? "")
     .replace(/^#.*$/gm, "")
@@ -28,7 +32,7 @@ function Section({ heading, pages }: { heading: string; pages: Thought[] }) {
         {pages.map((p) => (
           <Link
             key={p.id}
-            href={`/wiki/${p.id}`}
+            href={`/wiki/${slugOf(p)}`}
             className="bg-bg-surface border border-border rounded-lg p-4 hover:border-violet/40 transition-colors"
           >
             <div className="flex items-baseline justify-between gap-2 mb-1">
