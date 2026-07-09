@@ -87,7 +87,7 @@ server.registerTool(
         .optional()
         .describe("New text content — triggers re-embedding when provided"),
       metadata_patch: z
-        .record(z.unknown())
+        .record(z.string(), z.unknown())
         .optional()
         .describe(
           "Partial metadata to shallow-merge into the existing metadata JSONB. New keys are added; existing keys are overwritten; keys not mentioned are left alone.",
