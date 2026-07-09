@@ -22,10 +22,12 @@ The knowledge graph enables queries like "what projects does Sarah work on?" or 
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
-- **Enhanced thoughts schema** applied — install `schemas/enhanced-thoughts`
-- **Knowledge graph schema** applied — install `schemas/knowledge-graph` to create the `entities`, `edges`, `thought_entities`, and `entity_extraction_queue` tables
+- **Entity extraction schema** applied — install [`schemas/entity-extraction/`](../../schemas/entity-extraction/), which creates the `entities`, `edges`, `thought_entities`, and `entity_extraction_queue` tables plus the auto-queue trigger
 - At least one LLM API key: OpenRouter (recommended), OpenAI, or Anthropic
 - Supabase CLI installed for deployment
+
+> [!NOTE]
+> [`schemas/enhanced-thoughts/`](../../schemas/enhanced-thoughts/) is **not** required by this worker — it reads only `id`, `content`, and `metadata` from `thoughts`. Install it if other components need it.
 
 ## Steps
 
@@ -119,6 +121,60 @@ ORDER BY ed.updated_at DESC
 LIMIT 20;
 ```
 
+### 6. Schedule It (recommended)
+
+New thoughts are auto-queued by the trigger, but the worker only runs when something invokes it. Schedule it with `pg_cron` + `pg_net` (enable both under **Database → Extensions**), storing your access key in Supabase Vault:
+
+```sql
+select cron.schedule(
+  'entity-extraction-worker',
+  '0 */3 * * *',
+  $$
+  do $inner$
+  declare k text;
+  begin
+    select decrypted_secret into k from vault.decrypted_secrets where name = 'mcp_access_key';
+    if k is null or length(k) = 0 then
+      raise exception 'entity-extraction-worker: mcp_access_key not found in vault';
+    end if;
+    perform net.http_post(
+      url := 'https://<your-project-ref>.supabase.co/functions/v1/entity-extraction-worker?limit=10',
+      headers := jsonb_build_object('x-brain-key', k, 'Content-Type', 'application/json'),
+      timeout_milliseconds := 90000
+    );
+  end
+  $inner$;
+  $$
+);
+```
+
+> [!CAUTION]
+> **Three things silently break a naive schedule.** Each one produces a `cron.job_run_details` row reading `succeeded` while **zero thoughts are processed**:
+>
+> 1. **`net.http_post()` defaults to `timeout_milliseconds = 5000`.** This worker makes one LLM call per thought and takes *tens of seconds* (~26 s for 3 thoughts; ~58 s for 10–12). Without an explicit timeout, every scheduled call is abandoned mid-flight and nothing is ever committed. Set `timeout_milliseconds`, and keep `limit` small enough that a run completes inside it (`limit=10` ≈ 60 s, comfortably under the Edge Function's ~150 s budget).
+> 2. **A trailing space in the Vault secret's _name_** makes `where name = 'mcp_access_key'` match nothing. The sub-select returns `NULL`, the job sends `x-brain-key: null`, and the worker replies `401`. The `raise exception` guard above converts this into a visible cron failure instead of a phantom success.
+> 3. **`net.http_post()` only _enqueues_ the request** and returns a request id — pg_cron never observes the HTTP response. **`cron.job_run_details` is therefore not a health signal.**
+
+**Verify the schedule actually works** (do this instead of trusting the cron log):
+
+```sql
+-- the Vault secret name must be exact: expect name_len = 14
+select name, length(name) as name_len, (name = 'mcp_access_key') as exact_match
+from vault.decrypted_secrets;
+
+-- the queue should stay near empty
+select status, count(*) from entity_extraction_queue group by status;
+
+-- pg_net records the real outcome, including the worker's JSON reply
+select id, status_code, left(content::text, 140) as body, created
+from net._http_response order by created desc limit 5;
+```
+
+Want `status_code = 200` (with a body like `{"processed": 0, ...}`) and `pending ≈ 0`. A `401` means the key never arrived; a `null` status with `Timeout of 5000 ms reached` means the call was abandoned before the worker finished.
+
+> [!TIP]
+> With an empty queue the worker returns `{"processed": 0, ...}` in under a second — so you can validate auth, connectivity, and the timeout immediately by invoking the same `net.http_post(...)` by hand, without waiting for the next tick.
+
 ## API Reference
 
 ### `POST /entity-extraction-worker`
@@ -181,6 +237,11 @@ After completing setup and running the worker, you should be able to:
 5. Observe the queue draining — items move from `pending` → `processing` → `complete`
 
 ## Troubleshooting
+
+**Scheduled runs report `succeeded` but nothing is processed**
+`cron.job_run_details` says `succeeded` because `net.http_post()` only *enqueues* the request — pg_cron never observes the HTTP response. Check `net._http_response` for the real outcome. A `null` status with `Timeout of 5000 ms reached` means `timeout_milliseconds` was left at its 5 s default (this worker needs tens of seconds). A `401` means the `x-brain-key` header arrived empty — most often a trailing space in the Vault secret's *name*, so `where name = 'mcp_access_key'` matched nothing. See [Schedule It](#6-schedule-it-recommended).
+
+A telling symptom: `select status, count(*) from entity_extraction_queue group by status;` shows a `complete` count that exactly matches your *manual* invocations — meaning the cron has processed nothing at all, despite days of "successful" runs.
 
 **"No LLM API key configured"**
 Set at least one of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` as a Supabase secret.
