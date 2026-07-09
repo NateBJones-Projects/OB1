@@ -14,9 +14,9 @@ export default async function WikiArticlePage({
 }) {
   const { apiKey } = await requireSessionOrRedirect();
   const { id } = await params;
-  if (!/^\d+$/.test(id)) notFound();
+  if (!/^\d+$/.test(id) || !Number.isSafeInteger(Number(id))) notFound();
 
-  let page;
+  let page: Awaited<ReturnType<typeof fetchWikiPage>>;
   try {
     page = await fetchWikiPage(apiKey, Number(id));
   } catch (err) {
