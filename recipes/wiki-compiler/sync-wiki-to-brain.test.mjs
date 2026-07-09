@@ -46,4 +46,11 @@ test("buildWikiThought falls back to slug-derived title", () => {
   assert.equal(t.source_type, "wiki_topic");
   assert.equal(t.metadata.wiki_title, "autobiography");
   assert.equal(t.metadata.generated_at, null);
+  assert.equal(t.metadata.wiki_type, "topic");
+});
+
+test("buildWikiThought fallback wiki_type for entities dir is 'entity'", () => {
+  const t = buildWikiThought("entities", "person-nicole.md", "No frontmatter body.");
+  assert.equal(t.source_type, "wiki_entity");
+  assert.equal(t.metadata.wiki_type, "entity");
 });

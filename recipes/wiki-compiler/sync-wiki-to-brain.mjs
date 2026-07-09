@@ -51,7 +51,7 @@ export function buildWikiThought(dir, filename, raw) {
     metadata: {
       wiki_slug: slug,
       wiki_title: title,
-      wiki_type: meta.type || dir.replace(/s$/, ""),
+      wiki_type: meta.type || { entities: "entity", topics: "topic" }[dir],
       generated_at: meta.generated_at || null,
       compiled_by: "wiki-compiler",
     },
