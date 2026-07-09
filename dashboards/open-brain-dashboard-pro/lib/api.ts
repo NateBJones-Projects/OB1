@@ -259,3 +259,40 @@ export async function checkHealth(
 ): Promise<{ status: string }> {
   return apiFetch<{ status: string }>(apiKey, "/health");
 }
+
+// ── Wiki pages (compiled-wiki output stored as wiki_* thoughts) ──────────
+
+export type WikiKind = "wiki_entity" | "wiki_topic";
+
+/**
+ * List ALL compiled wiki pages of one kind. Paginates because the gateway
+ * caps per_page at 100. Includes restricted rows (all pages visible behind login).
+ */
+export async function fetchWikiPages(
+  apiKey: string,
+  kind: WikiKind
+): Promise<Thought[]> {
+  const perPage = 100;
+  const all: Thought[] = [];
+  for (let page = 1; page <= 50; page++) {
+    const res = await fetchThoughts(apiKey, {
+      source_type: kind,
+      per_page: perPage,
+      page,
+      sort: "created_at",
+      order: "desc",
+      exclude_restricted: false,
+    });
+    all.push(...res.data);
+    if (res.data.length < perPage) break;
+  }
+  return all;
+}
+
+/** Fetch one wiki page by its thought id (restricted included — all behind login). */
+export async function fetchWikiPage(
+  apiKey: string,
+  id: number
+): Promise<Thought> {
+  return fetchThought(apiKey, id, false);
+}
