@@ -233,6 +233,25 @@ Other outputs are owned by the underlying recipes:
 - `public.thought_edges` for typed reasoning links
 - `public.entities`, `public.edges`, `public.thought_entities` for graph extraction
 
+## Viewing on the dashboard
+
+The compiled markdown is browsable in **Open Brain Dashboard Pro** at `/wiki`, fetched live
+from the database (never committed to git). Two steps after a compile:
+
+```bash
+# 1. Compile to files (writes compiled-wiki/, which is gitignored)
+node recipes/wiki-compiler/compile-wiki.mjs
+
+# 2. Publish the pages into your brain as wiki_entity / wiki_topic thoughts
+node recipes/wiki-compiler/sync-wiki-to-brain.mjs
+```
+
+`sync-wiki-to-brain.mjs` is idempotent (re-runs update in place, keyed on `metadata.wiki_slug`).
+The dashboard reads the pages via the existing REST gateway — no schema or gateway changes, and
+your personal wiki content stays in the DB behind login. Regeneration needs no redeploy.
+
+Flags: `--dry-run` (preview, no writes), `--only entities|topics`, `--in-dir <path>`.
+
 ## Important Design Rule
 
 Do **not** treat generated wiki pages as the source of truth.
