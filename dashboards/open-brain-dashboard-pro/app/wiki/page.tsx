@@ -6,12 +6,12 @@ import type { Thought } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 function title(t: Thought): string {
-  const m = t.metadata as Record<string, unknown>;
+  const m = (t.metadata ?? {}) as Record<string, unknown>;
   return (m.wiki_title as string) || (m.wiki_slug as string) || `#${t.id}`;
 }
 
 function excerpt(t: Thought): string {
-  return t.content
+  return (t.content ?? "")
     .replace(/^#.*$/gm, "")
     .replace(/^>.*$/gm, "")
     .trim()
@@ -36,7 +36,7 @@ function Section({ heading, pages }: { heading: string; pages: Thought[] }) {
                 {title(p)}
               </span>
               <span className="text-[10px] uppercase tracking-wide text-text-muted shrink-0">
-                {(p.metadata as Record<string, unknown>).wiki_type as string ?? "wiki"}
+                {((p.metadata ?? {}) as Record<string, unknown>).wiki_type as string ?? "wiki"}
               </span>
             </div>
             {excerpt(p) && (
