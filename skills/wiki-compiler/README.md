@@ -70,6 +70,20 @@ The skill encodes the fix for each. See `SKILL.md` for the exact protocol.
 - [`schemas/entity-extraction`](../../schemas/entity-extraction/) and
   [`schemas/typed-reasoning-edges`](../../schemas/typed-reasoning-edges/) — the
   graph tables the compile reads and writes.
+- [Open Brain Dashboard Pro](../../dashboards/open-brain-dashboard-pro/) `/wiki` route —
+  the live viewer for compiled pages, published via `sync-wiki-to-brain.mjs`.
+
+## Viewing the output
+
+After compiling, publish the pages into your brain so the dashboard can render them live:
+
+```bash
+node recipes/wiki-compiler/compile-wiki.mjs        # -> compiled-wiki/ (gitignored)
+node recipes/wiki-compiler/sync-wiki-to-brain.mjs  # -> wiki_entity / wiki_topic thoughts
+```
+
+Then browse them at the Open Brain Dashboard Pro `/wiki` route. Content lives only in the
+database (behind login); nothing personal is committed to git.
 
 ## Design Rule
 

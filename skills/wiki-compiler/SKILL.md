@@ -90,7 +90,15 @@ zero output is a failure — verify, don't assume.
    ```
    If `thought_edges` is still empty, apply the edge-phase fix in the next section.
 
-6. **Drain the extraction queue (optional, for full coverage).** One compile
+6. **Publish to the brain (for dashboard viewing).** After a successful compile,
+   run `node recipes/wiki-compiler/sync-wiki-to-brain.mjs` to upsert each compiled
+   page into `public.thoughts` as a `wiki_entity` / `wiki_topic` thought (idempotent,
+   keyed on `metadata.wiki_slug`; needs `OPEN_BRAIN_URL` + `OPEN_BRAIN_SERVICE_KEY`).
+   The pages are then browsable at the Open Brain Dashboard Pro `/wiki` route, fetched
+   live — personal content stays in the DB and is never committed to git. Use
+   `--dry-run` first; `--only entities|topics` to scope.
+
+7. **Drain the extraction queue (optional, for full coverage).** One compile
    processes only `--extract-limit` items (default 25). To fold every thought
    into the graph, loop extraction-only passes until pending hits zero, then do
    one final compile so the wiki reflects every entity:
@@ -141,6 +149,8 @@ it is personal brain data.
   drives, and the source of truth for flags and architecture.
 - The component recipes it orchestrates: `typed-edge-classifier`, `entity-wiki`,
   `wiki-synthesis`, and the `entity-extraction` / `typed-reasoning-edges` schemas.
+- `sync-wiki-to-brain.mjs` + the [Open Brain Dashboard Pro](../../dashboards/open-brain-dashboard-pro/)
+  `/wiki` route — publish the compiled pages into the DB and browse them live (step 6).
 
 ## Notes
 
