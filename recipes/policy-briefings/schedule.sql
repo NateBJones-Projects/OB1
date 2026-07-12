@@ -4,8 +4,15 @@
 --
 -- BEFORE RUNNING:
 --   Replace <YOUR-PROJECT-REF> with your Supabase project reference.
---   Replace <YOUR-SYNTHESIS-KEY> with the value of your SYNTHESIS_ACCESS_KEY
---   secret (any random string you choose — gates both function URLs).
+--   Store your SYNTHESIS_ACCESS_KEY in Supabase Vault (step 0 below) so the
+--   key is read at fire time instead of being pasted into the job command.
+--
+-- SECURITY NOTE — why header auth + Vault, not ?key= in the URL:
+--   A key embedded in the URL is stored verbatim in cron.job.command (readable
+--   by anyone with SQL access) AND appears in Supabase's function-invocation
+--   logs on every run. Passing the key as a request header, read from Vault at
+--   fire time, keeps it out of both. Both functions accept the same key via
+--   the x-synthesis-key header.
 -- ============================================================
 --
 -- Prerequisites:
@@ -19,15 +26,25 @@
 -- the auditor inspects the full week before the summary is written.
 -- ============================================================
 
+-- 0. One-time: store the synthesis key in Vault (same value as the
+--    SYNTHESIS_ACCESS_KEY function secret). Run once; to change it later use
+--    vault.update_secret rather than re-running create_secret.
+-- SELECT vault.create_secret('<YOUR-SYNTHESIS-KEY>', 'synthesis_access_key');
+
 -- Daily morning briefing — 12:00 UTC (7am CDT). Window: last 1 day.
 SELECT cron.schedule(
   'daily-morning-briefing',
   '0 12 * * *',
   $$
   SELECT net.http_post(
-    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/morning-briefing?key=<YOUR-SYNTHESIS-KEY>',
-    headers := jsonb_build_object('Content-Type', 'application/json'),
-    body := jsonb_build_object('days', 1, 'post_to_slack', true, 'dry_run', false)
+    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/morning-briefing',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-synthesis-key', (SELECT decrypted_secret FROM vault.decrypted_secrets
+                          WHERE name = 'synthesis_access_key')
+    ),
+    body := jsonb_build_object('days', 1, 'post_to_slack', true, 'dry_run', false),
+    timeout_milliseconds := 120000
   );
   $$
 );
@@ -39,9 +56,14 @@ SELECT cron.schedule(
   '0 13 * * 0',
   $$
   SELECT net.http_post(
-    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/weekly-summary?key=<YOUR-SYNTHESIS-KEY>',
-    headers := jsonb_build_object('Content-Type', 'application/json'),
-    body := jsonb_build_object('days', 7, 'post_to_slack', true, 'dry_run', false)
+    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/weekly-summary',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-synthesis-key', (SELECT decrypted_secret FROM vault.decrypted_secrets
+                          WHERE name = 'synthesis_access_key')
+    ),
+    body := jsonb_build_object('days', 7, 'post_to_slack', true, 'dry_run', false),
+    timeout_milliseconds := 120000
   );
   $$
 );
@@ -53,8 +75,12 @@ SELECT cron.schedule(
 --
 -- Manual test (dry run: no store, no Slack post):
 --   SELECT net.http_post(
---     url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/weekly-summary?key=<YOUR-SYNTHESIS-KEY>',
---     headers := jsonb_build_object('Content-Type', 'application/json'),
+--     url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/weekly-summary',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'x-synthesis-key', (SELECT decrypted_secret FROM vault.decrypted_secrets
+--                           WHERE name = 'synthesis_access_key')
+--     ),
 --     body := jsonb_build_object('days', 7, 'post_to_slack', false, 'dry_run', true)
 --   );
 --
