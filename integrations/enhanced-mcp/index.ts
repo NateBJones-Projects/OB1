@@ -37,7 +37,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // ── Types ─────────────────────────────────────────────────────────────────
 
 type ThoughtRow = {
-  id: number;
+  id: string;
   content: string;
   content_fingerprint?: string | null;
   type: string;
@@ -51,10 +51,11 @@ type ThoughtRow = {
   rank?: number;
 };
 
+// The base upsert_thought RPC (schemas/enhanced-thoughts) returns this shape.
+// It is NOT { thought_id, action } — read `id` / `fingerprint` accordingly.
 type UpsertThoughtResult = {
-  thought_id: number;
-  action: string;
-  content_fingerprint: string;
+  id: string;
+  fingerprint: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -149,17 +150,16 @@ server.registerTool(
       }
 
       if (mode === "text") {
-        const filter: Record<string, unknown> = {
-          ...(metadataFilter as Record<string, unknown>),
-        };
-        filter.exclude_restricted = true;
-        if (startDate) filter.start_date = startDate;
-        if (endDate) filter.end_date = endDate;
-
+        // search_thoughts_text applies `metadata @> p_filter` (same
+        // containment semantics as match_thoughts), so synthetic directives
+        // like exclude_restricted or date bounds would match zero rows. Pass
+        // ONLY a genuine user metadata filter; enforce sensitivity + date
+        // filtering client-side below (this RPC returns sensitivity_tier and
+        // created_at, so both are available).
         const { data, error } = await supabase.rpc("search_thoughts_text", {
           p_query: query,
           p_limit: limit,
-          p_filter: filter,
+          p_filter: metadataFilter,
           p_offset: offset,
         });
 
@@ -167,13 +167,19 @@ server.registerTool(
           throw new Error(`search_thoughts_text failed: ${error.message}`);
         }
 
-        const rows = (data ?? []) as ThoughtRow[];
+        const allRows = (data ?? []) as ThoughtRow[];
         const totalCount =
-          rows.length > 0
+          allRows.length > 0
             ? Number(
-                (rows[0] as Record<string, unknown>).total_count ?? rows.length,
+                (allRows[0] as Record<string, unknown>).total_count ??
+                  allRows.length,
               )
             : 0;
+
+        const rows = allRows
+          .filter((row) => row.sensitivity_tier !== "restricted")
+          .filter((row) => !startDate || row.created_at >= startDate)
+          .filter((row) => !endDate || row.created_at <= endDate);
 
         if (rows.length === 0) {
           return toolSuccess("No matches found.", {
@@ -205,24 +211,15 @@ server.registerTool(
 
       // Semantic search (default)
       //
-      // NOTE: `match_thoughts` returns the top-N by similarity and then we
-      // date-filter client-side. When the RPC supports date/tier filters in
-      // its `filter` JSONB payload they'll be honored pre-cutoff and the
-      // behavior is server-side correct; when it doesn't, we rely on an
-      // over-fetch slack to avoid silently returning zero results on active
-      // brains with old date windows. See `known limitations` in the README.
+      // The deployed match_thoughts RPC treats its `filter` argument as a
+      // Postgres `metadata @> filter` containment test. Injecting synthetic
+      // directives like {exclude_restricted:true} or date bounds therefore
+      // makes it match ZERO rows — no thought's metadata contains those keys.
+      // We pass ONLY a genuine user-supplied metadata filter to the RPC and
+      // enforce sensitivity + date filtering client-side below.
       const dateFilterActive = !!(startDate || endDate);
-      // Forward filters into the RPC payload — ignored by older RPC versions
-      // but used by versions that support them, at which point the
-      // post-filter becomes a no-op.
-      const semanticFilter: Record<string, unknown> = {
-        ...(metadataFilter as Record<string, unknown>),
-        exclude_restricted: true,
-      };
-      if (startDate) semanticFilter.start_date = startDate;
-      if (endDate) semanticFilter.end_date = endDate;
 
-      // Over-fetch when date filter is active so client-side post-filter
+      // Over-fetch when a date filter is active so the client-side post-filter
       // has headroom. 3x the requested limit is a reasonable compromise
       // between cost and correctness for dense recent brains.
       const fetchCount = dateFilterActive
@@ -234,7 +231,7 @@ server.registerTool(
         query_embedding: queryEmbedding,
         match_count: fetchCount,
         match_threshold: minSimilarity,
-        filter: semanticFilter,
+        filter: metadataFilter,
       });
 
       if (error) {
@@ -242,8 +239,27 @@ server.registerTool(
       }
 
       const allRows = (data ?? []) as ThoughtRow[];
+
+      // match_thoughts does not return sensitivity_tier, so restricted rows
+      // cannot be filtered from its output directly. Look up the tiers for the
+      // candidate ids and drop restricted thoughts before returning — the same
+      // sensitivity guarantee the other read tools enforce. The lookup is
+      // usually empty (restricted content is blocked from cloud capture).
+      const candidateIds = allRows.map((row) => row.id);
+      const restrictedIds = new Set<string>();
+      if (candidateIds.length > 0) {
+        const { data: tierRows } = await supabase
+          .from("thoughts")
+          .select("id")
+          .in("id", candidateIds)
+          .eq("sensitivity_tier", "restricted");
+        for (const r of (tierRows ?? []) as { id: string }[]) {
+          restrictedIds.add(r.id);
+        }
+      }
+
       const rows = allRows
-        .filter((row) => row.sensitivity_tier !== "restricted")
+        .filter((row) => !restrictedIds.has(row.id))
         .filter((row) => !startDate || row.created_at >= startDate)
         .filter((row) => !endDate || row.created_at <= endDate)
         .slice(0, limit);
@@ -387,17 +403,12 @@ server.registerTool(
     description:
       "Fetch a thought by ID with its full metadata and provenance.",
     inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID"),
+      id: z.string().min(1).describe("Thought ID (UUID)"),
     }),
   },
   async (params) => {
     try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const id = asString((params as Record<string, unknown>).id, "").trim();
 
       if (!id) {
         return toolFailure("id is required");
@@ -455,7 +466,7 @@ server.registerTool(
     description:
       "Update the content of an existing thought. Re-generates embedding and metadata.",
     inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID to update"),
+      id: z.string().min(1).describe("Thought ID to update (UUID)"),
       content: z
         .string()
         .min(1)
@@ -464,12 +475,7 @@ server.registerTool(
   },
   async (params) => {
     try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const id = asString((params as Record<string, unknown>).id, "").trim();
       const content = asString(
         (params as Record<string, unknown>).content,
         "",
@@ -670,16 +676,8 @@ server.registerTool(
       const { data, error } = await supabase.rpc("upsert_thought", {
         p_content: prepared.content,
         p_payload: {
-          type: prepared.type,
-          sensitivity_tier: prepared.sensitivity_tier,
-          importance: prepared.importance,
-          quality_score: prepared.quality_score,
-          source_type: prepared.source_type,
           metadata: prepared.metadata,
           created_at: new Date().toISOString(),
-          ...(safeEmbedding(prepared.embedding) && {
-            embedding: prepared.embedding,
-          }),
         },
       });
 
@@ -687,17 +685,45 @@ server.registerTool(
         throw new Error(`upsert_thought failed: ${error.message}`);
       }
 
+      // The base upsert_thought RPC returns { id, fingerprint } and only
+      // persists content, fingerprint, and metadata — it does NOT return
+      // thought_id/action, nor does it write the structured columns or the
+      // embedding. Read the real shape here, then populate type / source_type
+      // / importance / quality_score / sensitivity_tier / embedding in a
+      // follow-up update so this server is self-sufficient regardless of
+      // which upsert_thought version is deployed. Without the embedding
+      // write, brain_search_thoughts (semantic) would never match a
+      // freshly captured thought — there is no async embedding backfill.
       const result = data as UpsertThoughtResult | null;
-      if (!result?.thought_id) {
-        throw new Error("upsert_thought returned no result");
+      if (!result?.id) {
+        throw new Error("upsert_thought returned no id");
+      }
+      const thoughtId = result.id;
+
+      const structuredUpdate: Record<string, unknown> = {
+        type: prepared.type,
+        source_type: prepared.source_type,
+        importance: prepared.importance,
+        quality_score: prepared.quality_score,
+        sensitivity_tier: prepared.sensitivity_tier,
+      };
+      if (safeEmbedding(prepared.embedding)) {
+        structuredUpdate.embedding = prepared.embedding;
+      }
+
+      const { error: enrichError } = await supabase
+        .from("thoughts")
+        .update(structuredUpdate)
+        .eq("id", thoughtId);
+      if (enrichError) {
+        console.error("capture enrichment update failed", enrichError);
       }
 
       return toolSuccess(
-        `${result.action === "inserted" ? "Captured new" : "Updated"} thought #${result.thought_id} as ${prepared.type}.`,
+        `Captured thought #${thoughtId} as ${prepared.type}.`,
         {
-          thought_id: result.thought_id,
-          action: result.action,
-          content_fingerprint: result.content_fingerprint,
+          thought_id: thoughtId,
+          content_fingerprint: result.fingerprint,
           type: prepared.type,
           sensitivity_tier: prepared.sensitivity_tier,
           metadata: prepared.metadata,
@@ -804,7 +830,7 @@ server.registerTool(
       const { data, error } = await supabase.rpc("search_thoughts_text", {
         p_query: query,
         p_limit: limit,
-        p_filter: { exclude_restricted: true },
+        p_filter: {},
         p_offset: offset,
       });
 
@@ -812,7 +838,12 @@ server.registerTool(
         throw new Error(`search_thoughts_text failed: ${error.message}`);
       }
 
-      const rows = (data ?? []) as ThoughtRow[];
+      // The RPC's p_filter is a `metadata @> filter` containment test and
+      // cannot express "exclude restricted", so filter it client-side using
+      // the sensitivity_tier the RPC returns.
+      const rows = ((data ?? []) as ThoughtRow[]).filter(
+        (row) => row.sensitivity_tier !== "restricted",
+      );
 
       if (rows.length === 0) {
         return toolSuccess("No matches found.", { results: [] });
@@ -915,22 +946,16 @@ server.registerTool(
       "Find thoughts related to a given thought via the knowledge graph connections.",
     inputSchema: z.object({
       thought_id: z
-        .number()
-        .int()
+        .string()
         .min(1)
-        .describe("Thought ID to find connections for"),
+        .describe("Thought ID (UUID) to find connections for"),
       limit: z.number().int().min(1).max(20).default(10).optional(),
     }),
   },
   async (params) => {
     try {
       const raw = params as Record<string, unknown>;
-      const thoughtId = asInteger(
-        raw.thought_id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const thoughtId = asString(raw.thought_id, "").trim();
       const limit = asInteger(raw.limit, 10, 1, 20);
 
       if (!thoughtId) {
