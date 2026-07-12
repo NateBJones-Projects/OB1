@@ -71,6 +71,8 @@ Useful but optional:
 7. Optionally use Open Brain.
    - Search for prior model assumptions, earlier reviews, or management claims.
    - Capture the final review memo or most important flags after completion.
+   - **Record provenance when the capability exists.** This skill produces a *derived* artifact synthesized from other thoughts. If the Open Brain setup exposes provenance-chains — a `capture_derived_thought` tool (the name may carry a connector prefix) or `derived_from` / `derivation_layer` columns — save the final review memo as a derived artifact: set `derivation_layer = 'derived'`, `derivation_method = 'synthesis'`, and `derived_from` to the UUIDs of the Open Brain thoughts you actually pulled and built on (resolve ids with the search/read tool; drop any ref you cannot resolve to a UUID). If provenance is unavailable, capture normally — the synthesis is still saved, just without the derivation link.
+   - **Read-path tools.** To retrieve a specific prior thought in full, fetch it by id with `get_thought` (or the connector's `fetch` tool); use `related_thoughts` to surface what a thought connects to. Tool names may carry a connector prefix — use whatever the environment exposes.
 
 ## Evidence and Judgment Rules
 
