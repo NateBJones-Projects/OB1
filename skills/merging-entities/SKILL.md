@@ -2,11 +2,12 @@
 name: merging-entities
 description: |
   Use when asked to merge, deduplicate, consolidate, or "clean up" duplicate
-  entities in the Open Brain knowledge graph, or before calling
-  ops_merge_entities, which repoints edges and mentions and then HARD-deletes
-  the loser entity with no undo. Also use when reviewing the
-  ops_entity_near_dupes candidate view — its pairs include real false positives
-  (C vs C++), so never merge from the list without confirming each pair.
+  entities in the Open Brain knowledge graph, or before calling the
+  merge_entities MCP tool or the ops_merge_entities RPC, which repoints edges
+  and mentions and then HARD-deletes the loser entity with no undo. Also use
+  when reviewing the ops_entity_near_dupes / list_entity_near_dupes candidates —
+  they include real false positives (C vs C++), so never merge from the list
+  without confirming each pair.
 author: Ezana Azene
 version: 1.0.0
 ---
@@ -40,9 +41,10 @@ human in the loop.
 
 ## Process
 
-1. **List candidates, do not act on them.** Query `ops_entity_near_dupes`
-   (highest-confidence pairs first). Read them. Each row is a *question*, not a
-   decision.
+1. **List candidates, do not act on them.** Read the `ops_entity_near_dupes`
+   view — via the `list_entity_near_dupes` MCP tool if your connector exposes
+   it, or as SQL directly (highest-confidence pairs first). Each row is a
+   *question*, not a decision.
 2. **Judge each pair — merge only when all three hold:**
    - **Same real-world entity**, not just similar strings. Ask: would a human
      call these the same thing? `Open Brain` / `open-brain` → yes. `C` / `C++`,
@@ -59,8 +61,10 @@ human in the loop.
    (both names, types, mention counts) and which side survives. For a large
    list, propose the clear ones and explicitly flag the judgment calls and the
    ones you are NOT merging (say why — "C vs C++ are distinct languages").
-4. **Merge one confirmed pair at a time.** `ops_merge_entities(survivor, loser,
-   reason)`, survivor id first. Write a real `reason`.
+4. **Merge one confirmed pair at a time.** Use the `merge_entities` MCP tool
+   (`survivor_id`, `loser_id`, `reason`) if your connector exposes it, otherwise
+   call the `ops_merge_entities(survivor, loser, reason)` RPC as SQL — survivor
+   id first, with a real `reason`. Same discipline either way.
 5. **Verify integrity after the session.** Confirm zero dangling references
    (`thought_entities` / `edges` pointing at a deleted id) and report the
    `consolidation_log` audit rows. Re-query `ops_entity_near_dupes` to show what
@@ -111,10 +115,13 @@ and the post-merge integrity check (zero dangling references).
 ## Notes
 
 - Substrate: the **entity-near-dupe-review** recipe
-  (`recipes/entity-near-dupe-review`) installs `ops_entity_near_dupes` and
-  `ops_merge_entities`. This skill is the behavioral half.
-- Tool/RPC names may carry a connector prefix; use whatever the environment
-  exposes to run SQL against your Open Brain database.
+  (`recipes/entity-near-dupe-review`) installs the `ops_entity_near_dupes` view
+  and `ops_merge_entities` RPC. This skill is the behavioral half.
+- Two surfaces, one discipline: an Open Brain connector may expose the MCP tools
+  `list_entity_near_dupes` (review) and `merge_entities` (execute) — prefer those
+  when present; otherwise run the view and the `ops_merge_entities` RPC as SQL
+  directly. Tool/RPC names may carry a connector prefix. The judge-each-pair,
+  confirm-before-merge, never-loop-the-list rules apply identically to both.
 - Prefer merging over deleting a duplicate entity by hand — the merge preserves
   the graph; a manual delete orphans edges. Pairs conceptually with
   **deleting-thoughts** / **updating-thoughts** as the graph-side member of the
