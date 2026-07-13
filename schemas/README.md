@@ -7,13 +7,13 @@ Database table extensions and metadata schemas for your Supabase database. Drop 
 | Schema | What It Does |
 | ------ | ------------ |
 | [Agent Memory](agent-memory/) | Sidecar tables that turn existing `thoughts` into governed, provenance-labeled operational memory for agent workflows |
+| [Reading List](reading-list/) | Standalone `reading_list` table for books, articles, podcasts, and videos with ratings, review notes, tags, and want-to-read → reading → finished status tracking |
 
 > **Looking for CRM?** See [`extensions/professional-crm`](../extensions/professional-crm/) — it includes schema + a full MCP server.
 
 ## Ideas
 
 - Taste preferences tracker
-- Reading list with rating metadata
 
 ## Contributing
 
