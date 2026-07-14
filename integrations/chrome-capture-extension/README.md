@@ -230,5 +230,6 @@ If you're weighing whether to add more MCP-exposing extensions on top, see the [
 
 ## Changelog
 
+- **0.6.1** — Bulk sync captures now send `skip_classification: true` to the ingest gateway, skipping the per-turn LLM classification pass during backfills (manual captures still classify). Gateways that don't support the flag ignore it.
 - **0.5.1** — Added the branded icon set (16/32/48/128 PNGs); the toolbar button now shows the Open Brain mark instead of Chrome's default puzzle-piece glyph.
 - **0.5.0** — Gemini bulk history sync, host-permission hardening, error surfacing, fingerprint dedup, retry caps, and race fixes.

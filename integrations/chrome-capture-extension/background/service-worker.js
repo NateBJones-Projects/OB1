@@ -449,6 +449,11 @@ async function processCaptureRequest(message) {
       source_label: capture.sourceLabel,
       source_type: capture.sourceType,
       auto_execute: capture.autoExecute,
+      // Bulk sync captures skip the gateway's per-turn LLM classification
+      // pass — a 400-turn backfill would otherwise fire 400 classification
+      // calls. Manual captures (user clicked Capture on one exchange) still
+      // classify. Gateways that don't support the flag simply ignore it.
+      skip_classification: capture.captureMode === 'sync',
       source_metadata: {
         ...capture.sourceMetadata,
         extension_capture_mode: capture.captureMode,
