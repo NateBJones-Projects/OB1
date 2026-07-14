@@ -17,22 +17,22 @@ export type RepoLearningConfig = {
 }
 
 export const REPO_LEARNING_CONFIG: RepoLearningConfig = {
-  slug: 'repo-learning-coach-sample',
-  title: 'Repo Learning Coach',
+  slug: 'open-brain-architecture',
+  title: 'Open Brain: Architecture & Mental Model',
   description:
-    'A Supabase-backed learning workspace that turns repo research into lessons, quizzes, progress tracking, and durable Open Brain captures.',
+    'A guided path through the Open Brain codebase: the thoughts data model, the canonical write and retrieval paths, the entity/edge knowledge graph, provenance, and the remote MCP + cron runtime.',
   audience:
-    'Solo builders, maintainers, and collaborators who need a fast way to understand a codebase without losing the reasoning behind it.',
+    'Engineers and contributors who want an accurate mental model of how Open Brain stores, links, and resurfaces memory before extending or operating it.',
   researchDirectory: ['research'],
   lessonDirectory: ['curriculum', 'lessons'],
   track: {
-    slug: 'repo-learning-foundations',
-    title: 'Repo Learning Foundations',
+    slug: 'open-brain-architecture',
+    title: 'Open Brain Architecture',
     description:
-      'A sample path that shows how to separate reusable learning infrastructure from repo-specific research and onboarding content.',
+      'How a persistent AI memory system is built on Supabase + pgvector: one durable thoughts table, a fingerprinted write path, a typed knowledge graph, provenance links, and a remote MCP + scheduled-synthesis runtime.',
   },
   brainIntegration: {
-    sourceTag: 'repo-learning-coach',
+    sourceTag: 'open-brain-architecture',
     relatedThoughtLimit: 5,
   },
 }
