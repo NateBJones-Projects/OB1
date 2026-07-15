@@ -22,8 +22,10 @@ SELECT cron.schedule(
   '*/15 * * * *',
   $$
   SELECT net.http_post(
-    -- Key goes in the x-brain-key header (not ?key= in the URL) deliberately:
-    -- avoids the secret persisting in cron.job / cron.job_run_details / URL logs.
+    -- Auth via x-brain-key header (not ?key= in the URL) so the secret stays out of
+    -- request URLs and edge-function URL logs. Note: pg_cron still stores the full
+    -- command (headers included) in cron.job/cron.job_run_details; use Supabase Vault
+    -- if that residual matters to you.
     url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/enrichment-worker?limit=20',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-brain-key', '<YOUR-MCP-ACCESS-KEY>'),
     body := '{}'::jsonb
