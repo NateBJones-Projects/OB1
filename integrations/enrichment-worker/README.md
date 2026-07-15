@@ -44,6 +44,31 @@ The Edge Function claims a batch, enriches each row, and writes patches back.
 - Anything else that lands with `NULL` / `pending` / `fallback` / `skipped` status is picked up by the 15-minute cron tick or a manual backfill.
 - The editorial-policy weekly auditor reports the backlog as `un-enriched: N (M stuck-at-max)`.
 
+### Synthesis artifacts (never enrich these)
+
+Generated / compiled rows — audit reports, morning/weekly briefings, wiki and topic pages, and any other LLM-synthesized output — must **never** be re-classified by this worker. Re-running a synthesis product through `extractMetadata` would overwrite curated synthesis metadata with a generic capture classification. Writers of such rows (via `recipes/editorial-policy/_shared/derived-thought-writer.ts`) stamp two independent guards:
+
+- **`metadata.enrichment_status = 'exempt'`** — the belt. The queue predicate excludes `'exempt'` directly, so it holds even if the provenance columns aren't installed.
+- **`derivation_layer = 'derived'` + `derivation_method = 'synthesis'`** — the suspenders (provenance columns).
+
+The queue predicate additionally excludes any row carrying a `metadata.generator` key (`AND NOT (metadata ? 'generator')`) — synthesis writers stamp a `generator` (e.g. `"auditor"`), so this is a third, schema-independent layer of defense.
+
+If you installed this worker after synthesis rows already existed, backfill the exemption once (an enumerated-or-predicate `UPDATE`). Review the match set first, then run it manually — this repo does **not** run it for you:
+
+```sql
+-- Backfill: mark pre-existing synthesis artifacts exempt so they never enqueue.
+UPDATE thoughts
+SET metadata = COALESCE(metadata, '{}'::jsonb) || '{"enrichment_status":"exempt"}'::jsonb
+WHERE (
+        metadata ? 'generator'                          -- has a synthesis generator key
+        OR COALESCE(derivation_layer, 'primary') = 'derived'
+        OR metadata->>'type' IN ('audit_report', 'connection_digest',
+                                 'morning_briefing', 'weekly_summary',
+                                 'wiki_page', 'topic_page', 'dossier')
+      )
+  AND COALESCE(metadata->>'enrichment_status', '') <> 'exempt';
+```
+
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
