@@ -133,9 +133,27 @@ async function fetchHygiene(): Promise<Record<string, unknown> | null> {
   const { data, error } = await supabase.rpc("lint_hygiene_summary");
   if (error) {
     console.warn(`lint_hygiene_summary rpc failed: ${error.message}`);
-    return null;
   }
-  return (data ?? null) as Record<string, unknown> | null;
+  const summary = (error ? null : (data ?? null)) as
+    | Record<string, unknown>
+    | null;
+
+  // Enrichment backlog (Task 1 views: thoughts_needing_enrichment +
+  // thoughts_enrichment_stuck). Cheap head-counts folded into the same
+  // never-paged hygiene surface. -1 signals a failed count (null), matching
+  // the "?" render fallback below.
+  const { count: needsEnrichment } = await supabase
+    .from("thoughts_needing_enrichment")
+    .select("id", { count: "exact", head: true });
+  const { count: enrichmentStuck } = await supabase
+    .from("thoughts_enrichment_stuck")
+    .select("id", { count: "exact", head: true });
+
+  return {
+    ...(summary ?? {}),
+    needs_enrichment: needsEnrichment ?? -1,
+    enrichment_stuck: enrichmentStuck ?? -1,
+  };
 }
 
 // ── Prompt construction ──────────────────────────────────────────────────
@@ -464,7 +482,7 @@ function buildAuditContent(result: AuditResult): string {
     lines.push("");
     lines.push("*Hygiene (mechanical — not paged):*");
     lines.push(
-      `• Tier 1: orphans-by-tag: ${h.orphans_by_tag ?? "?"} · exact-dup groups: ${h.exact_duplicate_groups ?? "?"} · missing fingerprint: ${h.missing_fingerprint ?? "?"} · low-signal: ${h.low_signal ?? "?"} · over-tagged: ${h.over_tagged ?? "?"} · very-long: ${h.very_long ?? "?"} (of ${h.total_thoughts ?? "?"} thoughts)`,
+      `• Tier 1: orphans-by-tag: ${h.orphans_by_tag ?? "?"} · exact-dup groups: ${h.exact_duplicate_groups ?? "?"} · missing fingerprint: ${h.missing_fingerprint ?? "?"} · low-signal: ${h.low_signal ?? "?"} · over-tagged: ${h.over_tagged ?? "?"} · very-long: ${h.very_long ?? "?"} · un-enriched: ${h.needs_enrichment ?? "?"} (${h.enrichment_stuck ?? "?"} stuck-at-max) (of ${h.total_thoughts ?? "?"} thoughts)`,
     );
     if (h.tier2_available) {
       lines.push(
