@@ -4,8 +4,8 @@
 --
 -- BEFORE RUNNING:
 --   Replace <YOUR-PROJECT-REF> with your Supabase project reference.
---   Replace <YOUR-AUDITOR-KEY> with the value of your AUDITOR_ACCESS_KEY
---   secret (any random string you choose — used to gate the function URL).
+--   Replace <YOUR-MCP-ACCESS-KEY> with the value of your MCP_ACCESS_KEY
+--   secret (used to gate the function via the x-brain-key header).
 -- ============================================================
 --
 -- Prerequisites:
@@ -22,9 +22,14 @@ SELECT cron.schedule(
   '0 9 * * 0',
   $$
   SELECT net.http_post(
-    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auditor?key=<YOUR-AUDITOR-KEY>',
+    -- Auth via x-brain-key header (not ?key= in the URL) so the secret stays out of
+    -- request URLs and edge-function URL logs. Note: pg_cron still stores the full
+    -- command (headers included) in cron.job/cron.job_run_details; use Supabase Vault
+    -- if that residual matters to you.
+    url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auditor',
     headers := jsonb_build_object(
-      'Content-Type', 'application/json'
+      'Content-Type', 'application/json',
+      'x-brain-key', '<YOUR-MCP-ACCESS-KEY>'
     ),
     body := jsonb_build_object(
       'days', 30,
@@ -48,8 +53,8 @@ SELECT cron.schedule(
 --
 -- Manual test (dry run, no Slack post, no audit_report stored):
 --   SELECT net.http_post(
---     url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auditor?key=<YOUR-AUDITOR-KEY>',
---     headers := jsonb_build_object('Content-Type', 'application/json'),
+--     url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auditor',
+--     headers := jsonb_build_object('Content-Type', 'application/json', 'x-brain-key', '<YOUR-MCP-ACCESS-KEY>'),
 --     body := jsonb_build_object('days', 30, 'post_to_slack', false, 'dry_run', true)
 --   );
 --

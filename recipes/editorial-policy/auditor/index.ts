@@ -14,7 +14,7 @@
 //   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 //   OPENROUTER_API_KEY
 //   SLACK_BOT_TOKEN, SLACK_CAPTURE_CHANNEL (or SLACK_DIGEST_CHANNEL to override)
-//   AUDITOR_ACCESS_KEY (random secret you set; gates the function URL)
+//   MCP_ACCESS_KEY (brain-wide secret; gates the function via the x-brain-key header)
 //   POLICY_VERSION (optional; defaults to "1.3", bump when editorial-policy.md changes)
 //
 // Schedule: see schedule.sql in this recipe folder.
@@ -140,8 +140,8 @@ async function fetchHygiene(): Promise<Record<string, unknown> | null> {
 
   // Enrichment backlog (Task 1 views: thoughts_needing_enrichment +
   // thoughts_enrichment_stuck). Cheap head-counts folded into the same
-  // never-paged hygiene surface. -1 signals a failed count (null), matching
-  // the "?" render fallback below.
+  // never-paged hygiene surface. -1 in metadata signals a failed count;
+  // rendered as '?'.
   const { count: needsEnrichment } = await supabase
     .from("thoughts_needing_enrichment")
     .select("id", { count: "exact", head: true });
@@ -479,10 +479,14 @@ function buildAuditContent(result: AuditResult): string {
   // Mechanical hygiene (lint Tier 1 + Tier 2) — informational, never paged.
   if (result.hygiene) {
     const h = result.hygiene as Record<string, number | boolean>;
+    // Enrichment counts store a failed head-count as -1 (never null), so the
+    // `?? "?"` fallback never fires for them; show '?' when the value is negative.
+    const showN = (v: unknown) =>
+      typeof v === "number" && v >= 0 ? v : "?";
     lines.push("");
     lines.push("*Hygiene (mechanical — not paged):*");
     lines.push(
-      `• Tier 1: orphans-by-tag: ${h.orphans_by_tag ?? "?"} · exact-dup groups: ${h.exact_duplicate_groups ?? "?"} · missing fingerprint: ${h.missing_fingerprint ?? "?"} · low-signal: ${h.low_signal ?? "?"} · over-tagged: ${h.over_tagged ?? "?"} · very-long: ${h.very_long ?? "?"} · un-enriched: ${h.needs_enrichment ?? "?"} (${h.enrichment_stuck ?? "?"} stuck-at-max) (of ${h.total_thoughts ?? "?"} thoughts)`,
+      `• Tier 1: orphans-by-tag: ${h.orphans_by_tag ?? "?"} · exact-dup groups: ${h.exact_duplicate_groups ?? "?"} · missing fingerprint: ${h.missing_fingerprint ?? "?"} · low-signal: ${h.low_signal ?? "?"} · over-tagged: ${h.over_tagged ?? "?"} · very-long: ${h.very_long ?? "?"} · un-enriched: ${showN(h.needs_enrichment)} (${showN(h.enrichment_stuck)} stuck-at-max) (of ${h.total_thoughts ?? "?"} thoughts)`,
     );
     if (h.tier2_available) {
       lines.push(
