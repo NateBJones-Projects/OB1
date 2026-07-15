@@ -173,27 +173,33 @@ Deno.serve(async (req: Request): Promise<Response> => {
     const content = `${event.text}${noteSuffix}`;
     const embedding = await getEmbedding(content);
 
-    const { error } = await supabase.from("thoughts").insert({
-      content,
-      embedding,
-      source_type: "readwise",
-      type: "reference",
-      metadata: {
-        source: "readwise",
-        readwise_highlight_id: event.id,
-        readwise_book_id: event.book_id,
-        book_title: book?.title ?? null,
-        book_author: book?.author ?? null,
-        book_category: book?.category ?? null,
-        highlighted_at: event.highlighted_at,
-        note: event.note,
-        location: event.location,
-        location_type: event.location_type,
-        color: event.color,
-        url: event.url,
-        tags: event.tags?.map((t) => t.name) ?? [],
-      },
-    });
+    const { data: inserted, error } = await supabase
+      .from("thoughts")
+      .insert({
+        content,
+        embedding,
+        source_type: "readwise",
+        type: "reference",
+        metadata: {
+          source: "readwise",
+          readwise_highlight_id: event.id,
+          readwise_book_id: event.book_id,
+          book_title: book?.title ?? null,
+          book_author: book?.author ?? null,
+          book_category: book?.category ?? null,
+          highlighted_at: event.highlighted_at,
+          note: event.note,
+          location: event.location,
+          location_type: event.location_type,
+          color: event.color,
+          url: event.url,
+          tags: event.tags?.map((t) => t.name) ?? [],
+          enrichment_status: "pending",
+          enrichment_attempts: 0,
+        },
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("Supabase insert error:", error);
@@ -205,6 +211,23 @@ Deno.serve(async (req: Request): Promise<Response> => {
         p_book_id: event.book_id,
         p_highlighted_at: event.highlighted_at,
       });
+    }
+
+    // Fire-and-forget: enrich this row now instead of waiting for the
+    // next cron tick. Failure is harmless — the row stays 'pending' and
+    // the 15-min worker tick picks it up.
+    const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY") ?? "";
+    if (inserted?.id && MCP_ACCESS_KEY) {
+      const invoke = fetch(
+        `${SUPABASE_URL}/functions/v1/enrichment-worker?id=${inserted.id}`,
+        { headers: { "x-brain-key": MCP_ACCESS_KEY } },
+      ).catch((err) => console.error("enrichment invoke failed", err));
+      try {
+        // @ts-ignore EdgeRuntime is provided by the Supabase runtime.
+        EdgeRuntime.waitUntil(invoke);
+      } catch {
+        // Older runtime without waitUntil: best-effort unawaited fetch.
+      }
     }
 
     return new Response("ok", { status: 200 });
