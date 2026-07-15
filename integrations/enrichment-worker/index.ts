@@ -140,6 +140,28 @@ Deno.serve(async (req) => {
       break;
     }
 
+    // Single-row asymmetry: a lone claim (webhook fast path, ?id=, ?limit=1)
+    // has NO circuit probe — the probe needs a batch to judge provider health.
+    // So a transport-class failure on the only row is indistinguishable from a
+    // provider outage; treat it like the breaker (clear the claim, burn zero
+    // attempts, report circuit_broken) instead of writing a fallback patch that
+    // consumes an attempt. Multi-row batches keep per-row fallback semantics on
+    // purpose: there a healthy probe has already proven providers are up, so a
+    // lone all_providers_failed is row-specific and SHOULD burn an attempt —
+    // and the cron's multi-row batches are the stuck-at-max escalation path, so
+    // exempting single rows here can't livelock a genuinely unclassifiable row.
+    if (rows.length === 1 && extracted._enrichment_status === "fallback") {
+      const err = extracted._enrichment_error ?? "";
+      if (
+        err.startsWith("fatal_provider_error") ||
+        err.startsWith("transient_failures_exhausted") ||
+        err === "all_providers_failed"
+      ) {
+        circuitBroken = true;
+        break;
+      }
+    }
+
     if (!flushed) {
       buffered.push({ row, extracted });
       const probeSize = Math.min(CIRCUIT_PROBE, rows.length);
