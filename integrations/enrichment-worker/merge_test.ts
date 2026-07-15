@@ -58,13 +58,57 @@ Deno.test("complete: tags are union-never-replace, deduped", () => {
   assertEquals(tags.filter((t) => t === "curated-native-tag").length, 1);
 });
 
-Deno.test("complete: tag union caps at 12", () => {
+Deno.test("complete: base preserved whole; LLM extras fill only remaining room under cap", () => {
+  // New semantics: base kept whole always; LLM extras appended only up to
+  // max(0, 12 - base.length). 10 native + 10 LLM => 10 native + 2 LLM = 12.
   const bigRow = { ...readwiseRow, metadata: { ...readwiseRow.metadata,
     tags: Array.from({ length: 10 }, (_, i) => `native-${i}`) } };
   const bigExtracted = { ...extracted,
     tags: Array.from({ length: 10 }, (_, i) => `llm-${i}`) };
   const p = buildCompletePatch(bigRow, bigExtracted);
-  assertEquals((p.metadata.tags as string[]).length, 12);
+  const tags = p.metadata.tags as string[];
+  assertEquals(tags.length, 12);
+  for (let i = 0; i < 10; i++) assert(tags.includes(`native-${i}`)); // all native survive
+  assertEquals(tags.filter((t) => t.startsWith("llm-")).length, 2);  // room = 12 - 10
+});
+
+Deno.test("complete: 15 native tags preserved whole; cap applies to additions only", () => {
+  const native = Array.from({ length: 15 }, (_, i) => `native-${i}`);
+  const row = { ...readwiseRow, metadata: { ...readwiseRow.metadata, tags: native } };
+  const ex = { ...extracted, tags: Array.from({ length: 5 }, (_, i) => `llm-${i}`) };
+  const p = buildCompletePatch(row, ex);
+  const tags = p.metadata.tags as string[];
+  for (const t of native) assert(tags.includes(t)); // ALL 15 native survive
+  assertEquals(tags.length, 15);                    // no LLM tag added (room = 0)
+  for (let i = 0; i < 5; i++) assertFalse(tags.includes(`llm-${i}`));
+});
+
+Deno.test("complete: object-shaped base (Readwise .name/.tag) coerced + preserved + unioned", () => {
+  const row = { ...readwiseRow, metadata: { ...readwiseRow.metadata,
+    tags: [{ name: "kindle-tag" }, { tag: "tagged" }, "plain"] } };
+  const ex = { ...extracted, tags: ["llm-tag"] };
+  const p = buildCompletePatch(row, ex);
+  const tags = p.metadata.tags as string[];
+  assert(tags.includes("kindle-tag")); // object .name
+  assert(tags.includes("tagged"));     // object .tag
+  assert(tags.includes("plain"));      // bare string
+  assert(tags.includes("llm-tag"));    // LLM extra unioned in
+});
+
+Deno.test("complete: lone string base treated as single-element list", () => {
+  const row = { ...readwiseRow, metadata: { ...readwiseRow.metadata, tags: "solo-tag" } };
+  const ex = { ...extracted, tags: ["llm-tag"] };
+  const p = buildCompletePatch(row, ex);
+  const tags = p.metadata.tags as string[];
+  assert(tags.includes("solo-tag"));
+  assert(tags.includes("llm-tag"));
+});
+
+Deno.test("complete: unrecognizable base fails closed — kept exactly as-is, no LLM merge", () => {
+  const row = { ...readwiseRow, metadata: { ...readwiseRow.metadata, tags: [1, 2] } };
+  const ex = { ...extracted, tags: ["llm-tag"] };
+  const p = buildCompletePatch(row, ex);
+  assertEquals(p.metadata.tags, [1, 2]); // raw base untouched, no coercion, no union
 });
 
 Deno.test("complete: readwise type pinned to reference, opinion in classified_type", () => {

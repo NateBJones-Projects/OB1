@@ -1,6 +1,6 @@
 // merge.ts — pure merge-policy functions. NORMATIVE section 4 of the spec.
 // No I/O here: everything is unit-testable without a network or database.
-import { mergeUniqueStrings } from "./_shared/helpers.ts";
+import { normalizeStringArray } from "./_shared/helpers.ts";
 import type { ThoughtMetadata } from "./_shared/config.ts";
 
 export type ClaimedRow = {
@@ -27,8 +27,65 @@ export const RUN_LEVEL_ERRORS: Set<string> = new Set([
 
 const LIST_CAP = 12;
 
-function unionCapped(base: unknown, extras: string[]): string[] {
-  return mergeUniqueStrings(base, extras).slice(0, LIST_CAP);
+/**
+ * Coerce a raw list-shaped value into a string[] WITHOUT dropping anything.
+ *
+ *  - string            -> [string]                  (lone tag, e.g. "solo-tag")
+ *  - string[]          -> as-is                     (native curated tags)
+ *  - {name}/{tag}[]    -> [.name | .tag, ...]        (Readwise object shape)
+ *  - null / undefined  -> []                        (nothing to preserve)
+ *  - anything else, or any array element that is neither a string nor an
+ *    object with a string .name/.tag  ->  null      (FAIL CLOSED)
+ *
+ * A null return is the signal to leave the caller's raw value completely
+ * untouched — we would rather keep an unrecognizable native list verbatim
+ * than silently discard curation we don't understand.
+ */
+export function coerceStringList(raw: unknown): string[] | null {
+  if (raw === null || raw === undefined) return [];
+  if (typeof raw === "string") return [raw];
+  if (Array.isArray(raw)) {
+    const out: string[] = [];
+    for (const el of raw) {
+      if (typeof el === "string") {
+        out.push(el);
+        continue;
+      }
+      if (typeof el === "object" && el !== null && !Array.isArray(el)) {
+        const rec = el as Record<string, unknown>;
+        if (typeof rec.name === "string") { out.push(rec.name); continue; }
+        if (typeof rec.tag === "string") { out.push(rec.tag); continue; }
+      }
+      return null; // unrecognizable element -> fail closed on the whole list
+    }
+    return out;
+  }
+  return null; // some other non-null scalar (number, boolean, …) -> fail closed
+}
+
+/**
+ * Union policy: the native base is preserved WHOLE (never capped, never
+ * dropped) and LLM `extras` are appended only into the room left under
+ * LIST_CAP — i.e. up to max(0, LIST_CAP - base.length) new items, deduped
+ * against the base and each other. If the base can't be understood
+ * (coerceStringList returns null) we fail closed and hand back the raw base
+ * untouched, doing no merge for that key.
+ */
+function unionPreserveBase(rawBase: unknown, extras: unknown): unknown {
+  const base = coerceStringList(rawBase);
+  if (base === null) return rawBase; // fail closed: keep curation verbatim
+  const room = Math.max(0, LIST_CAP - base.length);
+  const seen = new Set(base);
+  const result = [...base];
+  let added = 0;
+  for (const e of normalizeStringArray(extras)) {
+    if (added >= room) break;
+    if (seen.has(e)) continue;
+    seen.add(e);
+    result.push(e);
+    added++;
+  }
+  return result;
 }
 
 export function buildCompletePatch(
@@ -49,10 +106,10 @@ export function buildCompletePatch(
     ...existing,
     type,
     summary: extracted.summary,
-    topics: unionCapped(existing.topics, extracted.topics),
-    tags: unionCapped(existing.tags, extracted.tags),
-    people: unionCapped(existing.people, extracted.people),
-    action_items: unionCapped(existing.action_items, extracted.action_items),
+    topics: unionPreserveBase(existing.topics, extracted.topics),
+    tags: unionPreserveBase(existing.tags, extracted.tags),
+    people: unionPreserveBase(existing.people, extracted.people),
+    action_items: unionPreserveBase(existing.action_items, extracted.action_items),
     confidence: extracted.confidence,
     enrichment_status: "complete",
     enrichment_attempted_at: new Date().toISOString(),
