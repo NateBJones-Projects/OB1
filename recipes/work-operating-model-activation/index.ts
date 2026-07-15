@@ -827,11 +827,16 @@ server.tool(
   }
 );
 
-app.get("/health", (c) =>
-  c.json({ status: "ok", service: "Work Operating Model Activation MCP", version: "1.0.0" })
-);
-
 app.all("*", async (c) => {
+  // Public health check. Supabase mounts the function at /functions/v1/<name>
+  // and does NOT strip the function-name segment, so an absolute app.get("/health")
+  // never matches. Suffix-match here (before the auth gate and before the
+  // method guard below, which would otherwise 405 it) so it works under any
+  // mount prefix and stays reachable without the MCP access key.
+  if (c.req.method === "GET" && c.req.path.endsWith("/health")) {
+    return c.json({ status: "ok", service: "Work Operating Model Activation MCP", version: "1.0.0" });
+  }
+
   // Reject non-POST requests (OPTIONS excepted — no preflight route exists
   // above): a GET would fall through to StreamableHTTPTransport.handleRequest
   // and park on an SSE stream that never emits and never closes, hanging
