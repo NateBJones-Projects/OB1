@@ -11,6 +11,7 @@ KEY="${2:?usage: backfill.sh <function-url> <mcp-access-key>}"
 
 ITER=0
 START=$(date +%s)
+CIRCUIT_STREAK=0
 
 while :; do
   ITER=$((ITER + 1))
@@ -26,9 +27,16 @@ while :; do
   REMAINING=$(printf '%s' "$RESP" | python3 -c 'import sys,json;print(json.load(sys.stdin)["remaining"])' 2>/dev/null) || REMAINING="parse_error"
 
   if [ "$CIRCUIT" = "True" ]; then
-    echo "$(date +%T) circuit broken — provider outage or budget exhausted. Stopping."
-    exit 1
+    CIRCUIT_STREAK=$((CIRCUIT_STREAK + 1))
+    if [ "$CIRCUIT_STREAK" -ge 5 ]; then
+      echo "$(date +%T) circuit broken 5 times consecutively — sustained provider outage, giving up"
+      exit 1
+    fi
+    echo "$(date +%T) circuit broken (streak ${CIRCUIT_STREAK}/5) — provider blip, cooling down 300s"
+    sleep 300
+    continue
   fi
+  CIRCUIT_STREAK=0
 
   # Periodic progress line.
   if [ $((ITER % 10)) -eq 0 ]; then
