@@ -56,7 +56,15 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
   UPDATE thoughts t
-  SET metadata = COALESCE(t.metadata, '{}'::jsonb)
+  -- Guard against legacy non-object metadata (string/array): jsonb `||`
+  -- treats scalars as single-element arrays, which would array-ify the row
+  -- (2026-07-15 mangling incident). Wrap any non-object shape verbatim
+  -- under legacy_metadata instead.
+  SET metadata = (CASE
+                    WHEN jsonb_typeof(COALESCE(t.metadata, '{}'::jsonb)) = 'object'
+                      THEN COALESCE(t.metadata, '{}'::jsonb)
+                    ELSE jsonb_build_object('legacy_metadata', t.metadata)
+                  END)
                  || jsonb_build_object('enrichment_claimed_at', now())
   WHERE t.id IN (
     SELECT c.id

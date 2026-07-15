@@ -161,3 +161,23 @@ Deno.test("run-level errors are classified as such", () => {
   assert(RUN_LEVEL_ERRORS.has("classifier_disabled"));
   assertFalse(RUN_LEVEL_ERRORS.has("all_providers_failed"));
 });
+
+// ── Legacy metadata shapes (2026-07-15 mangling incident) ─────────────────
+
+Deno.test("legacy: array metadata is preserved under legacy_metadata, never spread", () => {
+  const row = { ...readwiseRow, source_type: "mcp",
+    metadata: ["old-stringified-metadata"] as unknown as Record<string, unknown> };
+  const p = buildFallbackPatch(row, "all_providers_failed");
+  assertEquals(p.metadata.legacy_metadata, ["old-stringified-metadata"]);
+  assertFalse("0" in p.metadata);
+  assertEquals(p.metadata.enrichment_attempts, 1);
+});
+
+Deno.test("legacy: string metadata is preserved under legacy_metadata on complete", () => {
+  const row = { ...readwiseRow, source_type: "mcp",
+    metadata: "raw-string" as unknown as Record<string, unknown> };
+  const p = buildCompletePatch(row, extracted);
+  assertEquals(p.metadata.legacy_metadata, "raw-string");
+  assertFalse("0" in p.metadata);
+  assertEquals(p.metadata.enrichment_status, "complete");
+});

@@ -88,11 +88,25 @@ function unionPreserveBase(rawBase: unknown, extras: unknown): unknown {
   return result;
 }
 
+/**
+ * Normalize a claimed row's metadata into a plain object we can safely merge
+ * into. Legacy rows have stored metadata as a JSON string or array; spreading
+ * those would produce numeric keys (the 2026-07-15 mangling incident). Any
+ * non-object shape is preserved verbatim under `legacy_metadata` instead.
+ */
+export function asObjectMetadata(raw: unknown): Record<string, unknown> {
+  if (raw === null || raw === undefined) return {};
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return { ...(raw as Record<string, unknown>) };
+  }
+  return { legacy_metadata: raw };
+}
+
 export function buildCompletePatch(
   row: ClaimedRow,
   extracted: Extracted,
 ): { type: string; metadata: Record<string, unknown> } {
-  const existing = { ...(row.metadata ?? {}) };
+  const existing = asObjectMetadata(row.metadata);
   delete existing.enrichment_claimed_at;
   delete existing.enrichment_last_error;
   delete existing.enrichment_attempts;
@@ -123,7 +137,7 @@ export function buildFallbackPatch(
   row: ClaimedRow,
   errorReason: string,
 ): { metadata: Record<string, unknown> } {
-  const existing = { ...(row.metadata ?? {}) };
+  const existing = asObjectMetadata(row.metadata);
   delete existing.enrichment_claimed_at;
   const attempts =
     (Number.parseInt(String(existing.enrichment_attempts ?? "0"), 10) || 0) + 1;
@@ -141,7 +155,7 @@ export function buildFallbackPatch(
 export function buildClaimClearPatch(
   row: ClaimedRow,
 ): { metadata: Record<string, unknown> } {
-  const existing = { ...(row.metadata ?? {}) };
+  const existing = asObjectMetadata(row.metadata);
   delete existing.enrichment_claimed_at;
   return { metadata: existing };
 }
