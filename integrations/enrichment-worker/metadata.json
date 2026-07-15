@@ -1,0 +1,17 @@
+{
+  "name": "Enrichment Worker",
+  "description": "Cron-driven Edge Function that enriches un-enriched thoughts (raw imports, skipped or failed classifications) with LLM metadata in place, via an atomic claim RPC. Pairs with Readwise capture stamping and a backfill drain loop.",
+  "category": "integrations",
+  "author": { "name": "Ezana Azene", "github": "eazene" },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "OpenRouter"],
+    "tools": ["pg_cron", "pg_net"]
+  },
+  "tags": ["enrichment", "metadata", "worker", "cron", "readwise", "hygiene"],
+  "difficulty": "intermediate",
+  "estimated_time": "45 minutes",
+  "created": "2026-07-15",
+  "updated": "2026-07-15"
+}
