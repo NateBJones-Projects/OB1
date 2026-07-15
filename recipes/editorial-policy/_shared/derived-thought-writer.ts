@@ -72,6 +72,19 @@ export interface DerivedThoughtPayload {
 /**
  * Store a derived/synthesis thought through the canonical dedup path with a
  * write-time embedding. Returns the thought id.
+ *
+ * Enrichment exemption (belt AND suspenders): synthesis artifacts must NEVER
+ * be picked up by the enrichment worker and re-classified.
+ *   - Belt (predicate-level, schema-independent): every stored row carries
+ *     metadata.enrichment_status = 'exempt', which the queue predicate excludes
+ *     regardless of whether the provenance columns exist.
+ *   - Suspenders (column-level): we also stamp the provenance columns
+ *     derivation_layer='derived' + derivation_method='synthesis' on the row.
+ *
+ * Portability: the 3-arg upsert_thought(p_content, p_payload, p_embedding) only
+ * exists via an optional migration. We attempt it first; if the RPC is missing
+ * (PGRST202 / SQLSTATE 42883) we fall back to the canonical 2-arg
+ * upsert_thought and set the embedding in the follow-up UPDATE.
  */
 export async function storeDerivedThought(
   supabase: SupabaseClient,
@@ -86,13 +99,70 @@ export async function storeDerivedThought(
     console.warn("derived-thought-writer: embedding failed, storing without:", (err as Error).message);
   }
 
-  const { data, error } = await supabase.rpc("upsert_thought", {
+  const derivationLayer = payload.derivation_layer ?? "derived";
+  const derivationMethod = payload.derivation_method ?? "synthesis";
+
+  // Belt: force enrichment_status='exempt' onto the metadata. Applied last so a
+  // caller can never accidentally override it back to an enrichable status.
+  const metadata: Record<string, unknown> = {
+    ...payload.metadata,
+    enrichment_status: "exempt",
+  };
+  const fullPayload = {
+    ...payload,
+    metadata,
+    derivation_layer: derivationLayer,
+    derivation_method: derivationMethod,
+  };
+
+  // Attempt the optional 3-arg upsert (carries the embedding server-side).
+  let id: string | null = null;
+  let usedTwoArg = false;
+  const three = await supabase.rpc("upsert_thought", {
     p_content: content,
-    p_payload: payload,
+    p_payload: fullPayload,
     p_embedding: embedding,
   });
-  if (error || !data?.id) {
-    throw new Error(`derived thought upsert failed: ${error?.message ?? "unknown"}`);
+  const notFound = three.error &&
+    ((three.error as { code?: string }).code === "PGRST202" ||
+     (three.error as { code?: string }).code === "42883");
+  if (notFound) {
+    // Canonical 2-arg fallback: no embedding param — set it in the UPDATE below.
+    usedTwoArg = true;
+    const two = await supabase.rpc("upsert_thought", {
+      p_content: content,
+      p_payload: fullPayload,
+    });
+    if (two.error || !two.data?.id) {
+      throw new Error(`derived thought upsert failed: ${two.error?.message ?? "unknown"}`);
+    }
+    id = two.data.id as string;
+  } else if (three.error || !three.data?.id) {
+    throw new Error(`derived thought upsert failed: ${three.error?.message ?? "unknown"}`);
+  } else {
+    id = three.data.id as string;
   }
-  return data.id as string;
+
+  // Suspenders: stamp provenance columns directly (neither RPC is guaranteed to
+  // write them), plus the embedding when the 2-arg path was used. Best-effort:
+  // if the provenance columns aren't installed the 'exempt' belt still holds, so
+  // don't fail the synthesis run over it.
+  const rowUpdate: Record<string, unknown> = {
+    derivation_layer: derivationLayer,
+    derivation_method: derivationMethod,
+  };
+  if (payload.derived_from) rowUpdate.derived_from = payload.derived_from;
+  if (usedTwoArg && embedding) rowUpdate.embedding = embedding;
+  const { error: updateError } = await supabase
+    .from("thoughts")
+    .update(rowUpdate)
+    .eq("id", id);
+  if (updateError) {
+    console.warn(
+      "derived-thought-writer: provenance/embedding stamp failed (belt 'exempt' status still applies):",
+      updateError.message,
+    );
+  }
+
+  return id;
 }

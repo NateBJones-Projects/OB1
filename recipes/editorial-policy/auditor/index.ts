@@ -504,13 +504,16 @@ function buildAuditContent(result: AuditResult): string {
 
 async function storeAuditReport(result: AuditResult): Promise<string> {
   const content = buildAuditContent(result);
-  // Canonical derived-thought path: dedup, write-time embedding. Audit reports
-  // carry no provenance columns; the structured findings live in metadata.
+  // Canonical derived-thought path: dedup, write-time embedding, provenance
+  // columns (derivation_layer='derived') + enrichment exemption. The explicit
+  // enrichment_status='exempt' here is defense-in-depth alongside the writer's
+  // own stamp: a synthesis artifact must never re-enter the enrichment queue.
   return await storeDerivedThought(supabase, content, {
     metadata: {
         type: "audit_report",
         source: "auditor-function",
         generator: "auditor",
+        enrichment_status: "exempt",
         policy_version: result.policy_version,
         generated_at: new Date().toISOString(),
         audit_window_start: result.audit_window.start,
