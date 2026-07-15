@@ -20,6 +20,7 @@
 // Schedule: see schedule.sql in this recipe folder.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { storeDerivedThought } from "../_shared/derived-thought-writer.ts";
 
 // ── Env ──────────────────────────────────────────────────────────────────
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -29,7 +30,10 @@ const SLACK_BOT_TOKEN = Deno.env.get("SLACK_BOT_TOKEN")!;
 const SLACK_CAPTURE_CHANNEL = Deno.env.get("SLACK_CAPTURE_CHANNEL")!;
 const SLACK_DIGEST_CHANNEL =
   Deno.env.get("SLACK_DIGEST_CHANNEL") ?? SLACK_CAPTURE_CHANNEL;
-const AUDITOR_ACCESS_KEY = Deno.env.get("AUDITOR_ACCESS_KEY")!;
+// Auth consolidated onto the brain-wide MCP_ACCESS_KEY (vault-backed, header
+// pattern) — the old per-function AUDITOR_ACCESS_KEY leaked via ?key= URLs
+// in cron commands/logs and is no longer accepted.
+const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const POLICY_VERSION = Deno.env.get("POLICY_VERSION") ?? "1.3"; // bump when docs/editorial-policy.md changes
@@ -88,6 +92,8 @@ interface AuditResult {
   findings: Finding[];
   slack_summary: string; // mrkdwn; only surfaced when critical findings exist
   baseline_note: string | null; // first-run context message
+  hygiene: Record<string, unknown> | null; // Tier 1 mechanical lint counts (never paged)
+  llm_error: string | null; // set when the LLM pass failed but hygiene was still stored
 }
 
 // ── Data fetching ────────────────────────────────────────────────────────
@@ -116,6 +122,20 @@ async function fetchPriorAudits(limit: number): Promise<PriorAudit[]> {
     return [];
   }
   return (data ?? []) as PriorAudit[];
+}
+
+// Tier 1 lint (mechanical, SQL-only, free). Definitions live in the lint_*
+// views; lint_hygiene_summary() aggregates their counts into one JSON. Read
+// this BEFORE the LLM call so a flaky/costly model can never take the free
+// hygiene metrics down with it. Returns null (not throw) on failure so the
+// audit still proceeds.
+async function fetchHygiene(): Promise<Record<string, unknown> | null> {
+  const { data, error } = await supabase.rpc("lint_hygiene_summary");
+  if (error) {
+    console.warn(`lint_hygiene_summary rpc failed: ${error.message}`);
+    return null;
+  }
+  return (data ?? null) as Record<string, unknown> | null;
 }
 
 // ── Prompt construction ──────────────────────────────────────────────────
@@ -278,7 +298,7 @@ async function callAuditor(
       "X-Title": "Open Brain Auditor",
     },
     body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
+      model: "anthropic/claude-haiku-4-5",
       response_format: { type: "json_object" },
       temperature: 0.2,
       messages: [
@@ -297,9 +317,19 @@ async function callAuditor(
     throw new Error("OpenRouter returned empty content");
   }
 
+  // Some models (e.g. Anthropic via OpenRouter) wrap JSON in a ```json fence
+  // even when response_format=json_object is requested. Strip it before parse.
+  let jsonText = text.trim();
+  if (jsonText.startsWith("```")) {
+    jsonText = jsonText
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(jsonText);
   } catch (e) {
     throw new Error(`Auditor returned non-JSON: ${(e as Error).message}`);
   }
@@ -428,16 +458,34 @@ function buildAuditContent(result: AuditResult): string {
     lines.push("_No findings. Brain looks clean for this window._");
   }
 
+  // Mechanical hygiene (lint Tier 1 + Tier 2) — informational, never paged.
+  if (result.hygiene) {
+    const h = result.hygiene as Record<string, number | boolean>;
+    lines.push("");
+    lines.push("*Hygiene (mechanical — not paged):*");
+    lines.push(
+      `• Tier 1: orphans-by-tag: ${h.orphans_by_tag ?? "?"} · exact-dup groups: ${h.exact_duplicate_groups ?? "?"} · missing fingerprint: ${h.missing_fingerprint ?? "?"} · low-signal: ${h.low_signal ?? "?"} · over-tagged: ${h.over_tagged ?? "?"} · very-long: ${h.very_long ?? "?"} (of ${h.total_thoughts ?? "?"} thoughts)`,
+    );
+    if (h.tier2_available) {
+      lines.push(
+        `• Tier 2 (graph): isolated high-importance: ${h.high_importance_isolated ?? "?"} · entities with zero edges: ${h.entities_zero_edges ?? "?"} (of ${h.entities_total ?? "?"} entities)`,
+      );
+    }
+  }
+  if (result.llm_error) {
+    lines.push("");
+    lines.push(`_LLM findings pass skipped this run: ${result.llm_error}_`);
+  }
+
   return lines.join("\n").trim();
 }
 
 async function storeAuditReport(result: AuditResult): Promise<string> {
   const content = buildAuditContent(result);
-  const { data, error } = await supabase
-    .from("thoughts")
-    .insert({
-      content,
-      metadata: {
+  // Canonical derived-thought path: dedup, write-time embedding. Audit reports
+  // carry no provenance columns; the structured findings live in metadata.
+  return await storeDerivedThought(supabase, content, {
+    metadata: {
         type: "audit_report",
         source: "auditor-function",
         generator: "auditor",
@@ -452,14 +500,10 @@ async function storeAuditReport(result: AuditResult): Promise<string> {
         moderate_count: result.findings.filter((f) => f.severity === "moderate").length,
         minor_count: result.findings.filter((f) => f.severity === "minor").length,
         findings: result.findings, // structured, queryable
-      },
-    })
-    .select("id")
-    .single();
-  if (error || !data) {
-    throw new Error(`audit_report insert failed: ${error?.message ?? "unknown"}`);
-  }
-  return data.id as string;
+        hygiene: result.hygiene,   // Tier 1 mechanical lint counts (separate from findings)
+        llm_error: result.llm_error, // non-null when the LLM pass failed but hygiene stored
+    },
+  });
 }
 
 // ── Slack ────────────────────────────────────────────────────────────────
@@ -485,8 +529,11 @@ async function postToSlack(channel: string, text: string): Promise<void> {
 Deno.serve(async (req: Request): Promise<Response> => {
   try {
     const url = new URL(req.url);
-    const key = url.searchParams.get("key") ?? req.headers.get("x-auditor-key");
-    if (key !== AUDITOR_ACCESS_KEY) {
+    const key =
+      req.headers.get("x-brain-key") ??
+      req.headers.get("x-auditor-key") ??
+      url.searchParams.get("key");
+    if (!MCP_ACCESS_KEY || key !== MCP_ACCESS_KEY) {
       return new Response("unauthorized", { status: 401 });
     }
 
@@ -503,6 +550,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const corpus = await fetchAuditCorpus(days);
     const priorAudits = await fetchPriorAudits(priorAuditCount);
+    // Tier 1 hygiene is computed regardless of the LLM path and even on an
+    // empty window, so mechanical metrics are recorded every run.
+    const hygiene = await fetchHygiene();
 
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
     const now = new Date().toISOString();
@@ -517,6 +567,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         slack_summary: "",
         baseline_note:
           "No synthesizable thoughts in window. Audit skipped LLM call; storing empty report for time-series continuity (R8.3).",
+        hygiene,
+        llm_error: null,
       };
       let storedId: string | null = null;
       if (!dryRun) storedId = await storeAuditReport(baselineResult);
@@ -534,10 +586,21 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const systemPrompt = buildSystemPrompt();
     const userMessage = buildUserMessage(corpus, priorAudits, days);
-    const { findings, slack_summary } = await callAuditor(
-      systemPrompt,
-      userMessage,
-    );
+
+    // The LLM pass is flaky and costly; the hygiene pass above already
+    // succeeded. Don't let an OpenRouter failure discard the whole run —
+    // fall back to a hygiene-only report with the error recorded.
+    let findings: Finding[] = [];
+    let slack_summary = "";
+    let llmError: string | null = null;
+    try {
+      const res = await callAuditor(systemPrompt, userMessage);
+      findings = res.findings;
+      slack_summary = res.slack_summary;
+    } catch (e) {
+      llmError = (e as Error).message;
+      console.error("auditor LLM pass failed; storing hygiene-only report:", llmError);
+    }
 
     const result: AuditResult = {
       audit_window: { start: since, end: now, thought_count: corpus.length },
@@ -549,6 +612,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         priorAudits.length === 0
           ? "First audit run — no prior audits to chain against. This becomes the baseline."
           : null,
+      hygiene,
+      llm_error: llmError,
     };
 
     let storedId: string | null = null;
@@ -574,6 +639,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
         minor_count: findings.filter((f) => f.severity === "minor").length,
         posted_to_slack: shouldPostSlack,
         dry_run: dryRun,
+        hygiene,
+        llm_error: llmError,
       }),
       { headers: { "Content-Type": "application/json" } },
     );
