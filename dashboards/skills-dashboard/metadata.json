@@ -1,0 +1,30 @@
+{
+  "name": "Skills Dashboard",
+  "description": "A localhost matrix dashboard showing which AI skills are installed in which harness (Claude Code, Codex, Grok, Hermes, Claude Desktop, ChatGPT Desktop), with category grouping, a per-skill file browser, optional LLM enrichment, and a static-export path for Vercel.",
+  "category": "dashboards",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": false,
+    "services": ["OpenRouter (optional, for LLM description enrichment)"],
+    "tools": ["Node.js 20+"]
+  },
+  "tags": [
+    "dashboard",
+    "skills",
+    "claude-code",
+    "codex",
+    "grok",
+    "claude-desktop",
+    "inventory",
+    "vite",
+    "express"
+  ],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-15",
+  "updated": "2026-07-15"
+}
