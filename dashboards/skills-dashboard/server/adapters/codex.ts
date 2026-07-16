@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { findSkillMds, installFromSkillMd } from '../walk.ts'
@@ -8,6 +8,7 @@ import type { AdapterResult } from './shared.ts'
 const userRoot = () => path.join(os.homedir(), '.codex', 'skills')
 const systemRoot = () => path.join(os.homedir(), '.codex', 'skills', '.system')
 const pluginCacheRoot = () => path.join(os.homedir(), '.codex', 'plugins', 'cache')
+const configPath = () => path.join(os.homedir(), '.codex', 'config.toml')
 
 const listDirs = (dir: string) => {
   try {
@@ -20,21 +21,65 @@ const listDirs = (dir: string) => {
 }
 
 /**
- * ~/.codex/plugins/cache/<marketplace>/<plugin>/<hash>/skills — no installed-plugins
- * ledger exists for Codex, so dedupe by plugin name: newest hash dir (mtime) wins.
+ * Codex's authoritative plugin ledger: [plugins."name@marketplace"] sections in
+ * ~/.codex/config.toml. This pins each plugin to ONE marketplace — the cache
+ * often holds the same plugin under several (e.g. openai-curated AND
+ * openai-curated-remote), which must not each contribute an install.
+ * Returns null if the config has no plugin entries (fall back to a cache scan).
  */
+function enabledPluginsFromConfig(): Map<string, string> | null {
+  let toml: string
+  try {
+    toml = readFileSync(configPath(), 'utf8')
+  } catch {
+    return null
+  }
+  const map = new Map<string, string>()
+  let found = false
+  const sectionRe = /^\[plugins\."([^@"]+)@([^"]+)"\]([^[]*)/gm
+  for (let m = sectionRe.exec(toml); m; m = sectionRe.exec(toml)) {
+    found = true
+    if (!/^\s*enabled\s*=\s*false/m.test(m[3])) map.set(m[1], m[2])
+  }
+  return found ? map : null
+}
+
+/** Newest version/hash dir inside a cached plugin dir → its skills/ subdir. */
+function skillsDirOfPlugin(pluginDir: string): string | null {
+  const newest = listDirs(pluginDir)
+    .map((dir) => ({ dir, mtime: statSync(dir).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)[0]
+  if (!newest) return null
+  const skillsDir = path.join(newest.dir, 'skills')
+  return existsSync(skillsDir) ? skillsDir : null
+}
+
 function codexPluginSkillRoots(): { pluginName: string; skillsDir: string }[] {
   const out: { pluginName: string; skillsDir: string }[] = []
+  const enabled = enabledPluginsFromConfig()
+
+  if (enabled) {
+    for (const [pluginName, marketplace] of enabled) {
+      const skillsDir = skillsDirOfPlugin(path.join(pluginCacheRoot(), marketplace, pluginName))
+      if (skillsDir) out.push({ pluginName, skillsDir })
+    }
+    return out
+  }
+
+  // No ledger — scan the cache, deduping the same plugin name across
+  // marketplaces (newest chosen dir wins).
+  const byName = new Map<string, { skillsDir: string; mtime: number }>()
   for (const marketplace of listDirs(pluginCacheRoot())) {
     for (const plugin of listDirs(marketplace)) {
-      const newestHash = listDirs(plugin)
-        .map((dir) => ({ dir, mtime: statSync(dir).mtimeMs }))
-        .sort((a, b) => b.mtime - a.mtime)[0]
-      if (!newestHash) continue
-      const skillsDir = path.join(newestHash.dir, 'skills')
-      if (existsSync(skillsDir)) out.push({ pluginName: path.basename(plugin), skillsDir })
+      const skillsDir = skillsDirOfPlugin(plugin)
+      if (!skillsDir) continue
+      const mtime = statSync(path.dirname(skillsDir)).mtimeMs
+      const name = path.basename(plugin)
+      const existing = byName.get(name)
+      if (!existing || mtime > existing.mtime) byName.set(name, { skillsDir, mtime })
     }
   }
+  for (const [pluginName, { skillsDir }] of byName) out.push({ pluginName, skillsDir })
   return out
 }
 
