@@ -17,11 +17,43 @@ interface PluginInstallRecord {
 }
 
 /**
+ * Several plugins can share one repo checkout (e.g. the anthropic-agent-skills
+ * marketplace installs the same commit for document-skills, claude-api and
+ * example-skills), with each plugin scoped to a SUBSET of ./skills via the
+ * marketplace manifest. Honor that scoping — globbing the shared checkout
+ * would report every skill once per plugin (phantom duplicates).
+ */
+function declaredSkillDirs(marketplace: string, pluginName: string): string[] | null {
+  try {
+    const manifest = JSON.parse(
+      readFileSync(
+        path.join(
+          os.homedir(),
+          '.claude',
+          'plugins',
+          'marketplaces',
+          marketplace,
+          '.claude-plugin',
+          'marketplace.json',
+        ),
+        'utf8',
+      ),
+    )
+    const entry = (manifest.plugins ?? []).find(
+      (p: { name?: string }) => p.name === pluginName,
+    )
+    return Array.isArray(entry?.skills) ? entry.skills : null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Enabled plugins resolved to their exact installPath via installed_plugins.json.
  * Never scans the plugin cache directly — it holds stale versions and
  * temp_subdir_*.clone junk that would double-count skills.
  */
-function enabledPluginSkillRoots(): { pluginName: string; skillsDir: string }[] {
+function enabledPluginSkillRoots(): { pluginName: string; skillDirs: string[] }[] {
   let enabled: Set<string>
   let plugins: Record<string, PluginInstallRecord[] | PluginInstallRecord>
   try {
@@ -37,7 +69,7 @@ function enabledPluginSkillRoots(): { pluginName: string; skillsDir: string }[] 
     return []
   }
 
-  const out: { pluginName: string; skillsDir: string }[] = []
+  const out: { pluginName: string; skillDirs: string[] }[] = []
   for (const [key, records] of Object.entries(plugins)) {
     if (!enabled.has(key)) continue
     const list = Array.isArray(records) ? records : [records]
@@ -48,9 +80,14 @@ function enabledPluginSkillRoots(): { pluginName: string; skillsDir: string }[] 
         Date.parse(a.lastUpdated ?? a.installedAt ?? '0'),
     )[0]
     if (!newest?.installPath) continue
-    const skillsDir = path.join(newest.installPath, 'skills')
-    if (!existsSync(skillsDir)) continue
-    out.push({ pluginName: key.split('@')[0], skillsDir })
+    const [pluginName, marketplace] = key.split('@')
+    const declared = declaredSkillDirs(marketplace, pluginName)
+    const skillDirs = declared
+      ? declared.map((rel) => path.resolve(newest.installPath!, rel)).filter(existsSync)
+      : existsSync(path.join(newest.installPath, 'skills'))
+        ? [path.join(newest.installPath, 'skills')]
+        : []
+    if (skillDirs.length) out.push({ pluginName, skillDirs })
   }
   return out
 }
@@ -68,11 +105,13 @@ export function scanClaudeCode(): AdapterResult {
     }
   }
 
-  for (const { pluginName, skillsDir } of enabledPluginSkillRoots()) {
-    roots.push(skillsDir)
-    for (const md of findSkillMds(skillsDir)) {
-      const install = installFromSkillMd(md, 'claude-code', `plugin:${pluginName}`)
-      if (install) installs.push(install)
+  for (const { pluginName, skillDirs } of enabledPluginSkillRoots()) {
+    for (const skillDir of skillDirs) {
+      roots.push(skillDir)
+      for (const md of findSkillMds(skillDir)) {
+        const install = installFromSkillMd(md, 'claude-code', `plugin:${pluginName}`)
+        if (install) installs.push(install)
+      }
     }
   }
 
