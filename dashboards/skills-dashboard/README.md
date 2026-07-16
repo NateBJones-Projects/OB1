@@ -48,7 +48,9 @@ Any skill with more than one install inside a single harness is flagged: rows ge
 - **Byte-identical copies** (e.g. several plugins shipping the same skill) are confirmed mechanically by content hash — no LLM call.
 - **Groups whose content differs** can be judged with the **Dedup with OpenRouter** button (needs `OPENROUTER_API_KEY`): the LLM classifies each group as `same` (redundant copies — with advice on which to keep), `variants` (deliberate platform-specific implementations — keep all), or `different` (unrelated skills sharing a name), with one-sentence reasoning and a recommendation.
 
-Verdicts are cached in `server/.dedup-cache.json` keyed by the group's content hashes, so a group is only judged once until one of its files changes. The dashboard never deletes files — it identifies and advises; cleanup stays in your hands.
+Verdicts are cached in `server/.dedup-cache.json` keyed by the group's content hashes, so a group is only judged once until one of its files changes.
+
+Each install in the panel has a **Delete** button (live mode only) with an inline confirm step. Deleting moves the skill directory to the macOS **Trash** (falling back to `~/.skills-dashboard-trash` if Trash access is denied) — never a hard delete, so it's recoverable. The endpoint only accepts paths that are part of a *current* duplicate group, so a skill's last remaining copy can never be removed this way. Note that copies inside a plugin's cache may reappear when that plugin updates.
 
 ## Deploy to Vercel (static snapshot)
 

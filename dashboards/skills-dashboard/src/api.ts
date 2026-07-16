@@ -39,6 +39,15 @@ export async function runEnrich(): Promise<{ enriched: number; candidates: numbe
   return jsonOrThrow(res)
 }
 
+export async function deleteInstall(
+  dirPath: string,
+): Promise<{ trashedTo: string; duplicates: DuplicateGroup[] }> {
+  const res = await fetch(`/api/skill-install?path=${encodeURIComponent(dirPath)}`, {
+    method: 'DELETE',
+  })
+  return jsonOrThrow(res)
+}
+
 export async function runDedup(
   groupId?: string,
 ): Promise<{ judged: number; groups: DuplicateGroup[] }> {

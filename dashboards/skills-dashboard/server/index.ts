@@ -10,7 +10,7 @@ try {
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { scanAll } from './scanner.ts'
-import { buildTree, guardPath, readFileCapped } from './files.ts'
+import { buildTree, guardPath, readFileCapped, trashDir } from './files.ts'
 import { enrich, llmAvailable } from './describe.ts'
 import { judgeDuplicates } from './dedup.ts'
 import { CATEGORIES } from './categories.ts'
@@ -60,6 +60,34 @@ app.get('/api/skill-file', (req, res) => {
     return
   }
   res.json(file)
+})
+
+// Deleting a duplicate install: only a dirPath that is part of a CURRENT
+// duplicate group may be removed — never an arbitrary path, and never a
+// skill's last remaining copy (a group requires >= 2 installs by
+// definition). The directory is moved to ~/.Trash, not hard-deleted.
+app.delete('/api/skill-install', (req, res) => {
+  const requested = String(req.query.path ?? '')
+  const scan = scanAll()
+  const real = requested ? guardPath(requested, scan.roots) : null
+  if (!real) {
+    res.status(403).json({ error: 'path outside skill roots' })
+    return
+  }
+  const isDuplicateInstall = scan.payload.duplicates.some((g) =>
+    g.installs.some((d) => guardPath(d.dirPath, scan.roots) === real),
+  )
+  if (!isDuplicateInstall) {
+    res.status(400).json({ error: 'not a current duplicate install — rescan and retry' })
+    return
+  }
+  try {
+    const trashedTo = trashDir(real)
+    console.log(`[delete] ${real} → ${trashedTo}`)
+    res.json({ trashedTo, duplicates: scanAll().payload.duplicates })
+  } catch (err) {
+    res.status(500).json({ error: String(err) })
+  }
 })
 
 let deduping = false

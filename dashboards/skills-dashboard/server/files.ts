@@ -1,4 +1,14 @@
-import { lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
+import {
+  cpSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+} from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import type { TreeNode } from './types.ts'
 
@@ -72,6 +82,35 @@ export function buildTree(dirPath: string): TreeNode {
     return node
   }
   return walk(dirPath, 0)
+}
+
+/**
+ * "Delete" a duplicate skill install by moving its directory to the macOS
+ * Trash — recoverable, never a hard rm. Returns the trash destination.
+ */
+export function trashDir(realDirPath: string): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const name = `skills-dashboard-${path.basename(realDirPath)}-${stamp}`
+  // macOS TCC can deny ~/.Trash to some processes — fall back to a local trash dir.
+  const candidates = [path.join(os.homedir(), '.Trash'), path.join(os.homedir(), '.skills-dashboard-trash')]
+  let lastErr: unknown
+  for (const trashRoot of candidates) {
+    const dest = path.join(trashRoot, name)
+    try {
+      mkdirSync(trashRoot, { recursive: true })
+      try {
+        renameSync(realDirPath, dest)
+      } catch {
+        // cross-device fallback
+        cpSync(realDirPath, dest, { recursive: true })
+        rmSync(realDirPath, { recursive: true })
+      }
+      return dest
+    } catch (err) {
+      lastErr = err
+    }
+  }
+  throw lastErr
 }
 
 export interface FileContent {

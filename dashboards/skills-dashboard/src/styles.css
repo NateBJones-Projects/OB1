@@ -686,6 +686,44 @@ td.cell-absent {
   min-width: 10rem;
 }
 
+.delete-button,
+.delete-yes,
+.delete-no {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  padding: 0.08rem 0.45rem;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  margin-left: auto;
+}
+
+.delete-button {
+  color: var(--muted);
+}
+
+.delete-button:hover {
+  color: #b3261e;
+  border-color: #b3261e;
+}
+
+.delete-confirm {
+  display: flex;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.delete-yes {
+  color: #fff;
+  background: #b3261e;
+  border-color: #b3261e;
+  margin-left: 0;
+}
+
+.delete-no {
+  color: var(--muted);
+  margin-left: 0;
+}
+
 .dedup-verdict-text {
   margin: 0.45rem 0 0;
   font-size: 0.78rem;

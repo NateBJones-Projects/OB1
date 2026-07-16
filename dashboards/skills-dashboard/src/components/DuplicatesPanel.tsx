@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { runDedup } from '../api.ts'
+import { deleteInstall, runDedup } from '../api.ts'
 import type { DuplicateGroup, HarnessId } from '../types.ts'
 
 interface Props {
@@ -31,6 +31,8 @@ export function DuplicatesPanel({ groups: initial, live, llmAvailable, onClose, 
   const [groups, setGroups] = useState(initial)
   const [judging, setJudging] = useState<string | 'all' | null>(null)
   const [note, setNote] = useState<string | null>(null)
+  const [confirmPath, setConfirmPath] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,6 +59,22 @@ export function DuplicatesPanel({ groups: initial, live, llmAvailable, onClose, 
       setNote(`judgment failed: ${(err as Error).message}`)
     } finally {
       setJudging(null)
+    }
+  }
+
+  const remove = async (dirPath: string) => {
+    setDeleting(dirPath)
+    setNote(null)
+    try {
+      const result = await deleteInstall(dirPath)
+      setGroups(result.duplicates)
+      setNote(`moved to Trash: ${result.trashedTo}`)
+      onJudged()
+    } catch (err) {
+      setNote(`delete failed: ${(err as Error).message}`)
+    } finally {
+      setDeleting(null)
+      setConfirmPath(null)
     }
   }
 
@@ -124,6 +142,37 @@ export function DuplicatesPanel({ groups: initial, live, llmAvailable, onClose, 
                       <span className="install-source">{d.source}</span>
                       <span className="install-date">{fmtDate(d.mtimeMs)}</span>
                       <span className="install-path">{d.sourcePath}</span>
+                      {live &&
+                        (confirmPath === d.dirPath ? (
+                          <span className="delete-confirm">
+                            <button
+                              type="button"
+                              className="delete-yes"
+                              onClick={() => remove(d.dirPath)}
+                              disabled={deleting !== null}
+                            >
+                              {deleting === d.dirPath ? 'Moving to Trash…' : 'Confirm delete'}
+                            </button>
+                            <button
+                              type="button"
+                              className="delete-no"
+                              onClick={() => setConfirmPath(null)}
+                              disabled={deleting !== null}
+                            >
+                              Cancel
+                            </button>
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="delete-button"
+                            title="Move this copy to the Trash"
+                            onClick={() => setConfirmPath(d.dirPath)}
+                            disabled={deleting !== null}
+                          >
+                            Delete
+                          </button>
+                        ))}
                     </li>
                   ))}
                 </ul>
