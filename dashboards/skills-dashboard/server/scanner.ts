@@ -6,6 +6,7 @@ import { scanClaudeDesktop } from './adapters/claude-desktop.ts'
 import { scanChatGPTDesktop } from './adapters/chatgpt-desktop.ts'
 import type { AdapterResult } from './adapters/shared.ts'
 import { CATEGORIES, categorize } from './categories.ts'
+import { findDuplicates } from './dedup.ts'
 import { loadCache, llmAvailable, sha256File, type EnrichTarget } from './describe.ts'
 import type {
   HarnessId,
@@ -127,6 +128,7 @@ export function scanAll(): ScanResult {
       harnesses,
       categories: [...CATEGORIES],
       rows,
+      duplicates: findDuplicates(rows),
     },
     roots,
     enrichTargets,

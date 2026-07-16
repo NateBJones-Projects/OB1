@@ -13,6 +13,11 @@ import type { MatrixPayload } from './types.ts'
 function sanitize(payload: MatrixPayload): MatrixPayload {
   const home = os.homedir()
   const relativize = (p: string) => (p.startsWith(home) ? `~${p.slice(home.length)}` : path.basename(p))
+  const sanitizeInstall = <T extends { sourcePath: string; dirPath: string }>(d: T): T => ({
+    ...d,
+    sourcePath: relativize(d.sourcePath),
+    dirPath: relativize(d.dirPath),
+  })
   return {
     ...payload,
     llmAvailable: false,
@@ -21,13 +26,23 @@ function sanitize(payload: MatrixPayload): MatrixPayload {
       installs: Object.fromEntries(
         Object.entries(row.installs).map(([harness, details]) => [
           harness,
-          details.map((d) => ({
-            ...d,
-            sourcePath: relativize(d.sourcePath),
-            dirPath: relativize(d.dirPath),
-          })),
+          details.map(sanitizeInstall),
         ]),
       ),
+    })),
+    duplicates: payload.duplicates.map((group) => ({
+      ...group,
+      installs: group.installs.map(sanitizeInstall),
+      // LLM verdict prose can quote absolute paths verbatim — scrub those too.
+      ...(group.verdict
+        ? {
+            verdict: {
+              ...group.verdict,
+              reasoning: group.verdict.reasoning.replaceAll(home, '~'),
+              recommendation: group.verdict.recommendation.replaceAll(home, '~'),
+            },
+          }
+        : {}),
     })),
   }
 }

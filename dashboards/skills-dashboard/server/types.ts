@@ -54,6 +54,27 @@ export interface MatrixRow {
   installs: Partial<Record<HarnessId, InstallDetail[]>>
 }
 
+export interface DuplicateVerdict {
+  verdict: 'same' | 'variants' | 'different'
+  reasoning: string
+  recommendation: string
+  /** 'content-hash' for mechanical byte-identical confirmation, else the LLM model. */
+  judgedBy: string
+}
+
+/** A skill with more than one install inside a single harness. */
+export interface DuplicateGroup {
+  /** Stable id derived from the installs' content hashes (verdict cache key). */
+  id: string
+  key: string
+  displayName: string
+  harness: HarnessId
+  installs: InstallDetail[]
+  /** All SKILL.md contents are byte-identical. */
+  identical: boolean
+  verdict?: DuplicateVerdict
+}
+
 export interface MatrixPayload {
   scannedAt: string
   /** True when the server can enrich descriptions via LLM (OPENROUTER_API_KEY set). */
@@ -61,6 +82,7 @@ export interface MatrixPayload {
   harnesses: HarnessMeta[]
   categories: string[]
   rows: MatrixRow[]
+  duplicates: DuplicateGroup[]
 }
 
 export interface TreeNode {

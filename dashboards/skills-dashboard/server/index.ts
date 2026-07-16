@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { scanAll } from './scanner.ts'
 import { buildTree, guardPath, readFileCapped } from './files.ts'
 import { enrich, llmAvailable } from './describe.ts'
+import { judgeDuplicates } from './dedup.ts'
 import { CATEGORIES } from './categories.ts'
 
 const app = express()
@@ -59,6 +60,26 @@ app.get('/api/skill-file', (req, res) => {
     return
   }
   res.json(file)
+})
+
+let deduping = false
+app.post('/api/dedup', (req, res) => {
+  if (!llmAvailable()) {
+    res.status(400).json({ error: 'OPENROUTER_API_KEY not set' })
+    return
+  }
+  if (deduping) {
+    res.status(409).json({ error: 'dedup judgment already running' })
+    return
+  }
+  deduping = true
+  const onlyId = typeof req.query.id === 'string' ? req.query.id : undefined
+  judgeDuplicates(scanAll().payload.duplicates, onlyId)
+    .then((result) => res.json(result))
+    .catch((err) => res.status(500).json({ error: String(err) }))
+    .finally(() => {
+      deduping = false
+    })
 })
 
 let enriching = false

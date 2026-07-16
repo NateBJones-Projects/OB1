@@ -41,6 +41,15 @@ Results are cached in `server/.describe-cache.json` keyed by file content hash, 
 
 Categories are assigned by an editable keyword rubric in `server/categories.ts` (manual overrides map at the top).
 
+## Duplicate detection & OpenRouter dedup
+
+Any skill with more than one install inside a single harness is flagged: rows get a `dup` chip and the toolbar shows an orange **duplicates (N)** button that opens the review panel.
+
+- **Byte-identical copies** (e.g. several plugins shipping the same skill) are confirmed mechanically by content hash — no LLM call.
+- **Groups whose content differs** can be judged with the **Dedup with OpenRouter** button (needs `OPENROUTER_API_KEY`): the LLM classifies each group as `same` (redundant copies — with advice on which to keep), `variants` (deliberate platform-specific implementations — keep all), or `different` (unrelated skills sharing a name), with one-sentence reasoning and a recommendation.
+
+Verdicts are cached in `server/.dedup-cache.json` keyed by the group's content hashes, so a group is only judged once until one of its files changes. The dashboard never deletes files — it identifies and advises; cleanup stays in your hands.
+
 ## Deploy to Vercel (static snapshot)
 
 A hosted deployment cannot scan this machine's disk — it serves a baked snapshot:

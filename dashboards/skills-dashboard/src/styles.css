@@ -538,6 +538,166 @@ td.cell-absent {
   padding: 0.5rem 0.9rem;
 }
 
+/* duplicates panel */
+.dup-button {
+  color: var(--signal) !important;
+  border-color: var(--signal) !important;
+}
+
+.chip-dup {
+  color: var(--signal);
+  border-color: var(--signal);
+}
+
+.duplicates-panel {
+  width: min(860px, 94vw);
+}
+
+.dedup-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid var(--hairline);
+  flex: none;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+.dedup-toolbar button {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--signal);
+  border-radius: 2px;
+  color: var(--signal);
+  background: var(--cell);
+}
+
+.dedup-toolbar button:disabled {
+  opacity: 0.5;
+}
+
+.dedup-summary,
+.dedup-note {
+  color: var(--muted);
+}
+
+.dedup-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.dedup-group {
+  border: 1px solid var(--hairline);
+  padding: 0.6rem 0.75rem;
+  background: var(--paper);
+}
+
+.dedup-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+
+.dedup-skill {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.dedup-harness {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--teal);
+}
+
+.chip-identical {
+  color: var(--teal);
+  border-color: var(--teal);
+  margin-left: 0;
+}
+
+.chip-differs {
+  color: var(--signal);
+  border-color: var(--signal);
+  margin-left: 0;
+}
+
+.verdict-badge {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 2px;
+  color: var(--cell);
+}
+
+.verdict-same {
+  background: var(--teal);
+}
+
+.verdict-variants {
+  background: var(--muted);
+}
+
+.verdict-different {
+  background: var(--signal);
+}
+
+.dedup-judge {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  margin-left: auto;
+}
+
+.dedup-judge:hover {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.dedup-installs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.dedup-installs li {
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.dedup-installs .install-source {
+  min-width: 10rem;
+}
+
+.dedup-verdict-text {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  color: var(--ink);
+}
+
+.dedup-judged-by {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+}
+
 /* file tree */
 .tree-root,
 .tree-children {

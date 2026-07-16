@@ -1,4 +1,6 @@
 export type {
+  DuplicateGroup,
+  DuplicateVerdict,
   HarnessId,
   HarnessMeta,
   InstallDetail,

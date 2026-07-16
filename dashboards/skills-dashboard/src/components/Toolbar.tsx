@@ -16,6 +16,8 @@ interface Props {
   onCollapseAll: () => void
   onExpandAll: () => void
   onRefresh: () => void
+  duplicatesCount: number
+  onShowDuplicates: () => void
 }
 
 function AgoLabel({ lastFetched }: { lastFetched: number | null }) {
@@ -83,6 +85,11 @@ export function Toolbar(props: Props) {
           />
           plugin skills ({props.pluginRowCount})
         </label>
+        {props.duplicatesCount > 0 && (
+          <button type="button" className="dup-button" onClick={props.onShowDuplicates}>
+            duplicates ({props.duplicatesCount})
+          </button>
+        )}
         <button type="button" onClick={props.onExpandAll}>Expand all</button>
         <button type="button" onClick={props.onCollapseAll}>Collapse all</button>
         <button type="button" onClick={props.onRefresh}>Refresh</button>

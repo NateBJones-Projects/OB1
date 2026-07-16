@@ -25,6 +25,7 @@ export function SkillRow({ row, harnesses, now, onOpenPopup }: Props) {
   const pluginOnly = Object.values(row.visibleInstalls).every((list) =>
     list.every((d) => d.source.startsWith('plugin:')),
   )
+  const hasDuplicates = Object.values(row.visibleInstalls).some((list) => list.length > 1)
 
   return (
     <>
@@ -34,6 +35,11 @@ export function SkillRow({ row, harnesses, now, onOpenPopup }: Props) {
             {row.displayName}
           </button>
           {pluginOnly && <span className="chip">plugin</span>}
+          {hasDuplicates && (
+            <span className="chip chip-dup" title="Multiple installs in one harness — see the duplicates panel">
+              dup
+            </span>
+          )}
           <button
             type="button"
             className="expand-toggle"

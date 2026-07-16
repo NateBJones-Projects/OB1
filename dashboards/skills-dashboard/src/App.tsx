@@ -5,6 +5,7 @@ import { isPluginSource } from './types.ts'
 import { Toolbar } from './components/Toolbar.tsx'
 import { SkillsTable } from './components/SkillsTable.tsx'
 import { SkillPopup } from './components/SkillPopup.tsx'
+import { DuplicatesPanel } from './components/DuplicatesPanel.tsx'
 
 const POLL_MS = 60_000
 const COLLAPSED_KEY = 'skills-dashboard:collapsed'
@@ -51,6 +52,7 @@ export default function App() {
   const [showPlugins, setShowPlugins] = useState(false)
   const [collapsed, setCollapsed] = useState<Set<string>>(loadCollapsed)
   const [popupRow, setPopupRow] = useState<VisibleRow | null>(null)
+  const [showDuplicates, setShowDuplicates] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const refresh = useCallback(async () => {
@@ -139,6 +141,8 @@ export default function App() {
         onCollapseAll={() => persistCollapsed(new Set(payload.categories))}
         onExpandAll={() => persistCollapsed(new Set())}
         onRefresh={refresh}
+        duplicatesCount={payload.duplicates?.length ?? 0}
+        onShowDuplicates={() => setShowDuplicates(true)}
       />
       <SkillsTable
         payload={payload}
@@ -151,6 +155,15 @@ export default function App() {
       />
       {popupRow && (
         <SkillPopup row={popupRow} live={mode === 'live'} onClose={() => setPopupRow(null)} />
+      )}
+      {showDuplicates && (
+        <DuplicatesPanel
+          groups={payload.duplicates ?? []}
+          live={mode === 'live'}
+          llmAvailable={payload.llmAvailable}
+          onClose={() => setShowDuplicates(false)}
+          onJudged={refresh}
+        />
       )}
     </>
   )

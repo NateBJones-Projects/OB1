@@ -1,4 +1,4 @@
-import type { FileContentPayload, MatrixPayload, TreeNode } from './types.ts'
+import type { DuplicateGroup, FileContentPayload, MatrixPayload, TreeNode } from './types.ts'
 
 export type Mode = 'live' | 'snapshot'
 
@@ -36,5 +36,13 @@ export async function fetchFile(filePath: string): Promise<FileContentPayload> {
 
 export async function runEnrich(): Promise<{ enriched: number; candidates: number }> {
   const res = await fetch('/api/enrich', { method: 'POST' })
+  return jsonOrThrow(res)
+}
+
+export async function runDedup(
+  groupId?: string,
+): Promise<{ judged: number; groups: DuplicateGroup[] }> {
+  const url = groupId ? `/api/dedup?id=${encodeURIComponent(groupId)}` : '/api/dedup'
+  const res = await fetch(url, { method: 'POST' })
   return jsonOrThrow(res)
 }
