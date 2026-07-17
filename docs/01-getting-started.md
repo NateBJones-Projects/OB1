@@ -253,6 +253,8 @@ OpenRouter is a universal AI API gateway — one account gives you access to eve
 
 Why OpenRouter instead of OpenAI directly? One account, one key, one billing relationship — and it future-proofs you for Claude, Gemini, or any other model later.
 
+Atlas Cloud is also supported as an OpenAI-compatible backend for the core MCP server. To use it instead of OpenRouter, set `OPEN_BRAIN_AI_PROVIDER=atlascloud` and `ATLASCLOUD_API_KEY`, and keep the embedding dimension at 1536 unless you also update the database vector column.
+
 1. Go to [openrouter.ai](https://openrouter.ai) and sign up
 2. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
 3. Click **Create Key**, name it `open-brain`
@@ -410,6 +412,12 @@ Set your OpenRouter key from Step 4:
 
 ```bash
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
+```
+
+Or, to use Atlas Cloud instead:
+
+```bash
+supabase secrets set OPEN_BRAIN_AI_PROVIDER=atlascloud ATLASCLOUD_API_KEY=your-atlascloud-key-here
 ```
 
 > [!NOTE]
@@ -592,6 +600,12 @@ Set your OpenRouter key from Step 4:
 
 ```powershell
 supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
+```
+
+Or, to use Atlas Cloud instead:
+
+```powershell
+supabase secrets set OPEN_BRAIN_AI_PROVIDER=atlascloud ATLASCLOUD_API_KEY=your-atlascloud-key-here
 ```
 
 > [!NOTE]
@@ -912,7 +926,7 @@ The embedding is what makes retrieval powerful. "Sarah's thinking about leaving"
 
 ### Swapping Models Later
 
-Because you're using OpenRouter, you can swap models by editing the model strings in the Edge Function code and redeploying. Browse available models at [openrouter.ai/models](https://openrouter.ai/models). Just make sure embedding dimensions match (1536 for the current setup).
+Because the server uses OpenAI-compatible endpoints, you can swap models by setting `OPEN_BRAIN_CHAT_MODEL` or `OPEN_BRAIN_EMBEDDING_MODEL` before redeploying. Browse OpenRouter models at [openrouter.ai/models](https://openrouter.ai/models), or use Atlas Cloud model IDs such as `qwen/qwen3.5-flash` for chat. Just make sure embedding dimensions match (1536 for the current setup).
 
 </details>
 
