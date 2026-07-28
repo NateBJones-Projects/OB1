@@ -55,7 +55,7 @@ RETURNS TABLE (
   total_count BIGINT
 )
 LANGUAGE plpgsql
-VOLATILE
+STABLE
 SET statement_timeout = '25s'
 AS $$
 BEGIN
@@ -84,7 +84,7 @@ BEGIN
       AND (SELECT count(*) FROM tsvector_hits) < (p_limit + p_offset)
       AND t.content ILIKE '%' || q.raw_query || '%'
       AND t.metadata @> coalesce(p_filter, '{}'::jsonb)
-      AND t.id NOT IN (SELECT th.hit_id FROM tsvector_hits th)
+      AND NOT EXISTS (SELECT 1 FROM tsvector_hits th WHERE th.hit_id = t.id)
     LIMIT 500
   ),
   all_hits AS (
@@ -118,8 +118,10 @@ BEGIN
             ELSE 0
           END
         )
-        + (coalesce(t.importance, 5) / 20.0)::real
-        + (coalesce(t.quality_score, 0.50) / 500.0)::real
+        -- importance is 1..5; max bonus 5/20 = 0.25
+        + (coalesce(t.importance, 3) / 20.0)::real
+        -- quality_score is 0..100; max bonus 100/500 = 0.20
+        + (coalesce(t.quality_score, 50) / 500.0)::real
       )::real AS rank
     FROM public.thoughts t
     CROSS JOIN query_input q
@@ -138,8 +140,12 @@ BEGIN
 END;
 $$;
 
+-- Do NOT grant to `anon`. Stock Open Brain keeps `thoughts` behind RLS
+-- (service_role only). Broadening execution to the publishable anon key
+-- would expose the entire brain to anyone who knows the project URL.
+-- See README "Security" section.
 GRANT EXECUTE ON FUNCTION search_thoughts_text(TEXT, INTEGER, JSONB, INTEGER)
-  TO authenticated, anon, service_role;
+  TO authenticated, service_role;
 
 -- ============================================================
 -- 3. BRAIN STATS AGGREGATE RPC
@@ -195,8 +201,10 @@ BEGIN
 END;
 $$;
 
+-- Do NOT grant to `anon`. This RPC is SECURITY DEFINER and would bypass
+-- RLS on the thoughts table. See README "Security" section.
 GRANT EXECUTE ON FUNCTION brain_stats_aggregate(INTEGER, BOOLEAN)
-  TO authenticated, anon, service_role;
+  TO authenticated, service_role;
 
 -- ============================================================
 -- 4. THOUGHT CONNECTIONS RPC
@@ -220,6 +228,7 @@ RETURNS TABLE (
   overlap_count INT
 )
 LANGUAGE plpgsql
+STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
@@ -266,7 +275,7 @@ BEGIN
       ) AS shared_people
     FROM thoughts bt
     WHERE bt.id != p_thought_id
-      AND (NOT p_exclude_restricted OR bt.sensitivity_tier != 'restricted')
+      AND (NOT p_exclude_restricted OR bt.sensitivity_tier IS DISTINCT FROM 'restricted')
       AND (
         EXISTS (
           SELECT 1 FROM jsonb_array_elements_text(bt.metadata->'topics') val
@@ -288,8 +297,12 @@ BEGIN
 END;
 $$;
 
+-- Do NOT grant to `anon`. This RPC is SECURITY DEFINER and exposes
+-- a 200-char content preview plus metadata for any thought by UUID;
+-- granting to anon would let anyone with the project URL pull content.
+-- See README "Security" section.
 GRANT EXECUTE ON FUNCTION get_thought_connections(UUID, INT, BOOLEAN)
-  TO authenticated, anon, service_role;
+  TO authenticated, service_role;
 
 -- ============================================================
 -- 5. BACKFILL EXISTING DATA
@@ -297,10 +310,42 @@ GRANT EXECUTE ON FUNCTION get_thought_connections(UUID, INT, BOOLEAN)
 --    exist. Safe to run multiple times (WHERE ... IS NULL guard).
 -- ============================================================
 
--- Backfill type from metadata
-UPDATE thoughts SET type = metadata->>'type'
-WHERE type IS NULL AND metadata->>'type' IS NOT NULL
-  AND metadata->>'type' IN ('idea','task','person_note','reference','decision','lesson','meeting','journal');
+-- Backfill `type` from metadata. Wrapped in an RPC so callers can
+-- override the allowlist. Default allowlist matches the canonical
+-- Open Brain type vocabulary; pass NULL to accept any string value
+-- present in metadata->>'type'.
+CREATE OR REPLACE FUNCTION backfill_thought_types(
+  p_allowed_types TEXT[] DEFAULT ARRAY[
+    'idea','task','person_note','reference',
+    'decision','lesson','meeting','journal'
+  ]
+)
+RETURNS BIGINT
+LANGUAGE plpgsql
+VOLATILE
+SET search_path = public
+AS $$
+DECLARE
+  v_updated BIGINT;
+BEGIN
+  UPDATE public.thoughts
+  SET type = metadata->>'type'
+  WHERE type IS NULL
+    AND metadata->>'type' IS NOT NULL
+    AND (p_allowed_types IS NULL OR metadata->>'type' = ANY(p_allowed_types));
+
+  GET DIAGNOSTICS v_updated = ROW_COUNT;
+  RETURN v_updated;
+END;
+$$;
+
+-- Do NOT grant to `anon`. This RPC writes to the thoughts table.
+GRANT EXECUTE ON FUNCTION backfill_thought_types(TEXT[])
+  TO authenticated, service_role;
+
+-- Run the backfill with the default allowlist so the paste-and-run
+-- flow still auto-populates `type` for canonical values.
+SELECT backfill_thought_types();
 
 -- Backfill source_type from metadata
 UPDATE thoughts SET source_type = metadata->>'source'

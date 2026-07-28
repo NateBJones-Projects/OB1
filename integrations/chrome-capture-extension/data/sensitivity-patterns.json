@@ -1,0 +1,19 @@
+{
+  "restricted": [
+    { "pattern": "\\b\\d{3}-?\\d{2}-?\\d{4}\\b", "flags": "", "label": "ssn_pattern" },
+    { "pattern": "\\b[A-Z]{1,2}\\d{6,9}\\b", "flags": "", "label": "passport_pattern" },
+    { "pattern": "\\b\\d{8,17}\\b.*\\b(account|routing|iban)\\b", "flags": "i", "label": "bank_account" },
+    { "pattern": "\\b(account|routing)\\b.*\\b\\d{8,17}\\b", "flags": "i", "label": "bank_account" },
+    { "pattern": "\\b(sk-|pk_live_|sk_live_|ghp_|gho_|AKIA)[A-Za-z0-9]{10,}", "flags": "i", "label": "api_key" },
+    { "pattern": "\\bpassword\\s*[:=]\\s*\\S+", "flags": "i", "label": "password_value" },
+    { "pattern": "\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b", "flags": "", "label": "credit_card" }
+  ],
+  "personal": [
+    { "pattern": "\\b\\d+\\s*mg\\b(?!\\s*\\/\\s*(dL|kg|L|ml))", "flags": "i", "label": "medication_dosage" },
+    { "pattern": "\\b(pregabalin|metoprolol|losartan|lisinopril|aspirin|atorvastatin|sertraline|metformin|gabapentin|prednisone|insulin|warfarin)\\b", "flags": "i", "label": "drug_name" },
+    { "pattern": "\\b(glucose|a1c|cholesterol|blood pressure|bp|hrv|bmi)\\b.*\\b\\d+", "flags": "i", "label": "health_measurement" },
+    { "pattern": "\\b(diagnosed|diagnosis|prediabetic|diabetic|arrhythmia|ablation)\\b", "flags": "i", "label": "medical_condition" },
+    { "pattern": "\\b(salary|income|net worth|401k|ira|portfolio)\\b.*\\b\\$?\\d", "flags": "i", "label": "financial_detail" },
+    { "pattern": "\\b\\$\\d{3,}[,\\d]*\\b", "flags": "i", "label": "financial_amount" }
+  ]
+}
