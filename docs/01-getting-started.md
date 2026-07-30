@@ -70,7 +70,12 @@ create table thoughts (
   embedding vector(1536),
   metadata jsonb default '{}'::jsonb,
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  -- Supersession: a retired row records when it was retired and (optionally)
+  -- which newer row replaces it. A row is current iff superseded_at is null.
+  superseded_by uuid references thoughts(id) on delete set null,
+  superseded_at timestamptz,
+  supersede_reason text
 );
 
 -- Index for fast vector similarity search
@@ -82,6 +87,12 @@ create index on thoughts using gin (metadata);
 
 -- Index for date range queries
 create index on thoughts (created_at desc);
+
+-- Partial index for the default "current rows only" filter
+create index thoughts_current_idx on thoughts (id) where superseded_at is null;
+
+-- Index for looking up what replaced a given row
+create index thoughts_superseded_by_idx on thoughts (superseded_by);
 
 -- Auto-update the updated_at timestamp
 create or replace function update_updated_at()
@@ -112,14 +123,17 @@ create or replace function match_thoughts(
   query_embedding vector(1536),
   match_threshold float default 0.7,
   match_count int default 10,
-  filter jsonb default '{}'::jsonb
+  filter jsonb default '{}'::jsonb,
+  include_superseded boolean default false
 )
 returns table (
   id uuid,
   content text,
   metadata jsonb,
   similarity float,
-  created_at timestamptz
+  created_at timestamptz,
+  superseded_by uuid,
+  superseded_at timestamptz
 )
 language plpgsql
 as $$
@@ -130,10 +144,13 @@ begin
     t.content,
     t.metadata,
     1 - (t.embedding <=> query_embedding) as similarity,
-    t.created_at
+    t.created_at,
+    t.superseded_by,
+    t.superseded_at
   from thoughts t
   where 1 - (t.embedding <=> query_embedding) > match_threshold
     and (filter = '{}'::jsonb or t.metadata @> filter)
+    and (include_superseded or t.superseded_at is null)
   order by t.embedding <=> query_embedding
   limit match_count;
 end;
@@ -193,13 +210,20 @@ CREATE UNIQUE INDEX idx_thoughts_fingerprint
   ON thoughts (content_fingerprint)
   WHERE content_fingerprint IS NOT NULL;
 
--- Upsert function: inserts new thoughts, merges metadata on duplicates
-CREATE OR REPLACE FUNCTION upsert_thought(p_content TEXT, p_payload JSONB DEFAULT '{}')
+-- Upsert function: inserts new thoughts, merges metadata on duplicates,
+-- and optionally retires the rows this capture supersedes — in one transaction,
+-- so a capture whose supersession targets are invalid writes nothing at all.
+CREATE OR REPLACE FUNCTION upsert_thought(
+  p_content TEXT,
+  p_payload JSONB DEFAULT '{}',
+  p_supersedes UUID[] DEFAULT NULL,
+  p_supersede_reason TEXT DEFAULT NULL
+)
 RETURNS JSONB AS $$
 DECLARE
   v_fingerprint TEXT;
-  v_result JSONB;
   v_id UUID;
+  v_target UUID;
 BEGIN
   v_fingerprint := encode(sha256(convert_to(
     lower(trim(regexp_replace(p_content, '\s+', ' ', 'g'))),
@@ -213,8 +237,13 @@ BEGIN
       metadata = thoughts.metadata || COALESCE(EXCLUDED.metadata, '{}'::jsonb)
   RETURNING id INTO v_id;
 
-  v_result := jsonb_build_object('id', v_id, 'fingerprint', v_fingerprint);
-  RETURN v_result;
+  IF p_supersedes IS NOT NULL THEN
+    FOREACH v_target IN ARRAY p_supersedes LOOP
+      PERFORM supersede_thought(v_target, v_id, p_supersede_reason);
+    END LOOP;
+  END IF;
+
+  RETURN jsonb_build_object('id', v_id, 'fingerprint', v_fingerprint);
 END;
 $$ LANGUAGE plpgsql;
 ```
@@ -223,9 +252,134 @@ $$ LANGUAGE plpgsql;
 
 > This prevents duplicate thoughts from cluttering your database. When you capture the same thought twice, it merges the metadata instead of creating a second row.
 
-![2.7](https://img.shields.io/badge/2.7-Verify-555?style=for-the-badge&labelColor=F4511E)
+![2.7](https://img.shields.io/badge/2.7-Add_Supersession_and_Updates-555?style=for-the-badge&labelColor=F4511E)
 
-✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, content_fingerprint, created_at, updated_at. Database → Functions shows `match_thoughts` and `upsert_thought`.
+New query → paste and Run. These two functions let a capture retire the row it replaces and let any row be corrected in place:
+
+<details>
+<summary>📋 <strong>SQL: Supersede + update functions</strong> (click to expand)</summary>
+
+```sql
+-- Retire one thought, optionally pointing at its replacement.
+-- Validation lives here (not in constraints) so the errors that reach an
+-- AI client are readable by an agent.
+create or replace function supersede_thought(
+  p_id uuid,
+  p_superseded_by uuid default null,
+  p_reason text default null
+)
+returns jsonb
+language plpgsql
+as $$
+declare
+  v_target thoughts%rowtype;
+  v_replacement thoughts%rowtype;
+  v_row thoughts%rowtype;
+begin
+  if p_superseded_by is not null and p_superseded_by = p_id then
+    raise exception 'A thought cannot supersede itself (%).', p_id;
+  end if;
+
+  select * into v_target from thoughts where id = p_id;
+  if not found then
+    raise exception 'Thought % does not exist; nothing was superseded.', p_id;
+  end if;
+  if v_target.superseded_at is not null then
+    raise exception 'Thought % is already superseded (at %, by %); refusing to change an existing supersession.',
+      p_id, v_target.superseded_at, coalesce(v_target.superseded_by::text, 'no successor');
+  end if;
+
+  if p_superseded_by is not null then
+    select * into v_replacement from thoughts where id = p_superseded_by;
+    if not found then
+      raise exception 'Replacement thought % does not exist; nothing was superseded.', p_superseded_by;
+    end if;
+    if v_replacement.superseded_at is not null then
+      raise exception 'Replacement thought % is itself superseded; point at the current head of the chain instead.',
+        p_superseded_by;
+    end if;
+  end if;
+
+  update thoughts
+  set superseded_by = p_superseded_by,
+      superseded_at = now(),
+      supersede_reason = p_reason
+  where id = p_id
+  returning * into v_row;
+
+  return jsonb_build_object(
+    'id', v_row.id,
+    'superseded_by', v_row.superseded_by,
+    'superseded_at', v_row.superseded_at,
+    'supersede_reason', v_row.supersede_reason
+  );
+end;
+$$;
+
+-- Patch a thought in place. Content changes recompute the dedup fingerprint
+-- and require a fresh embedding; metadata patches merge, and
+-- p_metadata_remove clears keys.
+create or replace function update_thought(
+  p_id uuid,
+  p_content text default null,
+  p_embedding vector(1536) default null,
+  p_metadata_patch jsonb default '{}'::jsonb,
+  p_metadata_remove text[] default array[]::text[]
+)
+returns jsonb
+language plpgsql
+as $$
+declare
+  v_row thoughts%rowtype;
+begin
+  if p_content is not null and p_embedding is null then
+    raise exception 'Content updates require a regenerated embedding; refusing to change content and leave the old embedding in place.';
+  end if;
+
+  begin
+    update thoughts
+    set content = coalesce(p_content, content),
+        content_fingerprint = case
+          when p_content is not null then encode(sha256(convert_to(
+            lower(trim(regexp_replace(p_content, '\s+', ' ', 'g'))),
+            'UTF8'
+          )), 'hex')
+          else content_fingerprint
+        end,
+        embedding = case when p_content is not null then p_embedding else embedding end,
+        metadata = (metadata || p_metadata_patch) - p_metadata_remove
+    where id = p_id
+    returning * into v_row;
+  exception when unique_violation then
+    raise exception 'Another thought already has identical content; updating % to that content would create a duplicate.', p_id;
+  end;
+
+  if v_row.id is null then
+    raise exception 'Thought % does not exist; nothing was updated.', p_id;
+  end if;
+
+  return jsonb_build_object(
+    'id', v_row.id,
+    'content', v_row.content,
+    'metadata', v_row.metadata,
+    'created_at', v_row.created_at,
+    'updated_at', v_row.updated_at,
+    'superseded_by', v_row.superseded_by,
+    'superseded_at', v_row.superseded_at,
+    'supersede_reason', v_row.supersede_reason
+  );
+end;
+$$;
+```
+
+</details>
+
+> [!NOTE]
+> **Already have an Open Brain?** Don't re-run the table creation — run [`schemas/supersession/migration.sql`](../schemas/supersession/migration.sql) instead, which adds the supersession columns and upgrades the functions in place.
+
+![2.8](https://img.shields.io/badge/2.8-Verify-555?style=for-the-badge&labelColor=F4511E)
+
+✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, content_fingerprint, created_at, updated_at, superseded_by, superseded_at, supersede_reason. Database → Functions shows `match_thoughts`, `upsert_thought`, `supersede_thought`, and `update_thought`.
 
 ---
 

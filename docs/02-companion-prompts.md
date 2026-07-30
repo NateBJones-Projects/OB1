@@ -311,6 +311,8 @@ Format:
 
 > **Why does formatting matter?** Your Open Brain's edge function uses an LLM to extract metadata from each capture — people, topics, action items, type. These templates are structured to give that LLM clear signals, which means better tagging, better search, better retrieval.
 
+> **Naming rule:** Give every person their full name, even in a list. Write "Christian Faulconer and Michelle Bennett," not "Christian and Michelle Bennett" — the extractor merges adjacent first-and-last name pairs joined by a conjunction, so the shortened form gets stored as one wrong person ("Christian Bennett").
+
 **Output feeds into:** N/A — reference tool.
 
 > **No prompt block below.** Unlike the other four, this isn't something you paste into AI. These are templates for what *you* type into your capture channel or say directly to any MCP-connected AI using "save this" or "remember this."

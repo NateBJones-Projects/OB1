@@ -7,6 +7,7 @@ Database table extensions and metadata schemas for your Supabase database. Drop 
 | Schema | What It Does |
 | ------ | ------------ |
 | [Agent Memory](agent-memory/) | Sidecar tables that turn existing `thoughts` into governed, provenance-labeled operational memory for agent workflows |
+| [Supersession and In-Place Updates](supersession/) | Lets a capture retire the row it replaces, hides retired rows from search by default, and adds in-place correction with the embedding kept consistent |
 
 > **Looking for CRM?** See [`extensions/professional-crm`](../extensions/professional-crm/) — it includes schema + a full MCP server.
 

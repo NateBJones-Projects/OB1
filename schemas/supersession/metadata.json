@@ -1,0 +1,18 @@
+{
+  "name": "Supersession and In-Place Updates",
+  "description": "Lets a capture retire the row it replaces, excludes retired rows from search by default, and adds in-place correction of a thought's content and metadata with the embedding kept consistent.",
+  "category": "schemas",
+  "author": {
+    "name": "Christian Faulconer",
+    "github": "cfaulconer"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true
+  },
+  "tags": ["schema", "supersession", "corrections", "search", "retrieval"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-29",
+  "updated": "2026-07-29"
+}

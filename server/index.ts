@@ -20,6 +20,8 @@ type ThoughtMatch = {
   metadata: Record<string, unknown>;
   similarity: number;
   created_at: string;
+  superseded_by: string | null;
+  superseded_at: string | null;
 };
 
 type ThoughtRecord = {
@@ -116,9 +118,14 @@ server.registerTool(
     },
     inputSchema: {
       query: z.string().describe("The search query to run against Open Brain thoughts"),
+      include_superseded: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Also return thoughts that have been retired by a newer capture"),
     },
   },
-  async ({ query }) => {
+  async ({ query, include_superseded }) => {
     try {
       const qEmb = await getEmbedding(query);
       const { data, error } = await supabase.rpc("match_thoughts", {
@@ -126,6 +133,7 @@ server.registerTool(
         match_threshold: 0.5,
         match_count: 10,
         filter: {},
+        include_superseded,
       });
 
       if (error) {
@@ -139,6 +147,9 @@ server.registerTool(
         id: t.id,
         title: thoughtTitle(t.content, t.created_at),
         url: thoughtUrl(t.id),
+        ...(t.superseded_at
+          ? { superseded_by: t.superseded_by, superseded_at: t.superseded_at }
+          : {}),
       }));
 
       return {
@@ -220,9 +231,14 @@ server.registerTool(
       query: z.string().describe("What to search for"),
       limit: z.number().optional().default(10),
       threshold: z.number().optional().default(0.5),
+      include_superseded: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Also return thoughts that have been retired by a newer capture"),
     },
   },
-  async ({ query, limit, threshold }) => {
+  async ({ query, limit, threshold, include_superseded }) => {
     try {
       const qEmb = await getEmbedding(query);
       const { data, error } = await supabase.rpc("match_thoughts", {
@@ -230,6 +246,7 @@ server.registerTool(
         match_threshold: threshold,
         match_count: limit,
         filter: {},
+        include_superseded,
       });
 
       if (error) {
@@ -256,6 +273,12 @@ server.registerTool(
             `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
             `Type: ${m.type || "unknown"}`,
           ];
+          if (t.superseded_at)
+            parts.push(
+              `SUPERSEDED: ${new Date(t.superseded_at).toLocaleDateString()}${
+                t.superseded_by ? ` — replaced by thought ${t.superseded_by}` : " (no successor)"
+              }`
+            );
           if (Array.isArray(m.topics) && m.topics.length)
             parts.push(`Topics: ${(m.topics as string[]).join(", ")}`);
           if (Array.isArray(m.people) && m.people.length)
@@ -300,16 +323,22 @@ server.registerTool(
       topic: z.string().optional().describe("Filter by topic tag"),
       person: z.string().optional().describe("Filter by person mentioned"),
       days: z.number().optional().describe("Only thoughts from the last N days"),
+      include_superseded: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe("Also list thoughts that have been retired by a newer capture"),
     },
   },
-  async ({ limit, type, topic, person, days }) => {
+  async ({ limit, type, topic, person, days, include_superseded }) => {
     try {
       let q = supabase
         .from("thoughts")
-        .select("content, metadata, created_at")
+        .select("content, metadata, created_at, superseded_by, superseded_at")
         .order("created_at", { ascending: false })
         .limit(limit);
 
+      if (!include_superseded) q = q.is("superseded_at", null);
       if (type) q = q.contains("metadata", { type });
       if (topic) q = q.contains("metadata", { topics: [topic] });
       if (person) q = q.contains("metadata", { people: [person] });
@@ -334,12 +363,23 @@ server.registerTool(
 
       const results = data.map(
         (
-          t: { content: string; metadata: Record<string, unknown>; created_at: string },
+          t: {
+            content: string;
+            metadata: Record<string, unknown>;
+            created_at: string;
+            superseded_by: string | null;
+            superseded_at: string | null;
+          },
           i: number
         ) => {
           const m = t.metadata || {};
           const tags = Array.isArray(m.topics) ? (m.topics as string[]).join(", ") : "";
-          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
+          const retired = t.superseded_at
+            ? ` [SUPERSEDED ${new Date(t.superseded_at).toLocaleDateString()}${
+                t.superseded_by ? ` → ${t.superseded_by}` : ""
+              }]`
+            : "";
+          return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})${retired}\n   ${t.content}`;
         }
       );
 
@@ -377,9 +417,19 @@ server.registerTool(
         .from("thoughts")
         .select("*", { count: "exact", head: true });
 
+      const { count: currentCount } = await supabase
+        .from("thoughts")
+        .select("*", { count: "exact", head: true })
+        .is("superseded_at", null);
+
+      const { count: supersededCount } = await supabase
+        .from("thoughts")
+        .select("*", { count: "exact", head: true })
+        .not("superseded_at", "is", null);
+
       const { data } = await supabase
         .from("thoughts")
-        .select("metadata, created_at")
+        .select("metadata, created_at, superseded_at")
         .order("created_at", { ascending: false });
 
       const types: Record<string, number> = {};
@@ -387,6 +437,7 @@ server.registerTool(
       const people: Record<string, number> = {};
 
       for (const r of data || []) {
+        if (r.superseded_at) continue;
         const m = (r.metadata || {}) as Record<string, unknown>;
         if (m.type) types[m.type as string] = (types[m.type as string] || 0) + 1;
         if (Array.isArray(m.topics))
@@ -401,7 +452,9 @@ server.registerTool(
           .slice(0, 10);
 
       const lines: string[] = [
-        `Total thoughts: ${count}`,
+        `Current thoughts: ${currentCount}`,
+        `Superseded thoughts: ${supersededCount}`,
+        `Total rows: ${count}`,
         `Date range: ${
           data?.length
             ? new Date(data[data.length - 1].created_at).toLocaleDateString() +
@@ -410,7 +463,7 @@ server.registerTool(
             : "N/A"
         }`,
         "",
-        "Types:",
+        "Types (current thoughts only):",
         ...sort(types).map(([k, v]) => `  ${k}: ${v}`),
       ];
 
@@ -448,20 +501,40 @@ server.registerTool(
       idempotentHint: false,
     },
     inputSchema: {
-      content: z.string().describe("The thought to capture — a clear, standalone statement that will make sense when retrieved later by any AI"),
+      content: z.string().describe("The thought to capture — a clear, standalone statement that will make sense when retrieved later by any AI. Give every person their full name ('Christian Faulconer and Michelle Bennett', never 'Christian and Michelle Bennett'): adjacent first-and-last name pairs joined by a conjunction get merged into one wrong person during extraction."),
+      supersedes: z
+        .union([z.string(), z.array(z.string())])
+        .optional()
+        .describe("ID or IDs of existing thoughts this capture retires. The retired rows stop appearing in search unless include_superseded is set."),
+      supersede_reason: z
+        .string()
+        .optional()
+        .describe("Short note on why the superseded thought(s) are being retired"),
     },
   },
-  async ({ content }) => {
+  async ({ content, supersedes, supersede_reason }) => {
     try {
+      const supersedesList =
+        supersedes === undefined ? [] : Array.isArray(supersedes) ? supersedes : [supersedes];
+
       const [embedding, metadata] = await Promise.all([
         getEmbedding(content),
         extractMetadata(content),
       ]);
 
-      const { data: upsertResult, error: upsertError } = await supabase.rpc("upsert_thought", {
+      const rpcArgs: Record<string, unknown> = {
         p_content: content,
         p_payload: { metadata: { ...metadata, source: "mcp" } },
-      });
+      };
+      if (supersedesList.length) {
+        rpcArgs.p_supersedes = supersedesList;
+        rpcArgs.p_supersede_reason = supersede_reason ?? null;
+      }
+
+      const { data: upsertResult, error: upsertError } = await supabase.rpc(
+        "upsert_thought",
+        rpcArgs
+      );
 
       if (upsertError) {
         return {
@@ -491,9 +564,170 @@ server.registerTool(
         confirmation += ` | People: ${(meta.people as string[]).join(", ")}`;
       if (Array.isArray(meta.action_items) && meta.action_items.length)
         confirmation += ` | Actions: ${(meta.action_items as string[]).join("; ")}`;
+      if (supersedesList.length)
+        confirmation += ` | Retired: ${supersedesList.join(", ")}`;
 
       return {
         content: [{ type: "text" as const, text: confirmation }],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Tool 5: Update Thought
+server.registerTool(
+  "update_thought",
+  {
+    title: "Update Thought",
+    description:
+      "Correct a thought in place. Patch semantics: omitted fields are untouched, explicit null clears a field. Changing content regenerates the embedding so search stays consistent; metadata-only changes leave the embedding alone.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: true,
+      idempotentHint: true,
+    },
+    inputSchema: {
+      id: z.string().describe("ID of the thought to update"),
+      content: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Replacement content. Forces a re-embed. Cannot be null."),
+      type: z
+        .string()
+        .nullable()
+        .optional()
+        .describe("Replacement type: observation, task, idea, reference, person_note. Null clears."),
+      topics: z.array(z.string()).nullable().optional().describe("Replacement topic tags. Null clears."),
+      people: z.array(z.string()).nullable().optional().describe("Replacement people list. Null clears."),
+      actions: z.array(z.string()).nullable().optional().describe("Replacement action items. Null clears."),
+    },
+  },
+  async ({ id, content, type, topics, people, actions }) => {
+    try {
+      if (content === null) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "content cannot be cleared — provide replacement text, or omit it to leave the content unchanged.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const patch: Record<string, unknown> = {};
+      const remove: string[] = [];
+      const fields: [unknown, string][] = [
+        [type, "type"],
+        [topics, "topics"],
+        [people, "people"],
+        [actions, "action_items"],
+      ];
+      for (const [value, key] of fields) {
+        if (value === undefined) continue;
+        if (value === null) remove.push(key);
+        else patch[key] = value;
+      }
+
+      if (content === undefined && !Object.keys(patch).length && !remove.length) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: "Nothing to update — provide content or at least one of type, topics, people, actions.",
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Re-embed if and only if content is changing.
+      const embedding = content !== undefined ? await getEmbedding(content) : null;
+
+      const { data, error } = await supabase.rpc("update_thought", {
+        p_id: id,
+        p_content: content ?? null,
+        p_embedding: embedding,
+        p_metadata_patch: patch,
+        p_metadata_remove: remove,
+      });
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Update failed: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Updated thought${content !== undefined ? " (embedding regenerated)" : " (metadata only, embedding untouched)"}:\n${JSON.stringify(data, null, 2)}`,
+          },
+        ],
+      };
+    } catch (err: unknown) {
+      return {
+        content: [{ type: "text" as const, text: `Error: ${(err as Error).message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+// Tool 6: Supersede Thought
+server.registerTool(
+  "supersede_thought",
+  {
+    title: "Supersede Thought",
+    description:
+      "Retire a thought, optionally pointing at the newer thought that replaces it. Use this for the retroactive case where the replacement was already captured. Retired thoughts stop appearing in search unless include_superseded is set.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+    },
+    inputSchema: {
+      id: z.string().describe("ID of the thought to retire"),
+      superseded_by: z
+        .string()
+        .optional()
+        .describe("ID of the replacement thought. Omit to retire with no successor."),
+      reason: z.string().optional().describe("Short note on why this thought is retired"),
+    },
+  },
+  async ({ id, superseded_by, reason }) => {
+    try {
+      const { data, error } = await supabase.rpc("supersede_thought", {
+        p_id: id,
+        p_superseded_by: superseded_by ?? null,
+        p_reason: reason ?? null,
+      });
+
+      if (error) {
+        return {
+          content: [{ type: "text" as const, text: `Supersede failed: ${error.message}` }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Superseded:\n${JSON.stringify(data, null, 2)}`,
+          },
+        ],
       };
     } catch (err: unknown) {
       return {
