@@ -86,7 +86,7 @@ without human review.
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - **Enhanced thoughts schema** applied — install `schemas/enhanced-thoughts` first (adds type, importance, sensitivity columns and utility RPCs)
 - **Smart ingest tables** applied — install `schemas/smart-ingest-tables` to create the `ingestion_jobs` and `ingestion_items` tables plus the `append_thought_evidence` RPC
-- At least one LLM API key for extraction: OpenRouter (recommended), OpenAI, or Anthropic
+- At least one LLM API key for extraction: OpenRouter (recommended), OpenAI, Anthropic, or Novita
 - An embedding API key: OpenRouter or OpenAI (required for semantic deduplication)
 - Supabase CLI installed for deployment
 
@@ -117,6 +117,7 @@ LLM EXTRACTION (at least one required)
   OpenRouter API key:    ____________  (recommended)
   OpenAI API key:        ____________
   Anthropic API key:     ____________
+  Novita API key:        ____________
 
 EMBEDDING (at least one required)
   OpenRouter API key:    ____________  (same key as above works)
@@ -150,7 +151,8 @@ Optional multi-provider fallback:
 ```bash
 supabase secrets set \
   OPENAI_API_KEY="your-openai-key" \
-  ANTHROPIC_API_KEY="your-anthropic-key"
+  ANTHROPIC_API_KEY="your-anthropic-key" \
+  NOVITA_API_KEY="your-novita-key"
 ```
 
 ### 3. Test with a Dry Run
@@ -267,7 +269,7 @@ After completing setup, you should be able to:
 ## Troubleshooting
 
 **"No LLM API key configured"**
-You need at least one of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` set as a Supabase secret. OpenRouter is recommended as the primary provider.
+You need at least one of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `NOVITA_API_KEY` set as a Supabase secret. OpenRouter is recommended as the primary provider.
 
 **"Input contains restricted content"**
 The function runs a pre-flight sensitivity check and blocks content matching restricted patterns (SSN, credit card, API keys, passwords). This is a safety feature — process sensitive content locally instead.
