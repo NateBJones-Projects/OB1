@@ -24,7 +24,7 @@ export const CLASSIFIER_MODEL_OPENAI = "gpt-4o-mini";
 export const CLASSIFIER_MODEL_ANTHROPIC = "claude-haiku-4-5-20251001";
 
 /** Novita model used as quaternary classifier fallback. */
-export const CLASSIFIER_MODEL_NOVITA = "deepseek/deepseek-v4-flash-0731";
+export const CLASSIFIER_MODEL_NOVITA = "deepseek/deepseek-v4-pro";
 
 // ── Thought defaults ─────────────────────────────────────────────────────────
 
