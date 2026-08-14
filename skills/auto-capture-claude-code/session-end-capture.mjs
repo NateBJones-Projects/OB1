@@ -18,7 +18,7 @@
  * Install in .claude/settings.json:
  *   {
  *     "hooks": {
- *       "Stop": [{
+ *       "SessionEnd": [{
  *         "matcher": "",
  *         "hooks": [{ "type": "command", "command": "node /path/to/session-end-capture.mjs" }]
  *       }]

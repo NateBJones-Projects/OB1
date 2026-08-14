@@ -74,7 +74,7 @@ extends it — it does not replace it.
    ```json
    {
      "hooks": {
-       "Stop": [
+       "SessionEnd": [
          {
            "matcher": "",
            "hooks": [
