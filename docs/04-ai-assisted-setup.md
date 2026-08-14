@@ -10,7 +10,7 @@ This works in Cursor, Claude Code, Codex, Windsurf, OpenClaw, or any AI coding t
 
 1. Clone or open this repo in your AI coding tool
 2. Tell it: **"Read `docs/01-getting-started.md` and walk me through building my Open Brain step by step."**
-3. Follow along. It'll handle the code parts. You handle the clicking (Supabase dashboard, Slack app settings, OpenRouter signup).
+3. Follow along. It'll handle the code parts. You handle the clicking (Supabase dashboard, Slack app settings, OpenRouter or OpenAI signup).
 
 That's the whole workflow. The sections below cover what to watch out for.
 
@@ -25,7 +25,7 @@ That's the whole workflow. The sections below cover what to watch out for.
 
 Some steps involve clicking through web UIs where your AI can't help directly. These are fast but you need to do them yourself:
 
-- **Creating accounts** — Supabase, OpenRouter, Slack. Sign up in your browser.
+- **Creating accounts** — Supabase, OpenRouter or OpenAI, Slack. Sign up in your browser.
 - **Supabase dashboard settings** — Enabling the vector extension, copying your Project URL and Secret key, checking Table Editor.
 - **Slack app configuration** — Creating the app, setting OAuth scopes, installing to workspace, enabling Event Subscriptions.
 - **Connecting AI clients** — Adding the MCP connector in Claude Desktop, ChatGPT, or other clients (Settings menus in each app).

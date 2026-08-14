@@ -178,20 +178,32 @@ This is a precise description of what vector retrieval does differently from fil
 
 ## API Key Rotation
 
-### "I rotated my OpenRouter API key and now nothing works"
+### "I rotated my AI API key and now nothing works"
 
-When you generate a new key on openrouter.ai/keys, the old key is revoked immediately. But your Open Brain uses that key in multiple places — and updating it in one spot doesn't update the others. Everything downstream of the old key breaks silently.
+When you generate a new provider key, the old key may be revoked immediately. But your Open Brain uses that key in multiple places — and updating it in one spot doesn't update the others. Everything downstream of the old key breaks silently.
 
-**Places your OpenRouter key lives (update ALL of them):**
+**Places your AI API key lives (update ALL of them):**
 
 1. **Supabase Edge Function secrets** — This is the most common one to miss. Your MCP server reads the key from here at runtime.
+
+   For OpenRouter:
 
    ```bash
    supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-new-key
    supabase functions deploy open-brain-mcp --no-verify-jwt
    ```
 
+   For OpenRouter:
+
    `secrets set` stores the new value, but Edge Functions read environment variables once at cold start and cache them. Already-running ("warm") instances keep using the old key until they recycle — which can take minutes and produce intermittent 401s in the meantime. Redeploying forces a fresh boot so the new key takes effect immediately. If you've deployed extension functions that also read `OPENROUTER_API_KEY`, redeploy each of them too (or run `supabase functions deploy` with no arg to redeploy all).
+
+For OpenAI direct:
+
+```bash
+supabase secrets set OPENAI_API_KEY=sk-your-new-key
+```
+
+`OPENAI_API_KEY` follows the same deployment cache behavior as `OPENROUTER_API_KEY` on warm Edge Function instances. If you switch providers, update every runtime, local config, and deployment integration that references that provider secret, then redeploy relevant functions.
 
 2. **Local `.env` files** — Any recipes or integrations you run locally (e.g., `recipes/chatgpt-conversation-import/.env`). Open each one and replace the old key value.
 
@@ -199,8 +211,16 @@ When you generate a new key on openrouter.ai/keys, the old key is revoked immedi
 
 **How to verify the new key works:**
 
+For OpenRouter:
+
 ```bash
 curl https://openrouter.ai/api/v1/models -H "Authorization: Bearer sk-or-v1-your-new-key"
+```
+
+For OpenAI direct:
+
+```bash
+curl https://api.openai.com/v1/models -H "Authorization: Bearer sk-your-new-key"
 ```
 
 If you get a JSON list of models back, the key is valid. If you get a 401, the key is wrong or not yet active.
