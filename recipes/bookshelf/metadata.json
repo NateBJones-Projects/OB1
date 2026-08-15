@@ -1,0 +1,21 @@
+{
+  "name": "Bookshelf",
+  "description": "A personal reading CRM — track books, log chapter notes by type, capture verbatim quotes, and search your library by topic or problem.",
+  "category": "recipes",
+  "author": {
+    "name": "Lauren",
+    "github": "ch3ck3rs"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "requires_primitives": ["deploy-edge-function", "remote-mcp", "rls"],
+  "tags": ["books", "reading", "notes", "quotes", "knowledge", "rls"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-08-14",
+  "updated": "2026-08-14"
+}
