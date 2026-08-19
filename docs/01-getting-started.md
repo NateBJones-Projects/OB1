@@ -428,7 +428,7 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 ![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
-Three commands, run them one at a time in order:
+Four commands, run them one at a time in order:
 
 **1. Create the function folder:**
 
@@ -442,14 +442,20 @@ supabase functions new open-brain-mcp
 curl -o supabase/functions/open-brain-mcp/index.ts https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts
 ```
 
-**3. Download the dependencies file:**
+**3. Download the compatibility helper:**
+
+```bash
+curl -o supabase/functions/open-brain-mcp/compatibility.ts https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/compatibility.ts
+```
+
+**4. Download the dependencies file:**
 
 ```bash
 curl -o supabase/functions/open-brain-mcp/deno.json https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json
 ```
 
 > [!WARNING]
-> ❌ **`No such file or directory`** on command 2 or 3 — you skipped command 1. Run it first, then retry.
+> ❌ **`No such file or directory`** on commands 2, 3, or 4 — you skipped command 1. Run it first, then retry.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
 
@@ -606,7 +612,7 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 ![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
-Three commands, run them one at a time in order:
+Four commands, run them one at a time in order:
 
 **1. Create the function folder:**
 
@@ -620,14 +626,20 @@ supabase functions new open-brain-mcp
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts -OutFile supabase\functions\open-brain-mcp\index.ts
 ```
 
-**3. Download the dependencies file:**
+**3. Download the compatibility helper:**
+
+```powershell
+Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/compatibility.ts -OutFile supabase\functions\open-brain-mcp\compatibility.ts
+```
+
+**4. Download the dependencies file:**
 
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json -OutFile supabase\functions\open-brain-mcp\deno.json
 ```
 
 > [!WARNING]
-> ❌ **`No such file or directory`** on command 2 or 3 — you skipped command 1. Run it first, then retry.
+> ❌ **`No such file or directory`** on commands 2, 3, or 4 — you skipped command 1. Run it first, then retry.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
 

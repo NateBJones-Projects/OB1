@@ -5,6 +5,7 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { Hono } from "hono";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
+import { normalizeThoughtId, type ThoughtId } from "./compatibility.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -15,7 +16,7 @@ const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type ThoughtMatch = {
-  id: string;
+  id: ThoughtId;
   content: string;
   metadata: Record<string, unknown>;
   similarity: number;
@@ -23,7 +24,7 @@ type ThoughtMatch = {
 };
 
 type ThoughtRecord = {
-  id: string;
+  id: ThoughtId;
   content: string;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -136,11 +137,14 @@ function buildServer(): McpServer {
           };
         }
 
-        const results = ((data || []) as ThoughtMatch[]).map((t) => ({
-          id: t.id,
-          title: thoughtTitle(t.content, t.created_at),
-          url: thoughtUrl(t.id),
-        }));
+        const results = ((data || []) as ThoughtMatch[]).map((t) => {
+          const id = normalizeThoughtId(t.id);
+          return {
+            id,
+            title: thoughtTitle(t.content, t.created_at),
+            url: thoughtUrl(id),
+          };
+        });
 
         return {
           content: [{ type: "text" as const, text: JSON.stringify({ results }) }],
@@ -183,11 +187,12 @@ function buildServer(): McpServer {
         }
 
         const thought = data as ThoughtRecord;
+        const thoughtId = normalizeThoughtId(thought.id);
         const document = {
-          id: thought.id,
+          id: thoughtId,
           title: thoughtTitle(thought.content, thought.created_at),
           text: thought.content,
-          url: thoughtUrl(thought.id),
+          url: thoughtUrl(thoughtId),
           metadata: {
             ...thought.metadata,
             created_at: thought.created_at,
