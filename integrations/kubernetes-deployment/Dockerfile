@@ -7,7 +7,7 @@ COPY deno.json ./
 RUN deno install
 
 # Copy server source
-COPY index.ts ./
+COPY index.ts compatibility.ts ./
 
 # Run as non-root
 USER deno

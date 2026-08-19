@@ -22,6 +22,7 @@ import { StreamableHTTPTransport } from "@hono/mcp";
 import { Hono } from "hono";
 import { z } from "zod";
 import { Pool } from "postgres";
+import { normalizeThoughtId, type ThoughtId } from "./compatibility.ts";
 
 // --- Configuration ---
 
@@ -52,7 +53,7 @@ const pool = new Pool({
 }, 20);
 
 type ThoughtMatch = {
-  id: string;
+  id: ThoughtId;
   content: string;
   metadata: Record<string, unknown>;
   similarity: number;
@@ -60,7 +61,7 @@ type ThoughtMatch = {
 };
 
 type ThoughtRecord = {
-  id: string;
+  id: ThoughtId;
   content: string;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -175,11 +176,14 @@ function buildServer(): McpServer {
             [embStr, 0.5, 10]
           );
 
-          const results = result.rows.map((t) => ({
-            id: t.id,
-            title: thoughtTitle(t.content, t.created_at),
-            url: thoughtUrl(t.id),
-          }));
+          const results = result.rows.map((t) => {
+            const id = normalizeThoughtId(t.id);
+            return {
+              id,
+              title: thoughtTitle(t.content, t.created_at),
+              url: thoughtUrl(id),
+            };
+          });
 
           return {
             content: [{ type: "text" as const, text: JSON.stringify({ results }) }],
@@ -229,11 +233,12 @@ function buildServer(): McpServer {
             };
           }
 
+          const thoughtId = normalizeThoughtId(thought.id);
           const document = {
-            id: thought.id,
+            id: thoughtId,
             title: thoughtTitle(thought.content, thought.created_at),
             text: thought.content,
-            url: thoughtUrl(thought.id),
+            url: thoughtUrl(thoughtId),
             metadata: {
               ...thought.metadata,
               created_at: thought.created_at,
