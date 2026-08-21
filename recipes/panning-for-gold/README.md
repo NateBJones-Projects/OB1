@@ -31,6 +31,8 @@ Every change here traces back to a real production failure documented in the ski
 
 Takes any unstructured text (voice transcripts, ChatGPT exports, freeform notes, multi-topic brain dumps) and runs a five-phase process: **Pre-Load** relevant Open Brain context, **Extract** every idea thread without filtering, **Evaluate** the highest-signal ones with targeted retrieval and gap detection, **Synthesize** into a permanent gold-found file, and **Write Back** results to Open Brain. Nothing gets dismissed as noise on the first pass.
 
+![panning-for-gold v3.0.0 process flow](process-flow.png)
+
 ## When to Use It
 
 - **After a meeting or brainstorm call.** Export your transcript, point Panning for Gold at it, and get a clean inventory of every topic, including the half-sentence at minute 38 that's actually a warm intro worth more than the whole agenda.
