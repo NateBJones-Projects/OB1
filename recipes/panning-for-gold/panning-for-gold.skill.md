@@ -23,7 +23,7 @@ Transform raw brain dumps into evaluated, actionable idea inventories. Five phas
 
 **Do NOT use this skill for:**
 - Podcast transcripts (a fit-score or podcast-notes recipe fits better)
-- Live, in-session brainstorm capture (pairs with the [Flywheel Retrieval](../flywheel-retrieval/) recipe instead — that one reads from Open Brain live and captures at session close; this one processes after the fact)
+- Live, in-session brainstorm capture (pairs with a live-retrieval skill instead — one that reads from Open Brain live and captures at session close; this one processes after the fact)
 
 ## Critical Rules (Learned from Production Use)
 
@@ -83,16 +83,19 @@ Quick-read the transcript (or summary if available) to identify person names, bu
 ### Step 2: Open Brain Queries (max 9 total)
 
 **People queries (max 4):** for the top 4 people mentioned, prioritizing unknowns and key relationships:
+
 ```
 search_thoughts(query="{person name}", limit=3)
 ```
 
 **Entity/topic queries (max 4):** for the top 4 businesses, products, or topics:
+
 ```
 search_thoughts(query="{entity or topic}", limit=3)
 ```
 
 **Ambient context (1 query):**
+
 ```
 list_thoughts(days=14, limit=10)
 ```
@@ -249,6 +252,7 @@ After Pass 2, tell the user: "N threads (M with prior connections, K new). Writi
 ### Pre-Evaluation Retrieval (max 10 queries)
 
 Before evaluating, run targeted searches for the top 10 threads by potential:
+
 ```
 search_thoughts(query="{thread topic + key person}", limit=3)
 ```
@@ -381,7 +385,7 @@ Is there a human the user should talk to before doing more solo work on this?
 
 After writing the gold-found file, capture to Open Brain automatically (do not ask for permission).
 
-> **Note:** if you have the [Flywheel Retrieval](../flywheel-retrieval/) recipe installed, it handles session-end captures automatically for live brainstorming. This phase still runs for panning because per-thread ACT NOW items are more granular than a session summary.
+> **Note:** if you have a live-retrieval skill installed that handles session-end captures automatically for live brainstorming, this phase still runs for panning because per-thread ACT NOW items are more granular than a session summary.
 
 ### What Gets Captured
 

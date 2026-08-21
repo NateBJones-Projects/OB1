@@ -15,7 +15,6 @@
   "tags": ["brain-dump", "transcript", "extraction", "evaluation", "voice", "processing", "skill", "retrieval"],
   "difficulty": "intermediate",
   "estimated_time": "20 minutes",
-  "companion_recipes": ["flywheel-retrieval"],
   "created": "2026-03-13",
   "updated": "2026-08-21"
 }
