@@ -23,7 +23,7 @@ The original v2.0.0 shipped a solid three-phase extract/evaluate/synthesize loop
 - **Gap Detection.** After evaluation, the skill explicitly asks what got missed and what your memory system knows that neither speaker mentioned.
 - **Hardened speaker handling.** Covers the zero-labels case (no speaker attribution at all), the diarizer-ceiling case (more real speakers than the tool supports), and a mandatory biographical-attribution quiz for any claim that could get projected onto the wrong person.
 - **Advisory-only dedup.** Capture guards now advise, never block — a duplicate is an acceptable outcome, a silently dropped capture is not.
-- **Pairs with any live-retrieval companion.** This recipe writes to Open Brain after the fact. If you also run a skill that reads from Open Brain live during brainstorming and writes at session close, the two close the loop together.
+- **Pairs with [Live Retrieval](../live-retrieval/).** This recipe writes to Open Brain after the fact; Live Retrieval is the read side of the flywheel, reading from Open Brain live during brainstorming and writing at session close. Together they close the loop.
 
 Every change here traces back to a real production failure documented in the skill's own Lessons Log — see that section in `panning-for-gold.skill.md` for the specifics.
 
@@ -123,9 +123,9 @@ The processor will:
 - **Transcript file:** `docs/meetings/YYYY-MM-DD-{source}-transcript.md`, saved at the end of the run.
 - **Open Brain thoughts:** ACT NOW items, new contact notes, and a session summary, all searchable in future sessions.
 
-### 7. (Optional) Combine with a live-retrieval skill
+### 7. (Optional) Combine with Live Retrieval
 
-If you have a skill or recipe that searches Open Brain live during brainstorming and auto-captures at session close, install it alongside this one for the full loop: Panning for Gold captures evaluated ideas post-hoc, the live-retrieval skill surfaces them during your next brainstorming session and captures new ones at close.
+Install [Live Retrieval](../live-retrieval/) alongside this recipe for the full loop: Panning for Gold captures evaluated ideas post-hoc, Live Retrieval surfaces them live during your next brainstorming session and captures new ones at close.
 
 ### 8. (Optional) Adapt for your tool
 

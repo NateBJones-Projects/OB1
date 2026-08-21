@@ -23,7 +23,7 @@ Transform raw brain dumps into evaluated, actionable idea inventories. Five phas
 
 **Do NOT use this skill for:**
 - Podcast transcripts (a fit-score or podcast-notes recipe fits better)
-- Live, in-session brainstorm capture (pairs with a live-retrieval skill instead — one that reads from Open Brain live and captures at session close; this one processes after the fact)
+- Live, in-session brainstorm capture (pairs with the [Live Retrieval](../live-retrieval/) recipe instead — it reads from Open Brain live and captures at session close; this one processes after the fact)
 
 ## Critical Rules (Learned from Production Use)
 
@@ -385,7 +385,7 @@ Is there a human the user should talk to before doing more solo work on this?
 
 After writing the gold-found file, capture to Open Brain automatically (do not ask for permission).
 
-> **Note:** if you have a live-retrieval skill installed that handles session-end captures automatically for live brainstorming, this phase still runs for panning because per-thread ACT NOW items are more granular than a session summary.
+> **Note:** if you have the [Live Retrieval](../live-retrieval/) recipe installed, it handles session-end captures automatically for live brainstorming. This phase still runs for panning because per-thread ACT NOW items are more granular than a session summary.
 
 ### What Gets Captured
 
