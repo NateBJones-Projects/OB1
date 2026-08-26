@@ -1,0 +1,20 @@
+{
+  "name": "Decision Ledger",
+  "description": "Ranked-recall sidecar for agent decisions: step-indexed ledger with importance, rationale, and dependency edges, a relevance-importance-recency ranking RPC with full-text fallback for local stacks, usage feedback counters, and a per-policy recall stats view.",
+  "category": "schemas",
+  "author": {
+    "name": "Sean Krayer",
+    "github": "osquashblossomo"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["agent-memory", "decision-ledger", "ranked-recall", "recall-policy", "long-horizon"],
+  "difficulty": "advanced",
+  "estimated_time": "20 minutes",
+  "created": "2026-08-17",
+  "updated": "2026-08-26"
+}
