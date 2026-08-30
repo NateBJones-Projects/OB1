@@ -827,11 +827,15 @@ server.tool(
   }
 );
 
-app.get("/health", (c) =>
-  c.json({ status: "ok", service: "Work Operating Model Activation MCP", version: "1.0.0" })
-);
-
 app.all("*", async (c) => {
+  // Public health check. Supabase mounts the function at /functions/v1/<name>
+  // and does NOT strip the function-name segment, so an absolute app.get("/health")
+  // never matches. Suffix-match here (before the auth gate) so it works under any
+  // mount prefix and stays reachable without the MCP access key.
+  if (c.req.method === "GET" && c.req.path.endsWith("/health")) {
+    return c.json({ status: "ok", service: "Work Operating Model Activation MCP", version: "1.0.0" });
+  }
+
   if (!c.req.header("accept")?.includes("text/event-stream")) {
     const headers = new Headers(c.req.raw.headers);
     headers.set("Accept", "application/json, text/event-stream");
