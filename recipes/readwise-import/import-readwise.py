@@ -246,6 +246,8 @@ def build_thought(highlight: dict, book: dict) -> dict:
             "color": highlight.get("color"),
             "url": highlight.get("url"),
             "tags": [t["name"] for t in highlight.get("tags", [])],
+            "enrichment_status": "pending",
+            "enrichment_attempts": 0,
         },
     }
 
