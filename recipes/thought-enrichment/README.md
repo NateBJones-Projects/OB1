@@ -119,6 +119,53 @@ After running the full pipeline:
 - Thoughts containing sensitive patterns are flagged with `sensitivity_tier` = `personal` or `restricted`
 - The `enriched` boolean is set to `true` for all processed thoughts
 
+## Troubleshooting
+
+**`TypeError: Failed to parse URL from /rest/v1/thoughts?...`**
+
+`SUPABASE_URL` is empty, so the request path is relative. Config is read from
+`.env.local` layered over `process.env` — confirm the variable is set in one of
+them. (Before the fix in this recipe's history, only `.env.local` was consulted,
+so env-injected credentials from CI or a wrapper script were invisible.)
+
+**`invalid input syntax for type uuid: "0"` from `backfill-sensitivity.mjs`**
+
+An older revision seeded its pagination cursor with the integer `0`, which
+PostgREST rejects when `thoughts.id` is a uuid. The symptom was a run reporting
+`Scanned: 0` with `Errors: 1` — a false all-clear. Update to a revision that
+seeds the all-zeros uuid.
+
+**Metadata lookups return NULL after a successful enrichment run**
+
+If `metadata->>'source'` is NULL, `metadata ? 'topics'` is false, or
+`jsonb_object_keys(metadata)` raises `cannot call jsonb_object_keys on a scalar`,
+the column holds a JSON *string* rather than an object. An older revision
+pre-stringified `metadata` before serializing the request body, double-encoding
+it. Check for affected rows:
+
+```sql
+select jsonb_typeof(metadata), count(*) from thoughts group by 1;
+-- 'string' rows are double-encoded
+```
+
+No data is lost — the original object survives verbatim inside the string. To
+repair, confirm every affected row parses back to an object, then un-nest:
+
+```sql
+select count(*) from thoughts
+where jsonb_typeof(metadata)='string'
+  and jsonb_typeof((metadata #>> '{}')::jsonb)='object';
+
+update thoughts set metadata = (metadata #>> '{}')::jsonb
+where jsonb_typeof(metadata)='string'
+  and jsonb_typeof((metadata #>> '{}')::jsonb)='object';
+```
+
+**A few thoughts fail every run**
+
+Malformed LLM JSON, typically well under 1%. Re-run with `--apply
+--retry-failed`. Persistent failures are usually very short or non-prose content.
+
 ## File overview
 
 | File | Purpose |

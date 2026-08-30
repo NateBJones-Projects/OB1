@@ -587,10 +587,9 @@ async function fetchByIds(config, ids) {
 
 async function patchThought(id, patch, config, retries = 4) {
   const url = `${config.supabaseUrl}/rest/v1/thoughts?id=eq.${id}`;
+  // `metadata` is jsonb and is serialized by the JSON.stringify(body) below.
+  // Pre-stringifying it here would store a jsonb scalar string, not an object.
   const body = { ...patch };
-  if (body.metadata) {
-    body.metadata = JSON.stringify(body.metadata);
-  }
   const opts = {
     method: "PATCH",
     headers: {
@@ -820,16 +819,21 @@ function parseArgs(argv) {
   return args;
 }
 
+/**
+ * Load config env from `.env.local` layered over `process.env`.
+ * File entries take precedence; `process.env` supplies anything the file omits.
+ */
 function parseEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
   const env = {};
-  for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
-    const idx = line.indexOf("=");
-    if (idx > 0 && !line.startsWith("#")) {
-      env[line.slice(0, idx).trim()] = line.slice(idx + 1).trim().replace(/^['"]|['"]$/g, "");
+  if (fs.existsSync(filePath)) {
+    for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
+      const idx = line.indexOf("=");
+      if (idx > 0 && !line.startsWith("#")) {
+        env[line.slice(0, idx).trim()] = line.slice(idx + 1).trim().replace(/^['"]|['"]$/g, "");
+      }
     }
   }
-  return env;
+  return { ...process.env, ...env };
 }
 
 function printUsage() {
