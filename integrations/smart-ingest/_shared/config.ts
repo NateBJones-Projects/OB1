@@ -23,6 +23,9 @@ export const CLASSIFIER_MODEL_OPENAI = "gpt-4o-mini";
 /** Anthropic model used as tertiary classifier fallback. */
 export const CLASSIFIER_MODEL_ANTHROPIC = "claude-haiku-4-5-20251001";
 
+/** Novita model used as quaternary classifier fallback. */
+export const CLASSIFIER_MODEL_NOVITA = "deepseek/deepseek-v4-pro";
+
 // ── Thought defaults ─────────────────────────────────────────────────────────
 
 /** Default thought type when classification is unavailable. */

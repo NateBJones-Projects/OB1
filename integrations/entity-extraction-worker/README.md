@@ -24,7 +24,7 @@ The knowledge graph enables queries like "what projects does Sarah work on?" or 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - **Enhanced thoughts schema** applied — install `schemas/enhanced-thoughts`
 - **Knowledge graph schema** applied — install `schemas/knowledge-graph` to create the `entities`, `edges`, `thought_entities`, and `entity_extraction_queue` tables
-- At least one LLM API key: OpenRouter (recommended), OpenAI, or Anthropic
+- At least one LLM API key: OpenRouter (recommended), OpenAI, Anthropic, or Novita
 - Supabase CLI installed for deployment
 
 ## Steps
@@ -50,7 +50,8 @@ Optional multi-provider fallback:
 ```bash
 supabase secrets set \
   OPENAI_API_KEY="your-openai-key" \
-  ANTHROPIC_API_KEY="your-anthropic-key"
+  ANTHROPIC_API_KEY="your-anthropic-key" \
+  NOVITA_API_KEY="your-novita-key"
 ```
 
 Optional safety knobs:
@@ -183,7 +184,7 @@ After completing setup and running the worker, you should be able to:
 ## Troubleshooting
 
 **"No LLM API key configured"**
-Set at least one of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` as a Supabase secret.
+Set at least one of `OPENROUTER_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `NOVITA_API_KEY` as a Supabase secret.
 
 **Queue items stuck in "processing"**
 If the worker crashes mid-batch, items remain in "processing" status. Reset them:

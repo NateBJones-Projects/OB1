@@ -26,6 +26,7 @@ import {
   CLASSIFIER_MODEL_OPENROUTER,
   CLASSIFIER_MODEL_OPENAI,
   CLASSIFIER_MODEL_ANTHROPIC,
+  CLASSIFIER_MODEL_NOVITA,
 } from "./_shared/config.ts";
 
 // ── Environment ─────────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY") ?? "";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
+const NOVITA_API_KEY = Deno.env.get("NOVITA_API_KEY") ?? "";
 
 const WORKER_VERSION = "entity-extraction-worker-v1";
 const MAX_ATTEMPTS = 5;
@@ -284,7 +286,7 @@ class ExtractionCostCapError extends Error {
   }
 }
 
-/** Try LLM providers in OB1 priority order: OpenRouter → OpenAI → Anthropic. */
+/** Try LLM providers in OB1 priority order: OpenRouter → OpenAI → Anthropic → Novita. */
 async function extractEntities(content: string): Promise<ExtractionResult> {
   // Hard cap on LLM calls per container lifetime. 0 disables the cap.
   if (ENTITY_EXTRACTION_MAX_CALLS > 0 && llmCallCount >= ENTITY_EXTRACTION_MAX_CALLS) {
@@ -340,25 +342,45 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
 
   // Anthropic (tertiary)
   if (ANTHROPIC_API_KEY) {
-    const response = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+    try {
+      const response = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": ANTHROPIC_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: CLASSIFIER_MODEL_ANTHROPIC,
+          max_tokens: 1024,
+          temperature: 0.1,
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+      if (!response.ok) throw new Error(`Anthropic failed (${response.status}): ${await response.text()}`);
+      return parseExtractionResult(readAnthropicText(await response.json()));
+    } catch (err) {
+      console.warn("Anthropic extraction failed:", (err as Error).message);
+    }
+  }
+
+  // Novita (quaternary)
+  if (NOVITA_API_KEY) {
+    const response = await fetchWithTimeout("https://api.novita.ai/openai/v1/chat/completions", {
       method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${NOVITA_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: CLASSIFIER_MODEL_ANTHROPIC,
-        max_tokens: 1024,
+        model: CLASSIFIER_MODEL_NOVITA,
         temperature: 0.1,
+        response_format: { type: "json_object" },
         messages: [{ role: "user", content: prompt }],
       }),
     });
-    if (!response.ok) throw new Error(`Anthropic failed (${response.status}): ${await response.text()}`);
-    return parseExtractionResult(readAnthropicText(await response.json()));
+    if (!response.ok) throw new Error(`Novita failed (${response.status}): ${await response.text()}`);
+    return parseExtractionResult(readChatCompletionText(await response.json()));
   }
 
-  throw new Error("No LLM API key configured (OPENROUTER_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY)");
+  throw new Error("No LLM API key configured (OPENROUTER_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or NOVITA_API_KEY)");
 }
 
 // ── Entity Normalization ────────────────────────────────────────────────────
@@ -563,7 +585,7 @@ Deno.serve(async (req) => {
     return json({ error: "Unauthorized" }, 401);
   }
 
-  if (!OPENROUTER_API_KEY && !OPENAI_API_KEY && !ANTHROPIC_API_KEY) {
+  if (!OPENROUTER_API_KEY && !OPENAI_API_KEY && !ANTHROPIC_API_KEY && !NOVITA_API_KEY) {
     return json({ error: "No LLM API key configured" }, 503);
   }
 
