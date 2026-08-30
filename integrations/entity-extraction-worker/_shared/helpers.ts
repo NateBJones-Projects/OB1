@@ -286,8 +286,16 @@ function readAnthropicText(payload: unknown): string {
 /** Strip markdown code fences (```json ... ```) that LLMs sometimes wrap around JSON output. */
 function stripCodeFences(text: string): string {
   const trimmed = text.trim();
-  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
-  return match ? match[1].trim() : trimmed;
+  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```\s*$/);
+  if (match) return match[1].trim();
+  // Fence with trailing prose or unterminated fence: strip the opening fence
+  // and cut at the next closing fence if one exists.
+  if (trimmed.startsWith("```")) {
+    const body = trimmed.replace(/^```(?:json)?\s*\n?/, "");
+    const close = body.indexOf("```");
+    return (close >= 0 ? body.slice(0, close) : body).trim();
+  }
+  return trimmed;
 }
 
 /** True for errors worth retrying: network failures, 429, and 5xx statuses. */
