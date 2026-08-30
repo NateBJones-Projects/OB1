@@ -20,7 +20,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const app = new Hono();
 
-app.post("/mcp", async (c) => {
+app.post("*", async (c) => {
   const key = c.req.query("key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_HOUSEHOLD_ACCESS_KEY");
   if (!key || key !== expected) {
@@ -29,7 +29,7 @@ app.post("/mcp", async (c) => {
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_HOUSEHOLD_KEY")!,
+    Deno.env.get("HOUSEHOLD_SUPABASE_KEY")!,
   );
 
   const server = new McpServer({ name: "meal-planning-shared", version: "1.0.0" });

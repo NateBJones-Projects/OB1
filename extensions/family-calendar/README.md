@@ -23,7 +23,7 @@ Two kids, two parents, overlapping schedules. Soccer practice conflicts with the
 - Nullable foreign keys (activities can belong to one person or the whole family)
 - Querying across date ranges
 
-> **Note:** This extension doesn't use Row Level Security. RLS is introduced in Extension 4 (Meal Planning), where shared household access makes it necessary. Extensions 1-3 are single-user systems.
+> **Note:** This extension doesn't use Row Level Security — it is omitted here for simplicity. Extensions 1 (Household Knowledge) and 2 (Home Maintenance) already include RLS policies in their schemas, and Extension 4 (Meal Planning) builds on RLS for shared household access.
 
 ## What It Does
 
