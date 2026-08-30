@@ -70,6 +70,15 @@ type ThoughtRecord = {
 const CITATION_BASE_URL =
   Deno.env.get("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts";
 
+// The 0.5 similarity threshold is tuned for OpenAI text-embedding-3-small. Other
+// embedding models have differently shaped similarity distributions -- bge-m3, for
+// example, has a compressed range where 0.5 silently drops genuinely relevant hits.
+// The default is unchanged; this only makes it configurable for non-OpenAI models.
+// Override globally with OPEN_BRAIN_MATCH_THRESHOLD or per-call with `threshold`.
+const DEFAULT_MATCH_THRESHOLD = parseFloat(
+  Deno.env.get("OPEN_BRAIN_MATCH_THRESHOLD") || "0.5"
+);
+
 function thoughtTitle(content: string, createdAt?: string): string {
   const firstLine = content.replace(/\s+/g, " ").trim().slice(0, 80);
   const datePrefix = createdAt ? new Date(createdAt).toLocaleDateString() : "Open Brain";
@@ -102,36 +111,94 @@ async function getEmbedding(text: string): Promise<number[]> {
   return d.data[0].embedding;
 }
 
-async function extractMetadata(text: string): Promise<Record<string, unknown>> {
-  const r = await fetch(`${CHAT_API_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${CHAT_API_KEY}`,
-      "Content-Type": "application/json",
+// Structured-output schema for metadata extraction.
+//
+// `response_format: { type: "json_object" }` is not accepted by every
+// OpenAI-compatible endpoint. LM Studio, for instance, rejects it with HTTP 400
+// ("'response_format.type' must be 'json_schema' or 'text'"). A real json_schema is
+// accepted by OpenAI and by the compatible runtimes, and enforces the shape rather
+// than merely requesting it.
+//
+// Strict mode requires `additionalProperties: false` on every object and every
+// property listed in `required`; omitting either is a 400 from OpenAI.
+// https://developers.openai.com/api/docs/guides/structured-outputs
+const METADATA_SCHEMA = {
+  type: "object",
+  properties: {
+    people: { type: "array", items: { type: "string" } },
+    action_items: { type: "array", items: { type: "string" } },
+    dates_mentioned: { type: "array", items: { type: "string" } },
+    topics: { type: "array", items: { type: "string" } },
+    type: {
+      type: "string",
+      enum: ["observation", "task", "idea", "reference", "person_note"],
     },
-    body: JSON.stringify({
-      model: CHAT_MODEL,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content: `Extract metadata from the user's captured thought. Return JSON with:
-- "people": array of people mentioned (empty if none)
-- "action_items": array of implied to-dos (empty if none)
-- "dates_mentioned": array of dates YYYY-MM-DD (empty if none)
-- "topics": array of 1-3 short topic tags (always at least one)
+  },
+  required: ["people", "action_items", "dates_mentioned", "topics", "type"],
+  additionalProperties: false,
+} as const;
+
+// Flag degraded extractions so they can be found and re-run later:
+//   SELECT id, content FROM thoughts WHERE metadata->>'metadata_degraded' = 'true';
+// Losing the thought entirely because the metadata model was down is worse than
+// storing it with weak metadata -- the content and embedding are the valuable parts.
+const METADATA_FALLBACK = {
+  topics: ["uncategorized"],
+  type: "observation",
+  metadata_degraded: true,
+};
+
+async function extractMetadata(text: string): Promise<Record<string, unknown>> {
+  try {
+    const r = await fetch(`${CHAT_API_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CHAT_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: CHAT_MODEL,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "thought_metadata",
+            strict: true,
+            schema: METADATA_SCHEMA,
+          },
+        },
+        messages: [
+          {
+            role: "system",
+            content: `Extract metadata from the user's captured thought.
+- "people": people mentioned (empty if none)
+- "action_items": implied to-dos (empty if none)
+- "dates_mentioned": dates as YYYY-MM-DD (empty if none)
+- "topics": 1-3 short topic tags (always at least one)
 - "type": one of "observation", "task", "idea", "reference", "person_note"
 Only extract what's explicitly there.`,
-        },
-        { role: "user", content: text },
-      ],
-    }),
-  });
-  const d = await r.json();
-  try {
-    return JSON.parse(d.choices[0].message.content);
-  } catch {
-    return { topics: ["uncategorized"], type: "observation" };
+          },
+          { role: "user", content: text },
+        ],
+      }),
+    });
+
+    // Fail loudly instead of silently degrading every capture.
+    if (!r.ok) {
+      const body = await r.text().catch(() => "");
+      console.error(`extractMetadata: chat API ${r.status} ${body.slice(0, 300)}`);
+      return METADATA_FALLBACK;
+    }
+
+    const d = await r.json();
+    const content = d?.choices?.[0]?.message?.content;
+    if (typeof content !== "string") {
+      console.error(`extractMetadata: unexpected response shape: ${JSON.stringify(d).slice(0, 300)}`);
+      return METADATA_FALLBACK;
+    }
+    return JSON.parse(content);
+  } catch (e) {
+    console.error(`extractMetadata failed: ${e instanceof Error ? e.message : e}`);
+    return METADATA_FALLBACK;
   }
 }
 
@@ -172,7 +239,7 @@ function buildServer(): McpServer {
              WHERE 1 - (embedding <=> $1::vector) >= $2
              ORDER BY embedding <=> $1::vector
              LIMIT $3`,
-            [embStr, 0.5, 10]
+            [embStr, DEFAULT_MATCH_THRESHOLD, 10]
           );
 
           const results = result.rows.map((t) => ({
@@ -269,7 +336,7 @@ function buildServer(): McpServer {
       inputSchema: {
         query: z.string().describe("What to search for"),
         limit: z.number().optional().default(10),
-        threshold: z.number().optional().default(0.5),
+        threshold: z.number().optional().default(DEFAULT_MATCH_THRESHOLD),
       },
     },
     async ({ query, limit, threshold }) => {
@@ -579,6 +646,17 @@ const app = new Hono();
 
 app.options("*", (c) => c.text("ok", 200, corsHeaders));
 
+// Constant-time comparison. A plain `!==` short-circuits on the first differing
+// byte, which leaks key material through response timing. Length is compared first
+// and non-secretly -- that only reveals the key's length, and bailing early on a
+// length mismatch is unavoidable for a fixed-width compare anyway.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 app.all("*", async (c) => {
   // Reject non-POST requests up front. This server is stateless over
   // streamable HTTP: there is no standalone SSE stream (GET) or session
@@ -592,7 +670,7 @@ app.all("*", async (c) => {
   }
 
   const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
-  if (!provided || provided !== MCP_ACCESS_KEY) {
+  if (!provided || !timingSafeEqual(provided, MCP_ACCESS_KEY)) {
     return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
   }
 
