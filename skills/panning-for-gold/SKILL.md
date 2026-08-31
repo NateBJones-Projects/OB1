@@ -300,6 +300,16 @@ After writing the gold-found file, capture to Open Brain automatically (do not a
 2. **Session summary** as one `capture_thought`:
    - `content`: "Panning session: [source], [N] threads, [M] ACT NOW, [K] RESEARCH MORE. Threads: [all thread titles + categories]. Gold-found: [file path]"
 
+3. **Provenance (session summary only).** The session summary is a derived
+   synthesis of the whole run. If the Open Brain setup has the provenance-chains
+   capability (a `capture_derived_thought` tool, or `derived_from`/
+   `derivation_layer` columns), capture the session summary as a derived
+   artifact instead of a plain `capture_thought` — `derivation_layer='derived'`,
+   `derivation_method='synthesis'`, and `derived_from` = the UUIDs of any related
+   Open Brain thoughts you pulled via `search_thoughts` and actually built on
+   (omit if none — the raw transcript is not a thought). The ACT NOW items stay
+   primary captures. No-op when that capability isn't present.
+
 This closes the flywheel: panning extracts and evaluates, OB1 stores, Gate 0 finds it next session.
 
 ## Phase 4: Self-Improvement
