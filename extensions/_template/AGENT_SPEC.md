@@ -148,6 +148,14 @@ const server = new McpServer({
 const app = new Hono();
 
 app.all("*", async (c) => {
+  // Reject non-POST requests: a GET would fall through to
+  // StreamableHTTPTransport.handleRequest and park on an SSE stream that
+  // never emits and never closes, hanging mcp-remote's OAuth-discovery GET
+  // probe and timing out the MCP handshake.
+  if (c.req.method !== "POST") {
+    return c.json({ error: "Method not allowed" }, 405);
+  }
+
   const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
     return c.json({ error: "Invalid or missing access key" }, 401);
