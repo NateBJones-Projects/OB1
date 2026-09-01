@@ -1,0 +1,20 @@
+{
+  "name": "Connector Sync State",
+  "description": "A generic per-connector bookkeeping table (public.connector_sync_state) plus three RPCs (connector_sync_begin, connector_sync_success, connector_sync_error) that let any capture connector remember where it left off and whether its last run succeeded. Each connector keeps one row per (connector, surface, sync_key) holding a resume cursor, a high-watermark, last-started/finished/success/error timestamps, the last error, and a running error count. Keyed by connector identity — it stores no raw source text and references no thoughts, so the canonical UUID thoughts.id never appears. Pairs with brain-health-monitoring to alert on stalled or erroring connectors.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["connectors", "sync", "cursor", "capture", "operational-state", "monitoring", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-06-13",
+  "updated": "2026-06-13"
+}
