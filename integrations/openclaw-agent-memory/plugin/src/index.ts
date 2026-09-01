@@ -179,7 +179,6 @@ export default definePluginEntry({
   id: "nbj-ob1-agent-memory",
   name: "NBJ OB1 Agent Memory for OpenClaw",
   description: "Recall and write governed Nate Jones OB1 memory from OpenClaw workflows.",
-  kind: "memory",
   register(api) {
     registerTool(api, {
       name: "openbrain_recall",

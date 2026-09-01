@@ -36,6 +36,8 @@
   "scripts": {
     "build": "esbuild src/index.ts --bundle --platform=node --format=esm --target=node20 --external:openclaw/* --external:typebox --outfile=dist/index.js",
     "schema:check": "node scripts/check-tool-schemas.mjs",
+    "scope:check": "node scripts/check-project-scope.mjs",
+    "test": "npm run build && npm run schema:check && npm run scope:check",
     "smoke:native": "bash smoke/native-openclaw-smoke.sh"
   },
   "dependencies": {
