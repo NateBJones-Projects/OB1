@@ -108,7 +108,7 @@ export async function fetchThoughts(
 
 export async function fetchThought(
   apiKey: string,
-  id: number,
+  id: string,
   excludeRestricted: boolean = true
 ): Promise<Thought> {
   const qs = excludeRestricted ? "" : "?exclude_restricted=false";
@@ -117,10 +117,10 @@ export async function fetchThought(
 
 export async function updateThought(
   apiKey: string,
-  id: number,
+  id: string,
   data: { content?: string; type?: string; importance?: number }
-): Promise<{ id: number; action: string; message: string }> {
-  return apiFetch<{ id: number; action: string; message: string }>(
+): Promise<{ id: string; action: string; message: string }> {
+  return apiFetch<{ id: string; action: string; message: string }>(
     apiKey,
     `/thought/${id}`,
     {
@@ -146,8 +146,8 @@ export async function fetchDuplicates(
 
 export interface DuplicateResolveResult {
   action: string;
-  survivor_id: number | null;
-  loser_id: number | null;
+  survivor_id: string | null;
+  loser_id: string | null;
   reattached: {
     reflections: number;
     thought_entities: number;
@@ -157,8 +157,8 @@ export interface DuplicateResolveResult {
 export async function resolveDuplicate(
   apiKey: string,
   params: {
-    thought_id_a: number;
-    thought_id_b: number;
+    thought_id_a: string;
+    thought_id_b: string;
     action: "keep_a" | "keep_b" | "keep_both";
   }
 ): Promise<DuplicateResolveResult> {
@@ -170,7 +170,7 @@ export async function resolveDuplicate(
 
 export async function deleteThought(
   apiKey: string,
-  id: number
+  id: string
 ): Promise<void> {
   await apiFetch<unknown>(apiKey, `/thought/${id}`, { method: "DELETE" });
 }
@@ -213,7 +213,7 @@ export async function fetchStats(
 }
 
 export interface CaptureResult {
-  thought_id: number;
+  thought_id: string;
   action: string;
   type: string;
   sensitivity_tier: string;

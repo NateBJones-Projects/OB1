@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
   try {
     const { ids } = (await request.json()) as { ids: unknown };
 
-    // BL-03: Strict input validation — array of positive integers only
+    // BL-03: Strict input validation — array of UUID thought ids only
+    // (public.thoughts.id is uuid, not a positive integer).
     if (!Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json({ error: "No IDs provided" }, { status: 400 });
     }
@@ -37,15 +38,16 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const sanitized: number[] = [];
+    const UUID_RE = /^[0-9a-fA-F-]{36}$/;
+    const sanitized: string[] = [];
     for (const raw of ids) {
-      if (!Number.isInteger(raw) || (raw as number) <= 0) {
+      if (typeof raw !== "string" || !UUID_RE.test(raw)) {
         return NextResponse.json(
-          { error: "All IDs must be positive integers" },
+          { error: "All IDs must be valid UUIDs" },
           { status: 400 }
         );
       }
-      sanitized.push(raw as number);
+      sanitized.push(raw);
     }
 
     // BL-03: Re-verify each thought actually has quality_score < 30 before deleting
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
       sanitized.map((id) => fetchThought(apiKey, id, excludeRestricted))
     );
 
-    const verifiedIds: number[] = [];
+    const verifiedIds: string[] = [];
     let rejected = 0;
     for (let i = 0; i < verifyResults.length; i++) {
       const r = verifyResults[i];
