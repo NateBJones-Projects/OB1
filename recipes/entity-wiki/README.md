@@ -109,6 +109,7 @@ LLM_API_KEY=<your-openrouter-or-openai-key>
 # LLM_BASE_URL=https://api.openai.com/v1
 # LLM_MODEL=gpt-4o-mini
 # OB_WIKI_OUT_DIR=./wikis
+# OB_WIKI_CITATION_URL_TEMPLATE=https://supabase.com/dashboard/project/<ref>/editor/<table-id>?schema=public&filter=id%3Aeq%3A<uuid>
 ```
 
 Done when: `node generate-wiki.mjs --help` prints the usage block without errors.
