@@ -1,20 +1,20 @@
 {
   "name": "Daily Digest",
-  "description": "Automated daily summary of recent thoughts delivered via Gmail draft, powered by Claude Code scheduled tasks and Open Brain MCP. Zero infrastructure required.",
+  "description": "Automated daily summary of recent thoughts — as a Gmail draft via Claude Code scheduled tasks (zero infrastructure), or fully auto-sent by a Supabase Edge Function with pg_cron and Resend.",
   "category": "recipes",
   "author": {
     "name": "Matt Hallett",
     "github": "matthallett"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "requires": {
     "open_brain": true,
-    "services": ["Gmail MCP"],
-    "tools": ["Claude Code or Claude Desktop"]
+    "services": ["Gmail MCP (Approach A)", "Resend (Approach B)"],
+    "tools": ["Claude Code or Claude Desktop (Approach A)", "Supabase CLI (Approach B)"]
   },
-  "tags": ["digest", "summary", "email", "automation", "scheduled-task", "gmail", "claude-code"],
+  "tags": ["digest", "summary", "email", "automation", "scheduled-task", "gmail", "claude-code", "edge-function", "pg_cron", "resend"],
   "difficulty": "beginner",
-  "estimated_time": "10 minutes",
+  "estimated_time": "20 minutes",
   "created": "2026-03-25",
-  "updated": "2026-03-25"
+  "updated": "2026-07-13"
 }

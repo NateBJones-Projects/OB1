@@ -10,8 +10,8 @@ There are two approaches — pick the one that fits your setup:
 
 | Approach | Infrastructure | Difficulty | Auto-send? |
 | -------- | -------------- | ---------- | ---------- |
-| **Claude Code Scheduled Task** (below) | None — uses MCP tools you already have | Beginner | Draft only (one-tap send) |
-| **Supabase Edge Function** (planned) | Edge Function + pg_cron + email service | Intermediate | Full auto-send |
+| **Claude Code Scheduled Task** ([Approach A](#approach-a-claude-code-scheduled-task)) | None — uses MCP tools you already have | Beginner | Draft only (one-tap send) |
+| **Supabase Edge Function** ([Approach B](#approach-b-supabase-edge-function)) | Edge Function + pg_cron + Resend | Beginner | Full auto-send |
 
 ---
 
@@ -106,17 +106,20 @@ Solution: Verify your Gmail MCP connector is working. Try `gmail_create_draft` m
 
 ---
 
-## Approach B: Supabase Edge Function (Planned)
+## Approach B: Supabase Edge Function
 
-A fully self-contained approach using a Supabase Edge Function, pg_cron trigger, and an email service (Resend or SendGrid) for true automated delivery without Claude running. This approach is not yet implemented — contributions welcome.
+A fully self-contained approach using a Supabase Edge Function, a pg_cron trigger, and [Resend](https://resend.com) for true automated delivery — no Claude session or local machine required. The digest is formatted with plain template code, so **no LLM key is needed**.
 
-### Prerequisites (planned)
+The function ([`edge-function/index.ts`](edge-function/index.ts)) queries thoughts from the last 24 hours, groups them by type with a summary header (counts, top topics), and emails the result. Thoughts with `sensitivity_tier` of `personal` or `restricted` (from the [enhanced-thoughts](../../schemas/enhanced-thoughts/) schema) are excluded by default.
 
+### Prerequisites
+
+- Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - Supabase CLI available ([Homebrew/Scoop/standalone binary or `npx supabase`](https://supabase.com/docs/guides/local-development/cli/getting-started); `npm i -g supabase` is not supported)
-- OpenRouter API key (for generating the summary)
-- Email service: Resend or SendGrid (free tier)
+- [Resend](https://resend.com) account (free tier: 100 emails/day — plenty for one digest)
+- `pg_cron` and `pg_net` extensions enabled (Database → Extensions in the Supabase dashboard)
 
-### Credential Tracker (for future Edge Function approach)
+### Credential Tracker
 
 ```text
 DAILY DIGEST -- CREDENTIAL TRACKER
@@ -124,13 +127,124 @@ DAILY DIGEST -- CREDENTIAL TRACKER
 
 FROM YOUR OPEN BRAIN SETUP
   Supabase Project URL:  ____________
-  Supabase Secret key:   ____________
-  OpenRouter API key:    ____________
+  Supabase project ref:  ____________
 
-DELIVERY METHOD
-  Email service (Resend/SendGrid): ____________
-  API key:                         ____________
-  Sender email:                    ____________
+DELIVERY
+  Resend API key:        ____________
+  Recipient email:       ____________
+  Sender email:          ____________ (optional — needs a verified domain)
+
+SECURITY
+  DIGEST_ACCESS_KEY:     ____________ (any random string you generate)
 
 --------------------------------------
+```
+
+### Steps
+
+![Step 1](https://img.shields.io/badge/Step_1-Get_a_Resend_Key-1E88E5?style=for-the-badge)
+
+Sign up at [resend.com](https://resend.com) and create an API key.
+
+> [!NOTE]
+> Without a verified domain, Resend's default `onboarding@resend.dev` sender can only deliver to **the email address of your own Resend account** — which is exactly what a personal digest needs. To send from your own address instead, verify a domain in Resend and set `DIGEST_FROM_EMAIL` in Step 3.
+
+---
+
+![Step 2](https://img.shields.io/badge/Step_2-Deploy_the_Function-1E88E5?style=for-the-badge)
+
+From your Supabase project directory:
+
+```bash
+mkdir -p supabase/functions/daily-digest
+cp recipes/daily-digest/edge-function/index.ts supabase/functions/daily-digest/index.ts
+supabase functions deploy daily-digest --no-verify-jwt
+```
+
+`--no-verify-jwt` is required because pg_cron calls the function without a user JWT — access is gated by the `DIGEST_ACCESS_KEY` secret instead.
+
+---
+
+![Step 3](https://img.shields.io/badge/Step_3-Set_Secrets-1E88E5?style=for-the-badge)
+
+```bash
+supabase secrets set \
+  RESEND_API_KEY=re_your_key_here \
+  DIGEST_TO_EMAIL=you@example.com \
+  DIGEST_ACCESS_KEY=$(openssl rand -hex 16)
+
+# Optional — only with a domain verified in Resend:
+# supabase secrets set DIGEST_FROM_EMAIL="Open Brain <digest@yourdomain.com>"
+```
+
+Note the `DIGEST_ACCESS_KEY` value (`supabase secrets list` shows digests only, not values, so save it in your credential tracker).
+
+---
+
+![Step 4](https://img.shields.io/badge/Step_4-Test-1E88E5?style=for-the-badge)
+
+Dry run first — returns the digest as JSON without sending anything:
+
+```bash
+curl -s -X POST \
+  "https://YOUR-PROJECT-REF.supabase.co/functions/v1/daily-digest?key=YOUR_DIGEST_ACCESS_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 24, "dry_run": true}'
+```
+
+Then send a real one by dropping `dry_run`:
+
+```bash
+curl -s -X POST \
+  "https://YOUR-PROJECT-REF.supabase.co/functions/v1/daily-digest?key=YOUR_DIGEST_ACCESS_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"hours": 24}'
+```
+
+Check your inbox. The response includes `{"sent": true, "thought_count": N, ...}`.
+
+Optional body parameters: `hours` (1–168, default 24) widens the window; `include_personal: true` includes `personal`/`restricted` sensitivity tiers, which are excluded by default.
+
+---
+
+![Step 5](https://img.shields.io/badge/Step_5-Schedule_It-1E88E5?style=for-the-badge)
+
+Open [`schedule.sql`](schedule.sql), replace `<YOUR-PROJECT-REF>` and `<YOUR-DIGEST-KEY>` with your values, then run it in the Supabase SQL Editor. This adds a pg_cron job that fires daily at 07:00 UTC — adjust the cron expression to land the email in your morning.
+
+Verify it's scheduled:
+
+```sql
+SELECT jobname, schedule FROM cron.job WHERE jobname = 'daily-digest';
+```
+
+### Expected Outcome
+
+Every morning, an email arrives with:
+
+- A summary header: total thoughts captured in the last 24 hours, breakdown by type, top topics
+- Thoughts grouped by type, each with a content preview (truncated to ~200 chars) and topic/people tags
+- On a quiet day, a short "no new thoughts" note instead
+
+The function responds to the cron trigger in a few seconds; no LLM calls, so runs are effectively free beyond Supabase's Edge Function quota.
+
+### Troubleshooting
+
+**Issue: `{"error": "unauthorized"}`**
+Solution: The `?key=` query parameter doesn't match the `DIGEST_ACCESS_KEY` secret. Re-check the value in `schedule.sql` and your curl command. If you've lost it, set a new one (`supabase secrets set DIGEST_ACCESS_KEY=...`) — no redeploy needed, secrets apply on the next invocation.
+
+**Issue: Resend returns 403 / email never arrives**
+Solution: Without a verified domain, the default `onboarding@resend.dev` sender can only deliver to your own Resend account email — make sure `DIGEST_TO_EMAIL` matches it, or verify a domain and set `DIGEST_FROM_EMAIL`. Also check Resend's dashboard → Logs for delivery status, and your spam folder.
+
+**Issue: `thoughts query failed: 401`**
+Solution: The function's auto-injected service role key isn't reaching PostgREST — this usually means the function was deployed to a different project than your thoughts database. Run `supabase link --project-ref YOUR-REF` and redeploy.
+
+**Issue: Digest is empty but I captured thoughts yesterday**
+Solution: The window is measured from *now*, not calendar days. If the cron fires at 07:00 UTC, it covers 07:00→07:00. Widen the window in `schedule.sql` (`'hours', 36`) or shift the cron time. Also note `personal`/`restricted` thoughts are excluded unless you pass `include_personal: true`.
+
+**Issue: Cron job exists but nothing fires**
+Solution: Confirm both `pg_cron` *and* `pg_net` are enabled (the job runs but the HTTP call silently fails without pg_net). Check run history:
+```sql
+SELECT start_time, status, return_message FROM cron.job_run_details
+WHERE jobid = (SELECT jobid FROM cron.job WHERE jobname = 'daily-digest')
+ORDER BY start_time DESC LIMIT 5;
 ```
