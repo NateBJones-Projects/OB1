@@ -1,0 +1,15 @@
+[
+  {
+    "id": "json-record-1",
+    "text": "JSON input can be reshaped into extracted records for later normalization.",
+    "source": "json-export",
+    "source_label": "JSON export",
+    "created_at": "2026-06-01T00:00:00Z",
+    "topics": ["json", "import"]
+  },
+  {
+    "id": "json-record-2",
+    "content": "Oversized JSON content can be chunked before import review.",
+    "source_type": "json-export"
+  }
+]

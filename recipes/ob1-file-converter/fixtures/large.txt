@@ -1,0 +1,5 @@
+Paragraph one captures the first operational note for a heavy import file. It should stay together when chunking is configured with enough room for one paragraph.
+
+Paragraph two captures the second operational note for a heavy import file. It should become a separate chunk when the maximum chunk size is intentionally low during tests.
+
+Paragraph three captures the final operational note for a heavy import file. The converter should preserve source path and locator metadata for every chunk.

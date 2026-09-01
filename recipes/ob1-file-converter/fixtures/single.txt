@@ -1,0 +1,3 @@
+Use dry-run import checks before writing migrated source data into Open Brain.
+
+Keep converted records small enough for review before any database write.
