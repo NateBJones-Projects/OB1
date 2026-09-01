@@ -1,0 +1,20 @@
+{
+  "name": "Auto-Capture Grok Adapter",
+  "description": "Grok CLI adapter for the auto-capture skill. Captures Grok sessions to Open Brain at session end via a native SessionEnd hook, parsing Grok's chat_history transcript format.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Grok CLI", "Node.js 18+"]
+  },
+  "requires_skills": ["auto-capture"],
+  "tags": ["skill", "capture", "grok", "hooks", "session-end", "ambient"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-05"
+}
