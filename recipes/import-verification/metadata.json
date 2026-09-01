@@ -1,0 +1,21 @@
+{
+  "name": "Import Verification",
+  "description": "Read-only verification script for checking Open Brain import coverage, metadata completeness, embeddings, duplicate fingerprints, and sample rows.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_skills": [],
+  "tags": ["import", "verification", "audit", "metadata", "read-only"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-06-06",
+  "updated": "2026-06-06"
+}

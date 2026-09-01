@@ -1,0 +1,73 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "content": "[ChatGPT: Database Migration Strategy | 2025-09-15] Chose PostgreSQL for the reporting service because the team needed relational joins, transactional consistency, and familiar operational tooling.",
+    "created_at": "2026-06-06T00:00:00Z",
+    "embedding": [0.01, 0.02, 0.03],
+    "source_type": "chatgpt",
+    "content_fingerprint": "sha256:9ec0acdf6f8c1f82d681d0e3b8ec8a7f1ea61d5b4179a6149ddccde2b1a1e33a",
+    "metadata": {
+      "source": "chatgpt",
+      "source_type": "chatgpt",
+      "source_label": "ChatGPT export - conversations.json",
+      "source_id": "conversation_abc123:thought_1",
+      "source_path": "chatgpt-export/conversations.json",
+      "source_locator": "messages 12-18",
+      "original_created_at": "2025-09-15T14:22:00Z",
+      "imported_at": "2026-06-06T00:00:00Z",
+      "importer_name": "chatgpt-conversation-import",
+      "importer_version": "1.0.0",
+      "input_hash": "sha256:2b45a3b4a377d0f5f27b0f8ad77e8f4fc4c8795a739e4fbd9610b7f742b2c4f1",
+      "content_fingerprint": "sha256:9ec0acdf6f8c1f82d681d0e3b8ec8a7f1ea61d5b4179a6149ddccde2b1a1e33a",
+      "sensitivity_tier": "standard",
+      "provenance": {
+        "method": "llm_extraction",
+        "source_record": "conversation abc123",
+        "source_locator": "messages 12-18",
+        "artifact": "chatgpt-export/conversations.json",
+        "extractor_model": "openai/gpt-4o-mini",
+        "review_status": "unreviewed"
+      },
+      "type": "decision",
+      "topics": ["database", "architecture", "reporting"],
+      "people": [],
+      "action_items": [],
+      "confidence": "firm"
+    }
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000002",
+    "content": "[Obsidian: Home Maintenance | Projects] Replace HVAC filters quarterly and keep receipts in the home maintenance folder.",
+    "created_at": "2026-06-06T00:05:00Z",
+    "embedding": [0.04, 0.05, 0.06],
+    "source_type": "obsidian",
+    "content_fingerprint": "sha256:5f6c9dd716d345f5356e833052e7f2ecfb6a17674f44b61d8ed847a6fc777100",
+    "metadata": {
+      "source": "obsidian",
+      "source_type": "obsidian",
+      "source_label": "House vault",
+      "source_id": "Projects/Home Maintenance.md",
+      "source_path": "Projects/Home Maintenance.md",
+      "source_locator": "heading: Seasonal maintenance",
+      "original_created_at": "2025-12-01T09:00:00Z",
+      "imported_at": "2026-06-06T00:05:00Z",
+      "importer_name": "obsidian-vault-import",
+      "importer_version": "1.0.0",
+      "input_hash": "sha256:083da49e5e445bd40357f6f591af393b806d1f6a2b1d8d1f6a5c9bf8a8c76f22",
+      "content_fingerprint": "sha256:5f6c9dd716d345f5356e833052e7f2ecfb6a17674f44b61d8ed847a6fc777100",
+      "sensitivity_tier": "personal",
+      "provenance": {
+        "method": "chunked_record",
+        "source_record": "Projects/Home Maintenance.md",
+        "source_locator": "heading: Seasonal maintenance",
+        "artifact": "Projects/Home Maintenance.md",
+        "review_status": "unreviewed"
+      },
+      "type": "task",
+      "topics": ["home", "maintenance"],
+      "people": [],
+      "action_items": ["Replace HVAC filters quarterly"],
+      "confidence": "firm"
+    }
+  }
+]
