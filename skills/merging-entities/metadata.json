@@ -1,0 +1,20 @@
+{
+  "name": "Merging Entities",
+  "description": "Safety-focused behavioral skill for merging duplicate Open Brain entities with ops_merge_entities — repoints the loser's edges and mentions then hard-deletes it. Requires reviewing candidates, judging each pair (the view has false positives like C vs C++), choosing the survivor deliberately, and confirming before merging. Never auto-merge the candidate list.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["entity-near-dupe-review recipe (ops_entity_near_dupes + ops_merge_entities)", "SQL access to the Open Brain database", "AI client with reusable skills, rules, or custom instructions"]
+  },
+  "tags": ["skill", "entity-resolution", "merge", "safety", "deduplication", "knowledge-graph", "open-brain"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-12",
+  "updated": "2026-07-12"
+}
