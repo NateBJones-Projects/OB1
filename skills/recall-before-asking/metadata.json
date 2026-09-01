@@ -1,0 +1,19 @@
+{
+  "name": "Recall Before Asking",
+  "description": "Behavioral protocol that makes an AI client search Open Brain before asking the user a factual, contextual, or status question. The read-path complement to auto-capture, with per-client install kit (always-loaded rule + optional prompt-submit hook).",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["skill", "recall", "memory", "read-path", "cross-client", "hooks", "prompt"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-08"
+}
