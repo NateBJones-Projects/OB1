@@ -55,7 +55,7 @@ const PAGE_SIZE = 1000;
 
 // ── Synthesizer catalogue ─────────────────────────────────────────────────
 
-const SYNTHESIZERS = {};
+export const SYNTHESIZERS = {};
 
 SYNTHESIZERS.autobiography = {
   summary: "Narrative autobiography grouped by year, from dated thoughts.",
@@ -155,7 +155,7 @@ SYNTHESIZERS.autobiography = {
 
 // ── Main ─────────────────────────────────────────────────────────────────
 
-async function main() {
+export async function main() {
   const args = parseArgs(process.argv.slice(2));
 
   if (args.help) {
@@ -387,4 +387,6 @@ function fail(msg) {
   process.exit(1);
 }
 
-await main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  await main();
+}
