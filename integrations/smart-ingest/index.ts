@@ -141,14 +141,14 @@ interface IngestionItem {
   content_fingerprint: string;
   action: ReconcileAction;
   reason: string;
-  matched_thought_id: number | null;
+  matched_thought_id: string | null;
   similarity_score: number | null;
   status: "pending" | "executed" | "failed";
   error_message: string | null;
 }
 
 interface IngestionJob {
-  id?: number;
+  id?: string;
   input_hash: string;
   source_label: string | null;
   source_type: string | null;
@@ -164,8 +164,8 @@ interface IngestionJob {
 }
 
 type UpsertThoughtResult = {
-  thought_id?: number;
-  id?: number;
+  thought_id?: string;
+  id?: string;
 };
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -347,15 +347,17 @@ function mergeTags(existing: unknown, extras: string[]): string[] {
   ]);
 }
 
-function extractThoughtId(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+function extractThoughtId(value: unknown): string | null {
+  // OB1 thought ids are UUIDs (strings). A successful upsert_thought may return
+  // the id as a bare string, or wrapped as { thought_id } / { id }.
+  if (typeof value === "string" && value.trim().length > 0) return value;
   if (value && typeof value === "object" && "thought_id" in value) {
     const thoughtId = (value as UpsertThoughtResult).thought_id;
-    if (typeof thoughtId === "number" && Number.isFinite(thoughtId)) return thoughtId;
+    if (typeof thoughtId === "string" && thoughtId.trim().length > 0) return thoughtId;
   }
   if (value && typeof value === "object" && "id" in value) {
     const id = (value as UpsertThoughtResult).id;
-    if (typeof id === "number" && Number.isFinite(id)) return id;
+    if (typeof id === "string" && id.trim().length > 0) return id;
   }
   return null;
 }
@@ -595,7 +597,7 @@ async function reconcileThought(
     tags: thought.tags,
     source_snippet: thought.source_snippet,
     content_fingerprint: fingerprint,
-    matched_thought_id: null as number | null,
+    matched_thought_id: null as string | null,
     similarity_score: null as number | null,
   };
 
@@ -649,7 +651,7 @@ async function reconcileThought(
 
   const topMatch = matches[0];
   const similarity = topMatch.similarity as number;
-  const matchedId = topMatch.id as number;
+  const matchedId = topMatch.id as string;
   const existingContent = (topMatch.content ?? "") as string;
 
   base.matched_thought_id = matchedId;
@@ -679,7 +681,7 @@ async function executeItem(
   sourceType: string | null,
   sourceMetadata?: Record<string, unknown> | null,
   skipClassification = false,
-): Promise<number | null> {
+): Promise<string | null> {
   switch (item.action) {
     case "add": {
       const prepared = await prepareThoughtPayload(item.content, {
@@ -822,7 +824,7 @@ async function createJob(
   job: IngestionJob,
   sourceMetadata?: Record<string, unknown> | null,
   inputLength: number = 0,
-): Promise<number> {
+): Promise<string> {
   const { data, error } = await supabase.from("ingestion_jobs").insert({
     input_hash: job.input_hash,
     source_label: job.source_label,
@@ -833,13 +835,13 @@ async function createJob(
   }).select("id").single();
   if (error) {
     console.error("Failed to create ingestion_jobs row:", error.message);
-    return 0;
+    return "";
   }
-  return data?.id ?? 0;
+  return data?.id ?? "";
 }
 
 async function updateJobById(
-  jobId: number,
+  jobId: string,
   updates: Record<string, unknown>,
 ): Promise<{ ok: boolean; error?: string }> {
   const { data, error } = await supabase
@@ -849,21 +851,21 @@ async function updateJobById(
     .select("id, status")
     .maybeSingle();
   if (error) {
-    console.error(`Failed to update job #${jobId}: ${error.message} (code: ${error.code}, details: ${error.details})`);
+    console.error(`Failed to update job ${jobId}: ${error.message} (code: ${error.code}, details: ${error.details})`);
     return { ok: false, error: `${error.code}: ${error.message}` };
   }
   if (!data) {
-    console.error(`updateJobById: update matched 0 rows for job #${jobId}`);
-    return { ok: false, error: `No row matched for job #${jobId}` };
+    console.error(`updateJobById: update matched 0 rows for job ${jobId}`);
+    return { ok: false, error: `No row matched for job ${jobId}` };
   }
   return { ok: true };
 }
 
 async function persistItems(
-  jobId: number,
+  jobId: string,
   items: IngestionItem[],
   sourceMetadata?: Record<string, unknown> | null,
-): Promise<number[]> {
+): Promise<string[]> {
   if (items.length === 0 || !jobId) return [];
   const rows = items.map((item) => ({
     job_id: jobId,
@@ -887,21 +889,26 @@ async function persistItems(
     console.error("Failed to persist ingestion_items:", error.message);
     return [];
   }
-  return (data ?? []).map((row: { id: number }) => row.id);
+  return (data ?? []).map((row: { id: string }) => row.id);
 }
 
 // ── Execute a dry-run job ───────────────────────────────────────────────────
+
+// OB1 ingestion_jobs.id is a UUID; reject anything that is not a UUID string.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function handleExecuteJob(req: Request): Promise<Response> {
   let body: Record<string, unknown>;
   try { body = await req.json(); } catch { return json({ error: "Invalid JSON body" }, 400); }
 
-  const jobId = typeof body.job_id === "number" ? body.job_id : 0;
-  if (!jobId) return json({ error: "job_id is required" }, 400);
+  const jobId = typeof body.job_id === "string" && UUID_RE.test(body.job_id.trim())
+    ? body.job_id.trim()
+    : "";
+  if (!jobId) return json({ error: "job_id is required (must be a UUID)" }, 400);
 
   const { data: job, error: jobErr } = await supabase
     .from("ingestion_jobs").select("*").eq("id", jobId).single();
-  if (jobErr || !job) return json({ error: `Job #${jobId} not found` }, 404);
+  if (jobErr || !job) return json({ error: `Job ${jobId} not found` }, 404);
   if (job.status === "complete") return json({ ...job, message: "Job already complete" }, 200);
   if (job.status !== "dry_run_complete") {
     return json({ error: `Job status is '${job.status}', expected 'dry_run_complete'` }, 400);
@@ -1191,7 +1198,7 @@ Deno.serve(async (req) => {
   }
 
   // Persist items to ingestion_items table
-  let itemIds: number[] = [];
+  let itemIds: string[] = [];
   if (jobId) itemIds = await persistItems(jobId, items, sourceMetadata);
 
   if (dryRun) {
@@ -1234,7 +1241,7 @@ Deno.serve(async (req) => {
   }
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
-    const itemDbId = itemIds[i] ?? 0;
+    const itemDbId = itemIds[i] ?? "";
     if (item.action === "skip") {
       item.status = "executed";
       if (itemDbId) await supabase.from("ingestion_items").update({ status: "executed" }).eq("id", itemDbId);
