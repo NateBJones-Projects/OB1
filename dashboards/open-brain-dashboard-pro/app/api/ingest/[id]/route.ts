@@ -13,15 +13,15 @@ function normalizeItem(raw: Record<string, unknown>): IngestionItem {
   };
 
   return {
-    id: raw.id as number,
-    job_id: raw.job_id as number,
+    id: raw.id as string,
+    job_id: raw.job_id as string,
     content: (raw.extracted_content ?? raw.content ?? "") as string,
     action: (raw.action ?? "skip") as string,
     reason: (raw.reason as string) ?? null,
     status: (raw.status ?? "pending") as string,
-    matched_thought_id: (raw.matched_thought_id as number) ?? null,
+    matched_thought_id: (raw.matched_thought_id as string) ?? null,
     similarity_score: raw.similarity_score != null ? Number(raw.similarity_score) : null,
-    result_thought_id: (raw.result_thought_id as number) ?? null,
+    result_thought_id: (raw.result_thought_id as string) ?? null,
     meta: parsedMeta,
   };
 }
@@ -41,9 +41,11 @@ export async function GET(
 
   const { id } = await params;
 
-  // WR-04: Validate id is a positive integer before forwarding
-  const idNum = Number(id);
-  if (!Number.isInteger(idNum) || idNum <= 0) {
+  // WR-04: Validate id is a UUID before forwarding. OB1 ingestion job ids are
+  // UUIDs, not integers — the old positive-integer check rejected them.
+  const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID_RE.test(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
@@ -56,7 +58,7 @@ export async function GET(
   }
 
   try {
-    const res = await fetch(`${API_URL}/ingestion-jobs/${idNum}`, {
+    const res = await fetch(`${API_URL}/ingestion-jobs/${id}`, {
       headers: { "x-brain-key": apiKey, "Content-Type": "application/json" },
     });
     const data = await res.json();
