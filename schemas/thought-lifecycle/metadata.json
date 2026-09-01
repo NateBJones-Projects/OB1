@@ -1,0 +1,20 @@
+{
+  "name": "Thought Lifecycle Receipts",
+  "description": "Adds an append-only thought_lifecycle_events receipt log and a single transactional write path so every lifecycle or correction action on an Open Brain thought commits together with its receipt — an unreceipted mutation cannot exist.",
+  "category": "schemas",
+  "author": {
+    "name": "Nev Harris",
+    "github": "Nev-Harris"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["lifecycle", "audit", "receipts", "append-only", "workflow-status"],
+  "difficulty": "advanced",
+  "estimated_time": "20 minutes",
+  "created": "2026-07-22",
+  "updated": "2026-07-22"
+}
