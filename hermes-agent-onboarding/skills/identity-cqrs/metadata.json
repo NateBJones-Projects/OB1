@@ -1,0 +1,21 @@
+{
+  "name": "Identity CQRS",
+  "description": "Thin layer that translates relational Supabase tables (identity_faults, agent_capabilities, career_tracker) into dynamic PERSONALITY and USER PROFILE blocks injected into session context. Bridges the gap between linear memory and relational structure needed for persistent identity with agency.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "requires_skills": ["supabase-startup-protocol", "context-bridge", "identity-self-audit"],
+  "tags": ["identity", "user-profile", "personality", "cqrs", "relational", "memory-gap", "agency"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}
