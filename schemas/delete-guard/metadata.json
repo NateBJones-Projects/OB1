@@ -1,0 +1,20 @@
+{
+  "name": "Mass-Delete Guard + Delete Audit",
+  "description": "A statement-level AFTER DELETE trigger on public.thoughts that blocks any single DELETE removing more than 50 thoughts, with an explicit privileged admin override, plus a UUID-keyed thoughts_delete_audit table that records every override (blocked attempts surface in the Postgres server log).",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["safety", "guard", "audit", "delete-protection", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-06-13",
+  "updated": "2026-06-13"
+}
