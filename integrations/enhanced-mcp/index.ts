@@ -37,7 +37,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // ── Types ─────────────────────────────────────────────────────────────────
 
 type ThoughtRow = {
-  id: number;
+  id: string;
   content: string;
   content_fingerprint?: string | null;
   type: string;
@@ -51,10 +51,11 @@ type ThoughtRow = {
   rank?: number;
 };
 
+// The base upsert_thought RPC (schemas/enhanced-thoughts) returns this shape.
+// It is NOT { thought_id, action } — read `id` / `fingerprint` accordingly.
 type UpsertThoughtResult = {
-  thought_id: number;
-  action: string;
-  content_fingerprint: string;
+  id: string;
+  fingerprint: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -76,6 +77,23 @@ function toolFailure(message: string) {
 function truncateContent(content: string, maxLen: number): string {
   if (!content || content.length <= maxLen) return content;
   return content.slice(0, maxLen) + "...";
+}
+
+// Citation helpers for the ChatGPT-compatible `search` / `fetch` tools.
+// Connector surfaces (ChatGPT deep research, company knowledge) expect a
+// read-only `search` returning {id,title,url} and a `fetch` returning the
+// full document, so enhanced-mcp exposes both by those exact names.
+const CITATION_BASE_URL =
+  Deno.env.get("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts";
+
+function thoughtTitle(content: string, createdAt?: string): string {
+  const firstLine = content.replace(/\s+/g, " ").trim().slice(0, 80);
+  const datePrefix = createdAt ? new Date(createdAt).toLocaleDateString() : "Open Brain";
+  return firstLine ? `${datePrefix} - ${firstLine}` : `${datePrefix} thought`;
+}
+
+function thoughtUrl(id: string): string {
+  return `${CITATION_BASE_URL.replace(/\/$/, "")}/${id}`;
 }
 
 // ── MCP Server ────────────────────────────────────────────────────────────
@@ -149,17 +167,16 @@ server.registerTool(
       }
 
       if (mode === "text") {
-        const filter: Record<string, unknown> = {
-          ...(metadataFilter as Record<string, unknown>),
-        };
-        filter.exclude_restricted = true;
-        if (startDate) filter.start_date = startDate;
-        if (endDate) filter.end_date = endDate;
-
+        // search_thoughts_text applies `metadata @> p_filter` (same
+        // containment semantics as match_thoughts), so synthetic directives
+        // like exclude_restricted or date bounds would match zero rows. Pass
+        // ONLY a genuine user metadata filter; enforce sensitivity + date
+        // filtering client-side below (this RPC returns sensitivity_tier and
+        // created_at, so both are available).
         const { data, error } = await supabase.rpc("search_thoughts_text", {
           p_query: query,
           p_limit: limit,
-          p_filter: filter,
+          p_filter: metadataFilter,
           p_offset: offset,
         });
 
@@ -167,13 +184,19 @@ server.registerTool(
           throw new Error(`search_thoughts_text failed: ${error.message}`);
         }
 
-        const rows = (data ?? []) as ThoughtRow[];
+        const allRows = (data ?? []) as ThoughtRow[];
         const totalCount =
-          rows.length > 0
+          allRows.length > 0
             ? Number(
-                (rows[0] as Record<string, unknown>).total_count ?? rows.length,
+                (allRows[0] as Record<string, unknown>).total_count ??
+                  allRows.length,
               )
             : 0;
+
+        const rows = allRows
+          .filter((row) => row.sensitivity_tier !== "restricted")
+          .filter((row) => !startDate || row.created_at >= startDate)
+          .filter((row) => !endDate || row.created_at <= endDate);
 
         if (rows.length === 0) {
           return toolSuccess("No matches found.", {
@@ -205,24 +228,15 @@ server.registerTool(
 
       // Semantic search (default)
       //
-      // NOTE: `match_thoughts` returns the top-N by similarity and then we
-      // date-filter client-side. When the RPC supports date/tier filters in
-      // its `filter` JSONB payload they'll be honored pre-cutoff and the
-      // behavior is server-side correct; when it doesn't, we rely on an
-      // over-fetch slack to avoid silently returning zero results on active
-      // brains with old date windows. See `known limitations` in the README.
+      // The deployed match_thoughts RPC treats its `filter` argument as a
+      // Postgres `metadata @> filter` containment test. Injecting synthetic
+      // directives like {exclude_restricted:true} or date bounds therefore
+      // makes it match ZERO rows — no thought's metadata contains those keys.
+      // We pass ONLY a genuine user-supplied metadata filter to the RPC and
+      // enforce sensitivity + date filtering client-side below.
       const dateFilterActive = !!(startDate || endDate);
-      // Forward filters into the RPC payload — ignored by older RPC versions
-      // but used by versions that support them, at which point the
-      // post-filter becomes a no-op.
-      const semanticFilter: Record<string, unknown> = {
-        ...(metadataFilter as Record<string, unknown>),
-        exclude_restricted: true,
-      };
-      if (startDate) semanticFilter.start_date = startDate;
-      if (endDate) semanticFilter.end_date = endDate;
 
-      // Over-fetch when date filter is active so client-side post-filter
+      // Over-fetch when a date filter is active so the client-side post-filter
       // has headroom. 3x the requested limit is a reasonable compromise
       // between cost and correctness for dense recent brains.
       const fetchCount = dateFilterActive
@@ -234,7 +248,7 @@ server.registerTool(
         query_embedding: queryEmbedding,
         match_count: fetchCount,
         match_threshold: minSimilarity,
-        filter: semanticFilter,
+        filter: metadataFilter,
       });
 
       if (error) {
@@ -242,8 +256,27 @@ server.registerTool(
       }
 
       const allRows = (data ?? []) as ThoughtRow[];
+
+      // match_thoughts does not return sensitivity_tier, so restricted rows
+      // cannot be filtered from its output directly. Look up the tiers for the
+      // candidate ids and drop restricted thoughts before returning — the same
+      // sensitivity guarantee the other read tools enforce. The lookup is
+      // usually empty (restricted content is blocked from cloud capture).
+      const candidateIds = allRows.map((row) => row.id);
+      const restrictedIds = new Set<string>();
+      if (candidateIds.length > 0) {
+        const { data: tierRows } = await supabase
+          .from("thoughts")
+          .select("id")
+          .in("id", candidateIds)
+          .eq("sensitivity_tier", "restricted");
+        for (const r of (tierRows ?? []) as { id: string }[]) {
+          restrictedIds.add(r.id);
+        }
+      }
+
       const rows = allRows
-        .filter((row) => row.sensitivity_tier !== "restricted")
+        .filter((row) => !restrictedIds.has(row.id))
         .filter((row) => !startDate || row.created_at >= startDate)
         .filter((row) => !endDate || row.created_at <= endDate)
         .slice(0, limit);
@@ -387,17 +420,12 @@ server.registerTool(
     description:
       "Fetch a thought by ID with its full metadata and provenance.",
     inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID"),
+      id: z.string().min(1).describe("Thought ID (UUID)"),
     }),
   },
   async (params) => {
     try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const id = asString((params as Record<string, unknown>).id, "").trim();
 
       if (!id) {
         return toolFailure("id is required");
@@ -455,7 +483,7 @@ server.registerTool(
     description:
       "Update the content of an existing thought. Re-generates embedding and metadata.",
     inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID to update"),
+      id: z.string().min(1).describe("Thought ID to update (UUID)"),
       content: z
         .string()
         .min(1)
@@ -464,12 +492,7 @@ server.registerTool(
   },
   async (params) => {
     try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const id = asString((params as Record<string, unknown>).id, "").trim();
       const content = asString(
         (params as Record<string, unknown>).content,
         "",
@@ -670,16 +693,8 @@ server.registerTool(
       const { data, error } = await supabase.rpc("upsert_thought", {
         p_content: prepared.content,
         p_payload: {
-          type: prepared.type,
-          sensitivity_tier: prepared.sensitivity_tier,
-          importance: prepared.importance,
-          quality_score: prepared.quality_score,
-          source_type: prepared.source_type,
           metadata: prepared.metadata,
           created_at: new Date().toISOString(),
-          ...(safeEmbedding(prepared.embedding) && {
-            embedding: prepared.embedding,
-          }),
         },
       });
 
@@ -687,17 +702,45 @@ server.registerTool(
         throw new Error(`upsert_thought failed: ${error.message}`);
       }
 
+      // The base upsert_thought RPC returns { id, fingerprint } and only
+      // persists content, fingerprint, and metadata — it does NOT return
+      // thought_id/action, nor does it write the structured columns or the
+      // embedding. Read the real shape here, then populate type / source_type
+      // / importance / quality_score / sensitivity_tier / embedding in a
+      // follow-up update so this server is self-sufficient regardless of
+      // which upsert_thought version is deployed. Without the embedding
+      // write, brain_search_thoughts (semantic) would never match a
+      // freshly captured thought — there is no async embedding backfill.
       const result = data as UpsertThoughtResult | null;
-      if (!result?.thought_id) {
-        throw new Error("upsert_thought returned no result");
+      if (!result?.id) {
+        throw new Error("upsert_thought returned no id");
+      }
+      const thoughtId = result.id;
+
+      const structuredUpdate: Record<string, unknown> = {
+        type: prepared.type,
+        source_type: prepared.source_type,
+        importance: prepared.importance,
+        quality_score: prepared.quality_score,
+        sensitivity_tier: prepared.sensitivity_tier,
+      };
+      if (safeEmbedding(prepared.embedding)) {
+        structuredUpdate.embedding = prepared.embedding;
+      }
+
+      const { error: enrichError } = await supabase
+        .from("thoughts")
+        .update(structuredUpdate)
+        .eq("id", thoughtId);
+      if (enrichError) {
+        console.error("capture enrichment update failed", enrichError);
       }
 
       return toolSuccess(
-        `${result.action === "inserted" ? "Captured new" : "Updated"} thought #${result.thought_id} as ${prepared.type}.`,
+        `Captured thought #${thoughtId} as ${prepared.type}.`,
         {
-          thought_id: result.thought_id,
-          action: result.action,
-          content_fingerprint: result.content_fingerprint,
+          thought_id: thoughtId,
+          content_fingerprint: result.fingerprint,
           type: prepared.type,
           sensitivity_tier: prepared.sensitivity_tier,
           metadata: prepared.metadata,
@@ -804,7 +847,7 @@ server.registerTool(
       const { data, error } = await supabase.rpc("search_thoughts_text", {
         p_query: query,
         p_limit: limit,
-        p_filter: { exclude_restricted: true },
+        p_filter: {},
         p_offset: offset,
       });
 
@@ -812,7 +855,12 @@ server.registerTool(
         throw new Error(`search_thoughts_text failed: ${error.message}`);
       }
 
-      const rows = (data ?? []) as ThoughtRow[];
+      // The RPC's p_filter is a `metadata @> filter` containment test and
+      // cannot express "exclude restricted", so filter it client-side using
+      // the sensitivity_tier the RPC returns.
+      const rows = ((data ?? []) as ThoughtRow[]).filter(
+        (row) => row.sensitivity_tier !== "restricted",
+      );
 
       if (rows.length === 0) {
         return toolSuccess("No matches found.", { results: [] });
@@ -915,22 +963,16 @@ server.registerTool(
       "Find thoughts related to a given thought via the knowledge graph connections.",
     inputSchema: z.object({
       thought_id: z
-        .number()
-        .int()
+        .string()
         .min(1)
-        .describe("Thought ID to find connections for"),
+        .describe("Thought ID (UUID) to find connections for"),
       limit: z.number().int().min(1).max(20).default(10).optional(),
     }),
   },
   async (params) => {
     try {
       const raw = params as Record<string, unknown>;
-      const thoughtId = asInteger(
-        raw.thought_id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
+      const thoughtId = asString(raw.thought_id, "").trim();
       const limit = asInteger(raw.limit, 10, 1, 20);
 
       if (!thoughtId) {
@@ -1549,6 +1591,453 @@ server.registerTool(
       });
     } catch (error) {
       console.error("ops_source_monitor failed", error);
+      return toolFailure(String(error));
+    }
+  },
+);
+
+// ── 14. search (ChatGPT/connector compatibility) ────────────────────────
+
+server.registerTool(
+  "search",
+  {
+    title: "Search Open Brain",
+    description:
+      "Search Open Brain memories by meaning. Read-only compatibility tool for connector surfaces (e.g. ChatGPT deep research / company knowledge) that expect a `search` tool returning {id, title, url}.",
+    annotations: { readOnlyHint: true },
+    inputSchema: z.object({
+      query: z.string().describe("The search query to run against Open Brain thoughts"),
+    }),
+  },
+  async (params) => {
+    try {
+      const query = asString((params as Record<string, unknown>).query, "").trim();
+      if (!query) return toolFailure("query is required");
+
+      const qEmb = await embedText(query);
+      const { data, error } = await supabase.rpc("match_thoughts", {
+        query_embedding: qEmb,
+        match_threshold: 0.5,
+        match_count: 10,
+        filter: {},
+      });
+      if (error) return toolFailure(`Search error: ${error.message}`);
+
+      const results = ((data ?? []) as ThoughtRow[]).map((t) => ({
+        id: t.id,
+        title: thoughtTitle(t.content, t.created_at),
+        url: thoughtUrl(t.id),
+      }));
+
+      // ChatGPT expects the results serialized as JSON in the text block.
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify({ results }) }],
+        structuredContent: { results },
+      };
+    } catch (error) {
+      console.error("search failed", error);
+      return toolFailure(String(error));
+    }
+  },
+);
+
+// ── 15. fetch (ChatGPT/connector compatibility) ─────────────────────────
+
+server.registerTool(
+  "fetch",
+  {
+    title: "Fetch Open Brain Thought",
+    description:
+      "Fetch one Open Brain thought by ID (use after `search`). Read-only compatibility tool returning {id, title, text, url, metadata} for citation. Restricted thoughts are not returned.",
+    annotations: { readOnlyHint: true },
+    inputSchema: z.object({
+      id: z.string().describe("The Open Brain thought ID returned by the search tool"),
+    }),
+  },
+  async (params) => {
+    try {
+      const id = asString((params as Record<string, unknown>).id, "").trim();
+      if (!id) return toolFailure("id is required");
+
+      const { data, error } = await supabase
+        .from("thoughts")
+        .select("id, content, metadata, sensitivity_tier, created_at, updated_at")
+        .eq("id", id)
+        .single();
+      if (error || !data) {
+        return toolFailure(`Fetch error: ${error?.message ?? "thought not found"}`);
+      }
+
+      const thought = data as ThoughtRow & { updated_at?: string | null };
+      if (thought.sensitivity_tier === "restricted") {
+        return toolFailure("This thought is restricted.");
+      }
+
+      const document = {
+        id: thought.id,
+        title: thoughtTitle(thought.content, thought.created_at),
+        text: thought.content,
+        url: thoughtUrl(thought.id),
+        metadata: {
+          ...thought.metadata,
+          created_at: thought.created_at,
+          updated_at: thought.updated_at,
+        },
+      };
+
+      return {
+        content: [{ type: "text" as const, text: JSON.stringify(document) }],
+        structuredContent: document,
+      };
+    } catch (error) {
+      console.error("fetch failed", error);
+      return toolFailure(String(error));
+    }
+  },
+);
+
+// ── 16. capture_derived_thought (provenance write) ──────────────────────
+//
+// Separate from brain_capture_thought so the everyday capture hot path is
+// never touched. Runs the same enhanced pipeline (sensitivity block +
+// classification + structured columns + embedding) and additionally writes
+// the top-level provenance columns (derived_from / derivation_* / supersedes)
+// that upsert_thought does not persist.
+
+server.registerTool(
+  "capture_derived_thought",
+  {
+    title: "Capture Derived Thought",
+    description:
+      "Save a synthesized/derived artifact (digest, wiki, research summary, report) to Open Brain WITH its provenance. Use instead of brain_capture_thought ONLY when the artifact was derived from other thoughts already in the brain. Records parent thought IDs so 'why do I believe this?' and 'what uses this?' stay answerable.",
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    inputSchema: z.object({
+      content: z.string().min(1).describe(
+        "The derived artifact text — a clear, standalone statement that will make sense when retrieved later"),
+      derived_from: z.array(z.string()).optional().describe(
+        "Parent thought UUIDs this artifact was synthesized from. Non-UUID refs are moved to metadata.provenance.unresolved_refs rather than rejected"),
+      derivation_layer: z.enum(["primary", "derived"]).optional().describe(
+        "'derived' for a synthesized artifact (default when derived_from is provided)"),
+      derivation_method: z.enum(["synthesis"]).optional().describe(
+        "How it was produced. Defaults to 'synthesis' when derived_from is provided"),
+      supersedes: z.string().uuid().optional().describe(
+        "UUID of a prior thought this one replaces (e.g. a regenerated digest)"),
+    }),
+  },
+  async (params) => {
+    try {
+      const raw = params as Record<string, unknown>;
+      const content = asString(raw.content, "").trim();
+      if (!content) return toolFailure("content is required");
+
+      // Restricted content is local-only — block before any write.
+      if (detectSensitivity(content).tier === "restricted") {
+        return toolFailure(
+          "Restricted thoughts are local-only and cannot be captured through cloud MCP.",
+        );
+      }
+
+      // Partition derived_from into valid UUID parents vs. unresolved refs so
+      // a single legacy ref (e.g. "#412") never rejects the whole capture —
+      // trace_provenance casts each element ::uuid and would raise on non-UUID.
+      const UUID_RE =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const rawRefs = Array.isArray(raw.derived_from)
+        ? (raw.derived_from as unknown[]).map((r) => String(r).trim())
+        : [];
+      const derivedFrom = rawRefs.filter((r) => UUID_RE.test(r));
+      const unresolvedRefs = rawRefs.filter((r) => !UUID_RE.test(r));
+
+      const layer = (raw.derivation_layer as string | undefined) ??
+        (derivedFrom.length > 0 ? "derived" : undefined);
+      const method = (raw.derivation_method as string | undefined) ??
+        (derivedFrom.length > 0 ? "synthesis" : undefined);
+      const supersedes = raw.supersedes as string | undefined;
+
+      const hasProvenance =
+        derivedFrom.length > 0 || unresolvedRefs.length > 0 ||
+        layer !== undefined || method !== undefined || supersedes !== undefined;
+
+      // Fold a provenance mirror into metadata so it survives upsert_thought's
+      // conflict-time `metadata || EXCLUDED.metadata` merge on re-capture; the
+      // top-level columns are (over)written in the follow-up update below.
+      const provenanceMeta: Record<string, unknown> = hasProvenance
+        ? {
+            provenance: {
+              ...(derivedFrom.length ? { derived_from: derivedFrom } : {}),
+              ...(layer ? { derivation_layer: layer } : {}),
+              ...(method ? { derivation_method: method } : {}),
+              ...(supersedes ? { supersedes } : {}),
+              ...(unresolvedRefs.length ? { unresolved_refs: unresolvedRefs } : {}),
+            },
+          }
+        : {};
+
+      const prepared = await prepareThoughtPayload(content, {
+        source: "mcp",
+        metadata: provenanceMeta,
+      });
+
+      const { data, error } = await supabase.rpc("upsert_thought", {
+        p_content: prepared.content,
+        p_payload: {
+          metadata: prepared.metadata,
+          created_at: new Date().toISOString(),
+        },
+      });
+      if (error) throw new Error(`upsert_thought failed: ${error.message}`);
+      const result = data as UpsertThoughtResult | null;
+      if (!result?.id) throw new Error("upsert_thought returned no id");
+      const thoughtId = result.id;
+
+      // Single follow-up update: structured columns + embedding (upsert_thought
+      // writes none of them) AND the top-level provenance columns.
+      const patch: Record<string, unknown> = {
+        type: prepared.type,
+        source_type: prepared.source_type,
+        importance: prepared.importance,
+        quality_score: prepared.quality_score,
+        sensitivity_tier: prepared.sensitivity_tier,
+      };
+      if (safeEmbedding(prepared.embedding)) patch.embedding = prepared.embedding;
+      if (derivedFrom.length) patch.derived_from = derivedFrom;
+      if (layer) patch.derivation_layer = layer;
+      if (method) patch.derivation_method = method;
+      if (supersedes) patch.supersedes = supersedes;
+
+      const { error: patchError } = await supabase
+        .from("thoughts")
+        .update(patch)
+        .eq("id", thoughtId);
+      if (patchError) {
+        return toolFailure(
+          `Captured thought ${thoughtId}, but failed to write provenance/embedding: ${patchError.message}`,
+        );
+      }
+
+      const parts = [`Captured derived thought #${thoughtId} as ${prepared.type}`];
+      if (derivedFrom.length) parts.push(`from ${derivedFrom.length} parent(s)`);
+      if (layer) parts.push(`[layer=${layer}${method ? `, method=${method}` : ""}]`);
+      if (supersedes) parts.push(`supersedes ${supersedes}`);
+      if (unresolvedRefs.length) {
+        parts.push(
+          `— ${unresolvedRefs.length} non-UUID ref(s) moved to ` +
+          `metadata.provenance.unresolved_refs: ${unresolvedRefs.join(", ")}`);
+      }
+      return toolSuccess(parts.join(" "), {
+        thought_id: thoughtId,
+        type: prepared.type,
+        derived_from: derivedFrom,
+        derivation_layer: layer ?? null,
+        derivation_method: method ?? null,
+        supersedes: supersedes ?? null,
+        unresolved_refs: unresolvedRefs,
+      });
+    } catch (error) {
+      console.error("capture_derived_thought failed", error);
+      return toolFailure(String(error));
+    }
+  },
+);
+
+// ── 17. trace_provenance ────────────────────────────────────────────────
+//   Walk derived_from upward and return the ancestor tree.
+
+server.registerTool(
+  "trace_provenance",
+  {
+    title: "Trace Provenance",
+    description:
+      "Walk a thought's derivation chain upward — show the atomic thoughts that fed this derived thought. Returns a tree. Restricted ancestors are redacted.",
+    inputSchema: z.object({
+      thought_id: z.string().uuid().describe("UUID of the thought to trace"),
+      depth: z.number().int().min(1).max(10).optional()
+        .describe("Max ancestor levels to walk (default 3, max 10)"),
+    }),
+  },
+  async (params) => {
+    try {
+      const raw = params as Record<string, unknown>;
+      const rootId = String(raw.thought_id ?? "").trim();
+      const maxDepth = Math.min(Math.max(1, Number(raw.depth ?? 3) || 3), 10);
+      const NODE_CAP = 250;
+
+      if (!rootId) return toolFailure("thought_id is required");
+
+      // Over-fetch by one so truncation can be detected exactly.
+      const { data, error } = await supabase.rpc("trace_provenance", {
+        p_thought_id: rootId,
+        p_max_depth: maxDepth,
+        p_node_cap: NODE_CAP + 1,
+      });
+      if (error) return toolFailure(`trace_provenance failed: ${error.message}`);
+
+      type TraceRow = {
+        thought_id: string;
+        depth: number;
+        parent_id: string | null;
+        content: string | null;
+        type: string | null;
+        source_type: string | null;
+        derivation_method: string | null;
+        derivation_layer: string | null;
+        sensitivity_tier: string | null;
+        created_at: string;
+        cycle: boolean;
+        restricted: boolean;
+      };
+
+      const rawRows = (data ?? []) as TraceRow[];
+      const truncated = rawRows.length > NODE_CAP;
+      const rows = truncated ? rawRows.slice(0, NODE_CAP) : rawRows;
+
+      type Node = {
+        thought_id: string;
+        depth?: number;
+        cycle?: boolean;
+        restricted?: boolean;
+        type?: string | null;
+        source_type?: string | null;
+        derivation_method?: string | null;
+        derivation_layer?: string | null;
+        created_at?: string;
+        content_preview?: string | null;
+        parents?: Node[];
+      };
+
+      // SQL contract: anchor row has parent_id = NULL; each step row encodes
+      // the edge "parent_id (child) ← thought_id (parent)". Index child→parent
+      // ROWS so per-path depth/metadata is preserved in a DAG.
+      const anchorRow = rows.find((r) => r.thought_id === rootId && r.parent_id === null);
+      const parentRowsByChild = new Map<string, TraceRow[]>();
+      for (const r of rows) {
+        if (r.parent_id) {
+          const arr = parentRowsByChild.get(r.parent_id) ?? [];
+          arr.push(r);
+          parentRowsByChild.set(r.parent_id, arr);
+        }
+      }
+
+      if (!anchorRow) return toolFailure(`Thought ${rootId} not found`);
+
+      function buildFromRow(r: TraceRow, ancestors: Set<string>): Node {
+        const nextAncestors = new Set(ancestors);
+        nextAncestors.add(r.thought_id);
+        const parentRows = parentRowsByChild.get(r.thought_id) ?? [];
+        const parents = parentRows.map((pr) => {
+          // Ancestor-path cycle: emit a stub without recursing.
+          if (nextAncestors.has(pr.thought_id)) {
+            return { thought_id: pr.thought_id, cycle: true } as Node;
+          }
+          return buildFromRow(pr, nextAncestors);
+        });
+        return {
+          thought_id: r.thought_id,
+          depth: r.depth,
+          cycle: r.cycle,
+          restricted: r.restricted,
+          type: r.type,
+          source_type: r.source_type,
+          derivation_method: r.derivation_method,
+          derivation_layer: r.derivation_layer,
+          created_at: r.created_at,
+          content_preview: r.content ? r.content.slice(0, 200) : null,
+          parents,
+        };
+      }
+
+      const root = buildFromRow(anchorRow, new Set<string>());
+      const nodeCount = rows.length;
+      const summary =
+        `Traced provenance of ${rootId} (depth=${maxDepth}, ${nodeCount} nodes visited` +
+        (truncated ? `, truncated at node_cap=${NODE_CAP}` : "") + `).`;
+
+      let payloadText: string;
+      try {
+        payloadText = JSON.stringify({
+          tree: root,
+          node_count: nodeCount,
+          depth_limit: maxDepth,
+          node_cap: NODE_CAP,
+          truncated,
+        }, null, 2);
+      } catch (stringifyErr) {
+        console.error("trace_provenance: JSON.stringify failed", stringifyErr);
+        return toolFailure(
+          `trace_provenance: failed to serialize tree for ${rootId} ` +
+          `(${String(stringifyErr)}). The provenance graph may contain a cycle ` +
+          `the detector missed — re-run with a smaller depth or file a bug.`,
+        );
+      }
+
+      return toolSuccess(`${summary}\n\n${payloadText}`, {
+        tree: root,
+        node_count: nodeCount,
+        depth_limit: maxDepth,
+        node_cap: NODE_CAP,
+        truncated,
+      });
+    } catch (error) {
+      console.error("trace_provenance failed", error);
+      return toolFailure(String(error));
+    }
+  },
+);
+
+// ── 18. find_derivatives ────────────────────────────────────────────────
+//   Single-level reverse lookup — "what downstream thoughts cite this one?"
+
+server.registerTool(
+  "find_derivatives",
+  {
+    title: "Find Derivatives",
+    description:
+      "Find all thoughts derived from this one (single-level reverse lookup). Answers 'what uses this thought?'. Restricted-tier derivatives are always hidden.",
+    inputSchema: z.object({
+      thought_id: z.string().uuid().describe("UUID of the thought whose derivatives to find"),
+      limit: z.number().int().min(1).max(500).optional()
+        .describe("Max rows to return (default 100, max 500)"),
+    }),
+  },
+  async (params) => {
+    try {
+      const raw = params as Record<string, unknown>;
+      const id = String(raw.thought_id ?? "").trim();
+      const limit = Math.min(Math.max(1, Number(raw.limit ?? 100) || 100), 500);
+
+      if (!id) return toolFailure("thought_id is required");
+
+      const { data, error } = await supabase.rpc("find_derivatives", {
+        p_thought_id: id,
+        p_limit: limit,
+      });
+      if (error) return toolFailure(`find_derivatives failed: ${error.message}`);
+
+      type DerivativeRow = {
+        id: string;
+        content: string | null;
+        type: string | null;
+        source_type: string | null;
+        derivation_method: string | null;
+        derivation_layer: string | null;
+        sensitivity_tier: string | null;
+        created_at: string;
+      };
+
+      const rows = (data ?? []) as DerivativeRow[];
+      const summary = rows.length === 0
+        ? `No derivatives found for ${id}.`
+        : `Found ${rows.length} derivative(s) of ${id}:\n` +
+          rows.slice(0, 10).map((r) =>
+            `  ${r.id} [${r.source_type ?? "?"}] ${String(r.content ?? "").slice(0, 100)}`
+          ).join("\n");
+
+      return toolSuccess(
+        `${summary}\n\n${JSON.stringify({ derivatives: rows, count: rows.length }, null, 2)}`,
+        { derivatives: rows, count: rows.length },
+      );
+    } catch (error) {
+      console.error("find_derivatives failed", error);
       return toolFailure(String(error));
     }
   },
