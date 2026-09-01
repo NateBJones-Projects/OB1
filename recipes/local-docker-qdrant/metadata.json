@@ -1,0 +1,21 @@
+{
+  "name": "Local Docker Open Brain (Qdrant)",
+  "description": "A self-contained Docker deployment of Open Brain using local Qdrant for vector storage and AWS Bedrock for embeddings and metadata extraction. Multi-tenancy-primed with ACL enforcement — runs side-by-side with the pgvector recipe.",
+  "category": "recipes",
+  "author": {
+    "name": "Tom Otvos",
+    "github": "tomotvos"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["AWS Bedrock"],
+    "tools": ["Docker", "Docker Compose", "AWS CLI"]
+  },
+  "requires_skills": [],
+  "tags": ["qdrant", "vector-store", "mcp", "multi-tenant-primed", "docker", "local", "privacy", "aws-bedrock", "self-hosted"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-20",
+  "updated": "2026-05-20"
+}
