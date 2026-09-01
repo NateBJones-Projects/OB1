@@ -107,7 +107,7 @@ Or connect the folder to Vercel via the dashboard. Set the environment variables
 
 ### Step 5 (alternative): Deploy to Cloudflare Workers (optional)
 
-If you're already on Cloudflare for the [`open-brain-rest`](../../integrations/cloudflare-rest-worker/) gateway, you can host the dashboard on the same platform via the [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter. The older `@cloudflare/next-on-pages` adapter caps at Next 15.5.x and doesn't support this dashboard's Next 16.
+If you're already on Cloudflare for the [`open-brain-rest`](../../integrations/open-brain-rest/) gateway, you can host the dashboard on the same platform via the [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter. The older `@cloudflare/next-on-pages` adapter caps at Next 15.5.x and doesn't support this dashboard's Next 16.
 
 The repo ships the two config files this needs out of the box (`open-next.config.ts` and `wrangler.jsonc`); rename the Worker in `wrangler.jsonc` if you want something other than `ob-dashboard`.
 
@@ -147,7 +147,8 @@ The Workflow page adds a visual kanban board for managing `task` and `idea` thou
 
 ### Features
 
-- **Drag-and-drop** between status columns using @dnd-kit (touch-friendly with 200ms hold delay)
+- **Drag-and-drop** between status columns using @dnd-kit (touch-friendly with 200ms hold delay) — drop on a column or directly onto a card to insert at that position, including into full columns
+- **Drag to reorder within a column** — cards render in priority order, and dropping a card above another persists the new order via the existing `importance` field (renumbered 99→1, no schema changes)
 - **Collapsible columns** — click the arrow to collapse any column to a slim vertical bar (persisted in localStorage)
 - **Auto-adjusting widths** — expanded columns share available space equally, no horizontal scrollbar
 - **Inline editing** — tap a card to open the edit modal (status, priority, type, content)
@@ -275,3 +276,5 @@ Do not enable `OB1_DEMO_AUTH_BYPASS` in shared previews or production. It exists
 4. **Search returns no results** — Ensure your thoughts have embeddings. Semantic search requires the `embedding` column to be populated. Run an embedding backfill if needed.
 
 5. **Ingest page shows "extracting" forever** — Check that the `smart-ingest` Edge Function is deployed. The ingest feature depends on a separate Edge Function for document extraction.
+
+6. **Kanban card order reverts after a drag** — Reordering persists by rewriting `importance` on the repositioned cards (one `/api/kanban/update` call per changed card). If the order snaps back with a "Failed to update board. Reverted." banner, one of those calls failed — check that your REST gateway is reachable and that the [workflow-status schema](../../schemas/workflow-status/) migration has been applied. Note that card priority dots and column position are the same value: dragging a card to the top of a column raises its importance.
