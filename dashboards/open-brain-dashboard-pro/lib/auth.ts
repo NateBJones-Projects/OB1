@@ -6,6 +6,14 @@ export interface SessionData {
   apiKey?: string;
   loggedIn?: boolean;
   restrictedUnlocked?: boolean;
+  /** Cached at login: does this brain expose the optional /crm surface? */
+  crmEnabled?: boolean;
+  /**
+   * Cached at login: does this brain expose the optional /wiki surface?
+   * Undefined on cookies minted before this field existed — treat as "unknown"
+   * (never assume true) everywhere it's read.
+   */
+  wikiEnabled?: boolean;
 }
 
 export class AuthError extends Error {

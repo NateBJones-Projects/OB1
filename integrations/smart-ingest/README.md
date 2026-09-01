@@ -173,7 +173,7 @@ You should get a response showing extracted thoughts and their reconciliation ac
 ```json
 {
   "status": "dry_run_complete",
-  "job_id": 1,
+  "job_id": "123e4567-e89b-12d3-a456-426614174000",
   "extracted_count": 3,
   "added_count": 3,
   "skipped_count": 0,
@@ -189,7 +189,7 @@ Once you're satisfied with the dry-run results, commit them to the database:
 curl -X POST "https://<your-project-ref>.supabase.co/functions/v1/smart-ingest/execute" \
   -H "Content-Type: application/json" \
   -H "x-brain-key: your-access-key" \
-  -d '{ "job_id": 1 }'
+  -d '{ "job_id": "123e4567-e89b-12d3-a456-426614174000" }'
 ```
 
 ### 5. Verify Results
@@ -237,7 +237,7 @@ Execute a previously dry-run job.
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `job_id` | number | ID of the dry-run job to execute |
+| `job_id` | string (UUID) | ID of the dry-run job to execute |
 | `skip_classification` | boolean | Override classification behavior for this execution |
 
 ## How It Connects to Other Components
