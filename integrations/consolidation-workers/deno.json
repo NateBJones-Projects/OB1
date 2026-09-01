@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "check": "deno check bio/index.ts metadata-norm/index.ts"
+    "check": "deno check bio/index.ts metadata-norm/index.ts wiki-profile/index.ts"
   },
   "compilerOptions": {
     "strict": true
