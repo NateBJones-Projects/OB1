@@ -120,14 +120,23 @@ After the migration you have: `agent_decision_ledger` (one row per decision memo
 The ranking formula, per row:
 
 ```text
-score = 0.45 * relevance       (cosine similarity, or scaled full-text rank, or 0)
+score = 0.45 * relevance       (cosine similarity, or saturated full-text rank, or 0)
       + 0.25 * importance      (ledger value, initialized from confidence)
-      + 0.15 * recency         (exp(-step_distance / 120), or wall-clock decay)
-      + 0.15 * dependency      (live decisions depending on this one, capped at 3)
+      + 0.15 * recency         (exp(-step_distance / 30))
+      + 0.15 * dependency      (live decisions depending on this one, saturating at 3)
       - 0.30 if not active     (only reachable with p_include_superseded)
 ```
 
-All weights and half-lives are function parameters — tune them per brain, and treat the view in Step 4 as the scoreboard for whether your tuning helps.
+Every component is normalized into `[0,1]` before it is weighted, so the weights above are the whole story about how far each signal can move a row. Each returned row also carries `relevance_source` — `cosine`, `fts`, or `none` — so a corpus that is only partly embedded shows up in the trace instead of quietly ranking on structure alone.
+
+Four of those properties were measured rather than assumed, on a 1024-dim port of this schema running under a local agent brain:
+
+- **The full-text query is disjunctive.** `plainto_tsquery` and `websearch_to_tsquery` AND their terms together, so a natural-language question matches a row only if that one row contains every content word in the question — 0 of 15 rows matched that way, which left the FTS arm (and 45% of the score) dead for exactly the local setup it exists to serve. The query's lexemes are ORed instead: same configuration, same stemming and stopword list, one operator changed.
+- **The full-text rank saturates rather than clipping.** `LEAST(ts_rank_cd * 10, 1.0)` pins every non-trivial match to exactly `1.0`, after which recency alone decides the order; `x / (1 + x)` is monotone over the whole range and bounded by 1.
+- **Cosine similarity is clamped.** It is `-1` on opposed vectors, not 0, and an unclamped negative relevance quietly subtracts from the blend.
+- **The step half-life is 30, not 120.** `exp(-d/120)` spreads 0.0165 of the score across 15 steps — inert at session scale. Step distance is measured from `max(p_current_step, the stream's own newest step)`, which is defined for every row, so a caller that passes a stale step or none at all no longer floors every row to a recency of `1.0`.
+
+All weights, the half-life, and the dependency saturation point are function parameters — tune them per brain, and treat the view in Step 4 as the scoreboard for whether your tuning helps.
 
 ## Troubleshooting
 
@@ -138,7 +147,7 @@ Solution: Run [`schemas/agent-memory/schema.sql`](../agent-memory/schema.sql) fi
 Solution: Only `memory_type = 'decision'` rows enroll. Check that your write-back payload puts decision text in the `decisions` array (the API maps it to that type), and that the trigger `trg_agent_decision_ledger_enroll` exists on `agent_memories`.
 
 **Issue: `match_decision_ledger` returns rows but relevance is always 0**
-Solution: You called it with neither `p_query_embedding` nor `p_query`. Pass the raw query text at minimum — the full-text fallback needs it. Ranking still works (importance/recency/structure), which is also the correct behavior for "no-query" core recall.
+Solution: Check `relevance_source` on the returned rows. `none` means you called it with neither `p_query_embedding` nor `p_query` — pass the raw query text at minimum, since the full-text fallback needs it. (Ranking still works on importance/recency/structure, which is also the correct behavior for "no-query" core recall.) `fts` with a 0 relevance means the query reduced to stopwords, or none of its lexemes appear in the ledger text. A mix of `cosine` and `fts` across one result set means part of your corpus has no embedding on its linked thought.
 
 **Issue: two concurrent writers produced duplicate step_index values**
 Solution: The max+1 fallback assumes a single writer per `(workspace, task)` stream. Concurrent writers should pass explicit `metadata.step_index` values from the agent loop's own step counter. Duplicate indexes don't break ranking; they only blur step-distance recency.

@@ -178,34 +178,102 @@ CREATE TRIGGER trg_agent_decision_ledger_updated_at
 --          + w_recency     * exp(-step_distance / half_life_steps)
 --          + w_dependency  * inbound_live_dependency_degree
 --
+--    Every component is normalised into [0,1] before it is weighted,
+--    so the weights above are the whole story about how far each
+--    signal can move a row.
+--
 --    Superseded/stale/rejected decisions are excluded by default
 --    (pass p_include_superseded => true for eval runs that need
 --    them). Pinned decisions always sort first.
 --
 --    Relevance fallback order:
 --      1. p_query_embedding provided and the linked thought has an
---         embedding  -> cosine similarity
---      2. p_query text provided -> websearch full-text rank (scaled
---         into the 0-1 range) — this is what makes the ledger usable
---         on a fully local stack with no embedding service
+--         embedding  -> cosine similarity, clamped into [0,1]
+--      2. p_query text provided -> full-text rank over a disjunctive
+--         tsquery, saturated into the 0-1 range — this is what makes
+--         the ledger usable on a fully local stack with no embedding
+--         service at all
 --      3. neither -> 0 (rank purely on importance/recency/structure)
+--
+--    Each row reports which of the three produced its relevance, in
+--    relevance_source, so a partly-embedded corpus is visible in the
+--    trace instead of silently ranking on structure alone.
+--
+--    Four of the properties below were measured rather than assumed,
+--    on a 1024-dim port of this schema running under a local agent
+--    brain:
+--
+--      * The tsquery is disjunctive. plainto_tsquery and
+--        websearch_to_tsquery AND their terms together, so a
+--        natural-language question matches a row only when that one
+--        row contains every content word in the question — 0 of 15
+--        rows matched a question that way, which left the FTS arm,
+--        and with it 45% of the score, dead for exactly the local
+--        setup it exists to serve. The query's lexemes are ORed
+--        instead: same text search configuration, same stemming and
+--        stopword list, one operator changed. An all-stopword query
+--        reduces to the empty tsquery, which ranks every row 0 — a
+--        quiet no-match, not an error.
+--
+--      * The full-text rank saturates instead of clipping.
+--        LEAST(ts_rank_cd * 10, 1.0) pins every non-trivial match to
+--        exactly 1.0: a row matching four query terms and a row
+--        matching one both scored 1.0, and recency alone decided the
+--        order. x / (1 + x) is monotone over the whole range and
+--        bounded by 1, and keeps the same scale constant.
+--
+--      * Cosine similarity is clamped. It is -1 on opposed vectors,
+--        not 0, and an unclamped negative relevance quietly subtracts
+--        from the blend.
+--
+--      * The step half-life is 30, not 120. exp(-d/120) spreads
+--        0.0165 of the score across 15 steps, which is inert at
+--        session scale. Distance is measured from max(the caller's
+--        step, the stream's own newest step), so a caller that passes
+--        a stale step — or none at all — no longer floors every row
+--        to a recency of 1.0. That anchor is defined for every row,
+--        which is what let the wall-clock fallback, and its
+--        p_half_life_days parameter, go away entirely.
+--
+--    p_dependency_saturation is the in-degree at which the dependency
+--    term reaches 1. It is deliberately a constant rather than the
+--    candidate set's own maximum degree: normalising by the maximum
+--    makes a row's score depend on what else happened to match, and
+--    scored the same decision 0.333 and 0.5 across two queries.
 -- ------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION public.match_decision_ledger(
-  p_workspace_id        TEXT,
-  p_query               TEXT              DEFAULT NULL,
-  p_query_embedding     vector(1536)      DEFAULT NULL,
-  p_project_id          TEXT              DEFAULT NULL,
-  p_task_id             TEXT              DEFAULT NULL,
-  p_current_step        INTEGER           DEFAULT NULL,
-  p_match_count         INTEGER           DEFAULT 10,
-  p_w_similarity        FLOAT             DEFAULT 0.45,
-  p_w_importance        FLOAT             DEFAULT 0.25,
-  p_w_recency           FLOAT             DEFAULT 0.15,
-  p_w_dependency        FLOAT             DEFAULT 0.15,
-  p_half_life_steps     FLOAT             DEFAULT 120.0,
-  p_half_life_days      FLOAT             DEFAULT 30.0,
-  p_include_superseded  BOOLEAN           DEFAULT false
+-- Dropping every existing overload by name, rather than relying on
+-- CREATE OR REPLACE, is what keeps re-running this file from leaving a
+-- superseded signature behind for PostgREST to choose between.
+DO $$
+DECLARE
+  v_fn RECORD;
+BEGIN
+  FOR v_fn IN
+    SELECT p.oid::regprocedure AS signature
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'match_decision_ledger'
+  LOOP
+    EXECUTE format('DROP FUNCTION %s', v_fn.signature);
+  END LOOP;
+END $$;
+
+CREATE FUNCTION public.match_decision_ledger(
+  p_workspace_id          TEXT,
+  p_query                 TEXT            DEFAULT NULL,
+  p_query_embedding       vector(1536)    DEFAULT NULL,
+  p_project_id            TEXT            DEFAULT NULL,
+  p_task_id               TEXT            DEFAULT NULL,
+  p_current_step          INTEGER         DEFAULT NULL,
+  p_match_count           INTEGER         DEFAULT 10,
+  p_w_similarity          FLOAT           DEFAULT 0.45,
+  p_w_importance          FLOAT           DEFAULT 0.25,
+  p_w_recency             FLOAT           DEFAULT 0.15,
+  p_w_dependency          FLOAT           DEFAULT 0.15,
+  p_half_life_steps       FLOAT           DEFAULT 30.0,
+  p_dependency_saturation FLOAT           DEFAULT 3.0,
+  p_include_superseded    BOOLEAN         DEFAULT false
 )
 RETURNS TABLE (
   memory_id        UUID,
@@ -217,6 +285,7 @@ RETURNS TABLE (
   pinned           BOOLEAN,
   lifecycle_status TEXT,
   relevance        FLOAT,
+  relevance_source TEXT,
   recency          FLOAT,
   dependency_boost FLOAT,
   ranking_score    FLOAT
@@ -224,67 +293,51 @@ RETURNS TABLE (
 LANGUAGE plpgsql
 STABLE
 AS $$
+DECLARE
+  v_tsquery tsquery;
 BEGIN
-  IF p_half_life_steps <= 0.0 THEN p_half_life_steps := 120.0; END IF;
-  IF p_half_life_days  <= 0.0 THEN p_half_life_days  := 30.0;  END IF;
+  IF p_half_life_steps IS NULL OR p_half_life_steps <= 0.0 THEN
+    p_half_life_steps := 30.0;
+  END IF;
+  IF p_dependency_saturation IS NULL OR p_dependency_saturation <= 0.0 THEN
+    p_dependency_saturation := 3.0;
+  END IF;
   IF p_match_count IS NULL OR p_match_count < 1 THEN p_match_count := 10; END IF;
 
+  -- Built once per call, not once per row. quote_literal keeps a lexeme
+  -- containing a quote or a backslash from ending the tsquery early.
+  IF p_query IS NOT NULL AND length(trim(p_query)) > 0 THEN
+    SELECT COALESCE(string_agg(quote_literal(lexeme), ' | '), '')::tsquery
+      INTO v_tsquery
+      FROM unnest(tsvector_to_array(to_tsvector('english', p_query))) AS lexeme;
+  END IF;
+
   RETURN QUERY
-  WITH scored AS (
+  WITH candidate AS (
     SELECT
-      m.id                                            AS s_memory_id,
-      m.summary                                       AS s_summary,
-      m.content                                       AS s_content,
-      l.rationale                                     AS s_rationale,
-      l.step_index                                    AS s_step_index,
-      l.importance                                    AS s_importance,
-      l.pinned                                        AS s_pinned,
-      m.lifecycle_status                              AS s_lifecycle_status,
-      -- relevance: vector similarity when available, FTS fallback otherwise
-      COALESCE(
-        CASE
-          WHEN p_query_embedding IS NOT NULL AND t.embedding IS NOT NULL
-            THEN (1 - (t.embedding <=> p_query_embedding))::FLOAT
-          WHEN p_query IS NOT NULL AND length(trim(p_query)) > 0
-            -- ts_rank_cd emits small raw values (~0.01-0.1); scale x10
-            -- so a solid text match lands in the same 0-1 range as
-            -- cosine similarity and can actually move the blend.
-            THEN LEAST(
-              ts_rank_cd(
-                to_tsvector('english', m.content || ' ' || COALESCE(l.rationale, '')),
-                websearch_to_tsquery('english', p_query)
-              )::FLOAT * 10.0,
-              1.0
-            )
-          ELSE 0.0
-        END,
-        0.0
-      ) AS s_relevance,
-      -- recency: step distance when the caller knows its step,
-      -- wall-clock decay otherwise
+      m.id                                            AS c_memory_id,
+      m.summary                                       AS c_summary,
+      m.content                                       AS c_content,
+      l.rationale                                     AS c_rationale,
+      l.step_index                                    AS c_step_index,
+      l.importance                                    AS c_importance,
+      l.pinned                                        AS c_pinned,
+      m.lifecycle_status                              AS c_lifecycle_status,
+      t.embedding                                     AS c_embedding,
+      -- ts_rank_cd emits small raw values (~0.01-0.1); the x10 scale
+      -- puts a solid text match in the same range as cosine similarity.
+      -- Applied once per row because the saturating transform below
+      -- needs the value twice, and Postgres does not fold two
+      -- ts_rank_cd() calls into a single evaluation.
       CASE
-        WHEN p_current_step IS NOT NULL
-          THEN exp(
-            -GREATEST((p_current_step - l.step_index)::FLOAT, 0.0)
-            / p_half_life_steps
-          )::FLOAT
-        ELSE exp(
-          -GREATEST(extract(epoch FROM (now() - l.created_at)) / 86400.0, 0.0)
-          / p_half_life_days
-        )::FLOAT
-      END AS s_recency,
-      -- dependency degree: how many live decisions depend on this one
-      LEAST(
-        (
-          SELECT COUNT(*)
-          FROM public.agent_decision_edges e
-          JOIN public.agent_memories fm ON fm.id = e.from_memory_id
-          WHERE e.to_memory_id = m.id
-            AND e.relation = 'depends_on'
-            AND fm.lifecycle_status = 'active'
-        )::FLOAT / 3.0,
-        1.0
-      ) AS s_dependency_boost
+        WHEN v_tsquery IS NULL THEN NULL
+        ELSE 10.0 * ts_rank_cd(
+               to_tsvector('english', m.content || ' ' || COALESCE(l.rationale, '')),
+               v_tsquery)::FLOAT
+      END                                             AS c_scaled_fts_rank,
+      -- The recency anchor is per stream: a step distance measured
+      -- across two tasks is not a distance at all.
+      MAX(l.step_index) OVER (PARTITION BY l.task_id) AS c_stream_max_step
     FROM public.agent_decision_ledger l
     JOIN public.agent_memories m ON m.id = l.memory_id
     LEFT JOIN public.thoughts t ON t.id = m.thought_id
@@ -295,36 +348,82 @@ BEGIN
         p_include_superseded
         OR m.lifecycle_status = 'active'
       )
+  ),
+  scored AS (
+    SELECT
+      c.*,
+      -- Which arm produced the relevance, so a corpus that is only
+      -- partly embedded is visible rather than silent.
+      CASE
+        WHEN p_query_embedding IS NOT NULL AND c.c_embedding IS NOT NULL THEN 'cosine'
+        WHEN v_tsquery IS NOT NULL THEN 'fts'
+        ELSE 'none'
+      END AS c_relevance_source,
+      CASE
+        WHEN p_query_embedding IS NOT NULL AND c.c_embedding IS NOT NULL
+          THEN LEAST(GREATEST((1 - (c.c_embedding <=> p_query_embedding))::FLOAT, 0.0), 1.0)
+        WHEN v_tsquery IS NOT NULL
+          -- Saturating, not clipping. GREATEST also folds a NULL rank
+          -- to 0 rather than letting it poison the score.
+          THEN LEAST(GREATEST(
+                 c.c_scaled_fts_rank / (1.0 + c.c_scaled_fts_rank),
+                 0.0), 1.0)
+        ELSE 0.0
+      END AS c_relevance,
+      -- GREATEST ignores NULL arguments, so a caller that passes no
+      -- step leaves the stream's newest step standing on its own; the
+      -- outer GREATEST floors the distance at 0 so a stale caller step
+      -- cannot make it negative.
+      exp(
+        -GREATEST(
+           GREATEST(p_current_step, c.c_stream_max_step) - c.c_step_index,
+           0)::FLOAT
+        / p_half_life_steps
+      )::FLOAT AS c_recency,
+      -- dependency degree: how many live decisions depend on this one
+      LEAST(
+        GREATEST((
+          SELECT COUNT(*)
+          FROM public.agent_decision_edges e
+          JOIN public.agent_memories fm ON fm.id = e.from_memory_id
+          WHERE e.to_memory_id = c.c_memory_id
+            AND e.relation = 'depends_on'
+            AND fm.lifecycle_status = 'active'
+        )::FLOAT / p_dependency_saturation, 0.0),
+        1.0
+      ) AS c_dependency_boost
+    FROM candidate c
   )
   SELECT
-    s.s_memory_id,
-    s.s_summary,
-    s.s_content,
-    s.s_rationale,
-    s.s_step_index,
-    s.s_importance,
-    s.s_pinned,
-    s.s_lifecycle_status,
-    s.s_relevance,
-    s.s_recency,
-    s.s_dependency_boost,
+    s.c_memory_id,
+    s.c_summary,
+    s.c_content,
+    s.c_rationale,
+    s.c_step_index,
+    s.c_importance,
+    s.c_pinned,
+    s.c_lifecycle_status,
+    s.c_relevance,
+    s.c_relevance_source,
+    s.c_recency,
+    s.c_dependency_boost,
     (
-      p_w_similarity * s.s_relevance
-      + p_w_importance * s.s_importance::FLOAT
-      + p_w_recency    * s.s_recency
-      + p_w_dependency * s.s_dependency_boost
+      p_w_similarity * s.c_relevance
+      + p_w_importance * LEAST(GREATEST(s.c_importance::FLOAT, 0.0), 1.0)
+      + p_w_recency    * s.c_recency
+      + p_w_dependency * s.c_dependency_boost
       -- non-active rows (only reachable with p_include_superseded)
       -- carry an explicit penalty so eval runs can still rank them
-      + CASE WHEN s.s_lifecycle_status <> 'active' THEN -0.30 ELSE 0.0 END
+      + CASE WHEN s.c_lifecycle_status <> 'active' THEN -0.30 ELSE 0.0 END
     )::FLOAT AS ranking_score
   FROM scored s
-  ORDER BY s.s_pinned DESC, ranking_score DESC, s.s_step_index DESC
+  ORDER BY s.c_pinned DESC, ranking_score DESC, s.c_step_index DESC
   LIMIT p_match_count;
 END;
 $$;
 
 COMMENT ON FUNCTION public.match_decision_ledger IS
-  'Ranked recall over the decision ledger. score = w_sim*relevance + w_imp*importance + w_rec*exp(-step_distance/half_life) + w_dep*dependency_degree. Vector similarity when an embedding is passed; websearch FTS fallback when only text is passed (fully local operation). Pinned rows first. Non-active decisions excluded unless p_include_superseded.';
+  'Ranked recall over the decision ledger. score = w_sim*relevance + w_imp*importance + w_rec*exp(-step_distance/half_life_steps) + w_dep*dependency_degree, every component clamped into [0,1] before it is weighted, non-active rows penalised 0.30 when admitted. Relevance is clamped cosine similarity when an embedding is passed and the row is embedded, a saturated disjunctive full-text rank when only query text is passed (fully local operation), 0 otherwise — reported per row as relevance_source. Pinned rows first. Non-active decisions excluded unless p_include_superseded.';
 
 -- ------------------------------------------------------------
 -- 5. Recall bookkeeping + usage feedback
