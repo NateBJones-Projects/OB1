@@ -1,0 +1,57 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dashboard: dev",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/dashboards/open-brain-dashboard-next"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "next",
+        "pattern": {
+          "regexp": "^(.*)$",
+          "message": 1
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Ready in|Local:"
+        }
+      }
+    },
+    {
+      "label": "Dashboard: lint",
+      "type": "shell",
+      "command": "npm run lint",
+      "options": {
+        "cwd": "${workspaceFolder}/dashboards/open-brain-dashboard-next"
+      },
+      "problemMatcher": "$eslint-stylish"
+    },
+    {
+      "label": "Dashboard: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/dashboards/open-brain-dashboard-next",
+        "env": {
+          "SESSION_SECRET": "local-vscode-build-only-please-replace-1234567890",
+          "NEXT_PUBLIC_API_URL": "http://localhost:54321/functions/v1/open-brain-rest"
+        }
+      },
+      "problemMatcher": "$tsc"
+    },
+    {
+      "label": "Dashboard: install",
+      "type": "shell",
+      "command": "npm install",
+      "options": {
+        "cwd": "${workspaceFolder}/dashboards/open-brain-dashboard-next"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

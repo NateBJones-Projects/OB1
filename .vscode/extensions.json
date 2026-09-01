@@ -1,0 +1,16 @@
+{
+  "recommendations": [
+    "denoland.vscode-deno",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "svelte.svelte-vscode",
+    "ms-playwright.playwright",
+    "github.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "mikestead.dotenv",
+    "yzhang.markdown-all-in-one",
+    "bierner.markdown-mermaid",
+    "streetsidesoftware.code-spell-checker"
+  ]
+}
