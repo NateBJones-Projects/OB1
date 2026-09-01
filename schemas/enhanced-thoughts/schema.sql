@@ -25,8 +25,14 @@ CREATE INDEX IF NOT EXISTS idx_thoughts_source_type ON thoughts (source_type);
 CREATE INDEX IF NOT EXISTS idx_thoughts_status ON thoughts (status) WHERE status IS NOT NULL;
 
 -- Full-text search index (speeds up search_thoughts_text)
+-- Partial: skip any row whose content exceeds Postgres's ~1MB tsvector cap.
+-- to_tsvector() raises "ERROR 54000: string is too long for tsvector" on larger
+-- input, which aborts the entire index build; the partial predicate excludes such
+-- rows so the build always succeeds. search_thoughts_text carries the matching
+-- octet_length guard so it stays consistent with this predicate and can use the index.
 CREATE INDEX IF NOT EXISTS idx_thoughts_content_tsvector
-  ON thoughts USING gin (to_tsvector('simple', coalesce(content, '')));
+  ON thoughts USING gin (to_tsvector('simple', coalesce(content, '')))
+  WHERE octet_length(coalesce(content, '')) < 977000;
 
 -- ============================================================
 -- 2. FULL-TEXT SEARCH RPC
@@ -71,6 +77,9 @@ BEGIN
     FROM public.thoughts t
     CROSS JOIN query_input q
     WHERE q.raw_query <> ''
+      -- Skip rows over the ~1MB tsvector cap; also matches the partial index predicate
+      -- so this CTE can use idx_thoughts_content_tsvector.
+      AND octet_length(coalesce(t.content, '')) < 977000
       AND to_tsvector('simple', coalesce(t.content, '')) @@ q.ts_query
       AND t.metadata @> coalesce(p_filter, '{}'::jsonb)
     LIMIT 2000
@@ -81,6 +90,8 @@ BEGIN
     FROM public.thoughts t
     CROSS JOIN query_input q
     WHERE q.raw_query <> ''
+      -- Skip rows over the ~1MB tsvector cap (the ranked CTE re-computes to_tsvector on hits).
+      AND octet_length(coalesce(t.content, '')) < 977000
       AND (SELECT count(*) FROM tsvector_hits) < (p_limit + p_offset)
       AND t.content ILIKE '%' || q.raw_query || '%'
       AND t.metadata @> coalesce(p_filter, '{}'::jsonb)
