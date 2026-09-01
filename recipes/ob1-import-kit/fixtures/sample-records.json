@@ -1,0 +1,28 @@
+[
+  {
+    "id": "chatgpt-export-001",
+    "content": "Chose PostgreSQL for the reporting service because relational joins and transactional consistency mattered more than raw write throughput.",
+    "source": "chatgpt",
+    "source_label": "ChatGPT export",
+    "source_path": "chatgpt-export/conversations.json",
+    "created_at": "2025-09-15T14:22:00Z",
+    "type": "decision",
+    "topics": ["database", "architecture"],
+    "confidence": "firm"
+  },
+  {
+    "id": "obsidian-home-maintenance",
+    "text": "Replace HVAC filters quarterly and keep receipts in the home maintenance folder.",
+    "source_type": "obsidian",
+    "sourceLabel": "House vault",
+    "path": "Projects/Home Maintenance.md",
+    "timestamp": "2025-12-01T09:00:00Z",
+    "type": "task",
+    "topics": ["home", "maintenance"]
+  },
+  {
+    "content": "Use dry-run import checks before writing any migrated source data into Open Brain.",
+    "source": "manual",
+    "source_label": "Operator notes"
+  }
+]
