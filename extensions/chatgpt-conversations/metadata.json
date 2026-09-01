@@ -1,0 +1,23 @@
+{
+  "name": "ChatGPT Conversation History",
+  "description": "Browse and search imported ChatGPT conversations with pyramid summaries. List by date/type/topic or semantic search over 128w summary embeddings.",
+  "category": "extensions",
+  "author": {
+    "name": "Derek Gourlay",
+    "github": "dgourlay"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Supabase CLI"],
+    "recipes": ["chatgpt-conversation-import"]
+  },
+  "requires_primitives": ["deploy-edge-function", "remote-mcp"],
+  "learning_order": 7,
+  "tags": ["chatgpt", "conversations", "search", "history", "semantic-search"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-04-09",
+  "updated": "2026-04-09"
+}
