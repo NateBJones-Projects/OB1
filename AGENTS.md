@@ -62,12 +62,12 @@ DESCRIBE THE EXACT WORK.
 
 ## Tracker and repository hygiene
 
-Standing practice (Jonathan, 2026-08-30): the ticket board and the branch list must describe reality, so nobody starts a work session by cleaning up.
+Standing practice (Jonathan, 2026-08-30; hardened 2026-09-02): the ticket board and the branch list must describe reality, and no issue lives forever as open.
 
-- At the end of every substantial working session — and always before marking a carrier issue `Done` — audit the project's open Linear issues against what actually shipped.
-- Close as `Done` any issue whose deliverable now objectively exists, with a one-line evidence comment naming the merged pull request or the artifact.
-- Cancel any issue whose subject was cut or superseded by a recorded decision, with a one-line comment naming that decision. When a parent's children split between delivered and superseded, say which went where in one parent comment.
-- An issue that is merely old is not stale; an issue that no longer describes work anyone intends is. When ownership of a lane is unclear, leave the lane and flag it to its owner instead of judging it.
+- Every issue you open has an assignee and a due date no more than 30 days out. The due date is the review-by date, not a delivery promise.
+- An issue with no activity (state change, informative comment, or linked PR) for 14 days gets a triage comment from whoever opened or last touched it: still intended, what blocks it, new review-by date. At 30 days the opener resolves it: `Done` with one-line evidence, `Canceled` naming the superseding decision, or reassigned with a comment naming the new owner and why. "Parked" is not a state.
+- At the end of every substantial working session, and always before marking a carrier issue `Done`, audit the project's open Linear issues against what actually shipped. Close as `Done` with the merged pull request or artifact named; cancel with the decision named; when a parent's children split between delivered and superseded, say which went where in one parent comment.
+- An issue that is merely old is not stale; an issue that no longer describes work anyone intends is. Issues assigned to Jonathan: agents move them to `Done` only with shipped evidence and never cancel them — flag them instead. Issues in state `Standing` are versioned standing instructions: exempt from the clock, re-verified when their version changes. When ownership of a lane is unclear, leave the lane and flag it to its owner.
+- Log every Linear create, update, comment, or close you make as one row in the fleet `linear_ticket_log` table.
 - Delete merged branches, local and remote, after every merge (`git push origin --delete BRANCH`, then `git remote prune origin`). Close superseded pull requests with a comment saying what replaced them.
 - Keep large binaries out of git history: recordings, exports, and other heavy artifacts go to Agent Drop (or another owned store) with the link committed in their place.
-
