@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/natebjones-projects-ob1-badge.png)](https://mseep.ai/app/natebjones-projects-ob1)
+
 <p align="center">
   <img src=".github/ob1-logo-wide.png" alt="Open Brain" width="600">
 </p>
