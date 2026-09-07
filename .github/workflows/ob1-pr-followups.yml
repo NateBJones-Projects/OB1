@@ -75,12 +75,14 @@ jobs:
             const reportDir = path.join(process.env.RUNNER_TEMP, 'ob1-gate-report');
             const contextFile = path.join(reportDir, 'ob1-review-context.json');
             const report = JSON.parse(fs.readFileSync(contextFile, 'utf8'));
-            // Fork workflow_run payloads can omit pull_requests. Resolve by the
-            // GitHub-reported commit, never by a PR number from the artifact.
-            const candidates = await github.paginate(
-              github.rest.repos.listPullRequestsAssociatedWithCommit,
-              { owner, repo, commit_sha: run.head_sha, per_page: 100 }
-            );
+            // Fork runs can omit pull_requests, and commit lookup can return no
+            // association. Resolve the API-reported fork/branch, then pin its SHA.
+            const forkOwner = run.head_repository?.owner?.login;
+            if (!forkOwner || !run.head_branch) throw new Error('Missing source identity');
+            const candidates = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open',
+              head: `${forkOwner}:${run.head_branch}`, per_page: 100
+            });
             const matches = candidates.filter(pr => pr.state === 'open' &&
               pr.head.sha === run.head_sha && pr.head.ref === run.head_branch &&
               pr.head.repo?.id === run.head_repository?.id &&
