@@ -53,6 +53,11 @@ SKIP these entirely (return empty):
 - YouTube video watching without a clear research pattern
 - Routine navigation to familiar places
 
+Gemini Apps entries may include Gemini's answer beneath the prompt. Use it to
+understand what was actually learned or decided — but facts that appear only
+in an answer are AI-generated and unverified, so attribute them ("Gemini
+answered/suggested ...") rather than stating them as established truth.
+
 Each thought must be:
 - A clear, standalone statement (makes sense without seeing the raw searches)
 - Written in first person
@@ -258,13 +263,59 @@ function filterActivities(activities, category) {
   });
 }
 
+// ─── Gemini answer extraction ───────────────────────────────────────────────
+// Gemini Apps records carry Gemini's answer as HTML in `safeHtmlItem`
+// ([{"html": "<p>..."}]). Contrary to older documentation, Takeout does NOT
+// export prompts only — most prompt records include the response (verified
+// against a real export, July 2026: 1,161 of 1,640 records). Strip the HTML
+// to plain text so day summaries can see both sides of the exchange.
+
+const ANSWER_MAX_CHARS = 1000;
+
+const HTML_ENTITIES = {
+  "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"', "&#39;": "'", "&nbsp;": " ",
+};
+
+function htmlToText(html) {
+  return html
+    .replace(/<(script|style)\b[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<li\b[^>]*>/gi, "\n- ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|ul|ol|table|tr|h[1-6]|pre|blockquote)>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(amp|lt|gt|quot|#39|nbsp);/g, m => HTML_ENTITIES[m])
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/[ \t]+/g, " ")
+    .replace(/\s*\n\s*/g, "\n")
+    .trim();
+}
+
+function extractGeminiAnswer(activity) {
+  const items = activity.safeHtmlItem;
+  if (!Array.isArray(items)) return "";
+  const html = items
+    .map(it => (it && typeof it.html === "string") ? it.html : (typeof it === "string" ? it : ""))
+    .filter(Boolean)
+    .join("\n");
+  if (!html) return "";
+  let text = htmlToText(html);
+  if (text.length > ANSWER_MAX_CHARS) {
+    text = text.slice(0, ANSWER_MAX_CHARS) + " [... answer trimmed ...]";
+  }
+  return text;
+}
+
 function groupByDay(activities) {
   const byDay = {};
   for (const a of activities) {
     const time = typeof a.time === "string" ? a.time : "";
     const day = time.slice(0, 10) || "unknown";
     if (!byDay[day]) byDay[day] = [];
-    byDay[day].push(typeof a.title === "string" ? a.title : String(a.title || ""));
+    let entry = typeof a.title === "string" ? a.title : String(a.title || "");
+    // Only Gemini Apps records have safeHtmlItem; no-op for other categories.
+    const answer = extractGeminiAnswer(a);
+    if (answer) entry += `\n   Gemini's answer: ${answer}`;
+    byDay[day].push(entry);
   }
   return byDay;
 }
@@ -273,7 +324,10 @@ function groupByDay(activities) {
 
 async function summarizeDay(category, day, entries) {
   const transcript = `Google ${category} activity for ${day}:\n\n${entries.join("\n")}`;
-  const truncated = transcript.slice(0, 6000);
+  // Gemini Apps entries carry answers, so give them more room before the cut
+  // (~3.4k tokens at 12k chars — still well under a cent with gpt-4o-mini).
+  const maxChars = category === "Gemini Apps" ? 12000 : 6000;
+  const truncated = transcript.slice(0, maxChars);
 
   const resp = await httpPost(
     `${OPENROUTER_BASE}/chat/completions`,

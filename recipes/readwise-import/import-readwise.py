@@ -193,10 +193,24 @@ def insert_thoughts(supabase, thoughts: list[dict]) -> None:
         supabase.table("thoughts").insert(thoughts).execute()
     except APIError as e:
         code = getattr(e, "code", None)
-        if code == STATEMENT_TIMEOUT_CODE and len(thoughts) > 1:
+        # Two conditions are handled by splitting the batch and retrying:
+        #  - 57014 statement timeout: pgvector index maintenance on a large
+        #    batch of 1536-dim vectors blew past the ~8s statement_timeout.
+        #  - 23505 unique violation: Open Brain guards content_fingerprint
+        #    with a partial UNIQUE index (idx_thoughts_fingerprint, populated
+        #    by a BEFORE INSERT trigger). A multi-row INSERT is atomic, so one
+        #    duplicate aborts the whole batch. That partial index can't be
+        #    targeted by PostgREST's on_conflict=, so instead of ON CONFLICT we
+        #    bisect to isolate the colliding row and skip just that one below.
+        if code in (STATEMENT_TIMEOUT_CODE, "23505") and len(thoughts) > 1:
             mid = len(thoughts) // 2
             insert_thoughts(supabase, thoughts[:mid])
             insert_thoughts(supabase, thoughts[mid:])
+            return
+        if code == "23505":
+            # A single row that still collides is a content-duplicate Open
+            # Brain already holds; skipping it is the intended dedupe-by-meaning
+            # behaviour and keeps the backfill idempotent.
             return
         raise
 

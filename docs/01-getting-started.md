@@ -4,6 +4,8 @@ This is the core of Open Brain — the foundation everything else builds on. Onc
 
 > **Prefer video?** Watch the [Open Brain Startup Guide](https://vimeo.com/1174979042/f883f6489a) (~27 min) for a full video walkthrough of this setup process. Follow along with the video or use this written guide — they cover the same steps.
 
+> **Have an AI coding tool?** Copy the [Setup Wizard prompt](04-ai-assisted-setup.md) into Claude Code, Cursor, Codex, or any similar tool. It interviews you, trims this guide down to just your path, runs the terminal steps for you, and verifies each checkpoint as you go.
+
 About 30 minutes. Zero coding experience. Two services:
 
 - **[Supabase](https://supabase.com)** — Your database (free tier)

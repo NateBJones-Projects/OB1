@@ -1596,6 +1596,17 @@ app.options("*", (c) => {
 });
 
 app.all("*", async (c) => {
+  // Reject non-POST requests up front. This server is stateless over
+  // streamable HTTP: there is no standalone SSE stream (GET) or session
+  // termination (DELETE) to serve. Without this guard a GET falls through to
+  // StreamableHTTPTransport.handleRequest, which parks it on an SSE stream
+  // that never emits and never closes. mcp-remote always sends a GET probe
+  // (OAuth discovery) before its initialize POST, so that probe hangs and
+  // the MCP handshake times out at the client with no error server-side.
+  if (c.req.method !== "POST") {
+    return c.json({ error: "Method not allowed" }, 405, { ...corsHeaders, Allow: "POST, OPTIONS" });
+  }
+
   // Header-only auth: `x-brain-key: <key>` or `Authorization: Bearer <key>`.
   // We do NOT accept the key via a `?key=` query parameter — URL query
   // strings end up in Supabase/CDN/proxy access logs, which leaks the

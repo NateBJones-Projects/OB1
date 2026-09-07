@@ -296,6 +296,10 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
   // literal occurrences of the tags so an adversarial thought can't break out.
   const prompt = ENTITY_EXTRACTION_PROMPT.replace("{content}", wrapThoughtContent(content));
 
+  // Remember why each configured provider gave up, so that exhausting the
+  // chain reports the actual cause instead of "no API key configured".
+  let lastProviderError: string | null = null;
+
   // OpenRouter (primary)
   if (OPENROUTER_API_KEY) {
     try {
@@ -314,6 +318,7 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
       if (!response.ok) throw new Error(`OpenRouter failed (${response.status}): ${await response.text()}`);
       return parseExtractionResult(readChatCompletionText(await response.json()));
     } catch (err) {
+      lastProviderError = `OpenRouter: ${(err as Error).message}`;
       console.warn("OpenRouter extraction failed:", (err as Error).message);
     }
   }
@@ -334,6 +339,7 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
       if (!response.ok) throw new Error(`OpenAI failed (${response.status}): ${await response.text()}`);
       return parseExtractionResult(readChatCompletionText(await response.json()));
     } catch (err) {
+      lastProviderError = `OpenAI: ${(err as Error).message}`;
       console.warn("OpenAI extraction failed:", (err as Error).message);
     }
   }
@@ -356,6 +362,13 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
     });
     if (!response.ok) throw new Error(`Anthropic failed (${response.status}): ${await response.text()}`);
     return parseExtractionResult(readAnthropicText(await response.json()));
+  }
+
+  // A provider was configured and tried, but every one of them failed. This is
+  // an availability problem, not a configuration problem — say so, and carry
+  // the underlying cause into last_error on the queue row.
+  if (lastProviderError) {
+    throw new Error(`All configured LLM providers failed. Last error: ${lastProviderError}`);
   }
 
   throw new Error("No LLM API key configured (OPENROUTER_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY)");
