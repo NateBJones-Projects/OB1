@@ -4,6 +4,9 @@ import { StatsWidget } from "@/components/StatsWidget";
 import { KanbanSummary } from "@/components/KanbanSummary";
 import { ThoughtCard } from "@/components/ThoughtCard";
 import { AddToBrain } from "@/components/AddToBrain";
+import { AttentionCenter } from "@/components/AttentionCenter";
+import { agentMemoryDefaults, fetchAgentMemories } from "@/lib/agent-memory";
+import type { AgentMemory } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,32 @@ export default async function DashboardPage() {
     );
   }
 
+  const { workspaceId } = agentMemoryDefaults();
+  let memories: AgentMemory[] = [];
+  let pending: AgentMemory[] = [];
+  let stale: AgentMemory[] = [];
+  let memoryError: string | null = null;
+  try {
+    const [allData, pendingData, staleData] = await Promise.all([
+      fetchAgentMemories(apiKey, { workspace_id: workspaceId, limit: 200 }),
+      fetchAgentMemories(apiKey, {
+        workspace_id: workspaceId,
+        review_status: "pending",
+        limit: 100,
+      }),
+      fetchAgentMemories(apiKey, {
+        workspace_id: workspaceId,
+        review_status: "stale",
+        limit: 100,
+      }),
+    ]);
+    memories = allData.memories;
+    pending = pendingData.memories;
+    stale = staleData.memories;
+  } catch (err) {
+    memoryError = err instanceof Error ? err.message : "Failed to load Agent Memory";
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -41,6 +70,14 @@ export default async function DashboardPage() {
           Overview of your second brain
         </p>
       </div>
+
+      <AttentionCenter
+        memories={memories}
+        pending={pending}
+        stale={stale}
+        workspaceId={workspaceId}
+        error={memoryError}
+      />
 
       <StatsWidget stats={stats} />
 

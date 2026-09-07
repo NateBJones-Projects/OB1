@@ -49,7 +49,7 @@ async function agentMemoryFetch<T>(
 
 export function agentMemoryDefaults() {
   return {
-    workspaceId: process.env.AGENT_MEMORY_WORKSPACE_ID || "ob1-staging",
+    workspaceId: process.env.AGENT_MEMORY_WORKSPACE_ID || "personal",
     projectId: process.env.AGENT_MEMORY_PROJECT_ID || "",
   };
 }
