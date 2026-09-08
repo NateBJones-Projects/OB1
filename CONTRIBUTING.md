@@ -51,6 +51,16 @@ Every contribution lives in its own subfolder under the right category (e.g., `r
 - **Your actual code** — SQL files, edge function code, frontend code, config files, whatever it takes
 - **NO credentials, API keys, or secrets.** The automated review will reject them. Use environment variables and document what the user needs to set.
 
+### Scaffold a New Contribution
+
+Generate a starter folder from the correct category template:
+
+```bash
+node scripts/new-contribution.mjs --category recipes --slug demo-recipe --name "Demo Recipe" --description "Adds a demonstration workflow to Open Brain." --author "Your Name" --difficulty beginner --estimated-time "20 minutes" --tags demo --yes
+```
+
+The generator creates the README, metadata, and category-specific starter artifacts without overwriting an existing folder. Dashboard scaffolds start with `index.html`, integrations with `index.ts`, and extensions with both `schema.sql` and `index.ts`, so the generated folder meets the category artifact gate before you customize it. The category `_template/` folders remain the source of truth. See [scripts/README.md](scripts/README.md) for interactive usage and all flags.
+
 ## README Standards
 
 Your contribution's README must include these sections:
