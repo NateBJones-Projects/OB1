@@ -1,0 +1,25 @@
+{
+  "name": "recall-quarantine-hard-drop",
+  "description": "A read-side quarantine wrapper that excludes selected thoughts from recall without altering the core thoughts table.",
+  "category": "schemas",
+  "author": {
+    "name": "Tony Finley",
+    "github": "wefilmshit"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": [
+      "Postgres with pgvector",
+      "psql"
+    ]
+  },
+  "tags": [
+    "recall",
+    "quarantine",
+    "safety"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes"
+}
