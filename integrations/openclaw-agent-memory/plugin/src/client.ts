@@ -17,8 +17,8 @@ function requestInput(input: Record<string, unknown>) {
 }
 
 function projectIdFrom(input: Record<string, unknown>, configuredProjectId?: string) {
-  if (configuredProjectId) return configuredProjectId;
   if (typeof input.project_id === "string" || input.project_id === null) return input.project_id;
+  if (configuredProjectId) return configuredProjectId;
   return null;
 }
 

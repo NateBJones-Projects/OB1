@@ -48,6 +48,12 @@ OPENCLAW
 
 ## Steps
 
+1. Apply the OB1 Agent Memory schema and deploy the Agent Memory API.
+2. Build the OpenClaw plugin package from `integrations/openclaw-agent-memory/plugin`.
+3. Install the plugin into an isolated OpenClaw profile with `openclaw plugins install --link`.
+4. Install the paired `nbj-ob1-agent-memory-openclaw` skill.
+5. Verify `openbrain_recall` and `openbrain_writeback` are available before enabling team workflows.
+
 ![Step 1](https://img.shields.io/badge/Step_1-Prepare_OB1_Agent_Memory-1E88E5?style=for-the-badge)
 
 Apply the schema and deploy the API.
