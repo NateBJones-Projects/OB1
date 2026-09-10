@@ -184,6 +184,26 @@ async function runCheck(fn, { timeout = 10_000 } = {}) {
   }
 }
 
+// open-brain-mcp uses the MCP Streamable HTTP transport, which may answer a
+// POST with either a plain JSON body or a text/event-stream frame
+// ("event: message\ndata: {...}"). Parse both so the MCP checks below don't
+// choke on SSE with "Unexpected token 'e', \"event: mes\"...".
+function parseJsonOrSse(text) {
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    const dataLines = String(text)
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice("data:".length).trim())
+      .filter((line) => line && line !== "[DONE]");
+    for (const line of dataLines) {
+      try { return JSON.parse(line); } catch (_) { /* skip non-payload events */ }
+    }
+    throw new Error(`unparseable MCP response: ${String(text).slice(0, 120)}`);
+  }
+}
+
 async function fetchJson(url, init, signal) {
   const res = await fetch(url, { ...init, signal });
   const text = await res.text();
@@ -193,7 +213,24 @@ async function fetchJson(url, init, signal) {
     e.status = res.status;
     throw e;
   }
-  return text ? JSON.parse(text) : null;
+  return text ? parseJsonOrSse(text) : null;
+}
+
+// A correct MCP auth rejection is either an HTTP 401/403, OR -- because
+// MCP-over-HTTP favours JSON-RPC error semantics over HTTP status -- an HTTP
+// 200 carrying a JSON-RPC error and NO tools/result. Returning tools without a
+// valid key is a real security failure, so only that case fails the check.
+async function assertMcpRejected(res) {
+  if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
+  const text = await res.text();
+  let parsed = null;
+  try { parsed = text ? parseJsonOrSse(text) : null; } catch (_) { /* leave null */ }
+  const hasTools = Array.isArray(parsed?.result?.tools);
+  if (res.status === 200 && parsed?.error && !hasTools) {
+    return `HTTP 200 + JSON-RPC ${parsed.error.code ?? "error"} (rejected, no data leaked)`;
+  }
+  if (hasTools) throw new Error("server returned tools without a valid key");
+  throw new Error(`expected 401/403 or JSON-RPC error, got HTTP ${res.status}`);
 }
 
 async function tableCount(table, signal, extraQuery = "") {
@@ -495,8 +532,7 @@ const authChecks = [
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
         signal: s,
       });
-      if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
-      throw new Error(`expected 401/403, got ${res.status}`);
+      return assertMcpRejected(res);
     },
   },
   {
@@ -508,8 +544,7 @@ const authChecks = [
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
         signal: s,
       });
-      if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
-      throw new Error(`expected 401/403, got ${res.status}`);
+      return assertMcpRejected(res);
     },
   },
   {
