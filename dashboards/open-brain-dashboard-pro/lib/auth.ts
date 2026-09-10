@@ -6,6 +6,8 @@ export interface SessionData {
   apiKey?: string;
   loggedIn?: boolean;
   restrictedUnlocked?: boolean;
+  /** Cached at login: does this brain expose the optional /crm surface? */
+  crmEnabled?: boolean;
 }
 
 export class AuthError extends Error {

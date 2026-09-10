@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { checkHealth, ApiError } from "@/lib/api";
+import { checkHealth, crmAvailable, ApiError } from "@/lib/api";
 import { LoginForm } from "./LoginForm";
 
 async function loginAction(formData: FormData) {
@@ -15,8 +15,9 @@ async function loginAction(formData: FormData) {
   // NEXT_PUBLIC_API_URL module-load guard (throws at import if missing) and
   // centralizes the health-check shape so the login path cannot drift from
   // the rest of the app.
+  const key = apiKey.trim();
   try {
-    await checkHealth(apiKey.trim());
+    await checkHealth(key);
   } catch (err) {
     if (err instanceof ApiError) {
       return { error: "Invalid API key or service unavailable" };
@@ -24,9 +25,14 @@ async function loginAction(formData: FormData) {
     return { error: "Could not reach API. Check your connection." };
   }
 
+  // Probe the optional CRM surface once so the sidebar can show or hide it.
+  // Never fatal: a brain without the crm-core schema simply gets crmEnabled=false.
+  const crmEnabled = await crmAvailable(key);
+
   const session = await getSession();
-  session.apiKey = apiKey.trim();
+  session.apiKey = key;
   session.loggedIn = true;
+  session.crmEnabled = crmEnabled;
   await session.save();
 
   redirect("/");
