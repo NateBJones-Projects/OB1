@@ -1,0 +1,20 @@
+{
+  "name": "Apple Notes Import",
+  "description": "Import your Apple Notes directly into Open Brain via macOS automation — no manual export step. Notes are extracted via JXA, converted from HTML to Markdown, chunked at heading boundaries, and ingested with embeddings and metadata including web URLs and note-to-note links.",
+  "category": "recipes",
+  "author": {
+    "name": "David Oliver",
+    "github": "davidroliver"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Python 3.10+", "macOS with Notes.app"]
+  },
+  "tags": ["apple-notes", "import", "macos", "migration"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-15",
+  "updated": "2026-04-15"
+}
