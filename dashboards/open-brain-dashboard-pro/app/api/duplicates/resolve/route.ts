@@ -29,20 +29,23 @@ export async function POST(request: NextRequest) {
       thought_id_b: unknown;
     };
 
-    // BL-03: Validate IDs are positive integers, not truthy-but-wrong values
+    // BL-03: Validate IDs are UUIDs, not truthy-but-wrong values. OB1 thought
+    // ids are UUIDs, not integers.
+    const UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (
-      !Number.isInteger(thought_id_a) ||
-      (thought_id_a as number) <= 0 ||
-      !Number.isInteger(thought_id_b) ||
-      (thought_id_b as number) <= 0
+      typeof thought_id_a !== "string" ||
+      !UUID_RE.test(thought_id_a) ||
+      typeof thought_id_b !== "string" ||
+      !UUID_RE.test(thought_id_b)
     ) {
       return NextResponse.json(
-        { error: "Both thought_id_a and thought_id_b must be positive integers" },
+        { error: "Both thought_id_a and thought_id_b must be valid UUIDs" },
         { status: 400 }
       );
     }
-    const idA = thought_id_a as number;
-    const idB = thought_id_b as number;
+    const idA = thought_id_a;
+    const idB = thought_id_b;
 
     if (idA === idB) {
       return NextResponse.json(

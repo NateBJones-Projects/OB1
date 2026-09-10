@@ -17,6 +17,39 @@ Seven server-rendered pages backed by iron-session auth and the Open Brain REST 
 | **Ingest** (`/ingest`) | Smart-ingest UI with dry-run preview, extracted-item cards, execute button, and job history. |
 | **Settings** (`/settings`) | Connection status, thought type breakdown, top topics, and masked API key prefix. |
 
+## CRM (optional)
+
+If your brain runs the CRM truth layer (the `crm-core` + `crm-engagement` schemas and the `/crm/*` routes on `open-brain-rest`), the dashboard grows a contacts surface:
+
+| Page | What you get |
+|------|--------------|
+| **Contacts** (`/contacts`) | Searchable contact list and a "new contact" form. |
+| **Contact** (`/contacts/:id`) | Editable fact panel with per-field origin, locks, and evidence; contact methods and aliases; this contact's open proposals with accept/reject; a notes / tasks / important-dates panel; and an activity view with a merged timeline and the raw change log. |
+| **Proposals** (`/proposals`) | Inbox of machine-suggested field changes filtered by status, with per-row accept/reject and bulk accept/reject for a whole import run. |
+
+The Contacts and Proposals nav entries appear **by default, whether or not the brain has the CRM layer installed yet**. Visiting either page on a brain without it shows a setup card: which schema(s) to apply (`schemas/crm-core` + `schemas/crm-engagement`), where to run them (your Supabase project's SQL editor), a link to the schema README, a reminder that `open-brain-rest` needs the `/crm/*` route group deployed, and a **Re-check now** button that re-probes the brain and refreshes the page — no sign-out required. The setup card's schema links point at the `alanshurafa/OB1` fork by default because the optional schemas haven't landed upstream yet; override with `NEXT_PUBLIC_SCHEMA_REPO_BASE` (see [Configuration](#configuration)). The open-proposals badge only ever renders a real count, so it stays hidden until CRM is actually enabled. Each CRM read also degrades on its own: if an individual route is missing or errors after CRM is enabled, that panel renders empty instead of blanking the page.
+
+Prefer the old hide-until-detected behavior? Set `NEXT_PUBLIC_OPTIONAL_NAV=auto` (see [Configuration](#configuration)) and rebuild — the dashboard probes for `/crm` once at login, caches the result in the session, and only then shows the Contacts/Proposals entries.
+
+## Wiki (optional)
+
+If your brain runs the persistent-wiki layer (the `schemas/wiki-pages` schema and the `/wiki/*` routes on `open-brain-rest`), the dashboard grows a wiki surface:
+
+| Page | What you get |
+|------|--------------|
+| **Wiki** (`/wiki`) | Page list filtered by kind (topic / entity / autobiography / custom), with section counts and a "new page" form. |
+| **Wiki page** (`/wiki/:slug`) | Sections in display order, each with its markdown body rendered sanitized, an origin chip (yours / generated), a lock toggle, and an evidence chip listing supporting thought ids. Edit a section inline (your edit takes ownership); add a section; archive the page. When a machine writer proposes an update to a section you own, a review panel shows the current body against the proposed draft with **accept / reject**. |
+
+**User Profile regeneration.** The `/wiki/user-profile` page header gains a **Regenerate profile** button, and the wiki list shows a **Create your profile** card while no `user-profile` page exists yet. Both POST to the dashboard's `/api/wiki/profile/regenerate` route, which triggers the [`wiki-profile` consolidation worker](../../integrations/consolidation-workers/wiki-profile/) — a separate Edge Function that synthesizes the page section by section and returns per-section outcomes, rendered inline as a compact list (created / updated / **pending** — amber, awaiting your review in the section panel / skipped / error). The worker must be deployed for this to do anything (`supabase functions deploy wiki-profile --no-verify-jwt`); without it the button fails fast with a clear "worker not deployed" error and the rest of the wiki surface is unaffected. The route derives the worker URL from `NEXT_PUBLIC_API_URL` by swapping the function name (`…/open-brain-rest` → `…/wiki-profile`); set `WIKI_PROFILE_URL` to override (see [Configuration](#configuration)).
+
+The Wiki nav entry appears **by default, whether or not the brain has the wiki layer installed yet**. Visiting `/wiki` on a brain without it — the login-time probe came back negative, a re-check still says no, or `GET /wiki/pages` returns 404 — shows a setup card: apply `schemas/wiki-pages`, confirm `open-brain-rest` exposes the `/wiki/*` route group, and a **Re-check now** button that re-probes the brain and refreshes the page without a sign-out.
+
+Prefer the old hide-until-detected behavior? Set `NEXT_PUBLIC_OPTIONAL_NAV=auto` (see [Configuration](#configuration)) and rebuild — the dashboard probes for `/wiki` once at login, caches the result in the session, and only then shows the Wiki entry.
+
+Archived pages are hidden from the list but stay fetchable — and editable — by slug; unarchive is a future gateway addition.
+
+Section bodies are agent-writable over MCP, so the dashboard treats them as untrusted: markdown is rendered with `react-markdown` and **no raw-HTML plugin**, so any embedded HTML is shown as text and never executed.
+
 ## Screenshots
 
 Screenshots go in `docs/screenshots/` and should be referenced from this README once you add them.
@@ -28,6 +61,10 @@ Screenshots go in `docs/screenshots/` and should be referenced from this README 
 - **Node.js 20+**
 - A host for the dashboard: Vercel or Netlify free tier works; self-hosting on a Node.js 20+ runtime is also fine
 
+## One-Command Install
+
+If you are standing up a brand-new brain rather than pointing this dashboard at an existing one, the [`brain-bootstrap` recipe](../../recipes/brain-bootstrap/) does the whole backend in a single script: it applies the core schema plus the wiki and CRM schemas in dependency order, deploys the `open-brain-rest`, `wiki-mcp`, `crm-mcp`, and `wiki-profile` Edge Functions, sets the secrets, and smoke-verifies each surface. It finishes by printing the exact `NEXT_PUBLIC_API_URL` and `SESSION_SECRET` for this dashboard and a Deploy-to-Vercel link that pre-sets the **Root Directory** to `dashboards/open-brain-dashboard-pro` and pre-fills the API URL. Run that first, then use the values it prints below.
+
 ## Configuration
 
 All configuration is through environment variables. **The app refuses to start if required variables are missing.**
@@ -37,6 +74,9 @@ All configuration is through environment variables. **The app refuses to start i
 | `NEXT_PUBLIC_API_URL` | Yes | Base URL of your Open Brain REST API, typically `https://YOUR-PROJECT-REF.supabase.co/functions/v1/open-brain-rest`. |
 | `SESSION_SECRET` | Yes | 32+ character secret used by `iron-session` to encrypt the session cookie. Generate with `openssl rand -hex 32`. |
 | `RESTRICTED_PASSPHRASE_HASH` | No | SHA-256 hash of a passphrase that unlocks restricted/sensitive content. Only meaningful if your brain has a `sensitivity_tier` column on `public.thoughts`. There is no official sensitivity-tiers primitive upstream yet — either add your own migration (see PR #192 for pattern) or wait for the primitive to land. On stock OB1, this dashboard's restricted-content toggle is hidden at startup. Generate with `echo -n "your-passphrase" \| shasum -a 256`. |
+| `NEXT_PUBLIC_OPTIONAL_NAV` | No | Controls whether the Contacts/Proposals (CRM) and Wiki nav entries show before their schema is installed. Default (unset, or any value other than `auto`): always show them, with a setup card on the page itself. Set to `auto` to restore hide-until-enabled behavior, gated on the login-time probe cached in the session. This is a `NEXT_PUBLIC_*` var, so it's inlined at **build** time — changing it needs a rebuild, not just a restart. |
+| `NEXT_PUBLIC_SCHEMA_REPO_BASE` | No | Base URL for the schema-folder links on the setup cards, e.g. `https://github.com/YOUR-ORG/YOUR-REPO/tree/main`. Defaults to the `alanshurafa/OB1` fork, where all the optional schemas currently live (they haven't landed upstream yet). Set it to your own repo/mirror if you maintain one. Build-time, like the other `NEXT_PUBLIC_*` vars. |
+| `WIKI_PROFILE_URL` | No | Full URL of the `wiki-profile` consolidation worker Edge Function. When unset, derived from `NEXT_PUBLIC_API_URL` by swapping the function name (`…/functions/v1/open-brain-rest` → `…/functions/v1/wiki-profile`). Plain server-side env — only the regenerate route handler reads it, so no `NEXT_PUBLIC_` prefix and a restart (not a rebuild) picks up changes. Must be `https://` (`http://localhost` allowed for dev). |
 
 Copy `.env.example` to `.env.local` (gitignored) and fill it in.
 
@@ -85,6 +125,9 @@ The dashboard calls these endpoints on your Open Brain REST gateway (all authent
 | `/thought/:id/connections` | GET | Detail page connections panel | Optional — panel hides if it errors |
 | `/duplicates`, `/duplicates/resolve` | GET / POST | Duplicates page | Optional — page shows an error otherwise |
 | `/ingest`, `/ingestion-jobs`, `/ingestion-jobs/:id`, `/ingestion-jobs/:id/execute` | POST / GET | Ingest page | Optional — page still loads without jobs |
+| `/crm/*` (contacts, proposals, notes, tasks, important-dates, timeline, history, …) | GET / POST / PATCH | Contacts, Proposals, contact detail panels | Optional — nav entries show by default; the pages themselves render a setup card until `/crm` is detected |
+| `/wiki/*` (pages, pages/:slug, sections/:id/accept-pending, reject-pending, lock, …) | GET / POST / PUT / DELETE | Wiki list, wiki page, section edit / lock / draft review | Optional — nav entry shows by default; the page itself renders a setup card until `/wiki` is detected |
+| `wiki-profile` Edge Function (a separate function, not a gateway route — see [Wiki](#wiki-optional)) | POST | "Regenerate profile" button, "Create your profile" card | Optional — without it the button returns a clear "worker not deployed" error; everything else works |
 
 > **On `/reflections/*`:** The ExoCortex upstream dashboard staged a reflections feature. This fork does not yet ship a reflections UI surface, but the architecture is ready: if you add a reflection panel later and your gateway doesn't serve `/reflections/*`, expect a 404 that the UI should swallow. The existing optional endpoints already degrade this way — the Connections panel, Duplicates page, and Ingest history all swallow fetch errors and render an empty/neutral state instead of crashing.
 
