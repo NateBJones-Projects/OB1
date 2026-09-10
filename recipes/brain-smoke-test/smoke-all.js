@@ -196,6 +196,49 @@ async function fetchJson(url, init, signal) {
   return text ? JSON.parse(text) : null;
 }
 
+/**
+ * Parse a response body that may be either plain JSON or a Server-Sent
+ * Events (SSE) stream. The open-brain-mcp function speaks MCP over
+ * StreamableHTTP, which returns tool/handshake results as SSE frames:
+ *
+ *   event: message
+ *   data: {"jsonrpc":"2.0","result":{...},"id":1}
+ *
+ * while auth rejections come back as a bare JSON-RPC envelope. Handle both
+ * so MCP checks don't choke on `event: mes...` with a JSON parse error.
+ * When multiple `data:` frames are present, the last complete JSON payload
+ * is the final response.
+ */
+function parseSseOrJson(text) {
+  if (!text) return null;
+  if (/^\s*(event:|data:)/.test(text)) {
+    const payloads = text
+      .split(/\r?\n/)
+      .filter((line) => line.startsWith("data:"))
+      .map((line) => line.slice("data:".length).trim())
+      .filter(Boolean);
+    if (!payloads.length) throw new Error("SSE response contained no data payload");
+    return JSON.parse(payloads[payloads.length - 1]);
+  }
+  return JSON.parse(text);
+}
+
+/**
+ * Like fetchJson, but for the MCP endpoint: tolerates SSE responses and
+ * does NOT throw on the function's intentional HTTP 200 + JSON-RPC error
+ * envelope (used for auth failures). Callers inspect the parsed body.
+ */
+async function fetchMcp(url, init, signal) {
+  const res = await fetch(url, { ...init, signal });
+  const text = await res.text();
+  if (!res.ok && res.status !== 200) {
+    const e = new Error(`HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ""}`);
+    e.status = res.status;
+    throw e;
+  }
+  return { status: res.status, body: parseSseOrJson(text) };
+}
+
 async function tableCount(table, signal, extraQuery = "") {
   const q = extraQuery ? `&${extraQuery}` : "";
   const res = await fetch(`${REST_BASE}/${table}?select=id&limit=1${q}`, {
@@ -236,7 +279,7 @@ const mcpChecks = [
   {
     name: "MCP tools/list returns core tools",
     fn: async (s) => {
-      const body = await fetchJson(MCP_URL, {
+      const { body } = await fetchMcp(MCP_URL, {
         method: "POST",
         headers: MCP_HEADERS,
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
@@ -252,7 +295,7 @@ const mcpChecks = [
   {
     name: "MCP initialize handshake",
     fn: async (s) => {
-      const body = await fetchJson(MCP_URL, {
+      const { body } = await fetchMcp(MCP_URL, {
         method: "POST",
         headers: MCP_HEADERS,
         body: JSON.stringify({
@@ -485,6 +528,24 @@ const dbChecks = [
 // Category 4: Auth
 // ---------------------------------------------------------------------------
 
+// open-brain-mcp intentionally rejects bad auth with an HTTP 200 + JSON-RPC
+// error envelope (code -32001) rather than a bare HTTP 401/403. This keeps
+// the connection alive for strict MCP hosts (Codex CLI, Claude Code) that
+// tear down transports on 4xx. Accept either signal as a valid rejection.
+const MCP_UNAUTHORIZED_CODE = -32001;
+
+async function assertMcpRejects(res) {
+  if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
+  const body = parseSseOrJson(await res.text());
+  if (body?.error?.code === MCP_UNAUTHORIZED_CODE) {
+    return `JSON-RPC ${body.error.code} (rejected, HTTP ${res.status})`;
+  }
+  throw new Error(
+    `expected rejection (HTTP 401/403 or JSON-RPC ${MCP_UNAUTHORIZED_CODE}), got HTTP ${res.status}` +
+    (body?.result ? " with a successful result" : "")
+  );
+}
+
 const authChecks = [
   {
     name: "MCP rejects missing access key",
@@ -495,8 +556,7 @@ const authChecks = [
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
         signal: s,
       });
-      if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
-      throw new Error(`expected 401/403, got ${res.status}`);
+      return assertMcpRejects(res);
     },
   },
   {
@@ -508,8 +568,7 @@ const authChecks = [
         body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
         signal: s,
       });
-      if (res.status === 401 || res.status === 403) return `HTTP ${res.status} (rejected)`;
-      throw new Error(`expected 401/403, got ${res.status}`);
+      return assertMcpRejects(res);
     },
   },
   {
