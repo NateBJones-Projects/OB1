@@ -1,0 +1,30 @@
+{
+  "name": "Policy-Citing Briefings + Weekly Summary",
+  "description": "Two Supabase Edge Functions that synthesize your captures into a daily morning briefing and a weekly summary, each citing the Editorial Policy (R10.2) and writing its output back into the thoughts table as a provenance-tagged derived thought. Pairs with the editorial-policy recipe: these are the synthesis prompts its auditor was built to enforce, so shipping them turns on the auditor's drift detection.",
+  "category": "recipes",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter", "Slack"],
+    "tools": ["Supabase CLI", "Deno (via Supabase Edge Functions)"]
+  },
+  "requires_skills": [],
+  "tags": [
+    "synthesis",
+    "briefing",
+    "weekly-summary",
+    "morning-briefing",
+    "editorial-policy",
+    "provenance",
+    "pg_cron",
+    "slack"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-07-11",
+  "updated": "2026-07-11"
+}
