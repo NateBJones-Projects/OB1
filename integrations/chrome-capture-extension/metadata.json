@@ -6,7 +6,7 @@
     "name": "Alan Shurafa",
     "github": "alanshurafa"
   },
-  "version": "1.1.1",
+  "version": "1.1.2",
   "requires": {
     "open_brain": true,
     "services": ["REST API gateway (integrations/open-brain-rest)"],
@@ -16,5 +16,5 @@
   "difficulty": "intermediate",
   "estimated_time": "20 minutes",
   "created": "2026-04-17",
-  "updated": "2026-06-14"
+  "updated": "2026-07-14"
 }

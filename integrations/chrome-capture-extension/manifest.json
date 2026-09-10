@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Open Brain Capture",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Capture AI conversations from Claude, ChatGPT, and Gemini into your Open Brain via the REST API gateway.",
   "icons": {
     "16": "icons/icon16.png",
