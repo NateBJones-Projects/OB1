@@ -16,9 +16,9 @@ export async function GET(
 
   const { id } = await params;
 
-  // WR-04: Validate id is a positive integer before forwarding
-  const idNum = Number(id);
-  if (!Number.isInteger(idNum) || idNum <= 0) {
+  // WR-04: Validate id is a UUID (thought ids are uuid, not integers) before
+  // forwarding.
+  if (!/^[0-9a-fA-F-]{36}$/.test(id)) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
@@ -36,7 +36,7 @@ export async function GET(
 
   try {
     const res = await fetch(
-      `${API_URL}/thought/${idNum}/connections?exclude_restricted=${excludeRestricted}&limit=20`,
+      `${API_URL}/thought/${id}/connections?exclude_restricted=${excludeRestricted}&limit=20`,
       {
         headers: {
           "x-brain-key": apiKey,
