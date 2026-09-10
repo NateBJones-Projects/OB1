@@ -1,0 +1,21 @@
+{
+  "name": "OB1 Import Kit",
+  "description": "Offline CLI skeleton for validating exported records and normalizing them into Open Brain thought candidates before any database import.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_skills": [],
+  "tags": ["import", "cli", "normalize", "dry-run", "migration"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-06-06",
+  "updated": "2026-06-06"
+}
