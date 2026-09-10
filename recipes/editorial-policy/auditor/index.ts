@@ -297,9 +297,21 @@ async function callAuditor(
     throw new Error("OpenRouter returned empty content");
   }
 
+  // Some models (e.g. Anthropic claude-haiku-4-5 via OpenRouter — the stricter
+  // reasoner this recipe recommends in Troubleshooting) wrap JSON in a ```json
+  // fence even when response_format=json_object is requested. Strip it before
+  // parse so the model swap doesn't break the parser.
+  let jsonText = text.trim();
+  if (jsonText.startsWith("```")) {
+    jsonText = jsonText
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(jsonText);
   } catch (e) {
     throw new Error(`Auditor returned non-JSON: ${(e as Error).message}`);
   }

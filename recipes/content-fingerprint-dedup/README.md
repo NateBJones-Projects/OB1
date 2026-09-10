@@ -84,6 +84,46 @@ Now call it from your Edge Function or import script:
 SELECT upsert_thought('My thought content', '{"metadata": {"source": "chatgpt"}}'::jsonb);
 ```
 
+### Step 2b: Guarantee a fingerprint on every write (trigger)
+
+`upsert_thought` only dedups when callers actually use it. Any code path that writes a raw `INSERT INTO thoughts` — a webhook handler, an Edge Function, a synthesis job, a one-off script — will insert a row with a **NULL** `content_fingerprint` and silently escape dedup. Because the unique index is partial (`WHERE content_fingerprint IS NOT NULL`), those NULL rows don't even conflict with each other, so the duplicates pile up unnoticed.
+
+A `BEFORE INSERT OR UPDATE` trigger closes that gap for good: it computes the fingerprint at write time for **any** path, so no caller can leak a NULL.
+
+```sql
+CREATE OR REPLACE FUNCTION set_content_fingerprint()
+RETURNS trigger AS $$
+BEGIN
+  -- Compute on insert when the caller didn't supply one, and recompute on
+  -- update ONLY when the content actually changed (so metadata-only updates
+  -- stay cheap and never touch the fingerprint).
+  IF NEW.content IS NOT NULL AND (
+       NEW.content_fingerprint IS NULL
+       OR (TG_OP = 'UPDATE' AND NEW.content IS DISTINCT FROM OLD.content)
+     ) THEN
+    NEW.content_fingerprint := encode(sha256(convert_to(
+      lower(trim(regexp_replace(NEW.content, '\s+', ' ', 'g'))),
+      'UTF8'
+    )), 'hex');
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_set_content_fingerprint ON thoughts;
+CREATE TRIGGER trg_set_content_fingerprint
+  BEFORE INSERT OR UPDATE ON thoughts
+  FOR EACH ROW
+  EXECUTE FUNCTION set_content_fingerprint();
+```
+
+The normalization is **identical** to `upsert_thought` above (`lower` + `trim` + collapse whitespace → SHA-256), so trigger-computed fingerprints line up exactly with the unique index. `upsert_thought` still works unchanged: it supplies its own fingerprint, the trigger sees a non-NULL value and leaves it alone, and `ON CONFLICT` behaves as before.
+
+> [!NOTE]
+> With the trigger in place, a raw `INSERT` of content that already exists will now raise a unique-violation (`23505`) instead of quietly creating a duplicate — that is dedup working as intended. Callers that should merge rather than error (retryable webhooks, idempotent re-imports) should go through `upsert_thought`, which handles the conflict with `ON CONFLICT DO UPDATE`.
+
+Once this trigger is installed, the [fingerprint-dedup-backfill](../fingerprint-dedup-backfill/) recipe becomes a **one-time** cleanup for pre-existing NULL rows rather than something you need to run on a schedule — new writes can no longer leak a NULL.
+
 ### Step 3: Backfill existing rows (optional)
 
 If you already have thoughts in the table, generate fingerprints for them:

@@ -64,6 +64,18 @@ app.post("*", async (c) => {
     },
     async ({ name, category, location, details, notes }) => {
       try {
+        // `details` is stored as jsonb — parse the JSON string into an
+        // object before inserting, or it lands in the column as an
+        // escaped string blob instead of a queryable object.
+        let parsedDetails: Record<string, unknown> = {};
+        if (details) {
+          try {
+            parsedDetails = JSON.parse(details);
+          } catch (e) {
+            throw new Error(`add_household_item: details is not valid JSON: ${(e as Error).message}`);
+          }
+        }
+
         const { data, error } = await supabase
           .from("household_items")
           .insert({
@@ -71,7 +83,7 @@ app.post("*", async (c) => {
             name,
             category: category || null,
             location: location || null,
-            details: details || {},
+            details: parsedDetails,
             notes: notes || null,
           })
           .select()

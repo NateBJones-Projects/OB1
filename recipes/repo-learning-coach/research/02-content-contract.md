@@ -1,7 +1,7 @@
 ---
 slug: content-contract
 title: The Content Contract
-summary: The repo-specific surface is plain files: one config file, research markdown, and lesson markdown with frontmatter.
+summary: "The repo-specific surface is plain files: one config file, research markdown, and lesson markdown with frontmatter."
 category: architecture
 ---
 
