@@ -4,6 +4,29 @@ import type {
   BrowseResponse,
   StatsResponse,
   IngestionJob,
+  CrmContactListResponse,
+  CrmContactBundle,
+  CrmCreateResponse,
+  CrmPatchResponse,
+  CrmProposalListResponse,
+  CrmChangeLogResponse,
+  CrmRelationshipItems,
+  CrmInteractionsResponse,
+  CrmTimelineResponse,
+  CrmEvidence,
+  CrmMethod,
+  CrmNote,
+  CrmTask,
+  CrmImportantDate,
+  WikiPageKind,
+  WikiPageListResponse,
+  WikiPageDetailResponse,
+  WikiCreatePageResponse,
+  WikiWriteSectionResponse,
+  WikiAcceptPendingResponse,
+  WikiRejectPendingResponse,
+  WikiLockResponse,
+  WikiArchivePageResponse,
 } from "./types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -247,7 +270,7 @@ export async function triggerIngest(
   apiKey: string,
   text: string,
   opts?: { dry_run?: boolean; skip_classification?: boolean }
-): Promise<{ job_id: number; status: string }> {
+): Promise<{ job_id: string; status: string }> {
   return apiFetch(apiKey, "/ingest", {
     method: "POST",
     body: JSON.stringify({ text, ...opts }),
@@ -258,4 +281,358 @@ export async function checkHealth(
   apiKey: string
 ): Promise<{ status: string }> {
   return apiFetch<{ status: string }>(apiKey, "/health");
+}
+
+// ─── CRM (optional) ─────────────────────────────────────────────────────────
+// These hit the /crm/* gateway routes, present only when the crm-core schema is
+// installed. `crmAvailable` probes once so the UI can hide the section entirely.
+
+/** Feature detection: true when the brain exposes the CRM surface. */
+export async function crmAvailable(apiKey: string): Promise<boolean> {
+  try {
+    await apiFetch<unknown>(apiKey, "/crm/contacts?per_page=1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchCrmContacts(
+  apiKey: string,
+  params?: {
+    page?: number;
+    per_page?: number;
+    q?: string;
+    privacy_tier?: string;
+    lifecycle_status?: string;
+    exclude_restricted?: boolean;
+  }
+): Promise<CrmContactListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.page !== undefined) sp.set("page", String(params.page));
+  if (params?.per_page !== undefined) sp.set("per_page", String(params.per_page));
+  if (params?.q) sp.set("q", params.q);
+  if (params?.privacy_tier) sp.set("privacy_tier", params.privacy_tier);
+  if (params?.lifecycle_status) sp.set("lifecycle_status", params.lifecycle_status);
+  if (params?.exclude_restricted !== undefined)
+    sp.set("exclude_restricted", String(params.exclude_restricted));
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/crm/contacts${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchCrmContact(
+  apiKey: string,
+  id: string,
+  excludeRestricted: boolean = true
+): Promise<CrmContactBundle> {
+  const qs = excludeRestricted ? "" : "?exclude_restricted=false";
+  return apiFetch(apiKey, `/crm/contacts/${id}${qs}`);
+}
+
+export async function createCrmContact(
+  apiKey: string,
+  data: {
+    display_name: string;
+    canonical_email?: string;
+    organization_name?: string;
+    job_title?: string;
+    actor?: string;
+  }
+): Promise<CrmCreateResponse> {
+  return apiFetch(apiKey, "/crm/contacts", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function patchCrmContact(
+  apiKey: string,
+  id: string,
+  data: {
+    patch: Record<string, unknown>;
+    actor?: string;
+    origin?: string;
+    run_id?: string | null;
+    expected_updated_at?: string | null;
+  }
+): Promise<CrmPatchResponse> {
+  return apiFetch(apiKey, `/crm/contacts/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function addCrmMethod(
+  apiKey: string,
+  id: string,
+  data: { method_type: string; value: string; label?: string; is_primary?: boolean; actor?: string; source?: string }
+): Promise<{ method: CrmMethod }> {
+  return apiFetch(apiKey, `/crm/contacts/${id}/methods`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function setCrmFieldLock(
+  apiKey: string,
+  id: string,
+  data: { field_key: string; locked: boolean; actor?: string }
+): Promise<Record<string, unknown>> {
+  return apiFetch(apiKey, `/crm/contacts/${id}/field-lock`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function fetchCrmFieldEvidence(
+  apiKey: string,
+  id: string,
+  params?: { field_key?: string; limit?: number; exclude_restricted?: boolean }
+): Promise<{ evidence: CrmEvidence[] }> {
+  const sp = new URLSearchParams();
+  if (params?.field_key) sp.set("field_key", params.field_key);
+  if (params?.limit !== undefined) sp.set("limit", String(params.limit));
+  if (params?.exclude_restricted !== undefined)
+    sp.set("exclude_restricted", String(params.exclude_restricted));
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/crm/contacts/${id}/field-evidence${qs ? `?${qs}` : ""}`);
+}
+
+export async function addCrmFieldEvidence(
+  apiKey: string,
+  id: string,
+  data: { field_key: string; thought_id: string; role?: string; target_kind?: string; target_id?: string | null; note?: string; actor?: string }
+): Promise<{ evidence_id: string }> {
+  return apiFetch(apiKey, `/crm/contacts/${id}/field-evidence`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function fetchCrmProposals(
+  apiKey: string,
+  params?: { page?: number; per_page?: number; status?: string; contact_id?: string; run_id?: string }
+): Promise<CrmProposalListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.page !== undefined) sp.set("page", String(params.page));
+  if (params?.per_page !== undefined) sp.set("per_page", String(params.per_page));
+  if (params?.status) sp.set("status", params.status);
+  if (params?.contact_id) sp.set("contact_id", params.contact_id);
+  if (params?.run_id) sp.set("run_id", params.run_id);
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/crm/proposals${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchCrmProposalsCount(
+  apiKey: string,
+  contactId?: string
+): Promise<{ open: number }> {
+  const qs = contactId ? `?contact_id=${encodeURIComponent(contactId)}` : "";
+  return apiFetch(apiKey, `/crm/proposals/count${qs}`);
+}
+
+export async function resolveCrmProposal(
+  apiKey: string,
+  id: string,
+  data: { decision: "accept" | "reject"; actor?: string }
+): Promise<Record<string, unknown>> {
+  return apiFetch(apiKey, `/crm/proposals/${id}/resolve`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function resolveCrmProposalsByRun(
+  apiKey: string,
+  data: { run_id: string; decision: "accept" | "reject"; actor?: string }
+): Promise<Record<string, unknown>> {
+  return apiFetch(apiKey, `/crm/proposals/resolve-run`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function fetchCrmHistory(
+  apiKey: string,
+  id: string,
+  params?: { page?: number; per_page?: number }
+): Promise<CrmChangeLogResponse> {
+  const sp = new URLSearchParams();
+  if (params?.page !== undefined) sp.set("page", String(params.page));
+  if (params?.per_page !== undefined) sp.set("per_page", String(params.per_page));
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/crm/contacts/${id}/history${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchCrmRelationshipItems(
+  apiKey: string,
+  id: string,
+  excludeRestricted: boolean = true
+): Promise<CrmRelationshipItems> {
+  const qs = excludeRestricted ? "" : "?exclude_restricted=false";
+  return apiFetch(apiKey, `/crm/contacts/${id}/relationship-items${qs}`);
+}
+
+export async function addCrmNote(
+  apiKey: string,
+  id: string,
+  data: { body: string; note_type?: string; pinned?: boolean; privacy_tier?: string; actor?: string }
+): Promise<{ note: CrmNote }> {
+  return apiFetch(apiKey, `/crm/contacts/${id}/notes`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateCrmNote(
+  apiKey: string,
+  noteId: string,
+  data: Record<string, unknown>
+): Promise<{ note: CrmNote }> {
+  return apiFetch(apiKey, `/crm/notes/${noteId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function addCrmTask(
+  apiKey: string,
+  id: string,
+  data: Record<string, unknown>
+): Promise<{ task: CrmTask }> {
+  return apiFetch(apiKey, `/crm/contacts/${id}/tasks`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateCrmTask(
+  apiKey: string,
+  taskId: string,
+  data: Record<string, unknown>
+): Promise<{ task: CrmTask }> {
+  return apiFetch(apiKey, `/crm/tasks/${taskId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function addCrmImportantDate(
+  apiKey: string,
+  id: string,
+  data: Record<string, unknown>
+): Promise<{ important_date: CrmImportantDate }> {
+  return apiFetch(apiKey, `/crm/contacts/${id}/important-dates`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateCrmImportantDate(
+  apiKey: string,
+  dateId: string,
+  data: Record<string, unknown>
+): Promise<{ important_date: CrmImportantDate }> {
+  return apiFetch(apiKey, `/crm/important-dates/${dateId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function fetchCrmInteractions(
+  apiKey: string,
+  id: string,
+  params?: { limit?: number; offset?: number; exclude_restricted?: boolean }
+): Promise<CrmInteractionsResponse> {
+  const sp = new URLSearchParams();
+  if (params?.limit !== undefined) sp.set("limit", String(params.limit));
+  if (params?.offset !== undefined) sp.set("offset", String(params.offset));
+  if (params?.exclude_restricted !== undefined)
+    sp.set("exclude_restricted", String(params.exclude_restricted));
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/crm/contacts/${id}/interactions${qs ? `?${qs}` : ""}`);
+}
+
+export async function logCrmInteraction(
+  apiKey: string,
+  data: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  return apiFetch(apiKey, `/crm/interactions`, { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function updateCrmInteraction(
+  apiKey: string,
+  interactionId: string,
+  data: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  return apiFetch(apiKey, `/crm/interactions/${interactionId}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
+export async function fetchCrmTimeline(
+  apiKey: string,
+  id: string,
+  params?: { limit?: number; exclude_restricted?: boolean }
+): Promise<CrmTimelineResponse> {
+  const sp = new URLSearchParams();
+  if (params?.limit !== undefined) sp.set("limit", String(params.limit));
+  if (params?.exclude_restricted !== undefined)
+    sp.set("exclude_restricted", String(params.exclude_restricted));
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/crm/contacts/${id}/timeline${qs ? `?${qs}` : ""}`);
+}
+
+// ─── Wiki (optional) ─────────────────────────────────────────────────────────
+// These hit the /wiki/* gateway routes, present only when the wiki-pages schema
+// is installed. `wikiAvailable` probes once so the UI can hide the section (or
+// show the inline "schema not installed" empty-state) entirely. A brain WITHOUT
+// the schema returns 404 on GET /wiki/pages, so the probe simply comes back
+// false. Section identifiers are UUIDs; a page slug is arbitrary user text and
+// is always percent-encoded before it goes into a path segment.
+
+/** Feature detection: true when the brain exposes the wiki surface. */
+export async function wikiAvailable(apiKey: string): Promise<boolean> {
+  try {
+    await apiFetch<unknown>(apiKey, "/wiki/pages?per_page=1");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchWikiPages(
+  apiKey: string,
+  params?: { page_kind?: string; page?: number; per_page?: number }
+): Promise<WikiPageListResponse> {
+  const sp = new URLSearchParams();
+  if (params?.page_kind) sp.set("page_kind", params.page_kind);
+  // IN-07: preserve explicit numeric values (page/per_page are always >= 1 here,
+  // but keep the guard consistent with the rest of this module).
+  if (params?.page !== undefined) sp.set("page", String(params.page));
+  if (params?.per_page !== undefined) sp.set("per_page", String(params.per_page));
+  const qs = sp.toString();
+  return apiFetch(apiKey, `/wiki/pages${qs ? `?${qs}` : ""}`);
+}
+
+export async function createWikiPage(
+  apiKey: string,
+  data: { slug: string; title: string; page_kind?: WikiPageKind; metadata?: Record<string, unknown> }
+): Promise<WikiCreatePageResponse> {
+  return apiFetch(apiKey, "/wiki/pages", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function fetchWikiPage(
+  apiKey: string,
+  slug: string
+): Promise<WikiPageDetailResponse> {
+  return apiFetch(apiKey, `/wiki/pages/${encodeURIComponent(slug)}`);
+}
+
+export async function writeWikiSection(
+  apiKey: string,
+  slug: string,
+  sectionKey: string,
+  data: { body_md: string; heading?: string; display_order?: number }
+): Promise<WikiWriteSectionResponse> {
+  return apiFetch(
+    apiKey,
+    `/wiki/pages/${encodeURIComponent(slug)}/sections/${encodeURIComponent(sectionKey)}`,
+    { method: "PUT", body: JSON.stringify(data) }
+  );
+}
+
+export async function acceptWikiPending(
+  apiKey: string,
+  sectionId: string
+): Promise<WikiAcceptPendingResponse> {
+  return apiFetch(apiKey, `/wiki/sections/${encodeURIComponent(sectionId)}/accept-pending`, {
+    method: "POST",
+  });
+}
+
+export async function rejectWikiPending(
+  apiKey: string,
+  sectionId: string
+): Promise<WikiRejectPendingResponse> {
+  return apiFetch(apiKey, `/wiki/sections/${encodeURIComponent(sectionId)}/reject-pending`, {
+    method: "POST",
+  });
+}
+
+export async function setWikiSectionLock(
+  apiKey: string,
+  sectionId: string,
+  locked: boolean
+): Promise<WikiLockResponse> {
+  return apiFetch(apiKey, `/wiki/sections/${encodeURIComponent(sectionId)}/lock`, {
+    method: "POST",
+    body: JSON.stringify({ locked }),
+  });
+}
+
+export async function archiveWikiPage(
+  apiKey: string,
+  slug: string
+): Promise<WikiArchivePageResponse> {
+  return apiFetch(apiKey, `/wiki/pages/${encodeURIComponent(slug)}`, { method: "DELETE" });
 }
