@@ -1,0 +1,21 @@
+{
+  "name": "Provenance Chains",
+  "description": "Behavioral skill that tags every derived artifact (digests, wikis, summaries) with correct derivation columns when capturing to Open Brain, and reaches for trace_provenance / find_derivatives when a user asks where a belief came from. Pairs with the provenance-chains schema and recipe.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["AI client with reusable skills/prompts (Claude Code, Codex, Cursor, etc.)"]
+  },
+  "requires_skills": [],
+  "tags": ["skill", "provenance", "derivation", "capture", "synthesis", "workflow"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-05",
+  "updated": "2026-07-05"
+}
