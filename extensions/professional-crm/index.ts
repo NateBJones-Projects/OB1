@@ -19,6 +19,17 @@ import { createClient } from "@supabase/supabase-js";
 
 const app = new Hono();
 
+/**
+ * PostgREST's `.or()` filter string treats `,` `.` `(` `)` `\` as syntax
+ * (condition separator, column.operator.value separator, grouping, escape).
+ * Unescaped user input in an ILIKE fallback can reshape the filter instead
+ * of just matching text — escape those characters before interpolating.
+ * https://postgrest.org/en/stable/references/api/tables_views.html#operators
+ */
+function escapePostgrestFilterValue(value: string): string {
+  return value.replace(/[,.()\\]/g, "\\$&");
+}
+
 // POST /mcp - Main MCP endpoint
 app.post("*", async (c) => {
   if (!c.req.header("accept")?.includes("text/event-stream")) {
@@ -137,8 +148,9 @@ app.post("*", async (c) => {
             .select("*")
             .eq("user_id", userId);
 
+          const escaped = escapePostgrestFilterValue(query);
           queryBuilder = queryBuilder.or(
-            `name.ilike.%${query}%,company.ilike.%${query}%,title.ilike.%${query}%,notes.ilike.%${query}%`
+            `name.ilike.%${escaped}%,company.ilike.%${escaped}%,title.ilike.%${escaped}%,notes.ilike.%${escaped}%`
           );
 
           if (tags && tags.length > 0) {
