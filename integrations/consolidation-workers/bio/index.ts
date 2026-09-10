@@ -25,6 +25,8 @@ import {
   asString,
   asInteger,
   computeContentFingerprint,
+  embedText,
+  safeEmbedding,
 } from "../_shared/helpers.ts";
 import {
   CLASSIFIER_MODEL_OPENROUTER,
@@ -400,6 +402,16 @@ async function upsertProfile(
 ): Promise<{ id: string; created: boolean }> {
   const now = new Date().toISOString();
 
+  // Embed the profile so it is retrievable by semantic search — the whole
+  // point of a canonical anchor. Best-effort: a transient embedding failure
+  // must not lose the profile write.
+  let embedding: number[] | undefined;
+  try {
+    embedding = safeEmbedding(await embedText(profileContent));
+  } catch (err) {
+    console.warn("Bio profile embedding failed; storing without embedding:", err);
+  }
+
   const profileMetadata = {
     generated_by: "consolidation-bio",
     artifact_type: "biographical_profile",
@@ -422,6 +434,7 @@ async function upsertProfile(
         source_type: "system_profile",
         metadata: profileMetadata,
         updated_at: now,
+        ...(embedding ? { embedding } : {}),
       })
       .eq("id", existingId);
 
@@ -450,6 +463,7 @@ async function upsertProfile(
       source_type: "system_profile",
       metadata: profileMetadata,
       content_fingerprint: contentFingerprint,
+      ...(embedding ? { embedding } : {}),
     })
     .select("id")
     .single();
