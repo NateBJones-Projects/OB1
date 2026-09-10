@@ -6,7 +6,7 @@
     "name": "Alan Shurafa",
     "github": "alanshurafa"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "requires": {
     "open_brain": true,
     "services": ["Supabase"],
@@ -16,5 +16,6 @@
   "tags": ["skill", "capture", "claude-code", "hooks", "session-end", "ambient"],
   "difficulty": "beginner",
   "estimated_time": "10 minutes",
-  "created": "2026-04-06"
+  "created": "2026-04-06",
+  "updated": "2026-07-05"
 }

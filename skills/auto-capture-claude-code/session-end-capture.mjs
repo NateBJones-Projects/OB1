@@ -35,6 +35,9 @@ import { fileURLToPath } from "node:url";
 
 const HARD_TIMEOUT_MS = 25000;
 const MIN_USER_TURNS = 3;
+// Cap the ingest payload under the embedding model's ~8191-token limit
+// (text-embedding-3-small). Long sessions otherwise make /ingest return HTTP 500.
+const MAX_INGEST_CHARS = Number(process.env.OB_CAPTURE_MAX_CHARS) || 24000;
 const RETRY_MAX_ATTEMPTS = 5;
 const RETRY_BATCH_SIZE = 3;
 // Per-request fetch timeout. Must be less than HARD_TIMEOUT_MS so an
@@ -91,7 +94,31 @@ function appendLog(sessionId, projectName, turns, disposition) {
   }
 }
 
-// ── Transcript parsing (simplified) ─────────────────────────────────────────
+// ── Transcript parsing (JSONL) ──────────────────────────────────────────────
+// Claude Code writes transcripts as JSON Lines: one JSON object per line, with
+// a `type` discriminator. Real conversation turns are type "user" / "assistant"
+// carrying a `message` object. Metadata lines (mode, attachment, system, etc.)
+// and sidechain (subagent) turns are ignored. A type:"user" line whose content
+// is only tool_result blocks is a tool response, not a human turn.
+
+function textFromContent(content) {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b) => b && b.type === "text" && typeof b.text === "string")
+      .map((b) => b.text)
+      .join("\n");
+  }
+  return "";
+}
+
+function isToolResultOnly(content) {
+  return (
+    Array.isArray(content) &&
+    content.length > 0 &&
+    content.every((b) => b && b.type === "tool_result")
+  );
+}
 
 function parseTranscript(transcriptPath) {
   const raw = fs.readFileSync(transcriptPath, "utf8");
@@ -103,35 +130,36 @@ function parseTranscript(transcriptPath) {
   let cwd = "";
 
   const turns = [];
-  let currentRole = null;
-  let currentContent = [];
 
   for (const line of lines) {
-    // Parse header lines
-    if (line.startsWith("Session ID: ")) { sessionId = line.slice(12).trim(); continue; }
-    if (line.startsWith("Created: ")) { createdAt = line.slice(9).trim(); continue; }
-    if (line.startsWith("Branch: ")) { gitBranch = line.slice(8).trim(); continue; }
-    if (line.startsWith("CWD: ")) { cwd = line.slice(5).trim(); continue; }
+    if (!line.trim()) continue;
+    let o;
+    try {
+      o = JSON.parse(line);
+    } catch {
+      continue; // skip any non-JSON line defensively
+    }
 
-    // Detect role markers
-    const roleMatch = line.match(/^(Human|Assistant|System):\s*(.*)/);
-    if (roleMatch) {
-      if (currentRole && currentContent.length > 0) {
-        turns.push({ role: currentRole, content: currentContent.join("\n").trim() });
-      }
-      currentRole = roleMatch[1].toLowerCase();
-      currentContent = roleMatch[2] ? [roleMatch[2]] : [];
-    } else {
-      currentContent.push(line);
+    // Header/metadata can appear on any record — capture the first seen.
+    if (sessionId === "unknown" && o.sessionId) sessionId = o.sessionId;
+    if (!createdAt && o.timestamp) createdAt = o.timestamp;
+    if (!gitBranch && o.gitBranch) gitBranch = o.gitBranch;
+    if (!cwd && o.cwd) cwd = o.cwd;
+
+    if (o.isSidechain) continue; // subagent turn, not part of the main thread
+
+    if (o.type === "user" && o.message?.role === "user") {
+      if (isToolResultOnly(o.message.content)) continue; // tool response, not a human turn
+      const text = textFromContent(o.message.content).trim();
+      if (text) turns.push({ role: "human", content: text });
+    } else if (o.type === "assistant" && o.message?.role === "assistant") {
+      // text blocks only — thinking and tool_use blocks are omitted from capture
+      const text = textFromContent(o.message.content).trim();
+      if (text) turns.push({ role: "assistant", content: text });
     }
   }
 
-  // Flush last turn
-  if (currentRole && currentContent.length > 0) {
-    turns.push({ role: currentRole, content: currentContent.join("\n").trim() });
-  }
-
-  const userTurns = turns.filter(t => t.role === "human").length;
+  const userTurns = turns.filter((t) => t.role === "human").length;
 
   return { sessionId, createdAt, gitBranch, cwd, turns, userTurns };
 }
@@ -155,12 +183,26 @@ function formatTranscript(parsed, projectName) {
     "---",
   ].join("\n");
 
-  const body = parsed.turns
+  let body = parsed.turns
     .filter(t => t.content.trim())
     .map(t => `[${t.role}]\n${escapeThoughtContent(t.content)}`)
     .join("\n\n");
 
+  // Keep the payload under the embedding token limit: preserve the start and
+  // end of the session, drop the middle.
+  body = truncateMiddle(body, MAX_INGEST_CHARS - header.length - 40);
+
   return `${header}\n\n<thought_content>\n${body}\n</thought_content>`;
+}
+
+function truncateMiddle(text, budget) {
+  if (!Number.isFinite(budget) || budget <= 0 || text.length <= budget) return text;
+  const marker = "\n\n[... transcript truncated to fit capture size limit ...]\n\n";
+  const keep = budget - marker.length;
+  if (keep <= 0) return text.slice(0, budget);
+  const headLen = Math.floor(keep * 0.6);
+  const tailLen = keep - headLen;
+  return text.slice(0, headLen) + marker + text.slice(text.length - tailLen);
 }
 
 // ── Import key (idempotency) ────────────────────────────────────────────────
