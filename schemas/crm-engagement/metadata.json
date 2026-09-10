@@ -1,0 +1,20 @@
+{
+  "name": "CRM Engagement",
+  "description": "The engagement layer for the CRM core: relationship notes, lightweight tasks/reminders, important dates, and a manual interaction log (calls, meetings, messages), all linked to crm_contacts by UUID with ON DELETE CASCADE. On top of those tables it derives a per-contact relationship-health summary (overdue tasks, due-soon tasks, upcoming dates, gone-quiet detection) and a keep-in-touch suggestion queue with dismiss/snooze/convert-to-task review history. The suggestion engine reads only this engagement data plus crm_contacts — no Gmail pipeline, no entity graph, no projection cache. UUID id contract throughout: every PK is UUID, contact_id is UUID REFERENCES public.crm_contacts(id), and crm_interactions.thought_id is UUID REFERENCES public.thoughts(id). RLS on every table, all privileges revoked from PUBLIC/anon/authenticated and granted only to service_role, every function SECURITY INVOKER. Note bodies and interaction summaries are kept out of the audit log. Requires the crm-core schema (apply it first).",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["schemas/crm-core (apply this schema first)"],
+    "tools": []
+  },
+  "tags": ["crm", "contacts", "notes", "tasks", "reminders", "interactions", "keep-in-touch", "relationship-health", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-06-14",
+  "updated": "2026-06-14"
+}
