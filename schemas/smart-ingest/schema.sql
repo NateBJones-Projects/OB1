@@ -40,13 +40,42 @@ CREATE TABLE IF NOT EXISTS public.ingestion_items (
   action text NOT NULL DEFAULT 'pending',   -- pending, add, skip, append_evidence, create_revision
   status text NOT NULL DEFAULT 'pending',   -- pending, ready, executed, failed
   reason text,
-  matched_thought_id bigint,
+  -- thoughts.id is uuid (schemas/enhanced-thoughts/schema.sql upsert_thought
+  -- returns v_id UUID). These were bigint, which made every write silently
+  -- orphan: the JSON string id never satisfied Number.isFinite() on the
+  -- Edge Function side, so it read back as "no thought_id" (OB1#379).
+  matched_thought_id uuid,
   similarity_score numeric(5,4),
-  result_thought_id bigint,
+  result_thought_id uuid,
   error_message text,
   metadata jsonb DEFAULT '{}',
   created_at timestamptz DEFAULT now()
 );
+
+-- Idempotent type migration for tables created before this fix. All existing
+-- values are NULL in practice (OB1#379 meant no write ever populated these
+-- columns), so USING NULL is safe; it's just documentation of that fact.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'ingestion_items'
+       AND column_name = 'matched_thought_id' AND data_type = 'bigint'
+  ) THEN
+    ALTER TABLE public.ingestion_items
+      ALTER COLUMN matched_thought_id TYPE uuid USING NULL;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'ingestion_items'
+       AND column_name = 'result_thought_id' AND data_type = 'bigint'
+  ) THEN
+    ALTER TABLE public.ingestion_items
+      ALTER COLUMN result_thought_id TYPE uuid USING NULL;
+  END IF;
+END
+$$;
 
 -- Index for fast job-item lookups
 CREATE INDEX IF NOT EXISTS ingestion_items_job_idx
@@ -117,8 +146,12 @@ $$;
 --    Returns { thought_id, evidence_count, action: 'appended' | 'already_exists' }.
 -- ============================================================
 
+-- Drop the old bigint-keyed overload (from before thoughts.id was uuid) so
+-- it doesn't linger as a dead, uncallable signature (OB1#379).
+DROP FUNCTION IF EXISTS public.append_thought_evidence(bigint, jsonb);
+
 CREATE OR REPLACE FUNCTION public.append_thought_evidence(
-  p_thought_id bigint,
+  p_thought_id uuid,
   p_evidence jsonb  -- {source, extracted_at, excerpt, source_label}
 )
 RETURNS jsonb
@@ -201,8 +234,8 @@ GRANT ALL ON TABLE public.ingestion_jobs TO service_role;
 GRANT ALL ON TABLE public.ingestion_items TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.ingestion_jobs_id_seq TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.ingestion_items_id_seq TO service_role;
-REVOKE EXECUTE ON FUNCTION public.append_thought_evidence(bigint, jsonb) FROM public;
-GRANT EXECUTE ON FUNCTION public.append_thought_evidence(bigint, jsonb)
+REVOKE EXECUTE ON FUNCTION public.append_thought_evidence(uuid, jsonb) FROM public;
+GRANT EXECUTE ON FUNCTION public.append_thought_evidence(uuid, jsonb)
   TO service_role;
 
 -- ============================================================

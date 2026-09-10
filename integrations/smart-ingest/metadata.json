@@ -6,7 +6,7 @@
     "name": "Alan Shurafa",
     "github": "alanshurafa"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "requires": {
     "open_brain": true,
     "services": ["OpenRouter or OpenAI (embeddings + extraction)", "Supabase"],
@@ -14,5 +14,6 @@
   },
   "tags": ["ingestion", "extraction", "llm", "deduplication", "edge-function"],
   "difficulty": "intermediate",
-  "estimated_time": "30 minutes"
+  "estimated_time": "30 minutes",
+  "updated": "2026-08-04"
 }
