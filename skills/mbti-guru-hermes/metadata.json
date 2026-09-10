@@ -1,0 +1,20 @@
+{
+  "name": "MBTI Guru Hermes",
+  "description": "MBTI typing engine for conversation within the agent-onboarding meta-skill. Administers the full MBTI Guru test in conversation (A/B questions, scoring identical to the original, descriptions of all 16 types). 4 versions: Quick (70q), Standard (93q), Extended (144q), Professional (200q).",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool", "Python 3"]
+  },
+  "tags": ["mbti", "guru", "personality", "test", "conversation", "stage-1c", "meta-skill"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

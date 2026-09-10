@@ -1,0 +1,21 @@
+{
+  "name": "Identity Self-Audit",
+  "description": "Mandatory identity self-audit. Detects and auto-registers agent identity faults (premature closure, false agreement, role confusion, etc.) in a Supabase identity_faults table. Core of the persistent human-machine interface layer that survives model swaps and provider changes. Stage 0 of the agent-onboarding meta-skill.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "requires_skills": ["supabase-startup-protocol"],
+  "tags": ["identity", "audit", "self-monitoring", "agency", "faults", "human-machine-interface", "universal"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

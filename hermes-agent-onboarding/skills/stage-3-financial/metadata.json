@@ -1,0 +1,21 @@
+{
+  "name": "Stage 3 Financial",
+  "description": "Stage 3 of the agent-onboarding meta-skill. Builds the user's financial profile from 4 layers: bank CSV import → MBTI × Finance profile → Financial goals → Adapted strategies. Uses Python modules for CSV parsing and MBTI financial personality assessment.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool", "Python 3"]
+  },
+  "requires_skills": ["mbti-guru-hermes"],
+  "tags": ["financial", "mbti", "csv", "goals", "stage-3", "meta-skill"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

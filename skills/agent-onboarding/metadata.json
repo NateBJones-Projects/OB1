@@ -1,0 +1,32 @@
+{
+  "name": "Agent Onboarding",
+  "description": "Generative 6-stage meta-skill that transforms a blank agent into a customized ecosystem for ANY user. Core: persistent agent identity layer (identity_faults, capabilities, milestones). Biography = career-tracker + MBTI. Financial × personality. Generative domain ontology.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "3.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "requires_skills": [
+    "identity-self-audit",
+    "identity-cqrs",
+    "context-bridge",
+    "supabase-startup-protocol",
+    "checkpoint-workflow",
+    "mbti-guru-hermes",
+    "stage-3-financial",
+    "stage-4-system-ontologist",
+    "stage-5-agent-calibration"
+  ],
+  "requires_primitives": [],
+  "tags": ["onboarding", "meta-skill", "generative", "identity", "mbti", "financial", "universal"],
+  "difficulty": "advanced",
+  "estimated_time": "2-3 hours",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

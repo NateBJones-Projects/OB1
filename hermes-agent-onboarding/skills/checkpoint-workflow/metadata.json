@@ -1,0 +1,21 @@
+{
+  "name": "Checkpoint Workflow",
+  "description": "Context component of the agent-onboarding meta-skill. Manages the lifecycle of session_checkpoints in Supabase — the context layer that feeds the agent identity framework. Each checkpoint is an intentional mark: not what was done (log), but where the agent was and what it was trying to become.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "requires_skills": ["supabase-startup-protocol"],
+  "tags": ["checkpoint", "meta-skill", "identity", "context", "session"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

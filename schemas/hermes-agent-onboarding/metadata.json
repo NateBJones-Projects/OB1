@@ -1,0 +1,20 @@
+{
+  "name": "Hermes Agent Onboarding — Schema",
+  "description": "10 database tables for persistent AI agent identity: identity_faults, agent_capabilities, identity_milestones, session_checkpoints, user_profiles, user_preferences, user_mbti, user_style, user_relations, user_beliefs. All with RLS and service_role GRANTs.",
+  "category": "schemas",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": ["identity", "mbti", "profiles", "faults", "capabilities", "checkpoints", "rls", "grants"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}

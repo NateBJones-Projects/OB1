@@ -1,0 +1,20 @@
+{
+  "name": "Stage 5 Agent Calibration",
+  "description": "Stage 5 of the agent-onboarding meta-skill. Translates everything collected in Stages 0–4 into executable agent behavior: per-user SOUL.md generation, wrapper configuration with domain skills, and end-to-end verification. Completes the onboarding cycle.",
+  "category": "skills",
+  "author": {
+    "name": "Djair Guilherme",
+    "github": "djairjr"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent or similar AI coding tool"]
+  },
+  "tags": ["calibration", "soul-md", "wrapper", "verification", "stage-5", "meta-skill"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-31",
+  "updated": "2026-05-31"
+}
