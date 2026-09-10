@@ -1,0 +1,19 @@
+{
+  "name": "ob1-file-converter",
+  "version": "1.0.0",
+  "description": "Offline converter for turning local text, markdown, and JSON exports into Open Brain extracted-record JSON.",
+  "private": true,
+  "type": "module",
+  "main": "convert.js",
+  "bin": {
+    "ob1-file-converter": "./convert.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test test.js",
+    "convert:sample": "node convert.js fixtures/dir --source sample --source-label \"Sample files\""
+  },
+  "license": "FSL-1.1-MIT"
+}
