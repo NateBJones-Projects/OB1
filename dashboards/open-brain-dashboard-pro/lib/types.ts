@@ -13,7 +13,7 @@ export interface Thought {
 }
 
 export interface IngestionJob {
-  id: number;
+  id: string;
   source_label: string;
   status: string;
   extracted_count: number;
@@ -69,16 +69,16 @@ export interface IngestionItemMeta {
 }
 
 export interface IngestionItem {
-  id: number;
-  job_id: number;
+  id: string;
+  job_id: string;
   /** The extracted thought content (DB column: extracted_content) */
   content: string;
   action: string; // add, skip, create_revision, append_evidence
   reason: string | null;
   status: string;
-  matched_thought_id: number | null;
+  matched_thought_id: string | null;
   similarity_score: number | null;
-  result_thought_id: number | null;
+  result_thought_id: string | null;
   /** Parsed metadata — type, importance, tags, source_snippet */
   meta: IngestionItemMeta;
 }
@@ -93,7 +93,7 @@ export type AddToBrainMode = "auto" | "single" | "extract";
 export interface AddToBrainResult {
   path: "single" | "extract";
   thought_id?: number;
-  job_id?: number;
+  job_id?: string;
   type?: string;
   status?: string;
   extracted_count?: number | null;
