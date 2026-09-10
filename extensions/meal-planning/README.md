@@ -198,7 +198,7 @@ Follow the [Deploy an Edge Function](../../primitives/deploy-edge-function/) gui
 You'll also need to set the household Supabase key:
 
 ```bash
-supabase secrets set SUPABASE_HOUSEHOLD_KEY=household-scoped-api-key
+supabase secrets set HOUSEHOLD_SUPABASE_KEY=household-scoped-api-key
 ```
 
 ### 3. Connect Your Household Member
