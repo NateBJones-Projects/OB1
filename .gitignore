@@ -21,6 +21,13 @@ token.json
 gmail-sync-log.json
 sync-log.json
 
+# Personal compiled/derived brain content — NEVER commit to a public repo.
+# These are generated locally from your own Open Brain data (autobiography,
+# personal + medical entity pages, enrichment/lint state) and are private.
+compiled-wiki/
+recipes/thought-enrichment/data/
+recipes/lint-sweep/lint-report-*.md
+
 # Build artifacts
 deno.lock
 docs/walkthroughs/*/public/

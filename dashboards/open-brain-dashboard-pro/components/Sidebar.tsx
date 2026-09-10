@@ -14,6 +14,7 @@ interface NavItem {
 const nav: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/thoughts", label: "Thoughts", icon: ThoughtsIcon },
+  { href: "/wiki", label: "Wiki", icon: WikiIcon },
   { href: "/search", label: "Search", icon: SearchIcon },
   { href: "/audit", label: "Audit", icon: AuditIcon },
   { href: "/duplicates", label: "Duplicates", icon: DuplicatesIcon },
@@ -99,6 +100,25 @@ function ThoughtsIcon({ active }: { active: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
       <path d="M3 4.5h12M3 9h8M3 13.5h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function WikiIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={active ? "currentColor" : "currentColor"}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
     </svg>
   );
 }

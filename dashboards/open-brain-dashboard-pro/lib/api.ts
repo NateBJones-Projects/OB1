@@ -259,3 +259,53 @@ export async function checkHealth(
 ): Promise<{ status: string }> {
   return apiFetch<{ status: string }>(apiKey, "/health");
 }
+
+// ── Wiki pages (compiled-wiki output stored as wiki_* thoughts) ──────────
+
+export type WikiKind = "wiki_entity" | "wiki_topic";
+
+/**
+ * List ALL compiled wiki pages of one kind. Paginates because the gateway
+ * caps per_page at 100. Includes restricted rows (all pages visible behind login).
+ */
+export async function fetchWikiPages(
+  apiKey: string,
+  kind: WikiKind
+): Promise<Thought[]> {
+  const perPage = 100;
+  const all: Thought[] = [];
+  for (let page = 1; page <= 50; page++) {
+    const res = await fetchThoughts(apiKey, {
+      source_type: kind,
+      per_page: perPage,
+      page,
+      sort: "created_at",
+      order: "desc",
+      exclude_restricted: false,
+    });
+    all.push(...res.data);
+    if (res.data.length < perPage) break;
+  }
+  return all;
+}
+
+/**
+ * Fetch one wiki page by its metadata.wiki_slug. Looks it up through the browse
+ * endpoint (both kinds) rather than /thought/:id — the gateway's single-thought
+ * route is numeric-only and this Open Brain instance uses UUID thought ids, so
+ * id-based fetch cannot work. Returns null if no page has that slug.
+ */
+export async function fetchWikiPageBySlug(
+  apiKey: string,
+  slug: string
+): Promise<Thought | null> {
+  const [entities, topics] = await Promise.all([
+    fetchWikiPages(apiKey, "wiki_entity"),
+    fetchWikiPages(apiKey, "wiki_topic"),
+  ]);
+  return (
+    [...entities, ...topics].find(
+      (t) => ((t.metadata ?? {}) as Record<string, unknown>).wiki_slug === slug
+    ) ?? null
+  );
+}
