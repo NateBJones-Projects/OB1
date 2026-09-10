@@ -107,7 +107,7 @@ Or connect the folder to Vercel via the dashboard. Set the environment variables
 
 ### Step 5 (alternative): Deploy to Cloudflare Workers (optional)
 
-If you're already on Cloudflare for the [`open-brain-rest`](../../integrations/cloudflare-rest-worker/) gateway, you can host the dashboard on the same platform via the [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter. The older `@cloudflare/next-on-pages` adapter caps at Next 15.5.x and doesn't support this dashboard's Next 16.
+If you're already on Cloudflare for the [`open-brain-rest`](../../integrations/open-brain-rest/) gateway, you can host the dashboard on the same platform via the [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter. The older `@cloudflare/next-on-pages` adapter caps at Next 15.5.x and doesn't support this dashboard's Next 16.
 
 The repo ships the two config files this needs out of the box (`open-next.config.ts` and `wrangler.jsonc`); rename the Worker in `wrangler.jsonc` if you want something other than `ob-dashboard`.
 
