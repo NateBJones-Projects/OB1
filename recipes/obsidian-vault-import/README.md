@@ -118,6 +118,8 @@ FILE LOCATION
 | `--no-secret-scan` | Disable secret detection (not recommended) |
 | `--verbose` | Show detailed progress for each note |
 | `--report` | Generate an `import-report.md` summary file |
+| `--source-label X` | Stamp `metadata.source = X` (default: `obsidian`) |
+| `--default-type X` | Fallback `metadata.type` when a note has no frontmatter `type:` (default: none) |
 
 ## What Gets Filtered
 
@@ -243,6 +245,27 @@ python import-obsidian.py /path/to/dayone-vault   --source-label day-one
 
 After this, your metadata filter becomes `{"source": "apple-journal"}` to
 retrieve only Apple Journal entries, etc.
+
+### Customizing the thought type
+
+By default the importer writes no `metadata.type` — thoughts inherit whatever
+default your downstream tooling applies. Two ways to set a type at import time:
+
+1. **Per note** — add a `type:` field to a note's YAML frontmatter. This always
+   wins, so a mixed vault can carry `type: decision`, `type: meeting`, etc.
+2. **Vault-wide fallback** — pass `--default-type` for any note that doesn't
+   declare its own. Ideal for single-purpose vaults:
+
+```bash
+python import-obsidian.py /path/to/journal-vault --default-type journal
+python import-obsidian.py /path/to/meeting-notes --default-type meeting
+```
+
+Precedence is: frontmatter `type:` → `--default-type` → omitted. After import,
+`{"type": "journal"}` filters to just those thoughts, and OB1's
+`enhanced-thoughts` schema promotes `metadata.type` into the indexed `type`
+column. Pairs naturally with `--source-label` — e.g. an Apple Journal export
+becomes `--source-label apple-journal --default-type journal`.
 
 ## Troubleshooting
 
