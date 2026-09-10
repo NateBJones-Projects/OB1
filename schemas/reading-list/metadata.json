@@ -1,0 +1,20 @@
+{
+  "name": "Reading List",
+  "description": "Adds a reading_list table for tracking books, articles, podcasts, and videos with ratings, review notes, tags, and status tracking from want-to-read through finished.",
+  "category": "schemas",
+  "author": {
+    "name": "Kaitlin Cort",
+    "github": "kaizengrowth"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["reading-list", "books", "media", "ratings", "tracking"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-07-13",
+  "updated": "2026-07-13"
+}
