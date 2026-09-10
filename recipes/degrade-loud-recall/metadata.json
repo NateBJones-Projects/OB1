@@ -1,0 +1,25 @@
+{
+  "name": "degrade-loud-recall",
+  "description": "A recall wrapper and assistant snippet that make recall source health explicit instead of silently treating missing recall as normal.",
+  "category": "recipes",
+  "author": {
+    "name": "Tony Finley",
+    "github": "wefilmshit"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": [
+      "Postgres with pgvector",
+      "psql"
+    ]
+  },
+  "tags": [
+    "recall",
+    "observability",
+    "source-health"
+  ],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes"
+}
