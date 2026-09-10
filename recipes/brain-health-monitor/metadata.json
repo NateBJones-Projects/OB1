@@ -1,0 +1,20 @@
+{
+  "name": "Brain Health Monitor",
+  "description": "Hourly ops probe that makes cron→function outcomes observable (pg_cron 'succeeded' only means the request was queued), pages Slack on critical breaches only, and sends a weekly all-green heartbeat so monitor-death is distinguishable from health.",
+  "category": "recipes",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase (pg_cron + pg_net)", "Slack bot token"],
+    "tools": ["Supabase CLI (to deploy the Edge Function)"]
+  },
+  "tags": ["monitoring", "ops", "alerting", "observability", "cron", "health", "slack"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-07-12",
+  "updated": "2026-07-12"
+}
