@@ -19,11 +19,14 @@
  *   SUPABASE_SERVICE_ROLE_KEY
  *   MCP_ACCESS_KEY
  *
- * Extension hook:
- *   If you install the thought_audit schema (see `schemas/thought-audit`)
- *   you can extend this function to write an audit row before the delete
- *   so the prior content is preserved for recovery. Left out of the base
- *   integration to keep dependencies minimal.
+ * Audit trail:
+ *   Requires the thought_audit schema (see `schemas/thought-audit`).
+ *   Before each hard delete, this function writes an append-only audit
+ *   row preserving the prior content and metadata under
+ *   diff.previous_content / diff.previous_metadata, so a deleted thought
+ *   is recoverable from the audit trail alone. The audit write is
+ *   fire-and-forget by contract — a failure there is logged but never
+ *   blocks the delete.
  */
 
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -60,9 +63,10 @@ server.registerTool(
   async ({ id }) => {
     try {
       // Pre-flight fetch so "not found" is a clear, distinct outcome.
+      // Also pull metadata so the audit row can preserve it for recovery.
       const { data: existing, error: fetchError } = await supabase
         .from("thoughts")
-        .select("id, content")
+        .select("id, content, metadata")
         .eq("id", id)
         .single();
 
@@ -76,6 +80,31 @@ server.registerTool(
           ],
           isError: true,
         };
+      }
+
+      // Audit-before-delete: preserve the prior content and metadata so the
+      // hard delete below is recoverable from the append-only audit trail
+      // alone. Fire-and-forget by contract — an audit failure is logged but
+      // MUST NOT block the delete (see schemas/thought-audit).
+      const meta = (existing.metadata ?? {}) as Record<string, unknown>;
+      const { error: auditError } = await supabase.from("thought_audit").insert({
+        thought_id: id,
+        action: "delete",
+        source: typeof meta.source === "string" ? meta.source : null,
+        author_session_id:
+          typeof meta.author_session_id === "string"
+            ? meta.author_session_id
+            : null,
+        diff: {
+          previous_content: existing.content,
+          previous_metadata: existing.metadata ?? null,
+        },
+        actor_context: { tool: "delete_thought", via: "delete-thought-mcp" },
+      });
+      if (auditError) {
+        console.warn(
+          `thought_audit insert failed for ${id} (continuing with delete): ${auditError.message}`,
+        );
       }
 
       const { error } = await supabase.from("thoughts").delete().eq("id", id);
@@ -99,7 +128,7 @@ server.registerTool(
         content: [
           {
             type: "text" as const,
-            text: `Deleted thought ${id} (prior content length: ${priorLength} chars).`,
+            text: `Deleted thought ${id} (prior content length: ${priorLength} chars).${auditError ? " Warning: audit row could not be written." : " Prior content preserved in thought_audit for recovery."}`,
           },
         ],
       };
