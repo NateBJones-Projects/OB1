@@ -1,6 +1,6 @@
 {
   "name": "Discord Capture",
-  "description": "Discord bot that captures messages from designated channels into Open Brain, mirroring the Slack capture pattern.",
+  "description": "Discord slash command and message context-menu command that capture thoughts into Open Brain via a Supabase Edge Function.",
   "category": "integrations",
   "author": {
     "name": "OB1 Team"
@@ -11,9 +11,9 @@
     "services": ["Discord API", "OpenRouter"],
     "tools": ["Supabase CLI"]
   },
-  "tags": ["discord", "capture", "bot", "messaging"],
+  "tags": ["discord", "capture", "slash-command", "messaging"],
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
   "created": "2026-03-11",
-  "updated": "2026-03-11"
+  "updated": "2026-08-02"
 }
