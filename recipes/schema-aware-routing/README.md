@@ -74,27 +74,39 @@ The LLM is prompted to ONLY extract action items when the speaker commits to doi
 ![Step 1](https://img.shields.io/badge/Step_1-Create_Your_Database_Tables-2E86AB?style=for-the-badge)
 
 <details>
-<summary>📋 <strong>SQL: Create all five tables and grant permissions</strong> (click to expand)</summary>
+<summary>📋 <strong>SQL: Extend thoughts, create recipe tables, and grant permissions</strong> (click to expand)</summary>
 
 ```sql
 -- Enable the vector extension for embeddings
 create extension if not exists vector;
 
--- 1. Thoughts table — the raw capture
-create table thoughts (
+-- 1. Thoughts table — the raw capture.
+-- If you already ran the canonical OB1 setup, this leaves your table intact
+-- and only adds the recipe-specific columns below.
+create table if not exists thoughts (
   id uuid primary key default gen_random_uuid(),
   content text not null,
   embedding vector(1536),
-  domain text default 'personal',
-  status text default 'active',
-  source text default 'api',
-  metadata jsonb default '{}',
+  metadata jsonb default '{}'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
+alter table thoughts add column if not exists domain text default 'personal';
+alter table thoughts add column if not exists status text default 'active';
+alter table thoughts add column if not exists source text default 'api';
+alter table thoughts add column if not exists metadata jsonb default '{}'::jsonb;
+alter table thoughts add column if not exists created_at timestamptz default now();
+alter table thoughts add column if not exists updated_at timestamptz default now();
+
+create index if not exists thoughts_metadata_gin_idx on thoughts using gin (metadata);
+create index if not exists thoughts_created_at_desc_idx on thoughts (created_at desc);
+create index if not exists thoughts_domain_idx on thoughts (domain);
+create index if not exists thoughts_status_idx on thoughts (status);
+create index if not exists thoughts_source_idx on thoughts (source);
+
 -- 2. People table — your contact graph
-create table people (
+create table if not exists people (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   aliases text[] default '{}',
@@ -106,7 +118,7 @@ create table people (
 );
 
 -- 3. Interactions table — links people to thoughts
-create table interactions (
+create table if not exists interactions (
   id uuid primary key default gen_random_uuid(),
   person_id uuid references people(id),
   note text,
@@ -116,7 +128,7 @@ create table interactions (
 );
 
 -- 4. Action items table — first-person commitments only
-create table action_items (
+create table if not exists action_items (
   id uuid primary key default gen_random_uuid(),
   title text not null,
   domain text default 'personal',
@@ -128,7 +140,7 @@ create table action_items (
 );
 
 -- 5. Pending confirmations table — for fuzzy match resolution
-create table pending_confirmations (
+create table if not exists pending_confirmations (
   id uuid primary key default gen_random_uuid(),
   type text not null,
   payload jsonb not null,
@@ -147,7 +159,7 @@ grant select, insert, update, delete on table public.pending_confirmations to se
 
 </details>
 
-Run this SQL in your Supabase SQL Editor (Dashboard → SQL Editor → New Query → paste → Run).
+Run this SQL in your Supabase SQL Editor (Dashboard → SQL Editor → New Query → paste → Run). It is safe to run after the canonical Open Brain getting-started SQL because it extends the existing `thoughts` table instead of recreating it.
 
 ✅ **Done when:** You can see all five tables in the Supabase Table Editor.
 
