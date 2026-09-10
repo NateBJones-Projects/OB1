@@ -88,15 +88,16 @@ For Claude Desktop and ChatGPT, the `?key=` URL is usually the simplest path. Fo
 Open Brain setup requires:
 
 - Supabase project.
-- OpenRouter account and API key.
+- OpenRouter account and API key, or Atlas Cloud configured as the OpenAI-compatible backend.
 - Supabase CLI.
 - A generated MCP access key.
 - pgvector enabled in Supabase.
-- `OPENROUTER_API_KEY` and `MCP_ACCESS_KEY` set as Supabase Edge Function secrets.
+- `OPENROUTER_API_KEY` and `MCP_ACCESS_KEY` set as Supabase Edge Function secrets. For Atlas Cloud, use `OPEN_BRAIN_AI_PROVIDER=atlascloud` plus `ATLASCLOUD_API_KEY` instead of `OPENROUTER_API_KEY`.
 
 Important details:
 
 - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Supabase Edge Functions.
+- OpenRouter remains the default AI backend. Atlas Cloud is selected explicitly with `OPEN_BRAIN_AI_PROVIDER=atlascloud`, or automatically when `ATLASCLOUD_API_KEY` is set and `OPENROUTER_API_KEY` is absent.
 - Newer Supabase projects may not grant service role table permissions by default. The user must run the documented `GRANT` SQL for the `thoughts` table.
 - The base embedding dimension is 1536. If users change embedding models, dimensions must still match the vector column and search function.
 - The `upsert_thought` function deduplicates by normalized content fingerprint and merges metadata on duplicate capture.

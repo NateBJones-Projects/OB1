@@ -8,10 +8,75 @@ import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const ATLASCLOUD_BASE = "https://api.atlascloud.ai/v1";
+const DEFAULT_OPENROUTER_EMBEDDING_MODEL = "openai/text-embedding-3-small";
+const DEFAULT_OPENROUTER_CHAT_MODEL = "openai/gpt-4o-mini";
+const DEFAULT_ATLASCLOUD_EMBEDDING_MODEL = "text-embedding-3-small";
+const DEFAULT_ATLASCLOUD_CHAT_MODEL = "qwen/qwen3.5-flash";
+
+const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY");
+const ATLASCLOUD_API_KEY =
+  Deno.env.get("ATLASCLOUD_API_KEY") || Deno.env.get("ATLAS_CLOUD_API_KEY");
+
+type AiProvider = {
+  name: "OpenRouter" | "Atlas Cloud";
+  baseUrl: string;
+  apiKey: string;
+  embeddingModel: string;
+  chatModel: string;
+};
+
+function trimTrailingSlash(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function buildAiProviderConfig(): AiProvider {
+  const requestedProvider = Deno.env.get("OPEN_BRAIN_AI_PROVIDER")?.toLowerCase();
+  const useAtlasCloud =
+    requestedProvider === "atlascloud" || requestedProvider === "atlas_cloud" ||
+    (!OPENROUTER_API_KEY && !!ATLASCLOUD_API_KEY);
+
+  if (useAtlasCloud) {
+    if (!ATLASCLOUD_API_KEY) {
+      throw new Error(
+        "Atlas Cloud selected but ATLASCLOUD_API_KEY or ATLAS_CLOUD_API_KEY is not set"
+      );
+    }
+
+    return {
+      name: "Atlas Cloud",
+      baseUrl: trimTrailingSlash(
+        Deno.env.get("ATLASCLOUD_API_BASE") ||
+          Deno.env.get("ATLAS_CLOUD_API_BASE") ||
+          ATLASCLOUD_BASE
+      ),
+      apiKey: ATLASCLOUD_API_KEY,
+      embeddingModel:
+        Deno.env.get("OPEN_BRAIN_EMBEDDING_MODEL") || DEFAULT_ATLASCLOUD_EMBEDDING_MODEL,
+      chatModel: Deno.env.get("OPEN_BRAIN_CHAT_MODEL") || DEFAULT_ATLASCLOUD_CHAT_MODEL,
+    };
+  }
+
+  if (!OPENROUTER_API_KEY) {
+    throw new Error(
+      "OPENROUTER_API_KEY is not set. Set it, or set OPEN_BRAIN_AI_PROVIDER=atlascloud with ATLASCLOUD_API_KEY."
+    );
+  }
+
+  return {
+    name: "OpenRouter",
+    baseUrl: trimTrailingSlash(Deno.env.get("OPENROUTER_BASE_URL") || OPENROUTER_BASE),
+    apiKey: OPENROUTER_API_KEY,
+    embeddingModel:
+      Deno.env.get("OPEN_BRAIN_EMBEDDING_MODEL") || DEFAULT_OPENROUTER_EMBEDDING_MODEL,
+    chatModel: Deno.env.get("OPEN_BRAIN_CHAT_MODEL") || DEFAULT_OPENROUTER_CHAT_MODEL,
+  };
+}
+
+const aiProvider = buildAiProviderConfig();
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 type ThoughtMatch = {
@@ -44,34 +109,34 @@ function thoughtUrl(id: string): string {
 }
 
 async function getEmbedding(text: string): Promise<number[]> {
-  const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
+  const r = await fetch(`${aiProvider.baseUrl}/embeddings`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${aiProvider.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/text-embedding-3-small",
+      model: aiProvider.embeddingModel,
       input: text,
     }),
   });
   if (!r.ok) {
     const msg = await r.text().catch(() => "");
-    throw new Error(`OpenRouter embeddings failed: ${r.status} ${msg}`);
+    throw new Error(`${aiProvider.name} embeddings failed: ${r.status} ${msg}`);
   }
   const d = await r.json();
   return d.data[0].embedding;
 }
 
 async function extractMetadata(text: string): Promise<Record<string, unknown>> {
-  const r = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+  const r = await fetch(`${aiProvider.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${aiProvider.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
+      model: aiProvider.chatModel,
       response_format: { type: "json_object" },
       messages: [
         {
