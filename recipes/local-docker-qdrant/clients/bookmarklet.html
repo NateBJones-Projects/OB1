@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Open Brain Bookmarklet (Qdrant)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 600px; margin: 60px auto; padding: 0 24px; color: #1a1a2e; }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; }
+    p { color: #555; margin-top: 4px; }
+    .bookmarklet {
+      display: inline-block;
+      margin: 24px 0;
+      padding: 12px 20px;
+      background: #1a1a2e;
+      color: #fff;
+      border-radius: 8px;
+      text-decoration: none;
+      font-size: 1rem;
+      cursor: grab;
+    }
+    .bookmarklet:active { cursor: grabbing; }
+    ol { line-height: 2; color: #333; }
+    details { margin-top: 32px; }
+    summary { cursor: pointer; color: #888; font-size: 0.9rem; }
+    pre { background: #f4f4f4; padding: 16px; border-radius: 6px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h1>Open Brain — Browser Bookmarklet (Qdrant Stack)</h1>
+  <p>Capture selected text or the current URL to your Open Brain.</p>
+
+  <a class="bookmarklet" href="javascript:(function(){var key=localStorage.getItem('ob_qdrant_key');if(!key){key=prompt('Open Brain Qdrant key (stored locally, one-time):');if(!key)return;localStorage.setItem('ob_qdrant_key',key);}var sel=window.getSelection().toString().trim();var content=sel||location.href;fetch('http://localhost:3100/capture-external',{method:'POST',headers:{'Content-Type':'application/json','x-brain-key':key},body:JSON.stringify({content:content,source:sel?'browser-selection':'browser-url',title:document.title,url:location.href})}).then(function(r){return r.json();}).then(function(d){if(d.error){alert('Open Brain error: '+d.error);return;}var msg=sel?'Selection captured':'URL captured';var n=document.createElement('div');n.textContent=msg+': '+(d.type||'')+(d.topics&amp;&amp;d.topics.length?' - '+d.topics.join(', '):'');n.style.cssText='position:fixed;top:16px;right:16px;z-index:999999;background:#1a1a2e;color:#fff;padding:12px 16px;border-radius:8px;font:14px/1.4 system-ui;box-shadow:0 4px 12px rgba(0,0,0,.4);max-width:320px;';document.body.appendChild(n);setTimeout(function(){n.remove();},3000);}).catch(function(e){alert('Capture failed: '+e.message);});})();">
+    Capture to Open Brain (Qdrant)
+  </a>
+
+  <ol>
+    <li>Drag the button above to your Chrome bookmarks bar.</li>
+    <li>Navigate to any page. Select some text, or select nothing to capture the URL.</li>
+    <li>Click the bookmark. On first use it will prompt for your <code>OPEN_BRAIN_KEY</code> and store it in <code>localStorage</code>.</li>
+    <li>A confirmation toast appears for 3 seconds showing the captured type and topics.</li>
+  </ol>
+
+  <details>
+    <summary>Reset stored key</summary>
+    <p>Run this in the browser console on any page:</p>
+    <pre>localStorage.removeItem('ob_qdrant_key')</pre>
+  </details>
+
+  <details>
+    <summary>Raw bookmarklet code</summary>
+    <pre id="raw"></pre>
+  </details>
+
+  <script>
+    var code = document.querySelector('.bookmarklet').getAttribute('href');
+    document.getElementById('raw').textContent = decodeURIComponent(code);
+  </script>
+</body>
+</html>
