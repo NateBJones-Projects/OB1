@@ -11,9 +11,9 @@ Pages here are persistent database objects split into sections, and each section
 - A **machine-owned** section (`origin = 'generated'`) can be regenerated freely — the next generated write overwrites it in place.
 - A **human-owned** section (`origin = 'manual'`, or any section that is `locked`) is protected. A generated write to it does **not** overwrite the live text. It parks the new draft in a pending buffer, where a human can review it and either accept it or leave it.
 
-Accepting a pending draft is a deliberate human action (`wiki_accept_pending`). The section stays human-owned afterward, so the machine keeps proposing but never auto-applies.
+Accepting a pending draft is a deliberate human action (`wiki_accept_pending`). The section stays human-owned afterward, so the machine keeps proposing but never auto-applies. Rejecting is the other half of that decision (`wiki_reject_pending`) — a human looks at the parked draft and discards it instead, leaving the live section exactly as it was.
 
-This is the same trust model as the rest of Open Brain's human-in-the-loop surfaces: **machine writes propose, a human accepts.** The rule lives in exactly one place — the `wiki_write_section` RPC — so every writer, current and future, goes through the same guard instead of each generator script re-implementing it (and getting it subtly wrong).
+This is the same trust model as the rest of Open Brain's human-in-the-loop surfaces: **machine writes propose, a human accepts or rejects.** The rule lives in exactly one place — the `wiki_write_section` RPC — so every writer, current and future, goes through the same guard instead of each generator script re-implementing it (and getting it subtly wrong). `wiki_accept_pending` and `wiki_reject_pending` are the two ends of the review workflow that guard sets up: every parked draft is eventually either promoted or discarded.
 
 ### How is this different from the wiki-compiler / wiki-synthesis recipes?
 
@@ -38,6 +38,7 @@ They are complementary. A compiler recipe can use this schema as its write targe
 - **`wiki_upsert_page(slug, title, page_kind, metadata, actor)`** — create or update a page by slug. Returns `{page_id, created}`.
 - **`wiki_write_section(page_id, section_key, body_md, origin, ...)`** — **the single write guard.** Returns `{section_id, action}` where `action` is `created`, `pending`, or `updated`.
 - **`wiki_accept_pending(section_id, actor)`** — promote a parked draft to the live body and snapshot a revision. Returns `{section_id, action}` (`accepted` or `no_pending`).
+- **`wiki_reject_pending(section_id, actor)`** — discard a parked draft without touching the live body. Returns `{section_id, action}` (`rejected` or `no_pending`).
 
 ### ID contract
 
@@ -70,7 +71,7 @@ OB1's canonical `public.thoughts.id` is a `UUID`, and every id here is UUID-alig
 
    SELECT proname
    FROM pg_proc
-   WHERE proname IN ('wiki_upsert_page', 'wiki_write_section', 'wiki_accept_pending')
+   WHERE proname IN ('wiki_upsert_page', 'wiki_write_section', 'wiki_accept_pending', 'wiki_reject_pending')
    ORDER BY proname;
    ```
 
@@ -91,7 +92,7 @@ supabase db push
 
 ## Worked example: the regen guard end to end
 
-This walks the three outcomes — a machine write being overwritten, a human edit being protected, and a human accepting the parked draft.
+This walks every outcome — a machine write being overwritten, a human edit being protected, a human accepting a parked draft, and a human rejecting one.
 
 ```sql
 -- 1. Create a page and a machine-generated section.
@@ -162,6 +163,39 @@ JOIN public.wiki_sections s ON s.id = r.section_id
 JOIN public.wiki_pages p ON p.id = s.page_id
 WHERE p.slug = 'quarterly-summary' AND s.section_key = 'overview'
 ORDER BY r.created_at DESC;
+
+-- 6. The generator runs again. The section is still human-owned, so this
+--    parks as another pending draft rather than overwriting.
+SELECT public.wiki_write_section(
+  (SELECT id FROM public.wiki_pages WHERE slug = 'quarterly-summary'),
+  'overview',
+  'Auto-generated overview, version 4.',
+  'generated'
+);                                  -- → action: "pending"
+
+-- 7. This time a human reviews the draft and rejects it instead of accepting.
+SELECT public.wiki_reject_pending(
+  (SELECT id FROM public.wiki_sections s
+   JOIN public.wiki_pages p ON p.id = s.page_id
+   WHERE p.slug = 'quarterly-summary' AND s.section_key = 'overview')
+);                                  -- → action: "rejected"
+
+-- The pending buffer is cleared and body_md is untouched — still the version
+-- 3 text accepted in step 5. No new row was written to
+-- wiki_section_revisions, because rejecting does not change body_md.
+SELECT body_md, pending_generated_md
+FROM public.wiki_sections s
+JOIN public.wiki_pages p ON p.id = s.page_id
+WHERE p.slug = 'quarterly-summary' AND s.section_key = 'overview';
+--  body_md               → 'Auto-generated overview, version 3.'  (unchanged)
+--  pending_generated_md  → NULL
+
+-- Calling wiki_reject_pending again (nothing left to reject) is a no-op.
+SELECT public.wiki_reject_pending(
+  (SELECT id FROM public.wiki_sections s
+   JOIN public.wiki_pages p ON p.id = s.page_id
+   WHERE p.slug = 'quarterly-summary' AND s.section_key = 'overview')
+);                                  -- → action: "no_pending"
 ```
 
 To **release** a section back to automatic generation (give up the human override), set its `origin` back to `'generated'` directly:
@@ -180,9 +214,9 @@ After running the migration:
 
 - Three tables exist — `public.wiki_pages`, `public.wiki_sections`, `public.wiki_section_revisions` — all RLS-enabled and granted to `service_role` only (revoked from `PUBLIC` / `anon` / `authenticated`).
 - The id chain is UUID throughout: `wiki_sections.page_id` and `wiki_section_revisions.section_id` are `UUID` foreign keys, and `evidence_thought_ids` is `UUID[]`.
-- Three RPCs exist — `wiki_upsert_page`, `wiki_write_section`, `wiki_accept_pending` — each `SECURITY INVOKER` and executable by `service_role` only.
+- Four RPCs exist — `wiki_upsert_page`, `wiki_write_section`, `wiki_accept_pending`, `wiki_reject_pending` — each `SECURITY INVOKER` and executable by `service_role` only.
 - One fictional seed page (`getting-started`) exists with a single generated section (`intro`). Re-running `schema.sql` does not duplicate it.
-- The regen guard behaves as in the worked example: a generated write to a human-owned section returns `action: "pending"` and leaves the live body untouched; `wiki_accept_pending` promotes the parked draft and records a revision.
+- The regen guard behaves as in the worked example: a generated write to a human-owned section returns `action: "pending"` and leaves the live body untouched; `wiki_accept_pending` promotes the parked draft and records a revision; `wiki_reject_pending` discards the parked draft, leaves `body_md` (and `origin`, `locked`, `heading`) untouched, and writes no revision.
 - No column on `public.thoughts` is altered or dropped.
 - PostgREST's schema cache is reloaded (`NOTIFY pgrst, 'reload schema'`).
 
@@ -191,6 +225,7 @@ After running the migration:
 To remove the persistent-wiki system entirely:
 
 ```sql
+DROP FUNCTION IF EXISTS public.wiki_reject_pending(UUID, TEXT);
 DROP FUNCTION IF EXISTS public.wiki_accept_pending(UUID, TEXT);
 DROP FUNCTION IF EXISTS public.wiki_write_section(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, UUID[], INTEGER, TEXT);
 DROP FUNCTION IF EXISTS public.wiki_upsert_page(TEXT, TEXT, TEXT, JSONB, TEXT);
@@ -206,7 +241,10 @@ Dropping the tables removes all wiki pages, sections, and their revision history
 ## Troubleshooting
 
 **A generated regeneration keeps returning `action: "pending"`.**
-The section is human-owned (`origin = 'manual'`) or `locked`. That is the guard working as intended — the machine cannot overwrite it. Accept the pending draft with `wiki_accept_pending`, or release the section back to automatic with `UPDATE ... SET origin = 'generated'`.
+The section is human-owned (`origin = 'manual'`) or `locked`. That is the guard working as intended — the machine cannot overwrite it. Accept the pending draft with `wiki_accept_pending`, reject it with `wiki_reject_pending`, or release the section back to automatic with `UPDATE ... SET origin = 'generated'`.
+
+**When should I use `wiki_reject_pending` instead of just leaving the draft parked?**
+Either is safe — an unreviewed draft sitting in `pending_generated_md` does not affect the live section. Reject it when you have looked at the draft and specifically do not want it, so the buffer is clear and the next `wiki_write_section` call starts from a clean slate instead of silently discarding the earlier draft you never reviewed.
 
 **`wiki_write_section` raises `invalid section origin`.**
 `p_origin` must be exactly `'manual'` or `'generated'`. Any other value is rejected so a typo cannot silently create an un-guardable section.
