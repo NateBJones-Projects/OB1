@@ -1,0 +1,20 @@
+{
+  "name": "CRM Core",
+  "description": "An editable contact book on top of Open Brain with a human-in-the-loop truth layer. Six tables (crm_contacts, crm_contact_methods, crm_contact_aliases, crm_contact_change_log, crm_field_proposals, crm_field_evidence) plus ten RPCs give every contact field per-field provenance and a propose/accept/reject flow: a human writes canonical fields directly, while a machine or agent (import/extraction/projection) must PROPOSE a change instead of overwriting one — a human then accepts (apply + log) or rejects (discard + log, permanently blocking an identical re-proposal). A pending proposal never mutates the live field. Field locks let a human freeze a field against all writers, including accepts. Contact-method values are redacted in the audit log. UUID id contract throughout: every PK is UUID and every memory reference is UUID REFERENCES public.thoughts(id). Same trust model as the persistent-wiki regen guard. Relationship tiers live in a separate schema; this keeps a free-text relationship note.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["crm", "contacts", "truth-layer", "field-proposals", "human-in-the-loop", "provenance", "audit", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-06-13",
+  "updated": "2026-06-13"
+}
