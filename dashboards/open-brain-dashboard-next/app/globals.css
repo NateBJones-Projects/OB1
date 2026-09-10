@@ -4,6 +4,9 @@
   --color-bg-primary: #1d201e;
   --color-bg-surface: rgba(255, 255, 255, 0.045);
   --color-bg-elevated: rgba(255, 255, 255, 0.07);
+  /* Opaque equivalent of bg-elevated over bg-primary — for floating layers
+     (modals, dropdowns) that have no opaque page background behind them */
+  --color-bg-overlay: #2d302e;
   --color-bg-hover: rgba(255, 255, 255, 0.085);
   --color-border: rgba(236, 229, 209, 0.16);
   --color-border-subtle: rgba(236, 229, 209, 0.085);

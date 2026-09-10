@@ -42,7 +42,7 @@ export function PriorityDot({ importance, onPriorityChange }: PriorityDotProps) 
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full mt-1 z-50 bg-bg-surface border border-border rounded-lg shadow-lg py-1 min-w-[120px]">
+        <div className="absolute left-0 top-full mt-1 z-50 bg-bg-overlay border border-border rounded-lg shadow-lg py-1 min-w-[120px]">
           {PRIORITY_LEVELS.map((p) => {
             const isCurrentLevel = level.label === p.label;
             return (

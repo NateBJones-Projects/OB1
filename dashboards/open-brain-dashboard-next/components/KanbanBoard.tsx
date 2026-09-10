@@ -99,6 +99,8 @@ export function KanbanBoard() {
         groups["new"].push(t);
       }
     }
+    // Column order is priority order — keep it stable through optimistic updates
+    for (const s of Object.keys(groups)) groups[s].sort((a, b) => b.importance - a.importance);
     return groups;
   }
 
@@ -113,27 +115,69 @@ export function KanbanBoard() {
     if (!over) return;
 
     const thoughtId = String(active.id);
-    const newStatus = over.id as string;
-
-    // Find which column the thought is currently in
     const thought = thoughts.find((t) => t.id === thoughtId);
-    if (!thought || thought.status === newStatus) return;
+    if (!thought) return;
+
+    // The drop target is either a column (status id) or another card —
+    // dropping on a card targets that card's column at that card's position.
+    const overId = String(over.id);
+    const isColumn = ([...KANBAN_STATUSES, "archived"] as string[]).includes(overId);
+    const overCard = isColumn ? null : thoughts.find((t) => t.id === overId);
+    if (!isColumn && !overCard) return;
+    const targetStatus = isColumn ? overId : (overCard!.status ?? "new");
+
+    // Rebuild the target column's priority order with the card inserted
+    const columnCards = thoughts
+      .filter((t) => t.id !== thoughtId && (t.status ?? "new") === targetStatus)
+      .sort((a, b) => b.importance - a.importance);
+    let insertIdx = columnCards.length;
+    if (overCard) {
+      const idx = columnCards.findIndex((t) => t.id === overId);
+      if (idx >= 0) insertIdx = idx;
+    }
+    const newOrder = [
+      ...columnCards.slice(0, insertIdx),
+      thought,
+      ...columnCards.slice(insertIdx),
+    ];
+
+    // Renumber importance top-down (evenly spaced 99→1) so order persists
+    const step = Math.max(1, Math.floor(98 / Math.max(newOrder.length, 1)));
+    const changes = new Map<string, { importance: number; status?: string }>();
+    newOrder.forEach((t, i) => {
+      const importance = Math.max(1, 99 - i * step);
+      const statusChanged = t.id === thoughtId && (thought.status ?? "new") !== targetStatus;
+      if (t.importance !== importance || statusChanged) {
+        changes.set(t.id, {
+          importance,
+          ...(statusChanged ? { status: targetStatus } : {}),
+        });
+      }
+    });
+    if (changes.size === 0) return;
 
     // Optimistic update
     previousThoughts.current = [...thoughts];
     setThoughts((prev) =>
-      prev.map((t) =>
-        t.id === thoughtId
-          ? { ...t, status: newStatus, status_updated_at: new Date().toISOString() }
-          : t
-      )
+      prev.map((t) => {
+        const c = changes.get(t.id);
+        if (!c) return t;
+        return {
+          ...t,
+          importance: c.importance,
+          ...(c.status
+            ? { status: c.status, status_updated_at: new Date().toISOString() }
+            : {}),
+        };
+      })
     );
 
-    // API call in background
-    apiUpdateKanban(thoughtId, { status: newStatus }).catch(() => {
-      // Revert on failure
+    // Persist all affected cards; revert everything on any failure
+    Promise.all(
+      [...changes.entries()].map(([id, c]) => apiUpdateKanban(id, c))
+    ).catch(() => {
       setThoughts(previousThoughts.current);
-      setError("Failed to update status. Reverted.");
+      setError("Failed to update board. Reverted.");
       setTimeout(() => setError(null), 5000);
     });
   }
