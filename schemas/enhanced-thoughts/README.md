@@ -21,8 +21,12 @@ This schema extension adds six new columns to the `thoughts` table (`type`, `sen
 
 ## Prerequisites
 
+> [!IMPORTANT]
+> **Apply the [`workflow-status`](../workflow-status/) schema first.** This migration's `upsert_thought` function writes to the `status` and `status_updated_at` columns on the `thoughts` table (see `schema.sql` lines 347-383). Those columns are created by the `workflow-status` schema. If you run this migration on a fresh install without `workflow-status` applied, the `CREATE OR REPLACE FUNCTION upsert_thought` block will fail with `column "status" of relation "thoughts" does not exist`.
+
 - Working Open Brain setup (see the getting-started guide in `docs/01-getting-started.md`)
 - Supabase project with the `thoughts` table, `match_thoughts` function, and `upsert_thought` function already created
+- [`workflow-status`](../workflow-status/) schema already applied (adds the `status` and `status_updated_at` columns this migration writes to)
 
 ## Credential Tracker
 
