@@ -27,3 +27,6 @@ docs/walkthroughs/*/public/
 docs/assets/agent-memory/promotional/generated-backgrounds/**/result.json
 docs/assets/agent-memory/screenshots/**/.chrome-*/
 integrations/openclaw-agent-memory/dist/
+
+# Wiki Compiler recipe default output (personal brain data, regenerable)
+compiled-wiki/

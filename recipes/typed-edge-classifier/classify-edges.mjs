@@ -300,7 +300,13 @@ function resolveModel(model, provider) {
   if (provider !== "openrouter") return model;
   if (!model) return model;
   if (model.includes("/")) return model;
-  return `anthropic/${model}`;
+  // OpenRouter rejects Anthropic's dated snapshot ids (e.g.
+  // "claude-haiku-4-5-20251001" -> HTTP 400 "not a valid model id"),
+  // but the Anthropic-direct API *requires* those dates. Since this
+  // branch only runs for the OpenRouter provider, strip a trailing
+  // -YYYYMMDD suffix so a dated default still routes correctly.
+  const undated = model.replace(/-\d{8}$/, "");
+  return `anthropic/${undated}`;
 }
 
 /**
