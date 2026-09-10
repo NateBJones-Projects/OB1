@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireSession, AuthError } from "@/lib/auth";
 import { deleteThought } from "@/lib/api";
+import { hardDeleteEnabled } from "@/lib/features";
 
 export async function POST(request: NextRequest) {
+  if (!hardDeleteEnabled) {
+    return NextResponse.json(
+      { error: "Hard delete is disabled. Archive or supersede the thought instead." },
+      { status: 405 }
+    );
+  }
   let apiKey: string;
   try {
     ({ apiKey } = await requireSession());

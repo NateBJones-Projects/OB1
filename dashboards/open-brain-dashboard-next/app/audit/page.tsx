@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TypeBadge } from "@/components/ThoughtCard";
 import { DeleteModal } from "@/components/DeleteModal";
 import type { Thought, BrowseResponse } from "@/lib/types";
+import { hardDeleteEnabled } from "@/lib/features";
 
 export default function AuditPage() {
   const [data, setData] = useState<BrowseResponse | null>(null);
@@ -92,7 +93,7 @@ export default function AuditPage() {
             {data && ` | ${data.total.toLocaleString()} total`}
           </p>
         </div>
-        {selected.size > 0 && (
+        {hardDeleteEnabled && selected.size > 0 && (
           <button
             onClick={() => setShowDelete(true)}
             className="px-4 py-2 text-sm font-medium text-danger border border-danger/30 rounded-lg hover:bg-danger/10 transition-colors"
@@ -109,7 +110,7 @@ export default function AuditPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-text-muted text-xs uppercase tracking-wider">
-                <th className="px-4 py-3 w-10">
+                {hardDeleteEnabled && <th className="px-4 py-3 w-10">
                   <input
                     type="checkbox"
                     checked={
@@ -119,7 +120,7 @@ export default function AuditPage() {
                     onChange={toggleAll}
                     className="accent-violet"
                   />
-                </th>
+                </th>}
                 <th className="text-left px-4 py-3 font-medium">Content</th>
                 <th className="text-left px-4 py-3 font-medium w-24">Type</th>
                 <th className="text-left px-4 py-3 font-medium w-20">Score</th>
@@ -128,14 +129,14 @@ export default function AuditPage() {
             <tbody className="divide-y divide-border-subtle">
               {data.data.map((t: Thought) => (
                 <tr key={t.id} className="hover:bg-bg-hover transition-colors">
-                  <td className="px-4 py-3">
+                  {hardDeleteEnabled && <td className="px-4 py-3">
                     <input
                       type="checkbox"
                       checked={selected.has(t.id)}
                       onChange={() => toggleSelect(t.id)}
                       className="accent-violet"
                     />
-                  </td>
+                  </td>}
                   <td className="px-4 py-3">
                     <Link
                       href={`/thoughts/${t.id}`}
@@ -185,7 +186,7 @@ export default function AuditPage() {
       )}
 
       {/* Two-step delete: first confirm count */}
-      {showDelete && !showFinalConfirm && (
+      {hardDeleteEnabled && showDelete && !showFinalConfirm && (
         <DeleteModal
           title="Confirm Bulk Delete"
           message={`You are about to delete ${selected.size} thought${selected.size !== 1 ? "s" : ""}. Proceed to final confirmation?`}
@@ -196,7 +197,7 @@ export default function AuditPage() {
           onCancel={() => setShowDelete(false)}
         />
       )}
-      {showFinalConfirm && (
+      {hardDeleteEnabled && showFinalConfirm && (
         <DeleteModal
           title="Final Confirmation"
           message={`This will permanently delete ${selected.size} thought${selected.size !== 1 ? "s" : ""}. This cannot be undone.`}

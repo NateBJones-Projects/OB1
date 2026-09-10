@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TypeBadge } from "@/components/ThoughtCard";
 import { DeleteModal } from "@/components/DeleteModal";
 import type { DuplicatePair } from "@/lib/types";
+import { hardDeleteEnabled } from "@/lib/features";
 
 const PER_PAGE = 30;
 
@@ -146,6 +147,35 @@ export default function DuplicatesPage() {
         <div className="flex items-center gap-2 text-text-muted text-sm">
           <div className="w-4 h-4 border-2 border-violet/30 border-t-violet rounded-full animate-spin" />
           Searching for near-duplicates...
+        </div>
+      </div>
+    );
+  }
+
+  if (!hardDeleteEnabled) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold mb-1">Duplicates</h1>
+          <p className="text-text-secondary text-sm">
+            Read-only duplicate review. Hard delete is disabled for this installation.
+          </p>
+        </div>
+        {error && <p className="text-danger text-sm">{error}</p>}
+        <div className="space-y-4">
+          {pairs.map((pair) => (
+            <div key={pairKey(pair)} className="bg-bg-surface border border-border rounded-lg p-4 space-y-3">
+              <span className="text-xs text-amber-400">{(pair.similarity * 100).toFixed(1)}% similar</span>
+              <div className="grid grid-cols-2 gap-3">
+                <Link href={`/thoughts/${pair.thought_id_a}`} className="bg-bg-elevated rounded-lg p-3 text-sm hover:text-violet">
+                  {pair.content_a}
+                </Link>
+                <Link href={`/thoughts/${pair.thought_id_b}`} className="bg-bg-elevated rounded-lg p-3 text-sm hover:text-violet">
+                  {pair.content_b}
+                </Link>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     );

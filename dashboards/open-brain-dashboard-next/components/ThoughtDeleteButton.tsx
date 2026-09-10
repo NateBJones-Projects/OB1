@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { DeleteModal } from "./DeleteModal";
+import { hardDeleteEnabled } from "@/lib/features";
 
 export function ThoughtDeleteButton({
   deleteAction,
@@ -11,6 +12,14 @@ export function ThoughtDeleteButton({
 }) {
   const [showModal, setShowModal] = useState(false);
   const router = useRouter();
+
+  if (!hardDeleteEnabled) {
+    return (
+      <span className="px-3 py-1.5 text-xs text-text-muted border border-border rounded-lg">
+        Hard delete disabled
+      </span>
+    );
+  }
 
   return (
     <>
