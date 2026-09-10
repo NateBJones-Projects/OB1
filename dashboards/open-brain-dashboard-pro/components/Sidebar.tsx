@@ -9,6 +9,8 @@ interface NavItem {
   label: string;
   icon: React.ComponentType<{ active: boolean }>;
   isActive?: (pathname: string) => boolean;
+  /** Optional count pill rendered at the trailing edge of the entry. */
+  badge?: number;
 }
 
 const nav: NavItem[] = [
@@ -23,13 +25,28 @@ const nav: NavItem[] = [
 
 export function Sidebar({
   restrictedConfigured = false,
+  crmEnabled = false,
+  openProposals = 0,
 }: {
   restrictedConfigured?: boolean;
+  crmEnabled?: boolean;
+  openProposals?: number;
 }) {
   const pathname = usePathname();
 
   // Hide sidebar on login page
   if (pathname === "/login") return null;
+
+  // CRM is optional: its nav entries appear only when the brain exposes /crm
+  // (probed at login). Insert after "Thoughts" so it reads Dashboard → Thoughts
+  // → Contacts → Proposals → …
+  const items: NavItem[] = [...nav];
+  if (crmEnabled) {
+    items.splice(2, 0,
+      { href: "/contacts", label: "Contacts", icon: ContactsIcon },
+      { href: "/proposals", label: "Proposals", icon: ProposalsIcon, badge: openProposals },
+    );
+  }
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-56 bg-bg-surface border-r border-border flex flex-col z-40">
@@ -45,8 +62,8 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 px-3 py-4 space-y-1">
-        {nav.map((entry) => {
-          const { href, label, icon: Icon, isActive: isActiveFn } = entry;
+        {items.map((entry) => {
+          const { href, label, icon: Icon, isActive: isActiveFn, badge } = entry;
           const active = isActiveFn
             ? isActiveFn(pathname)
             : href === "/"
@@ -64,6 +81,11 @@ export function Sidebar({
             >
               <Icon active={active} />
               {label}
+              {badge !== undefined && badge > 0 && (
+                <span className="ml-auto text-xs font-semibold px-1.5 py-0.5 rounded-full bg-violet text-white min-w-[1.25rem] text-center">
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -143,6 +165,25 @@ function SettingsIcon({ active }: { active: boolean }) {
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
       <circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.7 3.7l1.4 1.4M12.9 12.9l1.4 1.4M3.7 14.3l1.4-1.4M12.9 5.1l1.4-1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ContactsIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <circle cx="6.5" cy="6" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2 15c0-2.5 2-4 4.5-4S11 12.5 11 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M12 4.5a2.5 2.5 0 0 1 0 5M13.5 15c0-2.2-1.2-3.6-3-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ProposalsIcon({ active }: { active: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" className={active ? "text-violet" : "text-text-muted"}>
+      <path d="M2 5.5h14v9H2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M2 5.5L9 10l7-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
   );
 }

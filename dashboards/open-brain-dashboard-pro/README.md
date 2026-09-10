@@ -17,6 +17,33 @@ Seven server-rendered pages backed by iron-session auth and the Open Brain REST 
 | **Ingest** (`/ingest`) | Smart-ingest UI with dry-run preview, extracted-item cards, execute button, and job history. |
 | **Settings** (`/settings`) | Connection status, thought type breakdown, top topics, and masked API key prefix. |
 
+## CRM (optional)
+
+If your brain runs the CRM truth layer (the `crm-core` + `crm-engagement` schemas and the `/crm/*` routes on `open-brain-rest`), the dashboard grows a contacts surface:
+
+| Page | What you get |
+|------|--------------|
+| **Contacts** (`/contacts`) | Searchable contact list and a "new contact" form. |
+| **Contact** (`/contacts/:id`) | Editable fact panel with per-field origin, locks, and evidence; contact methods and aliases; this contact's open proposals with accept/reject; a notes / tasks / important-dates panel; and an activity view with a merged timeline and the raw change log. |
+| **Proposals** (`/proposals`) | Inbox of machine-suggested field changes filtered by status, with per-row accept/reject and bulk accept/reject for a whole import run. |
+
+The Contacts and Proposals nav entries, and the open-proposals badge on the sidebar, appear **only when the brain exposes the `/crm` surface**. The dashboard probes for it once at login and caches the result in the session, so a brain without the CRM layer never shows these entries and behaves exactly as before. Each CRM read also degrades on its own: if an individual route is missing or errors, that panel renders empty instead of blanking the page.
+
+## Wiki (optional)
+
+If your brain runs the persistent-wiki layer (the `schemas/wiki-pages` schema and the `/wiki/*` routes on `open-brain-rest`), the dashboard grows a wiki surface:
+
+| Page | What you get |
+|------|--------------|
+| **Wiki** (`/wiki`) | Page list filtered by kind (topic / entity / autobiography / custom), with section counts and a "new page" form. |
+| **Wiki page** (`/wiki/:slug`) | Sections in display order, each with its markdown body rendered sanitized, an origin chip (yours / generated), a lock toggle, and an evidence chip listing supporting thought ids. Edit a section inline (your edit takes ownership); add a section; archive the page. When a machine writer proposes an update to a section you own, a review panel shows the current body against the proposed draft with **accept / reject**. |
+
+Wiki pages are reachable at `/wiki` (a dedicated sidebar entry lands in a later change). The dashboard probes for the `/wiki` surface once at login and caches the result in the session. When the schema is absent — the probe comes back negative, or `GET /wiki/pages` returns 404 — the page renders a short inline notice ("Wiki schema not installed — apply `schemas/wiki-pages` to enable") instead of an error, so a brain without the wiki layer behaves exactly as before.
+
+Archived pages are hidden from the list but stay fetchable — and editable — by slug; unarchive is a future gateway addition.
+
+Section bodies are agent-writable over MCP, so the dashboard treats them as untrusted: markdown is rendered with `react-markdown` and **no raw-HTML plugin**, so any embedded HTML is shown as text and never executed.
+
 ## Screenshots
 
 Screenshots go in `docs/screenshots/` and should be referenced from this README once you add them.
@@ -85,6 +112,8 @@ The dashboard calls these endpoints on your Open Brain REST gateway (all authent
 | `/thought/:id/connections` | GET | Detail page connections panel | Optional — panel hides if it errors |
 | `/duplicates`, `/duplicates/resolve` | GET / POST | Duplicates page | Optional — page shows an error otherwise |
 | `/ingest`, `/ingestion-jobs`, `/ingestion-jobs/:id`, `/ingestion-jobs/:id/execute` | POST / GET | Ingest page | Optional — page still loads without jobs |
+| `/crm/*` (contacts, proposals, notes, tasks, important-dates, timeline, history, …) | GET / POST / PATCH | Contacts, Proposals, contact detail panels | Optional — CRM surface is hidden unless `/crm` is detected at login |
+| `/wiki/*` (pages, pages/:slug, sections/:id/accept-pending, reject-pending, lock, …) | GET / POST / PUT / DELETE | Wiki list, wiki page, section edit / lock / draft review | Optional — wiki surface degrades to an inline notice unless `/wiki` is detected at login |
 
 > **On `/reflections/*`:** The ExoCortex upstream dashboard staged a reflections feature. This fork does not yet ship a reflections UI surface, but the architecture is ready: if you add a reflection panel later and your gateway doesn't serve `/reflections/*`, expect a 404 that the UI should swallow. The existing optional endpoints already degrade this way — the Connections panel, Duplicates page, and Ingest history all swallow fetch errors and render an empty/neutral state instead of crashing.
 
