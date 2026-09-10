@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import type { Thought, KanbanStatus } from "@/lib/types";
 import { KANBAN_STATUSES, KANBAN_LABELS, PRIORITY_LEVELS, getPriorityLevel, THOUGHT_TYPES, KANBAN_TYPES } from "@/lib/types";
+import { hardDeleteEnabled } from "@/lib/features";
 
 interface KanbanCardModalProps {
   thought: Thought;
@@ -252,7 +253,7 @@ export function KanbanCardModal({
                 Archive
               </button>
             )}
-            <button
+            {hardDeleteEnabled && <button
               type="button"
               onClick={() => {
                 setShowDiscardConfirm(false);
@@ -261,7 +262,7 @@ export function KanbanCardModal({
               className="text-sm text-text-muted hover:text-danger transition-colors"
             >
               Delete
-            </button>
+            </button>}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -290,7 +291,7 @@ export function KanbanCardModal({
     document.body
   )}
 
-  {showDeleteConfirm && createPortal(
+  {hardDeleteEnabled && showDeleteConfirm && createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50"
       onClick={() => setShowDeleteConfirm(false)}

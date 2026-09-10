@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteThought } from "@/lib/api";
 import { requireSession, AuthError } from "@/lib/auth";
+import { hardDeleteEnabled } from "@/lib/features";
 
 export async function POST(request: NextRequest) {
+  if (!hardDeleteEnabled) {
+    return NextResponse.json(
+      { error: "Hard delete is disabled. Archive or supersede the thought instead." },
+      { status: 405 }
+    );
+  }
   // Auth BEFORE body parse — unauthed requests get 401, not 400
   let apiKey: string;
   try {
