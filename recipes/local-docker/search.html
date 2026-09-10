@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Brain Search</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f8f9fa; color: #1a1a2e; min-height: 100vh; }
+
+    .hero { display: flex; flex-direction: column; align-items: center; padding: 80px 24px 40px; }
+    .hero h1 { font-size: 2.4rem; font-weight: 800; margin-bottom: 32px; letter-spacing: -1px; font-family: Georgia, 'Times New Roman', serif; }
+
+    .search-bar { display: flex; width: 100%; max-width: 640px; border: 2px solid #1a1a2e; border-radius: 32px; overflow: hidden; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .search-bar input { flex: 1; padding: 14px 20px; font-size: 1rem; border: none; outline: none; background: transparent; }
+    .search-bar button { padding: 14px 24px; background: #1a1a2e; color: #fff; border: none; font-size: 0.95rem; cursor: pointer; }
+    .search-bar button:hover { background: #2d2d4e; }
+
+    .results-header { max-width: 900px; margin: 0 auto; padding: 24px 24px 0; font-size: 0.85rem; color: #888; }
+    .results-header strong { color: #1a1a2e; }
+
+    .results { max-width: 900px; margin: 0 auto; padding: 12px 24px 24px; }
+    .result { background: #fff; border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+    .result-meta { display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .badge { font-size: 0.75rem; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+    .badge-match { background: #e8f5e9; color: #2e7d32; }
+    .badge-type { background: #e3f2fd; color: #1565c0; cursor: pointer; }
+    .badge-type:hover { background: #bbdefb; }
+    .badge-source { background: #fff3e0; color: #e65100; }
+    .badge-topic { background: #f3e5f5; color: #6a1b9a; cursor: pointer; }
+    .badge-topic:hover { background: #e1bee7; }
+    .result-date { font-size: 0.75rem; color: #888; margin-left: auto; }
+    .result-content { font-size: 0.95rem; line-height: 1.6; color: #333; white-space: pre-wrap; }
+
+    .status { text-align: center; padding: 40px; color: #888; font-size: 0.95rem; }
+    .error { color: #c62828; }
+
+    .key-prompt { margin-top: 16px; font-size: 0.85rem; color: #888; }
+    .key-prompt a { color: #1a1a2e; cursor: pointer; text-decoration: underline; }
+
+    .filters-hint { margin-top: 12px; max-width: 640px; text-align: center; font-size: 0.8rem; color: #666; line-height: 1.8; }
+    .filters-hint code { background: #ececf2; padding: 2px 7px; border-radius: 4px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; color: #1a1a2e; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🧠 Open Brain</h1>
+  <div class="search-bar">
+    <input type="text" id="query" placeholder="What do you know about..." autofocus>
+    <button onclick="search()">Search</button>
+  </div>
+  <p class="filters-hint">
+    Filters: <code>tag:foo</code> · <code>type:reference</code> · <code>source:mcp</code> · <code>date:today</code> · <code>date:yesterday</code> · <code>date:2026-05-13</code> · <code>since:2026-05-01</code> · <code>until:2026-05-13</code>
+  </p>
+  <p class="key-prompt" id="key-status"></p>
+</div>
+
+<div id="results-header" class="results-header"></div>
+<div class="results" id="results"></div>
+
+<script>
+  const KEY_STORAGE = 'ob_key';
+
+  function getKey() {
+    let key = localStorage.getItem(KEY_STORAGE);
+    if (!key) {
+      key = prompt('Open Brain key (stored locally, one-time):');
+      if (key) localStorage.setItem(KEY_STORAGE, key);
+    }
+    return key;
+  }
+
+  function showKeyStatus() {
+    const key = localStorage.getItem(KEY_STORAGE);
+    const el = document.getElementById('key-status');
+    el.innerHTML = key
+      ? 'Using stored key. <a onclick="resetKey()">Reset</a>'
+      : 'No key stored. You will be prompted on first search.';
+  }
+
+  function resetKey() {
+    localStorage.removeItem(KEY_STORAGE);
+    showKeyStatus();
+  }
+
+  document.getElementById('query').addEventListener('keydown', e => {
+    if (e.key === 'Enter') search();
+  });
+
+  function browseTag(tag) {
+    document.getElementById('query').value = '';
+    doSearch({ tag, limit: 50 }, `tag: ${tag}`);
+  }
+
+  function browseType(type) {
+    document.getElementById('query').value = '';
+    doSearch({ type, limit: 50 }, `type: ${type}`);
+  }
+
+  function resolveDate(input) {
+    const lower = input.toLowerCase();
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (lower === 'today') return fmt(new Date());
+    if (lower === 'yesterday') { const y = new Date(); y.setDate(y.getDate()-1); return fmt(y); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(input)) return input;
+    return null;
+  }
+
+  function search() {
+    const raw = document.getElementById('query').value.trim();
+    if (!raw) return;
+    const lower = raw.toLowerCase();
+    if (lower.startsWith('tag:')) {
+      const tag = raw.slice(4).trim();
+      if (tag) doSearch({ tag, limit: 50 }, `tag: ${tag}`);
+    } else if (lower.startsWith('type:')) {
+      const type = raw.slice(5).trim();
+      if (type) doSearch({ type, limit: 50 }, `type: ${type}`);
+    } else if (lower.startsWith('source:')) {
+      const source = raw.slice(7).trim();
+      if (source) doSearch({ source, limit: 50 }, `source: ${source}`);
+    } else if (lower.startsWith('date:')) {
+      const date = resolveDate(raw.slice(5).trim());
+      if (date) doSearch({ date, limit: 50 }, `date: ${date}`);
+      else document.getElementById('results').innerHTML = '<div class="status error">date must be today, yesterday, or YYYY-MM-DD</div>';
+    } else if (lower.startsWith('since:')) {
+      const since = resolveDate(raw.slice(6).trim());
+      if (since) doSearch({ since, limit: 50 }, `since: ${since}`);
+      else document.getElementById('results').innerHTML = '<div class="status error">since must be today, yesterday, or YYYY-MM-DD</div>';
+    } else if (lower.startsWith('until:')) {
+      const until = resolveDate(raw.slice(6).trim());
+      if (until) doSearch({ until, limit: 50 }, `until: ${until}`);
+      else document.getElementById('results').innerHTML = '<div class="status error">until must be today, yesterday, or YYYY-MM-DD</div>';
+    } else {
+      doSearch({ query: raw, limit: 10 }, `"${raw}"`);
+    }
+  }
+
+  async function doSearch(body, label) {
+    const key = getKey();
+    if (!key) return;
+
+    const resultsEl = document.getElementById('results');
+    const headerEl = document.getElementById('results-header');
+    resultsEl.innerHTML = '<div class="status">Searching...</div>';
+    headerEl.innerHTML = '';
+
+    try {
+      const resp = await fetch('http://localhost:3000/search-external', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-brain-key': key },
+        body: JSON.stringify(body)
+      });
+      const data = await resp.json();
+
+      if (data.error) {
+        resultsEl.innerHTML = `<div class="status error">Error: ${data.error}</div>`;
+        return;
+      }
+
+      if (!data.results.length) {
+        resultsEl.innerHTML = '<div class="status">No results found.</div>';
+        return;
+      }
+
+      const mode = data.mode === 'browse' ? 'most recent' : 'best match';
+      headerEl.innerHTML = `<strong>${data.results.length}</strong> result${data.results.length !== 1 ? 's' : ''} for ${escapeHtml(label)} &mdash; sorted by ${mode}`;
+
+      resultsEl.innerHTML = data.results.map(r => {
+        const matchBadge = r.similarity !== null
+          ? `<span class="badge badge-match">${r.similarity}%</span>` : '';
+        const typeBadge = `<span class="badge badge-type" onclick="browseType('${escapeAttr(r.type)}')" title="Browse all ${escapeHtml(r.type)}">${escapeHtml(r.type)}</span>`;
+        const sourceBadge = r.source ? `<span class="badge badge-source">${escapeHtml(r.source)}</span>` : '';
+        const topicBadges = (r.topics || []).map(t =>
+          `<span class="badge badge-topic" onclick="browseTag('${escapeAttr(t)}')" title="Browse all: ${escapeHtml(t)}">${escapeHtml(t)}</span>`
+        ).join('');
+        const date = new Date(r.created_at).toLocaleDateString();
+        return `
+          <div class="result">
+            <div class="result-meta">
+              ${matchBadge}
+              ${typeBadge}
+              ${sourceBadge}
+              ${topicBadges}
+              <span class="result-date">${date}</span>
+            </div>
+            <div class="result-content">${escapeHtml(r.content)}</div>
+          </div>`;
+      }).join('');
+
+    } catch (e) {
+      resultsEl.innerHTML = `<div class="status error">Failed: ${e.message}</div>`;
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function escapeAttr(s) {
+    return String(s).replace(/'/g, "\\'");
+  }
+
+  showKeyStatus();
+</script>
+</body>
+</html>

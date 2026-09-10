@@ -1,0 +1,42 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: openbrain
+      POSTGRES_USER: openbrain
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openbrain -d openbrain"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mcp-server:
+    build: ./server
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://openbrain:${POSTGRES_PASSWORD}@postgres:5432/openbrain
+      MCP_ACCESS_KEY: ${MCP_ACCESS_KEY}
+      PORT: 3000
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_PROFILE: ${AWS_PROFILE:-default}
+      AWS_SHARED_CREDENTIALS_FILE: /root/.aws/credentials
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-amazon.titan-embed-text-v2:0}
+      METADATA_MODEL: ${METADATA_MODEL:-us.anthropic.claude-haiku-4-5-20251001-v1:0}
+    volumes:
+      - type: bind
+        source: ${AWS_HOME}
+        target: /root/.aws
+        read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
