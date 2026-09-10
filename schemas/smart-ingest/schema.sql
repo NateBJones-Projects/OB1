@@ -40,9 +40,11 @@ CREATE TABLE IF NOT EXISTS public.ingestion_items (
   action text NOT NULL DEFAULT 'pending',   -- pending, add, skip, append_evidence, create_revision
   status text NOT NULL DEFAULT 'pending',   -- pending, ready, executed, failed
   reason text,
-  matched_thought_id bigint,
+  -- Open Brain keys public.thoughts by uuid (see docs/01-getting-started.md),
+  -- so references to a thought id must be uuid, not bigint.
+  matched_thought_id uuid,
   similarity_score numeric(5,4),
-  result_thought_id bigint,
+  result_thought_id uuid,
   error_message text,
   metadata jsonb DEFAULT '{}',
   created_at timestamptz DEFAULT now()
@@ -118,7 +120,7 @@ $$;
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION public.append_thought_evidence(
-  p_thought_id bigint,
+  p_thought_id uuid,  -- thoughts.id is uuid (see docs/01-getting-started.md)
   p_evidence jsonb  -- {source, extracted_at, excerpt, source_label}
 )
 RETURNS jsonb
@@ -201,8 +203,8 @@ GRANT ALL ON TABLE public.ingestion_jobs TO service_role;
 GRANT ALL ON TABLE public.ingestion_items TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.ingestion_jobs_id_seq TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.ingestion_items_id_seq TO service_role;
-REVOKE EXECUTE ON FUNCTION public.append_thought_evidence(bigint, jsonb) FROM public;
-GRANT EXECUTE ON FUNCTION public.append_thought_evidence(bigint, jsonb)
+REVOKE EXECUTE ON FUNCTION public.append_thought_evidence(uuid, jsonb) FROM public;
+GRANT EXECUTE ON FUNCTION public.append_thought_evidence(uuid, jsonb)
   TO service_role;
 
 -- ============================================================

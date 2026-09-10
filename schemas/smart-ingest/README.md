@@ -55,7 +55,7 @@ After running the migration:
 - Two new tables: `ingestion_jobs` (tracks job lifecycle with status, counters, and metadata) and `ingestion_items` (stores extracted thoughts with action codes, dedup reasons, and execution results). Both tables include a nullable `user_id uuid` column; on Supabase it references `auth.users(id) ON DELETE CASCADE`.
 - Three indexes: `ingestion_items_job_idx` on `ingestion_items(job_id)` for fast job-to-item lookups, plus partial indexes `idx_ingestion_jobs_pending` (jobs in `status = 'pending'`) and `idx_ingestion_items_pending` (items in `status IN ('pending','ready')`) to keep the worker's queue polling small.
 - Row Level Security enabled on both tables with a `service_role ALL` policy on each, and — on Supabase — an `authenticated SELECT` policy scoped to `user_id = auth.uid()` so a signed-in user can read only their own rows.
-- One RPC function `append_thought_evidence(bigint, jsonb)` that idempotently appends evidence entries to a thought's metadata.
+- One RPC function `append_thought_evidence(uuid, jsonb)` that idempotently appends evidence entries to a thought's metadata.
 - Service role has full access to both tables and their sequences. The `append_thought_evidence` RPC is **service-role only** — it is `SECURITY DEFINER` and bypasses RLS on `thoughts`, so it is revoked from `public` and granted only to `service_role`. The companion Edge Function (`integrations/smart-ingest/`) must call it with the Supabase service role key, never the anon key.
 
 ## Job Claim Semantics

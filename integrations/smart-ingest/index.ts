@@ -39,6 +39,7 @@ import {
   CLASSIFIER_MODEL_OPENAI,
   CLASSIFIER_MODEL_ANTHROPIC,
   MAX_TAGS_PER_THOUGHT,
+  type PreparedPayload,
 } from "./_shared/config.ts";
 
 // ── Environment ─────────────────────────────────────────────────────────────
@@ -141,7 +142,7 @@ interface IngestionItem {
   content_fingerprint: string;
   action: ReconcileAction;
   reason: string;
-  matched_thought_id: number | null;
+  matched_thought_id: ThoughtId | null;
   similarity_score: number | null;
   status: "pending" | "executed" | "failed";
   error_message: string | null;
@@ -163,9 +164,12 @@ interface IngestionJob {
   error_message: string | null;
 }
 
+/** A thought's primary key. Open Brain instances use bigint or uuid. */
+type ThoughtId = number | string;
+
 type UpsertThoughtResult = {
-  thought_id?: number;
-  id?: number;
+  thought_id?: ThoughtId;
+  id?: ThoughtId;
 };
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -347,15 +351,27 @@ function mergeTags(existing: unknown, extras: string[]): string[] {
   ]);
 }
 
-function extractThoughtId(value: unknown): number | null {
+/**
+ * Normalize a thought id returned by the DB. Open Brain instances key the
+ * thoughts table by either bigint or uuid; accept both. A number must be
+ * finite; a string must be non-empty after trimming.
+ */
+function normalizeThoughtId(value: unknown): ThoughtId | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") return value;
+  return null;
+}
+
+function extractThoughtId(value: unknown): ThoughtId | null {
+  const direct = normalizeThoughtId(value);
+  if (direct !== null) return direct;
   if (value && typeof value === "object" && "thought_id" in value) {
-    const thoughtId = (value as UpsertThoughtResult).thought_id;
-    if (typeof thoughtId === "number" && Number.isFinite(thoughtId)) return thoughtId;
+    const byThoughtId = normalizeThoughtId((value as UpsertThoughtResult).thought_id);
+    if (byThoughtId !== null) return byThoughtId;
   }
   if (value && typeof value === "object" && "id" in value) {
-    const id = (value as UpsertThoughtResult).id;
-    if (typeof id === "number" && Number.isFinite(id)) return id;
+    const byId = normalizeThoughtId((value as UpsertThoughtResult).id);
+    if (byId !== null) return byId;
   }
   return null;
 }
@@ -595,7 +611,7 @@ async function reconcileThought(
     tags: thought.tags,
     source_snippet: thought.source_snippet,
     content_fingerprint: fingerprint,
-    matched_thought_id: null as number | null,
+    matched_thought_id: null as ThoughtId | null,
     similarity_score: null as number | null,
   };
 
@@ -649,7 +665,7 @@ async function reconcileThought(
 
   const topMatch = matches[0];
   const similarity = topMatch.similarity as number;
-  const matchedId = topMatch.id as number;
+  const matchedId = topMatch.id as ThoughtId;
   const existingContent = (topMatch.content ?? "") as string;
 
   base.matched_thought_id = matchedId;
@@ -672,6 +688,32 @@ async function reconcileThought(
 
 // ── Execution ───────────────────────────────────────────────────────────────
 
+/**
+ * Backfill the enhanced-thoughts columns after upsert_thought.
+ *
+ * This instance's `upsert_thought` RPC only persists content, fingerprint, and
+ * metadata — it ignores the typed columns and the embedding. Mirroring the REST
+ * gateway's own capture path, we follow the upsert with a direct UPDATE so the
+ * thought gets its type/importance/source_type/quality_score/sensitivity_tier
+ * and, critically, its embedding — without which future semantic dedup could
+ * never match this thought. Non-fatal: a failed enrichment leaves a valid
+ * thought (content + metadata already written), so we log and continue.
+ */
+async function enrichThoughtColumns(thoughtId: ThoughtId, prepared: PreparedPayload): Promise<void> {
+  const updates: Record<string, unknown> = {
+    type: prepared.type,
+    importance: prepared.importance,
+    quality_score: prepared.quality_score,
+    source_type: prepared.source_type,
+    sensitivity_tier: prepared.sensitivity_tier,
+  };
+  if (safeEmbedding(prepared.embedding)) updates.embedding = prepared.embedding;
+  const { error } = await supabase.from("thoughts").update(updates).eq("id", thoughtId);
+  if (error) {
+    console.warn(`enrichThoughtColumns failed for thought ${thoughtId}: ${error.message}`);
+  }
+}
+
 async function executeItem(
   item: IngestionItem,
   embedding: number[],
@@ -679,7 +721,7 @@ async function executeItem(
   sourceType: string | null,
   sourceMetadata?: Record<string, unknown> | null,
   skipClassification = false,
-): Promise<number | null> {
+): Promise<ThoughtId | null> {
   switch (item.action) {
     case "add": {
       const prepared = await prepareThoughtPayload(item.content, {
@@ -717,6 +759,7 @@ async function executeItem(
       if (error) throw new Error(`upsert_thought failed: ${error.message}`);
       const thoughtId = extractThoughtId(data);
       if (thoughtId === null) throw new Error("upsert_thought returned no thought_id");
+      await enrichThoughtColumns(thoughtId, prepared);
       return thoughtId;
     }
 
@@ -772,6 +815,7 @@ async function executeItem(
       if (error) throw new Error(`upsert_thought (revision) failed: ${error.message}`);
       const thoughtId = extractThoughtId(data);
       if (thoughtId === null) throw new Error("upsert_thought (revision) returned no thought_id");
+      await enrichThoughtColumns(thoughtId, prepared);
       return thoughtId;
     }
 
