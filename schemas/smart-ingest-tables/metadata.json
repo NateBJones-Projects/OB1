@@ -1,0 +1,21 @@
+{
+  "name": "Smart Ingest Tables",
+  "description": "Schema for tracking dry-run import jobs, extracted items, reconciliation decisions, and reviewed execution status. Database dependency for the smart-ingest integration.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Supabase SQL Editor"]
+  },
+  "requires_skills": [],
+  "tags": ["ingestion", "dry-run", "jobs", "metadata", "review"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-06-13",
+  "updated": "2026-06-13"
+}
