@@ -27,3 +27,8 @@ docs/walkthroughs/*/public/
 docs/assets/agent-memory/promotional/generated-backgrounds/**/result.json
 docs/assets/agent-memory/screenshots/**/.chrome-*/
 integrations/openclaw-agent-memory/dist/
+open-brain-credential-tracker.xlsx
+~$open-brain-credential-tracker.xlsx
+integrations/consolidation-workers/_shared/tmp.txt
+
+zebras/
