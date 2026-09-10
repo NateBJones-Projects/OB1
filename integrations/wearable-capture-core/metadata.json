@@ -1,0 +1,31 @@
+{
+  "name": "Wearable Capture Core",
+  "description": "Reusable engine that turns any polling wearable (Omi, Limitless, and future devices) into Open Brain thoughts as ATOMS — title, action items, transcript chunks — each tagged with provenance (attribution / attributed_to / generator) and deduped on a salted per-atom fingerprint. Per-device adapters implement a five-method interface; the core owns auth, atom dedup, embedding, and writes.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "0.2.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter"],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": [
+    "wearable",
+    "capture",
+    "voice",
+    "lifelog",
+    "core",
+    "adapter",
+    "poller",
+    "atomic",
+    "provenance",
+    "attribution"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-06-16",
+  "updated": "2026-06-16"
+}
