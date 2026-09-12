@@ -23,12 +23,15 @@ Never built an Open Brain? Start here:
 
 ## Recent Contributions
 
-The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-08-30.
+The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-09-12.
 
 <!-- recent-contributions:start -->
 
 | Contribution | What changed | Creator |
 | ------------ | ------------ | ------- |
+| [Add ingestion metadata contract](docs/ingestion-metadata-contract.md) | Adds ingestion metadata contract. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Clarify ingestion import path](docs/drafts) | Clarify ingestion import path. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Repair PR checks and isolate fork validation](docs/01-getting-started.md) | Repair PR checks and isolate fork validation. | [@justfinethanku](https://github.com/justfinethanku) |
 | [Refresh README recent contributions](README.md) | Refresh README recent contributions. | [@github-actions[bot]](https://github.com/github-actions[bot]) |
 | [Add deploy-pages workflow for openbrain.fyi](.github/workflows/deploy-pages.yml) | Adds deploy-pages workflow for openbrain.fyi. | [@snapsynapse](https://github.com/snapsynapse) |
 | [Google Activity import: include Gemini answers from safeHtmlItem](recipes/google-activity-import/) | Google Activity import: include Gemini answers from safeHtmlItem. | [@araece](https://github.com/araece) |
@@ -46,9 +49,6 @@ The 20 most recent merged PRs. This list is generated from GitHub and refreshes 
 | [Persistent wiki pages](schemas/wiki-pages/) | Persistent wiki pages. | [@alanshurafa](https://github.com/alanshurafa) |
 | [Fix update-thought-mcp deploy-blocking bugs](integrations/update-thought-mcp/) | Fixes update-thought-mcp deploy-blocking bugs. | [@eazene](https://github.com/eazene) |
 | [Reject non-POST MCP requests with 405 to prevent GET handshake hang](integrations/kubernetes-deployment/) | Reject non-POST MCP requests with 405 to prevent GET handshake hang. | [@jcpoyser](https://github.com/jcpoyser) |
-| [Fix ob-graph MCP GET route causing SSE reconnect storm](recipes/ob-graph/) | Fixes ob-graph MCP GET route causing SSE reconnect storm. | [@eazene](https://github.com/eazene) |
-| [Fix UUID id pagination in thought-enrichment backfills](recipes/thought-enrichment/) | Fixes UUID id pagination in thought-enrichment backfills. | [@themacmarketer](https://github.com/themacmarketer) |
-| [Fix double-encoded metadata writes in thought-enrichment](recipes/thought-enrichment/) | Fixes double-encoded metadata writes in thought-enrichment. | [@jebontheside](https://github.com/jebontheside) |
 
 <!-- recent-contributions:end -->
 
