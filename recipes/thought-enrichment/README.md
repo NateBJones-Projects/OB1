@@ -119,6 +119,16 @@ WHERE jsonb_typeof(metadata) = 'string';
 
 If any row held a non-JSON string the statement aborts as a whole and changes nothing.
 
+## Troubleshooting
+
+**`enrich-thoughts.mjs` reports missing `SUPABASE_URL` / API key although the variable is exported in the shell**
+
+Config is read from `.env.local` next to the script, layered over `process.env`
+(file entries win). Confirm the variable is set in one of the two. Revisions
+before this note consulted only `.env.local`, so credentials injected by a
+wrapper script, a cron job, or CI were invisible and the script exited before
+scanning a single row.
+
 ## Cost expectations
 
 The default OpenRouter model is `openai/gpt-4o-mini` at roughly $0.001--0.002 per thought. For 1,000 thoughts, expect approximately $1--2. The `backfill-type` and `backfill-sensitivity` scripts are free (no LLM calls -- they use local logic only).
