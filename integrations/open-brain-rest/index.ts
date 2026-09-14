@@ -8,6 +8,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") || "";
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
+const ALLOW_HARD_DELETE = Deno.env.get("ALLOW_HARD_DELETE") === "true";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -434,6 +435,7 @@ async function createThought(body: z.infer<typeof captureSchema>) {
     sensitivity_tier: body.sensitivity_tier || stringMeta(extracted, "sensitivity_tier") || "standard",
     status,
     status_updated_at: status ? new Date().toISOString() : null,
+    enriched: true,
   };
 
   const { error } = await supabase.from("thoughts").update(update).eq("id", thoughtId);
@@ -458,7 +460,13 @@ app.use("*", async (c, next) => {
   await next();
 });
 
-app.get("/health", (c) => c.json({ ok: true, status: "ok", service: "open-brain-rest", version: "0.1.0" }, 200, corsHeaders));
+app.get("/health", (c) => c.json({
+  ok: true,
+  status: "ok",
+  service: "open-brain-rest",
+  version: "0.1.0",
+  hard_delete_enabled: ALLOW_HARD_DELETE,
+}, 200, corsHeaders));
 
 app.get("/stats", async (c) => {
   try {
@@ -522,6 +530,12 @@ app.put("/thought/:id", async (c) => {
 });
 
 app.delete("/thought/:id", async (c) => {
+  if (!ALLOW_HARD_DELETE) {
+    return c.json({
+      error: "Hard delete is disabled. Archive or supersede the thought instead.",
+      code: "HARD_DELETE_DISABLED",
+    }, 405, corsHeaders);
+  }
   const id = c.req.param("id");
   const { error } = await supabase.from("thoughts").delete().eq("id", id);
   if (error) return c.json({ error: error.message }, 500, corsHeaders);

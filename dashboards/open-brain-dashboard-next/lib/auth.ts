@@ -6,6 +6,8 @@ export interface SessionData {
   apiKey?: string;
   loggedIn?: boolean;
   restrictedUnlocked?: boolean;
+  rememberDevice?: boolean;
+  expiresAt?: number;
 }
 
 export class AuthError extends Error {
@@ -52,7 +54,32 @@ function demoAuthBypass() {
 
 export async function getSession() {
   const cookieStore = await cookies();
-  return getIronSession<SessionData>(cookieStore, sessionOptions);
+  const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
+  // Do not write cookies during Server Component reads. Removing the payload
+  // makes every existing authentication guard fail closed for expired sessions.
+  if (session.expiresAt !== undefined &&
+      (!Number.isSafeInteger(session.expiresAt) || session.expiresAt <= Date.now())) {
+    for (const key of Object.keys(session)) delete session[key as keyof SessionData];
+  }
+  if (session.expiresAt !== undefined) {
+    const remaining = Math.max(1, Math.ceil((session.expiresAt - Date.now()) / 1000));
+    session.updateConfig({ ...sessionOptions, ttl: remaining });
+  }
+  return session;
+}
+
+/** Called only after the access key has been validated by the login action. */
+export async function startSession(apiKey: string, rememberDevice: boolean) {
+  const session = await getSession();
+  const remember = process.env.LOCAL_DASHBOARD_AUTH === "true" && rememberDevice === true;
+  const ttl = 60 * 60 * 24 * (remember ? 30 : 1);
+  session.apiKey = apiKey;
+  session.loggedIn = true;
+  session.restrictedUnlocked = false;
+  session.rememberDevice = remember;
+  session.expiresAt = Date.now() + ttl * 1000;
+  session.updateConfig({ ...sessionOptions, ttl });
+  await session.save();
 }
 
 /**

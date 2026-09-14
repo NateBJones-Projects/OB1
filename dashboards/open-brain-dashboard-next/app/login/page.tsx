@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth";
+import { getSession, startSession } from "@/lib/auth";
 import { LoginForm } from "./LoginForm";
 
 async function loginAction(formData: FormData) {
@@ -24,10 +24,7 @@ async function loginAction(formData: FormData) {
     return { error: "Could not reach API. Check your connection." };
   }
 
-  const session = await getSession();
-  session.apiKey = apiKey;
-  session.loggedIn = true;
-  await session.save();
+  await startSession(apiKey, formData.get("rememberDevice") === "on");
 
   redirect("/");
 }
@@ -61,7 +58,7 @@ export default async function LoginPage() {
           </p>
         </div>
 
-        <LoginForm action={loginAction} />
+        <LoginForm action={loginAction} allowRememberDevice={process.env.LOCAL_DASHBOARD_AUTH === "true"} />
       </div>
     </div>
   );
