@@ -25,14 +25,38 @@
  *   - Haiku filter: ~300 in / 100 out tokens per pair. At Haiku 4.5
  *     pricing that's roughly $0.0005 per filtered pair.
  *   - Opus classify: ~800 in / 200 out tokens per pair. At Opus 4.7
- *     pricing that's roughly $0.018 per classified pair.
+ *     pricing that's roughly $0.009 per classified pair.
  *   - Typical filter pass rate is 20-40%.
  *
  *   Example: 500 candidate pairs, 30% pass filter =>
- *     500 * $0.0005 + 150 * $0.018  ~=  $0.25 + $2.70  ~=  $2.95
+ *     500 * $0.0005 + 150 * $0.009  ~=  $0.25 + $1.35  ~=  $1.60
  *
  *   The `--max-cost-usd` flag caps total spend. The script tracks
  *   estimated spend as it runs and stops before exceeding the cap.
+ *
+ *   EXCEPTION — the `claude-cli` provider bills against a Claude
+ *   subscription, not per token, so there is no dollar figure to cap.
+ *   Under that provider the script reports CALLS instead of dollars and
+ *   --max-cost-usd is inapplicable (see PROVIDERS below). The pair caps
+ *   (--limit, --pair) are the bound that still applies.
+ *
+ * PROVIDERS
+ *   openrouter   HTTP, OPENROUTER_API_KEY  (preferred — one key covers OB1)
+ *   anthropic    HTTP, ANTHROPIC_API_KEY   (direct, retained for back-compat)
+ *   claude-cli   shells out to the local `claude` binary, so operators on a
+ *                Claude subscription (Max plan) with no API credits can run
+ *                this recipe. Billed per seat, not per token.
+ *
+ *   Selection precedence:
+ *     1. an explicit --provider flag
+ *     2. OPENROUTER_API_KEY in the environment
+ *     3. ANTHROPIC_API_KEY in the environment
+ *     4. `claude-cli`, when the `claude` binary is on PATH
+ *
+ *   `claude-cli` CANNOT run nested inside a Claude Code session (the CLI
+ *   detects the parent session and its OAuth handshake fails), so the
+ *   script refuses when CLAUDECODE is set — the same rule the atomizer
+ *   recipe applies. Run it from a plain terminal instead.
  *
  * REQUIRED ENV VARS
  *   OPEN_BRAIN_URL            e.g. https://YOUR-PROJECT.supabase.co
@@ -41,25 +65,38 @@
  *   And ONE of (OpenRouter is preferred to match the rest of OB1's recipes):
  *     OPENROUTER_API_KEY      sk-or-v1-...   (routes to Anthropic models)
  *     ANTHROPIC_API_KEY       sk-ant-...     (direct, retained for back-compat)
+ *     — or neither, with the `claude` CLI installed and logged in.
  *
  *   When using OpenRouter, the default models (claude-haiku-4-5-20251001
  *   and claude-opus-4-7) are auto-prefixed with "anthropic/". Pass an
  *   already-prefixed string (e.g. "anthropic/claude-haiku-4-5") via
  *   --filter-model / --classify-model to override.
  *
+ *   The `claude-cli` provider ignores the model flags entirely: the CLI
+ *   answers with whatever model the operator's subscription is configured
+ *   for. Edge metadata records "claude-cli" rather than a model id so the
+ *   row never claims a model that was never selected.
+ *
  * USAGE
  *   node classify-edges.mjs --dry-run
  *   node classify-edges.mjs --limit 100 --max-cost-usd 2.00
  *   node classify-edges.mjs --pair <uuid-a>,<uuid-b>
- *   node classify-edges.mjs --model claude-opus-4-7 --no-hybrid
+ *   node classify-edges.mjs --model claude-opus-5 --no-hybrid
+ *   node classify-edges.mjs --provider claude-cli --limit 10 --dry-run
  *   node classify-edges.mjs --mirror-supersedes  # optional, OFF by default
  */
 
 import process from "node:process";
+import fs from "node:fs";
+import path from "node:path";
+
+import { buildCleanEnv, spawnClaudeCli } from "./lib/claude-cli.mjs";
 
 // ── constants ──────────────────────────────────────────────────────────────
 
 const CLASSIFIER_VERSION = "typed-edge-classifier-1.0.0";
+
+const PROVIDERS = new Set(["openrouter", "anthropic", "claude-cli"]);
 
 // Must match the CHECK constraint in schemas/typed-reasoning-edges/schema.sql
 const TYPED_RELATIONS = new Set([
@@ -74,11 +111,35 @@ const TYPED_RELATIONS = new Set([
 // Rough per-1M-token pricing (USD). Used for the cost cap, not billing.
 // Values are approximate and should be refreshed when Anthropic updates
 // their public pricing page.
+//
+// LIST PRICES CHECKED 2026-09-13. Re-verify before any large run — this
+// map is hand-maintained and Anthropic reprices without touching this
+// repo. Keys are the exact model ids the Anthropic API accepts. The
+// current generation has no dated aliases (the ids are complete as
+// written — `claude-opus-5`, never a date-suffixed variant), so the one
+// dated key below is the legacy Haiku 4.5 snapshot this recipe has
+// always shipped as its default filter model.
+//
+// NOTE: the Opus 4.x rows previously read $15 / $75 per 1M. That was an
+// earlier Opus-tier rate; Opus 4.6 and 4.7 are list-priced at $5 / $25
+// like the rest of the current Opus tier, so every estimate against the
+// default classify model was ~3x too high and the default $5 cap halted
+// runs about three times too early.
 const PRICING = {
+  // Haiku tier
   "claude-haiku-4-5-20251001": { in: 1.0, out: 5.0 },
   "claude-haiku-4-5": { in: 1.0, out: 5.0 },
-  "claude-opus-4-7": { in: 15.0, out: 75.0 },
-  "claude-opus-4-6": { in: 15.0, out: 75.0 },
+  // Sonnet tier
+  "claude-sonnet-5": { in: 2.0, out: 10.0 },
+  "claude-sonnet-4-6": { in: 3.0, out: 15.0 },
+  // Opus tier
+  "claude-opus-5": { in: 5.0, out: 25.0 },
+  "claude-opus-4-8": { in: 5.0, out: 25.0 },
+  "claude-opus-4-7": { in: 5.0, out: 25.0 },
+  "claude-opus-4-6": { in: 5.0, out: 25.0 },
+  // Fable tier
+  "claude-fable-5-1": { in: 10.0, out: 50.0 },
+  "claude-fable-5": { in: 10.0, out: 50.0 },
 };
 
 // Tracks which unknown models we've already warned about so the log
@@ -122,8 +183,25 @@ function estimateCost(model, inTokens, outTokens) {
  * no cap at all — which is exactly the pricing-drift failure mode that
  * WARN-1 in REVIEW.md calls out. Better to fail loudly at startup than
  * to under-report spend.
+ *
+ * The `claude-cli` provider is exempt, and not as a grandfather clause: a
+ * Claude subscription has no per-token price, so there is no dollar
+ * figure to cap and no pricing row that could be missing.
+ * --max-cost-usd is INAPPLICABLE there rather than silently unenforced —
+ * the run is bounded by --limit / --pair instead, and those caps keep
+ * working. Say so out loud when the operator actually passed the flag.
  */
-function assertPricingKnown(args) {
+function assertPricingKnown(args, provider) {
+  if (provider === "claude-cli") {
+    if (args.maxCostUsdExplicit) {
+      console.warn(
+        "[classify-edges] --max-cost-usd is inapplicable to provider=claude-cli: a Claude " +
+          "subscription is not billed per token, so there is no spend to cap. Ignoring the " +
+          "flag. Use --limit (or --pair) to bound the run; call counts are reported at the end.",
+      );
+    }
+    return;
+  }
   const used = new Set();
   if (args.hybrid) used.add(args.filterModel);
   used.add(args.singleModel || args.classifyModel);
@@ -162,6 +240,9 @@ function assertPricingKnown(args) {
 // Unknown models return 0 which correctly disables the proactive
 // parallelism clamp (see estimateCost + WARN-1 refusal at startup).
 function worstCasePerPair(args) {
+  // No per-token price under a subscription, so there is nothing to
+  // clamp against — same effect as an unknown model.
+  if (args.provider === "claude-cli") return 0;
   const classifyModel = args.singleModel || args.classifyModel;
   const classifyWorst = estimateCost(classifyModel, 800, 512);
   if (!args.hybrid) return classifyWorst;
@@ -188,8 +269,12 @@ function parseArgs(argv) {
     singleModel: null, // if set, skip hybrid and use this model end-to-end
     hybrid: true,
     maxCostUsd: 5.0,
+    maxCostUsdExplicit: false,
     noCostCap: false,
     mirrorSupersedes: false,
+    // null = auto-detect (see detectProvider). Resolved onto args.provider
+    // by loadEnv so the rest of the script can branch on one field.
+    provider: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -206,7 +291,18 @@ function parseArgs(argv) {
     } else if (a === "--filter-model") args.filterModel = argv[++i];
     else if (a === "--classify-model") args.classifyModel = argv[++i];
     else if (a === "--no-hybrid") args.hybrid = false;
-    else if (a === "--max-cost-usd") args.maxCostUsd = Number(argv[++i]) || 5.0;
+    else if (a === "--max-cost-usd") {
+      args.maxCostUsd = Number(argv[++i]) || 5.0;
+      args.maxCostUsdExplicit = true;
+    } else if (a === "--provider") {
+      const v = String(argv[++i] || "").trim();
+      if (!PROVIDERS.has(v)) {
+        throw new Error(
+          `--provider expects one of ${[...PROVIDERS].join(", ")} (got "${v}")`,
+        );
+      }
+      args.provider = v;
+    }
     else if (a === "--no-cost-cap") args.noCostCap = true;
     else if (a === "--mirror-supersedes") args.mirrorSupersedes = true;
     else if (a === "--help" || a === "-h") {
@@ -229,14 +325,26 @@ function printHelp() {
       "  --min-support N          Min shared-entity count per pair (default 2)",
       "  --pair UUID_A,UUID_B     Classify one explicit pair; skips sampling",
       "",
-      "Model selection:",
+      "Provider selection:",
+      "  --provider NAME          openrouter | anthropic | claude-cli.",
+      "                           Default: OPENROUTER_API_KEY, else ANTHROPIC_API_KEY,",
+      "                           else claude-cli when the `claude` binary is on PATH.",
+      "                           claude-cli runs on a Claude subscription (no API",
+      "                           credits needed), ignores the model flags, cannot run",
+      "                           nested inside a Claude Code session, and reports",
+      "                           call counts instead of dollars.",
+      "",
+      "Model selection (HTTP providers only — claude-cli uses its own configured model):",
       "  --model MODEL            Use one model end-to-end; disables hybrid",
       "  --filter-model MODEL     Haiku model for candidate filter (default claude-haiku-4-5-20251001)",
       "  --classify-model MODEL   Opus model for final classification (default claude-opus-4-7)",
       "  --no-hybrid              Skip Haiku filter; run --classify-model on every pair",
       "",
       "Cost / safety:",
-      "  --max-cost-usd N         Hard cap on estimated spend (default 5.00)",
+      "  --max-cost-usd N         Hard cap on estimated spend (default 5.00).",
+      "                           Inapplicable under --provider claude-cli (a",
+      "                           subscription has no per-token price); --limit and",
+      "                           --pair still bound the run.",
       "  --no-cost-cap            Acknowledge that --max-cost-usd cannot be enforced",
       "                           when pricing is unknown for the selected model(s).",
       "  --dry-run                Classify but do not INSERT",
@@ -253,19 +361,104 @@ function printHelp() {
   );
 }
 
-function loadEnv() {
+/**
+ * Is the `claude` binary on PATH? Used only as the last rung of the
+ * provider precedence ladder, so a false negative just means the
+ * operator has to pass --provider claude-cli explicitly.
+ *
+ * CLAUDE_CLI_PATH (same env var the atomizer honours) wins when set.
+ */
+function claudeCliAvailable() {
+  const explicit = process.env.CLAUDE_CLI_PATH;
+  if (explicit) return fs.existsSync(explicit);
+  const exts = process.platform === "win32" ? [".cmd", ".exe", ".bat", ""] : [""];
+  for (const dir of String(process.env.PATH || "").split(path.delimiter)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      try {
+        if (fs.existsSync(path.join(dir, `claude${ext}`))) return true;
+      } catch {
+        /* unreadable PATH entry — keep looking */
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Nested-execution guard, copied from the atomizer recipe: the Claude
+ * CLI detects that it is running inside a Claude Code session and its
+ * OAuth handshake fails, so the CLI provider cannot be used from there.
+ * spawnClaudeCli's buildCleanEnv strips these vars from the CHILD, but
+ * that is not enough — the parent session still owns the terminal and
+ * the credential handshake — so we refuse up front instead.
+ */
+function inClaudeCodeSession() {
+  return !!(
+    process.env.CLAUDE_CODE_SESSION_ID ||
+    process.env.CLAUDECODE ||
+    process.env.CLAUDE_CODE_ENTRYPOINT
+  );
+}
+
+/**
+ * Provider precedence (documented in the header and the README):
+ *   1. explicit --provider
+ *   2. OPENROUTER_API_KEY
+ *   3. ANTHROPIC_API_KEY
+ *   4. claude-cli, when the `claude` binary is on PATH
+ * Returns null when nothing is usable, so loadEnv can report it with
+ * the rest of the missing-env list.
+ */
+function detectProvider(explicit, env) {
+  if (explicit) return explicit;
+  if (env.OPENROUTER_API_KEY) return "openrouter";
+  if (env.ANTHROPIC_API_KEY) return "anthropic";
+  if (claudeCliAvailable()) return "claude-cli";
+  return null;
+}
+
+function loadEnv(args) {
   const env = process.env;
   const missing = [];
   for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY"]) {
     if (!env[k]) missing.push(k);
   }
-  // Need at least one LLM provider key. Prefer OpenRouter to match the
-  // multi-provider pattern in entity-extraction-worker (and so a single
-  // OPENROUTER_API_KEY can serve every recipe in OB1).
-  const hasOpenrouter = Boolean(env.OPENROUTER_API_KEY);
-  const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
-  if (!hasOpenrouter && !hasAnthropic) {
-    missing.push("OPENROUTER_API_KEY or ANTHROPIC_API_KEY");
+  // Pick the LLM provider. Prefer OpenRouter to match the multi-provider
+  // pattern in entity-extraction-worker (so a single OPENROUTER_API_KEY
+  // can serve every recipe in OB1), then direct Anthropic, then the
+  // local `claude` CLI for operators on a subscription with no API
+  // credits at all.
+  const provider = detectProvider(args.provider, env);
+  // Provider problems are reported BEFORE the generic missing-env list:
+  // an operator who typed `--provider claude-cli` inside a Claude Code
+  // session needs to hear about the nesting, not about OPEN_BRAIN_URL.
+  //
+  // An explicit --provider must actually be usable; never silently fall
+  // back to a different provider than the one the operator asked for.
+  if (provider === "openrouter" && !env.OPENROUTER_API_KEY) {
+    throw new Error("--provider openrouter requires OPENROUTER_API_KEY");
+  }
+  if (provider === "anthropic" && !env.ANTHROPIC_API_KEY) {
+    throw new Error("--provider anthropic requires ANTHROPIC_API_KEY");
+  }
+  if (provider === "claude-cli") {
+    if (!claudeCliAvailable()) {
+      throw new Error(
+        "--provider claude-cli requires the `claude` binary on PATH (or CLAUDE_CLI_PATH " +
+          "pointing at it). Install Claude Code, or use --provider openrouter|anthropic.",
+      );
+    }
+    if (inClaudeCodeSession()) {
+      throw new Error(
+        "provider=claude-cli cannot be invoked from inside a Claude Code session " +
+          "(CLAUDECODE is set; the nested CLI's session detection / OAuth will fail). " +
+          "Run this from a standalone terminal, or use --provider openrouter|anthropic.",
+      );
+    }
+  }
+  if (!provider) {
+    missing.push("OPENROUTER_API_KEY or ANTHROPIC_API_KEY (or the `claude` CLI on PATH)");
   }
   if (missing.length > 0) {
     throw new Error(`Missing env vars: ${missing.join(", ")}`);
@@ -279,7 +472,7 @@ function loadEnv() {
     OPEN_BRAIN_SERVICE_KEY: env.OPEN_BRAIN_SERVICE_KEY,
     OPENROUTER_API_KEY: env.OPENROUTER_API_KEY || "",
     ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY || "",
-    LLM_PROVIDER: hasOpenrouter ? "openrouter" : "anthropic",
+    LLM_PROVIDER: provider,
   };
 }
 
@@ -311,6 +504,17 @@ function resolveModel(model, provider) {
 function normalizeModelForPricing(model) {
   if (!model) return model;
   return model.startsWith("anthropic/") ? model.slice("anthropic/".length) : model;
+}
+
+/**
+ * What to report as the model that answered — for the run log and for
+ * `metadata.classifier_model` on the inserted edge. The claude-cli
+ * provider never receives a model parameter (the CLI uses whatever the
+ * operator's subscription is configured for), so recording the flag
+ * value there would put a model id on the row that was never selected.
+ */
+function modelLabel(env, model) {
+  return env.LLM_PROVIDER === "claude-cli" ? "claude-cli" : model;
 }
 
 // ── Supabase REST client ───────────────────────────────────────────────────
@@ -486,7 +690,54 @@ async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
   if (env.LLM_PROVIDER === "openrouter") {
     return callOpenRouterOnce(env, model, system, userMsg, maxTokens);
   }
+  if (env.LLM_PROVIDER === "claude-cli") {
+    return callClaudeCliOnce(env, model, system, userMsg, maxTokens);
+  }
   return callAnthropicDirectOnce(env, model, system, userMsg, maxTokens);
+}
+
+// Timeout for one `claude -p` round-trip. The CLI is slower than the
+// HTTP APIs (process start + OAuth + a full Claude Code turn), so the
+// atomizer's 180s default is the right order of magnitude here too.
+const CLAUDE_CLI_TIMEOUT_MS = Number(process.env.CLAUDE_CLI_TIMEOUT_MS) || 180_000;
+
+/**
+ * Provider: claude-cli. Shells out to the local `claude` binary so an
+ * operator with a Claude subscription (Max plan) and no API credits can
+ * run this recipe.
+ *
+ * Invocation mirrors recipes/atomizer/lib/atomize-text.mjs exactly:
+ * `claude -p` (non-interactive print mode) with the prompt piped via
+ * STDIN rather than passed as an argv element, which dodges shell
+ * escaping entirely — thought text is arbitrary user content full of
+ * quotes and newlines, and `spawn(..., {shell: true})` would mangle it.
+ *
+ * Differences from the HTTP providers, all deliberate:
+ *   - `model` is IGNORED. The CLI answers with whatever model the
+ *     operator's subscription is configured for; there is no per-call
+ *     model parameter we can honour truthfully, so callers get told
+ *     (see the startup banner) rather than silently misled.
+ *   - `maxTokens` is IGNORED — `claude -p` has no output-token cap flag.
+ *     The prompts already ask for a short strict-JSON object.
+ *   - Token counts come back as 0. A subscription is not billed per
+ *     token, so there is nothing to price; the runner counts CALLS
+ *     instead (see recordUsage).
+ *   - The CLI echoes prose and sometimes markdown fences around the
+ *     JSON. That is handled by parseJsonStrict, the same extractor the
+ *     HTTP paths use.
+ */
+async function callClaudeCliOnce(env, model, system, userMsg, maxTokens) {
+  const prompt =
+    `${system}\n\n${userMsg}\n\n` +
+    `Respond with the strict JSON object described above and nothing else — ` +
+    `no preamble, no explanation, no markdown fences.`;
+  const { stdout } = await spawnClaudeCli(
+    [process.env.CLAUDE_CLI_PATH || "claude", "-p"],
+    buildCleanEnv(),
+    CLAUDE_CLI_TIMEOUT_MS,
+    prompt,
+  );
+  return { raw: String(stdout).trim(), inTokens: 0, outTokens: 0 };
 }
 
 async function callAnthropicDirectOnce(env, model, system, userMsg, maxTokens) {
@@ -581,11 +832,28 @@ async function callAnthropic(env, model, system, userMsg, maxTokens) {
   throw lastErr;
 }
 
+/**
+ * Every provider's response goes through here. The HTTP providers
+ * normally return bare JSON; the claude-cli provider is chattier and
+ * may wrap the object in markdown fences or a sentence of prose, so
+ * after the fence strip we fall back to pulling the first balanced-
+ * looking {...} span out of the text. The fallback is shared rather
+ * than CLI-only: a fenced reply from any provider parses the same way.
+ */
 function parseJsonStrict(raw) {
   const cleaned = raw.replace(/^```(?:json)?/m, "").replace(/```$/m, "").trim();
   try {
     return JSON.parse(cleaned);
   } catch (e) {
+    // Fallback: first {...} span in the response.
+    const match = cleaned.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
+        /* fall through to the original error below */
+      }
+    }
     throw new Error(`JSON parse failed: ${e.message}; raw=${raw.slice(0, 200)}`);
   }
 }
@@ -771,6 +1039,28 @@ async function insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, modelUse
   }
 }
 
+// ── usage accounting ───────────────────────────────────────────────────────
+
+/**
+ * Record one LLM call against the run's budget.
+ *
+ * Two currencies, depending on the provider:
+ *   - HTTP providers bill per token, so we accumulate estimated dollars
+ *     and --max-cost-usd caps the run.
+ *   - claude-cli bills a flat subscription, so there are no dollars to
+ *     accumulate (token counts come back as 0 anyway). We count calls
+ *     instead and report them at the end; the run stays bounded by
+ *     --limit / --pair.
+ *
+ * Calls are counted for every provider — it is useful context in the
+ * summary line either way.
+ */
+function recordUsage(env, costState, model, inTokens, outTokens) {
+  costState.calls += 1;
+  if (env.LLM_PROVIDER === "claude-cli") return;
+  costState.spent += estimateCost(model, inTokens, outTokens);
+}
+
 // ── process one pair ───────────────────────────────────────────────────────
 
 async function processPair(env, sb, args, pair, costState) {
@@ -802,8 +1092,8 @@ async function processPair(env, sb, args, pair, costState) {
     } catch (e) {
       return { ...pair, status: "filter_error", error: e.message };
     }
-    filterModelUsed = args.filterModel;
-    costState.spent += estimateCost(args.filterModel, filt.inTokens, filt.outTokens);
+    filterModelUsed = modelLabel(env, args.filterModel);
+    recordUsage(env, costState, args.filterModel, filt.inTokens, filt.outTokens);
     if (costState.spent >= args.maxCostUsd) {
       return { ...pair, status: "skip_cost_cap_after_filter" };
     }
@@ -820,7 +1110,11 @@ async function processPair(env, sb, args, pair, costState) {
   } catch (e) {
     return { ...pair, status: "classifier_error", error: e.message };
   }
-  costState.spent += estimateCost(classifyModel, cls.inTokens, cls.outTokens);
+  recordUsage(env, costState, classifyModel, cls.inTokens, cls.outTokens);
+  // What actually answered. Under claude-cli the model flags were never
+  // sent anywhere, so reporting them (in the run log or in edge
+  // metadata) would claim a model that was never selected.
+  const classifyModelUsed = modelLabel(env, classifyModel);
 
   const label =
     cls.direction === "B_to_A"
@@ -835,7 +1129,7 @@ async function processPair(env, sb, args, pair, costState) {
       confidence: cls.confidence,
       rationale: cls.rationale,
       filterModel: filterModelUsed,
-      classifyModel,
+      classifyModel: classifyModelUsed,
     };
   }
   if (cls.confidence < args.minConfidence) {
@@ -846,7 +1140,7 @@ async function processPair(env, sb, args, pair, costState) {
       confidence: cls.confidence,
       rationale: cls.rationale,
       filterModel: filterModelUsed,
-      classifyModel,
+      classifyModel: classifyModelUsed,
     };
   }
 
@@ -858,13 +1152,15 @@ async function processPair(env, sb, args, pair, costState) {
       confidence: cls.confidence,
       rationale: cls.rationale,
       filterModel: filterModelUsed,
-      classifyModel,
+      classifyModel: classifyModelUsed,
       valid_from: cls.valid_from,
       valid_until: cls.valid_until,
     };
   }
 
-  const result = await insertTypedEdge(sb, args, pair, thoughtA, thoughtB, cls, classifyModel);
+  const result = await insertTypedEdge(
+    sb, args, pair, thoughtA, thoughtB, cls, classifyModelUsed,
+  );
   return result.ok
     ? {
         ...pair,
@@ -873,7 +1169,7 @@ async function processPair(env, sb, args, pair, costState) {
         label,
         confidence: cls.confidence,
         filterModel: filterModelUsed,
-        classifyModel,
+        classifyModel: classifyModelUsed,
       }
     : {
         ...pair,
@@ -881,7 +1177,7 @@ async function processPair(env, sb, args, pair, costState) {
         reason: result.reason,
         label,
         filterModel: filterModelUsed,
-        classifyModel,
+        classifyModel: classifyModelUsed,
       };
 }
 
@@ -894,8 +1190,8 @@ async function processPair(env, sb, args, pair, costState) {
  * cap-awareness) can overshoot `--max-cost-usd` by up to
  * `(parallelism - 1) * worstCasePerPair` because all in-flight tasks
  * check `costState.spent` before any of them has resolved. With
- * Opus classify at ~$0.018/pair and parallelism=3, the overshoot can
- * reach ~$0.036 past the cap — not catastrophic, but the README
+ * Opus classify at ~$0.009/pair and parallelism=3, the overshoot can
+ * reach ~$0.018 past the cap — not catastrophic, but the README
  * promises a hard cap.
  *
  * Fix: before each chunk, compute the remaining budget. If the
@@ -951,13 +1247,19 @@ async function processInChunks(items, fn, parallelism, costState, maxCostUsd, wo
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
+  // Resolve the provider first — it decides whether the cost cap is even
+  // applicable. loadEnv spends nothing; it only reads env vars, checks
+  // for the `claude` binary, and enforces the nested-session refusal.
+  const env = loadEnv(args);
+  args.provider = env.LLM_PROVIDER;
+
   // Preflight: if any model we're about to call has no pricing entry,
   // refuse to run with --max-cost-usd unless --no-cost-cap is set. See
   // WARN-1 in REVIEW.md. This catches the "unknown model silently runs
-  // uncapped" failure mode before any LLM spend.
-  assertPricingKnown(args);
+  // uncapped" failure mode before any LLM spend. Skipped for claude-cli,
+  // which has no per-token price at all.
+  assertPricingKnown(args, env.LLM_PROVIDER);
 
-  const env = loadEnv();
   const sb = sbClient(env);
 
   let pairs;
@@ -975,13 +1277,33 @@ async function main() {
     pairs = await sampleCandidatePairs(sb, args.minSupport, args.limit);
   }
   console.log(`[classify-edges] processing ${pairs.length} pairs${args.dryRun ? " (dry-run)" : ""}`);
+  const usingCli = env.LLM_PROVIDER === "claude-cli";
+  const modeLabel = usingCli
+    ? args.hybrid
+      ? "hybrid(filter->classify, both via claude-cli)"
+      : "single(claude-cli)"
+    : args.hybrid
+      ? "hybrid(Haiku->Opus)"
+      : args.singleModel || args.classifyModel;
   console.log(
-    `[classify-edges] mode=${args.hybrid ? "hybrid(Haiku->Opus)" : args.singleModel || args.classifyModel}` +
-      ` | max-cost=$${args.maxCostUsd.toFixed(2)}` +
+    `[classify-edges] provider=${env.LLM_PROVIDER} | mode=${modeLabel}` +
+      ` | ${usingCli ? "max-cost=n/a (subscription)" : `max-cost=$${args.maxCostUsd.toFixed(2)}`}` +
       ` | mirror-supersedes=${args.mirrorSupersedes}`,
   );
+  if (usingCli && args.hybrid) {
+    // Worth saying plainly: the whole point of the hybrid split is that
+    // the filter leg runs on a cheaper model, and the CLI gives us no
+    // way to pick one. Both legs hit the same configured model, so the
+    // filter costs an extra call per pair and buys nothing but a
+    // slightly cheaper prompt.
+    console.warn(
+      "[classify-edges] provider=claude-cli ignores --filter-model/--classify-model: the CLI " +
+        "answers with the model your subscription is configured for, so both hybrid legs use " +
+        "the same model. Consider --no-hybrid to halve the number of calls.",
+    );
+  }
 
-  const costState = { spent: 0 };
+  const costState = { spent: 0, calls: 0 };
   // Worst-case per-pair cost for the hard cost cap. In hybrid mode this
   // includes BOTH the Haiku filter leg AND the Opus classify leg so the
   // parallelism clamp reflects the true per-pair spend (see
@@ -1001,7 +1323,19 @@ async function main() {
   const counts = {};
   for (const r of results) counts[r.status] = (counts[r.status] ?? 0) + 1;
   console.log("\n[classify-edges] status counts:", counts);
-  console.log(`[classify-edges] estimated spend: $${costState.spent.toFixed(4)} of $${args.maxCostUsd.toFixed(2)} cap`);
+  if (usingCli) {
+    // No dollars to report under a subscription — calls are the unit
+    // that means anything here.
+    console.log(
+      `[classify-edges] LLM calls: ${costState.calls} (provider=claude-cli — billed to your ` +
+        `Claude subscription, not per token; --max-cost-usd does not apply)`,
+    );
+  } else {
+    console.log(
+      `[classify-edges] estimated spend: $${costState.spent.toFixed(4)} of ` +
+        `$${args.maxCostUsd.toFixed(2)} cap across ${costState.calls} LLM call(s)`,
+    );
+  }
 
   for (const r of results) {
     if (["inserted", "would_insert", "below_confidence", "none"].includes(r.status)) {

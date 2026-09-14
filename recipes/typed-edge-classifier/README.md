@@ -16,7 +16,7 @@ Walks candidate pairs of thoughts (pairs that share at least N entities via `tho
 - [`schemas/typed-reasoning-edges/`](../../schemas/typed-reasoning-edges/) applied (this recipe writes to `thought_edges`)
 - [`entity-extraction` schema (PR #197)](https://github.com/NateBJones-Projects/OB1/pull/197) applied — this is where candidate pairs come from (thoughts that share entities via `thought_entities`). You can skip this if you only ever pass explicit `--pair UUID_A,UUID_B`.
 - Node.js 18+
-- An LLM API key — `OPENROUTER_API_KEY` (preferred — one key covers every OB1 recipe) or `ANTHROPIC_API_KEY` (direct, retained for back-compat)
+- An LLM provider — `OPENROUTER_API_KEY` (preferred — one key covers every OB1 recipe), `ANTHROPIC_API_KEY` (direct, retained for back-compat), **or** the `claude` CLI installed and logged in, if you have a Claude subscription rather than API credits (see [Providers](#providers))
 
 ## Credential Tracker
 
@@ -34,9 +34,12 @@ LLM PROVIDER (pick ONE)
   OpenRouter key:        ____________   -> OPENROUTER_API_KEY   (preferred)
   -- OR --
   Anthropic key:         ____________   -> ANTHROPIC_API_KEY    (direct)
+  -- OR --
+  Claude CLI on PATH:    [ ] yes        -> --provider claude-cli (subscription)
 
 COST CAP FOR FIRST RUN
   Max USD:               ____________   (recommend $1-2 for a dry run first)
+                                        (n/a on the claude-cli provider)
 
 --------------------------------------
 ```
@@ -55,6 +58,9 @@ COST CAP FOR FIRST RUN
 
    # Option B — Anthropic direct (retained for back-compat)
    export ANTHROPIC_API_KEY="sk-ant-..."
+
+   # Option C — no key at all: run on a Claude subscription via the local
+   # `claude` CLI. Nothing to export; just pass --provider claude-cli.
    ```
 
    When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are auto-prefixed with `anthropic/` so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`).
@@ -86,6 +92,44 @@ COST CAP FOR FIRST RUN
    ORDER BY count(*) DESC;
    ```
 
+## Providers
+
+| Provider | Auth | Billing | Model selection |
+|---|---|---|---|
+| `openrouter` | `OPENROUTER_API_KEY` | per token | `--filter-model` / `--classify-model` / `--model` |
+| `anthropic` | `ANTHROPIC_API_KEY` | per token | `--filter-model` / `--classify-model` / `--model` |
+| `claude-cli` | the local `claude` binary, already logged in | your Claude subscription (per seat) | **ignored** — the CLI answers with whatever model your subscription is configured for |
+
+Pick one explicitly with `--provider NAME`. With no flag, the classifier picks the first of these that is available:
+
+1. an explicit `--provider` flag
+2. `OPENROUTER_API_KEY` in the environment
+3. `ANTHROPIC_API_KEY` in the environment
+4. `claude-cli`, when the `claude` binary is on `PATH` (or `CLAUDE_CLI_PATH` points at it)
+
+An explicit `--provider` never silently falls back to a different one — if the key or binary it needs is missing, the run fails with that reason.
+
+### The `claude-cli` provider (Claude subscription, no API credits)
+
+If you have a Claude subscription (Max plan) rather than API credits, `--provider claude-cli` shells out to the local `claude` binary in non-interactive mode (`claude -p`, prompt piped via stdin) instead of calling an HTTP API. The spawn helper in `lib/claude-cli.mjs` is copied from the [atomizer recipe](../atomizer/lib/claude-cli.mjs), which established the pattern; recipes are self-contained folders, so the file is duplicated rather than imported across recipe boundaries.
+
+```bash
+# Ten pairs, dry run, on a subscription
+node classify-edges.mjs --provider claude-cli --limit 10 --dry-run
+
+# For real, single-stage (see the hybrid note below)
+node classify-edges.mjs --provider claude-cli --limit 50 --no-hybrid
+```
+
+Four things behave differently on this provider, all of them deliberate:
+
+- **No dollar cost cap.** A subscription is not billed per token, so there is no spend to cap: `--max-cost-usd` is *inapplicable* rather than unenforced, and the classifier says so if you pass it. The **pair caps still apply** — `--limit` and `--pair` bound the run exactly as they do elsewhere — and the summary line reports **LLM calls** instead of dollars.
+- **Model flags are ignored.** The CLI has no per-call model parameter we could honour truthfully, so `--model` / `--filter-model` / `--classify-model` do not reach it, and `metadata.classifier_model` on the inserted edge records `claude-cli` rather than a model id that was never selected. Because both hybrid legs then hit the same model, the Haiku-filter saving disappears — the classifier warns and suggests `--no-hybrid`, which halves the number of calls.
+- **It cannot run nested inside a Claude Code session.** The CLI detects the parent session and its OAuth handshake fails, so the classifier refuses at startup when `CLAUDECODE` is set — the same rule the atomizer recipe applies. Run it from a plain terminal.
+- **It is slower.** Each call is a full CLI turn (process start, auth, response) — expect several seconds per leg rather than sub-second HTTP. `CLAUDE_CLI_TIMEOUT_MS` (default 180000) bounds a single call; `CLAUDE_CLI_PATH` overrides binary discovery.
+
+The CLI also tends to answer with prose or markdown fences around the JSON the classifier asks for. Every provider's response goes through the same `parseJsonStrict` extractor, which strips fences and, failing that, pulls the first `{...}` span out of the text.
+
 ## How the hybrid tiering works
 
 The default pipeline is two-stage:
@@ -95,16 +139,34 @@ The default pipeline is two-stage:
 
 You can disable the hybrid and run a single model end-to-end with `--model <model>` (e.g., `--model claude-haiku-4-5-20251001` for a cheap pass).
 
+On `--provider claude-cli` the tiering does not apply — both legs use the same subscription-configured model, so the filter leg costs an extra call per pair and saves nothing. Prefer `--no-hybrid` there.
+
 ## Cost bound
 
-> **Pricing disclaimer.** The `--max-cost-usd` cap uses a hand-maintained `PRICING` map in `classify-edges.mjs` that is updated manually. Check [Anthropic's pricing page](https://www.anthropic.com/pricing) before large runs. If you run with a model that is NOT in the PRICING map, the classifier will **refuse to run** when `--max-cost-usd` is set, and will log `WARNING: no pricing info for model "X"` otherwise. Pass `--no-cost-cap` to explicitly acknowledge an uncapped run; see "Pricing-unknown guard" below.
+> **Not applicable on `--provider claude-cli`.** Everything in this section describes per-token billing. On a Claude subscription there is no per-token price, so `--max-cost-usd` and the `PRICING` map do not apply; the run is bounded by `--limit` / `--pair` and the summary reports call counts. See [Providers](#providers).
+
+> **Pricing disclaimer.** The `--max-cost-usd` cap uses a hand-maintained `PRICING` map in `classify-edges.mjs` that is updated manually. **List prices in that map were last checked 2026-09-13 — re-verify before large runs.** Check [Anthropic's pricing page](https://www.anthropic.com/pricing) before large runs. If you run with a model that is NOT in the PRICING map, the classifier will **refuse to run** when `--max-cost-usd` is set, and will log `WARNING: no pricing info for model "X"` otherwise. Pass `--no-cost-cap` to explicitly acknowledge an uncapped run; see "Pricing-unknown guard" below.
 
 | Stage | Rough tokens / pair | Model | Approx cost / pair |
 |---|---|---|---|
 | Haiku filter | 300 in / 100 out | `claude-haiku-4-5-20251001` | $0.0005 |
-| Opus classify | 800 in / 200 out | `claude-opus-4-7` | $0.018 |
+| Opus classify | 800 in / 200 out | `claude-opus-4-7` | $0.009 |
 
-Typical filter pass rate: 20-40%. On 500 candidate pairs with a 30% pass rate, expect roughly `500 * $0.0005 + 150 * $0.018 = $2.95`.
+Typical filter pass rate: 20-40%. On 500 candidate pairs with a 30% pass rate, expect roughly `500 * $0.0005 + 150 * $0.009 = $1.60`.
+
+### Priced models
+
+`PRICING` in `classify-edges.mjs` carries list rates per 1M tokens, checked **2026-09-13**. Model ids are the exact strings the Anthropic API accepts; the current generation has no dated aliases, so `claude-opus-5` (never a date-suffixed variant) is the whole id. The one dated key is the legacy Haiku 4.5 snapshot that is still this recipe's default filter model.
+
+| Model id | Input $/1M | Output $/1M |
+|---|---|---|
+| `claude-haiku-4-5`, `claude-haiku-4-5-20251001` | $1 | $5 |
+| `claude-sonnet-5` | $2 | $10 |
+| `claude-sonnet-4-6` | $3 | $15 |
+| `claude-opus-5`, `claude-opus-4-8`, `claude-opus-4-7`, `claude-opus-4-6` | $5 | $25 |
+| `claude-fable-5`, `claude-fable-5-1` | $10 | $50 |
+
+The Opus 4.x rows previously read $15 / $75, an earlier Opus-tier rate. Current list price for that tier is $5 / $25, so estimates against the default classify model used to run ~3x high and the default $5 cap halted runs about three times too early. The per-pair figures in the table above reflect the corrected rate.
 
 ### Pricing-unknown guard
 
@@ -127,7 +189,7 @@ that the cap cannot be enforced.
 
 The `--max-cost-usd` flag is a **hard cap** on estimated spend. The classifier tracks estimated token cost after every call and stops scheduling new pairs the moment the cap is reached. Always pass a cap on first runs.
 
-**Hard-cap semantics under `--parallelism > 1`.** Before launching each chunk, the runner computes the remaining budget and clamps the chunk size so that `chunk_size * worst_case_per_pair <= remaining_budget`. As spend approaches the cap, parallelism drops to 1; once spend meets or exceeds the cap, no new pairs are scheduled. In hybrid mode `worst_case_per_pair` includes BOTH the Haiku filter leg AND the Opus classify leg (roughly `$0.0005 + $0.018 = $0.0185` on the default prompt), so a pair that spends on both legs is fully budgeted before any sibling task launches. Worst-case overshoot is bounded by the cost of the **single** in-flight task that discovers the cap has been hit, which is `worst_case_per_pair`. Previously, up to `parallelism - 1` extra pairs could spend past the cap because all in-flight tasks checked `costState.spent` before any of them had resolved, and the clamp only budgeted the classify leg. This is now fixed.
+**Hard-cap semantics under `--parallelism > 1`.** Before launching each chunk, the runner computes the remaining budget and clamps the chunk size so that `chunk_size * worst_case_per_pair <= remaining_budget`. As spend approaches the cap, parallelism drops to 1; once spend meets or exceeds the cap, no new pairs are scheduled. In hybrid mode `worst_case_per_pair` includes BOTH the Haiku filter leg AND the Opus classify leg (roughly `$0.0005 + $0.009 = $0.0095` on the default prompt), so a pair that spends on both legs is fully budgeted before any sibling task launches. Worst-case overshoot is bounded by the cost of the **single** in-flight task that discovers the cap has been hit, which is `worst_case_per_pair`. Previously, up to `parallelism - 1` extra pairs could spend past the cap because all in-flight tasks checked `costState.spent` before any of them had resolved, and the clamp only budgeted the classify leg. This is now fixed.
 
 The proactive clamp requires every model that will actually be called (filter model in hybrid mode, classify model always) to be priced in `PRICING` (in `classify-edges.mjs`). An unknown model on either leg disables the clamp; the classifier will **refuse to run with `--max-cost-usd`** under an unknown model unless you explicitly pass `--no-cost-cap` (see pricing warning below).
 
@@ -148,11 +210,15 @@ After a full non-dry run:
 --limit N                Max candidate pairs (default 20)
 --min-support N          Min shared entities per pair (default 2)
 --pair UUID_A,UUID_B     Classify one explicit pair; skips sampling
+--provider NAME          openrouter | anthropic | claude-cli. Default:
+                         OPENROUTER_API_KEY, else ANTHROPIC_API_KEY, else
+                         claude-cli when the `claude` binary is on PATH
 --model MODEL            Use one model end-to-end; disables hybrid
 --filter-model MODEL     Haiku model for candidate filter
 --classify-model MODEL   Opus model for final classification
 --no-hybrid              Skip Haiku filter entirely
---max-cost-usd N         Hard cap on estimated spend (default 5.00)
+--max-cost-usd N         Hard cap on estimated spend (default 5.00).
+                         Inapplicable under --provider claude-cli
 --no-cost-cap            Acknowledge that the cap cannot be enforced when
                          pricing is unknown for the selected model(s)
 --dry-run                Classify but do not INSERT
@@ -246,6 +312,15 @@ For now: flag off by default, behavior documented, decision deferred to dev-revi
 
 **Issue: `Missing env vars: OPEN_BRAIN_URL, OPEN_BRAIN_SERVICE_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY`**
 Solution: Export `OPEN_BRAIN_URL` + `OPEN_BRAIN_SERVICE_KEY` plus one LLM provider key (either `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`). The service-role key is required because the classifier writes to `thought_edges` directly via PostgREST; the anon key won't have permission. Never commit any of these keys or paste them into a browser-facing app.
+
+**Issue: `provider=claude-cli cannot be invoked from inside a Claude Code session`**
+Solution: You are running the classifier from inside Claude Code (or another harness that sets `CLAUDECODE`). The nested `claude` CLI's session detection and OAuth handshake fail there, so the classifier refuses up front instead of erroring halfway through a run. Run it from a plain terminal, or use `--provider openrouter` / `--provider anthropic`.
+
+**Issue: `--provider claude-cli requires the `claude` binary on PATH`**
+Solution: Install Claude Code and log in, or point `CLAUDE_CLI_PATH` at the binary. Auto-detection also scans `PATH` for `claude`, so this only comes up when the binary lives somewhere unusual.
+
+**Issue: `Claude CLI timed out after 180s`**
+Solution: Each `claude-cli` call is a full CLI turn, so it is much slower than an HTTP call. Raise `CLAUDE_CLI_TIMEOUT_MS`, drop `--parallelism`, or add `--no-hybrid` to halve the calls per pair.
 
 **Issue: `Candidate sampling requires thought_entities (from schemas/entity-extraction/)`**
 Solution: Either apply the `entity-extraction` schema (so this recipe has a pool to sample from), or skip sampling entirely by passing `--pair UUID_A,UUID_B` for each pair you want classified.
