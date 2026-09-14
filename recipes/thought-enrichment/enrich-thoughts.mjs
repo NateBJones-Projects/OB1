@@ -821,16 +821,23 @@ function parseArgs(argv) {
   return args;
 }
 
+/**
+ * Load config from `.env.local` layered over `process.env`.
+ * File entries win; `process.env` supplies anything the file omits, so the
+ * script also works with no file at all when credentials are injected by a
+ * wrapper script, a cron job, or CI.
+ */
 function parseEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return {};
   const env = {};
-  for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
-    const idx = line.indexOf("=");
-    if (idx > 0 && !line.startsWith("#")) {
-      env[line.slice(0, idx).trim()] = line.slice(idx + 1).trim().replace(/^['"]|['"]$/g, "");
+  if (fs.existsSync(filePath)) {
+    for (const line of fs.readFileSync(filePath, "utf8").split("\n")) {
+      const idx = line.indexOf("=");
+      if (idx > 0 && !line.startsWith("#")) {
+        env[line.slice(0, idx).trim()] = line.slice(idx + 1).trim().replace(/^['"]|['"]$/g, "");
+      }
     }
   }
-  return env;
+  return { ...process.env, ...env };
 }
 
 function printUsage() {
