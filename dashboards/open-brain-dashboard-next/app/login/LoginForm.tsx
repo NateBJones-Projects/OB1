@@ -4,8 +4,10 @@ import { useActionState } from "react";
 
 export function LoginForm({
   action,
+  allowRememberDevice = false,
 }: {
   action: (formData: FormData) => Promise<{ error: string } | undefined>;
+  allowRememberDevice?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     async (_prev: { error: string } | undefined, formData: FormData) => {
@@ -33,6 +35,13 @@ export function LoginForm({
           className="w-full border border-border bg-bg-surface px-4 py-2.5 text-text-primary placeholder-text-muted transition focus:border-violet focus:outline-none focus:ring-1 focus:ring-violet/30"
         />
       </div>
+
+      {allowRememberDevice && (
+        <label className="flex items-center gap-2 text-sm text-text-secondary">
+          <input type="checkbox" name="rememberDevice" className="accent-violet" />
+          Remember this device for 30 days
+        </label>
+      )}
 
       {state?.error && (
         <p className="text-danger text-sm">{state.error}</p>
