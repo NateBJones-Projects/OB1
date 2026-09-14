@@ -329,6 +329,26 @@ select metadata->'triage'->>'rule' as rule, sensitivity_tier, count(*)
 
 Note the privacy reality: embedding sends text to OpenAI or OpenRouter, and atomization sends it to your chosen provider (Plaud's own cloud AI has already seen all of it). `summary` minimizes that footprint; `skip` eliminates it.
 
+### Importing everything as `standard`
+
+`default_tier` is `personal` because a keyword list never covers everything and
+the cost of under-tiering is that private material flows on to embeddings, an LLM,
+and any surface that trusts the tier. Getting there by omission or a typo should
+not be possible.
+
+An operator who genuinely wants every recording freely readable can say so, but
+has to say it explicitly:
+
+```json
+"default_tier": "standard",
+"acknowledge_default_standard": true
+```
+
+The restricted regex set still escalates either way. Those patterns are
+credentials and identifiers rather than private subjects, and a recording
+containing one is held back because it would otherwise be embedded and sent to a
+model — a different problem from privacy, and not one this switch is about.
+
 ## Flags
 
 ### `export-plaud.mjs`

@@ -116,11 +116,35 @@ test("escalation guard: a standard verdict is re-checked against the regex sets"
   assert.equal(verdict.tier, "restricted");
   assert.equal(verdict.rule, "escalation:regex:restricted");
 });
-test("loadTriageRules refuses default_tier 'standard'", () => {
-  const tmp = path.join(os.tmpdir(), `plaud-rules-${process.pid}.json`);
-  fs.writeFileSync(tmp, JSON.stringify({ default_tier: "standard", rules: [] }));
-  assert.throws(() => loadTriageRules(tmp), /default_tier must not be "standard"/);
-  fs.unlinkSync(tmp);
+test("loadTriageRules refuses default_tier 'standard' unless it is acknowledged", () => {
+  // Getting to "everything is freely readable" by omission or a typo should not
+  // be possible; saying it on purpose should be.
+  const base = {
+    version: 1,
+    default_tier: "standard",
+    regex: { restricted: [], personal: [] },
+    rules: [],
+  };
+  const write = (obj) => {
+    const f = path.join(os.tmpdir(), `triage-${Math.random().toString(36).slice(2)}.json`);
+    fs.writeFileSync(f, JSON.stringify(obj));
+    return f;
+  };
+
+  assert.throws(
+    () => loadTriageRules(write(base)),
+    /acknowledge_default_standard/,
+    "unacknowledged 'standard' is refused, and the error says how to opt in",
+  );
+
+  const ok = loadTriageRules(write({ ...base, acknowledge_default_standard: true }));
+  assert.equal(ok.defaultTier, "standard", "an explicit acknowledgement is honoured");
+
+  assert.throws(
+    () => loadTriageRules(write({ ...base, acknowledge_default_standard: "yes" })),
+    /acknowledge_default_standard/,
+    "only a real boolean true counts",
+  );
 });
 test("tier map overrides the rules", () => {
   const tmp = path.join(os.tmpdir(), `plaud-tiers-${process.pid}.csv`);

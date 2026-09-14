@@ -101,10 +101,17 @@ export function loadTriageRules(filePath) {
   if (!TIERS.includes(defaultTier)) {
     throw new Error(`triage rules: default_tier "${defaultTier}" is not one of ${TIERS.join(", ")}`);
   }
-  if (defaultTier === "standard") {
+  // Unclassified material escalates by default: a keyword list never covers
+  // everything, and the cost of under-tiering is that private material flows on
+  // to embeddings, an LLM and any surface that trusts the tier. An operator who
+  // genuinely wants everything readable can say so, but has to say it in the
+  // file rather than get there by omission or a typo.
+  if (defaultTier === "standard" && parsed.acknowledge_default_standard !== true) {
     throw new Error(
-      'triage rules: default_tier must not be "standard" — unclassified material escalates ' +
-        '(use "personal" or "restricted").',
+      'triage rules: default_tier "standard" means nothing is tiered up unless a rule ' +
+        "fires, so anything your keywords miss is treated as freely readable. If that is " +
+        'what you want, set "acknowledge_default_standard": true in the same file. ' +
+        "Regex escalation to restricted still applies either way.",
     );
   }
 

@@ -7,7 +7,10 @@
     "",
     "Rules are evaluated top to bottom, first match wins, and the rule that fired is",
     "written to metadata.triage.rule so you can audit and re-tier later.",
-    "Anything that matches nothing gets default_tier (never 'standard').",
+    "Anything that matches nothing gets default_tier, which defaults to 'personal'.",
+    "Setting default_tier to 'standard' means anything your keywords miss is treated",
+    "as freely readable, so it requires \"acknowledge_default_standard\": true in this",
+    "same file. Regex escalation to restricted still applies either way.",
     "A 'standard' verdict is re-checked against both regex sets before it is accepted,",
     "so a badly ordered file cannot silently downgrade a recording containing an SSN."
   ],
