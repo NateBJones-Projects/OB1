@@ -1,0 +1,4 @@
+.env
+.env.local
+output/
+alias-map.json
