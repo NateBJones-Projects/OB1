@@ -13,10 +13,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { contentFingerprint, parseArgs } from "../lib/common.mjs";
-import { chunkTurns, discoverRecordings, parseTranscriptText, splitSections } from "../lib/plaud-parse.mjs";
+import {
+  chunkTurns,
+  discoverRecordings,
+  parseTranscriptText,
+  splitSections,
+  splitSummaryDoc,
+} from "../lib/plaud-parse.mjs";
 import { loadTierMap, loadTriageRules, triageRecording } from "../lib/triage.mjs";
 import { parseAtomsFromResponse, resolveProvider, excerptTranscript } from "../lib/providers.mjs";
 import { entriesToRecords, parseListing } from "../export-plaud.mjs";
+import { mediaFilename, parseShareId, planRecording } from "../fetch-shared.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const recipeDir = path.join(__dirname, "..");
@@ -214,6 +221,164 @@ test("provider precedence: explicit flag beats env, OpenRouter beats the rest", 
   assert.equal(resolveProvider({ GEMINI_API_KEY: "z" }, null, null).provider, "gemini");
   assert.throws(() => resolveProvider({}, null, null), /No LLM provider available/);
   assert.throws(() => resolveProvider(env, "llama", null), /Unknown provider/);
+});
+
+console.log("share links");
+test("parseShareId accepts the full share URL", () => {
+  const { shareId, uuid, token } = parseShareId(
+    "https://web.plaud.ai/s/pub_11111111-2222-3333-4444-555555555555::AbCdEf0123-_xyz",
+  );
+  assert.equal(shareId, "pub_11111111-2222-3333-4444-555555555555::AbCdEf0123-_xyz");
+  assert.equal(uuid, "pub_11111111-2222-3333-4444-555555555555");
+  assert.equal(token, "AbCdEf0123-_xyz");
+});
+test("parseShareId accepts the inner /nshare/ URL and a percent-encoded ::", () => {
+  assert.equal(
+    parseShareId("https://web.plaud.ai/nshare/pub_11111111-2222-3333-4444-555555555555%3A%3AAbCdEf0123")
+      .shareId,
+    "pub_11111111-2222-3333-4444-555555555555::AbCdEf0123",
+  );
+});
+test("parseShareId accepts a bare id, with or without the token", () => {
+  assert.equal(
+    parseShareId("  pub_11111111-2222-3333-4444-555555555555::AbCdEf0123  ").shareId,
+    "pub_11111111-2222-3333-4444-555555555555::AbCdEf0123",
+  );
+  // The API answers for the uuid alone, so a link truncated at "::" still works.
+  const bare = parseShareId("pub_11111111-2222-3333-4444-555555555555");
+  assert.equal(bare.token, null);
+  assert.equal(bare.uuid, "pub_11111111-2222-3333-4444-555555555555");
+});
+test("parseShareId rejects malformed input rather than asking the API", () => {
+  // The share API answers garbage ids with HTTP 200 + {"status":40400}, so a
+  // bad id must be caught here or it looks like a dead link.
+  assert.throws(() => parseShareId("not-a-share-id"), /not a Plaud share id/);
+  assert.throws(() => parseShareId(""), /No share link given/);
+  assert.throws(() => parseShareId("https://web.plaud.ai/file/abc123"), /not a Plaud share path/);
+  assert.throws(() => parseShareId("pub_short::x"), /not a Plaud share id/);
+});
+
+test("mediaFilename keeps a sane basename, sanitizes the rest, and de-duplicates", () => {
+  const taken = new Set();
+  assert.equal(mediaFilename("permanent/abc/mark/20260101_000000_aa.jpg", taken), "20260101_000000_aa.jpg");
+  assert.equal(mediaFilename("permanent/abc/poster/card@v2 copy.png", taken), "card_v2_copy.png");
+  assert.equal(mediaFilename("permanent/other/card@v2 copy.png", taken), "card_v2_copy-2.png");
+  assert.equal(mediaFilename("permanent/abc/blob", new Set()), "blob.bin");
+});
+
+test("planRecording lands in the layout discoverRecordings reads", () => {
+  // Fictional payload shaped like GET /share/access/<id>.
+  const payload = {
+    status: 0,
+    object_type: "file",
+    owner_name: "",
+    is_trans: 1,
+    is_ai_content: 1,
+    data_file: {
+      id: "aaaabbbbccccdddd",
+      filename: "Widget roadmap sync",
+      start_time: 1746093600000,
+      duration: 1800000,
+      file_language: "en",
+      trans_result: [
+        { start_time: 0, end_time: 4000, speaker: "Robin", content: "Shipping the widget Friday." },
+        { start_time: 4000, end_time: 9000, speaker: "Sam", content: "I will write the release note." },
+      ],
+      notes_list: [
+        {
+          data_type: "auto_sum_note",
+          data_tab_name: "Summary",
+          data_content:
+            "![PLAUD NOTE](permanent/x/summary_poster/card_1.png)\n\nRobin and Sam agreed the widget ships Friday.\n\n" +
+            "## Action Items\n\n- [ ] Sam writes the release note\n",
+        },
+        {
+          data_type: "high_light",
+          data_tab_name: "Highlights",
+          data_content: JSON.stringify([
+            {
+              timestamp: 4000,
+              mark_type_string: "image",
+              title: "Whiteboard: release plan",
+              content: "The board lists three launch gates.",
+              picture_link: "permanent/x/mark/board.jpg",
+            },
+          ]),
+        },
+      ],
+      download_link_map: {
+        "permanent/x/summary_poster/card_1.png": "https://example.invalid/card_1.png",
+        "permanent/x/mark/board.jpg": "https://example.invalid/board.jpg",
+      },
+    },
+  };
+
+  const plan = planRecording(payload, {
+    shareId: "pub_11111111-2222-3333-4444-555555555555::AbCdEf0123",
+    shareUrl: "https://web.plaud.ai/s/pub_11111111-2222-3333-4444-555555555555::AbCdEf0123",
+    idOverride: null,
+    includeMedia: true,
+  });
+
+  assert.equal(plan.recordingId, "aaaabbbbccccdddd");
+  assert.deepEqual(plan.files.map((f) => f.name), ["meta.json", "transcript.txt", "summary.md"]);
+
+  const meta = JSON.parse(plan.files[0].text);
+  assert.equal(meta.title, "Widget roadmap sync");
+  assert.equal(meta.start_time, 1746093600000);
+  assert.deepEqual(meta.speakers, ["Robin", "Sam"]);
+  assert.match(meta.share_url, /^https:\/\/web\.plaud\.ai\/s\//);
+
+  const transcript = plan.files[1].text;
+  assert.match(transcript, /^\[00:00:00\] Robin: Shipping the widget Friday\.$/m);
+  assert.match(transcript, /^\[00:00:04\] Sam: I will write the release note\.$/m);
+
+  // S3 object keys must be rewritten to the local media/ path, or the summary
+  // carries dead references once the presigned URLs expire.
+  const summaryDoc = plan.files[2].text;
+  assert.ok(!summaryDoc.includes("permanent/x/"), "S3 keys should be rewritten");
+  assert.match(summaryDoc, /!\[PLAUD NOTE\]\(media\/card_1\.png\)/);
+  assert.match(summaryDoc, /!\[Whiteboard: release plan\]\(media\/board\.jpg\)/);
+
+  // The acceptance criterion: splitSummaryDoc must pull BOTH Plaud's own
+  // "## Action Items" and our "## Highlights" out of the body.
+  const split = splitSummaryDoc(summaryDoc);
+  assert.match(split.highlights, /Action Items:/);
+  assert.match(split.highlights, /Sam writes the release note/);
+  assert.match(split.highlights, /Highlights:/);
+  assert.match(split.highlights, /Whiteboard: release plan/);
+  assert.match(split.summary, /Robin and Sam agreed the widget ships Friday/);
+  assert.ok(!split.summary.includes("Sam writes the release note"), "action items belong in highlights");
+});
+
+test("planRecording refuses a share with neither transcript nor summary", () => {
+  assert.throws(
+    () =>
+      planRecording(
+        { status: 0, is_trans: 0, is_ai_content: 0, data_file: { id: "x", filename: "Empty" } },
+        { shareId: "pub_11111111-2222-3333-4444-555555555555::AbCdEf0123", shareUrl: "u" },
+      ),
+    /neither a transcript nor a summary/,
+  );
+});
+
+test("planRecording survives a highlights note that is not valid JSON", () => {
+  const plan = planRecording(
+    {
+      status: 0,
+      is_trans: 1,
+      is_ai_content: 1,
+      data_file: {
+        id: "y",
+        filename: "Partial",
+        trans_result: [{ start_time: 0, speaker: "Robin", content: "Hello." }],
+        notes_list: [{ data_type: "high_light", data_tab_name: "Highlights", data_content: "{not json" }],
+      },
+    },
+    { shareId: "pub_11111111-2222-3333-4444-555555555555::AbCdEf0123", shareUrl: "u" },
+  );
+  assert.ok(plan.warnings.some((w) => /not parseable JSON/.test(w)));
+  assert.deepEqual(plan.files.map((f) => f.name), ["meta.json", "transcript.txt"]);
 });
 
 console.log("args");

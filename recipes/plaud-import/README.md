@@ -6,11 +6,12 @@
 
 Exports your recordings from Plaud to a local folder, then imports each one as **one parent thought** (the Plaud AI summary, backdated to the recording time) plus **N atomic child thoughts** extracted from the transcript by an LLM. Every row carries a sensitivity tier decided by an auditable rule chain, a client-computed `content_fingerprint` for dedup, and the provenance fields required by the [ingestion metadata contract](../../docs/ingestion-metadata-contract.md).
 
-Two scripts:
+Three scripts:
 
 | Script | Job |
 | ------ | --- |
 | `export-plaud.mjs` | Drives the official `@plaud-ai/cli` to pull metadata, transcript, and summary for every recording into a local folder. Paced, resumable, defensive about what the CLI returns. |
+| `fetch-shared.mjs` | Pulls **one publicly shared** recording from its share link into the same folder layout. No account, no CLI, no credentials. See [Fetching a shared recording](#fetching-a-shared-recording). |
 | `import-plaud.mjs` | Walks that folder, triages sensitivity, atomizes transcripts, embeds, and inserts into `thoughts`. |
 
 Node 18+, ESM, **zero npm dependencies** (built-in `fetch`, `node:crypto`, `node:fs`).
@@ -215,6 +216,81 @@ Each recording produces one parent row and a handful of atom rows, all with `sou
 
 Because `created_at` is backdated, a year of imports will not flood your recent-thoughts view or weekly digest — but the source will also look silent in any 24-hour volume dashboard. That is expected for a backfill.
 
+## Fetching a shared recording
+
+`fetch-shared.mjs` takes a Plaud **public share link** and writes one recording
+into the same per-recording layout `export-plaud.mjs` produces, so the importer
+needs no special handling. It needs no Plaud account, no CLI, and no
+credentials — the share endpoint is public.
+
+```bash
+node fetch-shared.mjs 'https://web.plaud.ai/s/pub_<uuid>::<token>' --out ~/plaud-export --dry-run
+node fetch-shared.mjs 'https://web.plaud.ai/s/pub_<uuid>::<token>' --out ~/plaud-export
+node import-plaud.mjs ~/plaud-export --dry-run
+```
+
+It accepts the full link or the bare `pub_<uuid>::<token>` id. Quote the URL —
+`::` is fine in most shells, but `?` and `&` in a copied link are not.
+
+### Where the data comes from
+
+The share page is an HTML shell that iframes `/nshare/<id>`, a Vue app fed by a
+single unauthenticated JSON call:
+
+```
+GET https://api.plaud.ai/share/access/pub_<uuid>::<token>
+```
+
+One response carries everything the page renders, so there is **no DOM
+scraping** here and no selectors to repair — if Plaud changes the page, this
+script is unaffected; if they change *this endpoint*, it fails loudly naming the
+key it expected. The endpoint is **not documented by Plaud**; it was found by
+reading the share page's own network traffic. Treat it as an internal API.
+
+What the payload contains, and where each part lands:
+
+| Payload field | Written to |
+| ------------- | ---------- |
+| `data_file.filename`, `start_time`, `duration`, `file_language` | `meta.json` (plus `share_url`, `share_id`, `fetched_at`) |
+| `data_file.trans_result[]` | `transcript.txt` as `[HH:MM:SS] Speaker: line` |
+| `notes_list[]` where `data_type = "auto_sum_note"` | `summary.md`, verbatim |
+| `notes_list[]` where `data_type = "high_light"` | a `## Highlights` section appended to `summary.md` |
+| `download_link_map` (presigned S3 URLs) | `media/` |
+
+Two headings end up in the record's `highlights` field rather than `summary`,
+because `splitSummaryDoc()` matches `/highlight|action item|key point|takeaway|todo/i`
+on section names: Plaud's own `## Action Items` (left exactly where it wrote it)
+and the `## Highlights` this script appends. Marks are rendered as a flat bullet
+list on purpose — a `###` per mark would open a new section and leak them back
+into the summary.
+
+**Infographics**: yes, when the recording has one. Plaud calls it a *summary
+poster* and stores it under `…/summary_poster/card_*.png`, referenced from the
+first line of the summary markdown. Whiteboard/photo marks arrive under
+`…/mark/*.jpg`. Both are downloaded into `media/` and their references in
+`summary.md` are rewritten from the S3 object key to the local `media/<file>`
+path, so the markdown still resolves after the presigned URLs expire (they are
+good for 5-60 minutes). `--no-media` skips all of it.
+
+### When the link has rotted
+
+A share link is exactly the kind of thing that stops working. The endpoint
+reports failure **in the body with HTTP 200** (`{"msg":"Share not found",
+"status":40400}`), so this script checks `status === 0` rather than `res.ok`,
+and turns each case into an actionable message:
+
+| Symptom | What it means |
+| ------- | ------------- |
+| `Plaud rejected this share link (status 40400…)` | Revoked, expired, or never public. Re-share in Plaud and use the new link. |
+| `returned HTTP 403` | Cloudflare's bot rule, not a bad link. Set `PLAUD_SHARE_USER_AGENT` in `.env.local` to a current browser UA. |
+| `did not return JSON` | The share API moved. Re-check the endpoint against the share page's network traffic. |
+| `answered status 0 but with no "data_file" object` | The payload shape changed; the message names the keys it did get. |
+| `neither a transcript nor a summary` | The recording has not finished transcribing in Plaud. |
+
+Two optional `.env.local` knobs, both for repair rather than routine use:
+`PLAUD_SHARE_API_BASE` (default `https://api.plaud.ai`) and
+`PLAUD_SHARE_USER_AGENT`.
+
 ## Sensitivity Triage
 
 Voice recordings are the most sensitive material most people will ever import: client calls, doctor's appointments, family conversations. The tier is decided **before** anything is embedded or sent to an LLM.
@@ -269,6 +345,21 @@ Note the privacy reality: embedding sends text to OpenAI or OpenRouter, and atom
 | `--force` | Re-download recordings already complete on disk. |
 | `--dry-run` | Enumerate ids only. No per-recording calls, no writes. |
 | `--verbose` | Print every CLI invocation. |
+
+### `fetch-shared.mjs`
+
+| Flag | Description |
+| ---- | ----------- |
+| `<share-url-or-id>` | Positional, required. The full share link or a bare `pub_<uuid>::<token>` id. |
+| `--out <dir>` | Destination folder (required). One subfolder is created inside it, named after the recording id. Keep it outside any git repo. |
+| `--id <name>` | Override the derived recording id (the subfolder name). |
+| `--no-media` | Skip images and the summary infographic. |
+| `--force` | Overwrite an existing recording folder. |
+| `--dry-run` | Report the files and byte counts it would write. Writes nothing. |
+| `--timeout-ms N` | Per-request timeout. Default 45000. |
+| `--retries N` | Retries per request, exponential backoff. Default 3. |
+| `--verbose` | Print the endpoint, file sizes, and every media file. |
+| `--help` | Usage. Works with nothing configured. |
 
 ### `import-plaud.mjs`
 
@@ -334,7 +425,7 @@ Time: roughly 45-60 s per recording sequentially, so ~4 h for 300; about 1-1.5 h
 
 ## Unverified Plaud behaviour
 
-This recipe was written against Plaud's published CLI documentation, not against a live account. The following are **assumptions**, and each one is worth ten seconds of your own checking:
+The CLI half of this recipe was written against Plaud's published documentation, not against a live account. The share half (`fetch-shared.mjs`) *was* built against a live public share link on 2026-09-14, but against an **undocumented** endpoint. The following are the open questions, and each one is worth ten seconds of your own checking:
 
 | Claim | Status | How to check |
 | ----- | ------ | ------------ |
@@ -343,6 +434,14 @@ This recipe was written against Plaud's published CLI documentation, not against
 | Rate limits and plan gating on the CLI | Undocumented. The community Obsidian plugin reports being rate-limited by Plaud's private endpoints. | Start at `--delay-ms 400`; the exporter backs off on failures. |
 | Folders/tags exposed by the CLI (for folder-based triage) | Not in the docs. The importer reads `tags`/`folder`/`labels` from metadata if they appear, and otherwise relies on keyword triage. | Inspect an exported `meta.json`. |
 | Plaud's web "bulk export" mechanics | Documented as existing, flow unverified. | Irrelevant if the CLI works. |
+| `GET /share/access/<id>` is a stable public endpoint | **Verified working 2026-09-14**, but undocumented. Found by reading the share page's network traffic, so it can change or start requiring auth without notice. | `node fetch-shared.mjs <link> --dry-run --verbose`. |
+| The `::<token>` half of a share id is required | **No.** The API answers for the `pub_<uuid>` alone (verified 2026-09-14), so the token looks decorative rather than a second secret. Do not rely on it as an access control. | Request the endpoint with the uuid only. |
+| The Cloudflare User-Agent rule | Unverified as policy. Node's default `User-Agent: node` gets a 403 HTML challenge; any browser-shaped UA passes, with no cookie or JS challenge. If Plaud tightens this, the script 403s with a message saying so. | Set `PLAUD_SHARE_USER_AGENT` and retry. |
+| `trans_result[]` vs `transaction_polish[]` | Both are present and parallel; they differed on 273 of 348 segments in the one share tested. `transaction_polish` is presumably a cleaned-up rendering, but Plaud does not say. `fetch-shared.mjs` writes `trans_result` and falls back to the polished array only if it is absent. | Diff the two arrays in the raw JSON. |
+| `notes_list[].data_error_code` (`"1"`, `"10"`) and `data_file.is_ai_content` / `is_mindmap` | Meaning unknown. Non-zero `data_error_code` values appeared on notes that rendered fine, so they are ignored. | — |
+| Share payloads for non-`file` `object_type` (e.g. a shared folder) | Untested. Only `object_type: "file"` was seen. The script reads `data_file` and fails loudly naming the key if it is absent. | Share a folder and run `--dry-run`. |
+| Mindmaps in a share payload | Not seen. The one share tested had `is_mindmap: 0` and no mindmap field, so nothing is extracted for it. | Share a recording that has a mindmap. |
+| Presigned S3 link lifetime | Observed `X-Amz-Expires` of 3600 s (images) and 300 s (note bodies). Not a documented contract. | Read the `X-Amz-Expires` query param. |
 | Zapier can replay history | Almost certainly not — its triggers fire on new transcripts. | Irrelevant for a backfill. |
 
 If the official CLI does not work for you, the importer also reads two other layouts: the unofficial `plaud` CLI's `files export --formats txt,json,md` output (its JSON carries real `trans_result[].speaker` labels), and the markdown written by the community Plaud-to-Obsidian plugin. Point `import-plaud.mjs` at either folder and it auto-detects.
@@ -354,7 +453,7 @@ Once the backfill is done, the official Plaud **MCP** server is a better fit tha
 Everything except Plaud itself can be exercised offline:
 
 ```bash
-node test/run-tests.mjs                    # 21 offline checks: triage, parsing, fingerprints
+node test/run-tests.mjs                    # 30 offline checks: triage, parsing, fingerprints, share links
 node import-plaud.mjs fixtures --dry-run --report   # 4 fake recordings, three layouts
 
 # End-to-end against a local mock of PostgREST + the embeddings API:
@@ -364,6 +463,8 @@ OPENAI_API_KEY=mock EMBEDDING_BASE_URL=http://127.0.0.1:8787/v1 \
   node import-plaud.mjs fixtures --no-llm --verbose
 curl -s http://127.0.0.1:8787/__stats | head -c 300
 ```
+
+A public share link is the one path that needs no account at all: `node fetch-shared.mjs <link> --out /tmp/plaud-share --dry-run` exercises the endpoint, the payload parsing, and the output plan without writing anything.
 
 `fixtures/` holds four fictional recordings covering the directory layout, the flat unofficial-CLI layout, the Obsidian-plugin markdown layout, and one recording that trips a sensitivity rule. `test/fake-plaud-cli.mjs` stands in for `@plaud-ai/cli` so `export-plaud.mjs` can be run end to end (`--plaud-bin`), including its failure modes via `FAKE_PLAUD_BROKEN=listing|meta|empty`.
 

@@ -13,7 +13,7 @@
     "tools": ["Node.js 18+", "@plaud-ai/cli"]
   },
   "requires_skills": [],
-  "tags": ["plaud", "import", "transcripts", "voice", "meetings"],
+  "tags": ["plaud", "import", "transcripts", "voice", "meetings", "share-link"],
   "difficulty": "intermediate",
   "estimated_time": "60 minutes",
   "created": "2026-09-14",

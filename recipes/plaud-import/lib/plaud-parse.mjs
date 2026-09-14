@@ -353,7 +353,7 @@ function loadDirectoryRecording(root, dir) {
 }
 
 /** A Plaud summary doc often carries a highlights / action-items section. */
-function splitSummaryDoc(markdown) {
+export function splitSummaryDoc(markdown) {
   if (!markdown) return { summary: "", highlights: "" };
   const sections = splitSections(markdown);
   const highlightKeys = Object.keys(sections).filter((k) =>
