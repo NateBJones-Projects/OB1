@@ -35,6 +35,12 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY") ?? "";
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY") ?? "";
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY") ?? "";
+// Any OpenAI-compatible Chat Completions endpoint can stand in for OpenAI
+// (Gemini's compatibility layer, Groq, Together, a local Ollama/LM Studio, ...).
+// Default keeps the stock behaviour. Set CLASSIFIER_MODEL_OPENAI alongside it
+// when the endpoint uses different model ids.
+const OPENAI_BASE_URL = (Deno.env.get("OPENAI_BASE_URL") ?? "https://api.openai.com/v1").replace(/\/+$/, "");
+const OPENAI_CLASSIFIER_MODEL = Deno.env.get("CLASSIFIER_MODEL_OPENAI") ?? CLASSIFIER_MODEL_OPENAI;
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY") ?? "";
 
 const WORKER_VERSION = "entity-extraction-worker-v1";
@@ -326,7 +332,7 @@ async function extractEntities(content: string): Promise<ExtractionResult> {
   // OpenAI (secondary)
   if (OPENAI_API_KEY) {
     try {
-      const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+      const response = await fetchWithTimeout(`${OPENAI_BASE_URL}/chat/completions`, {
         method: "POST",
         headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
