@@ -273,7 +273,11 @@ app.post("*", async (c) => {
       const futureDate = new Date();
       futureDate.setDate(today.getDate() + daysAhead);
 
-      const { data, error } = await supabase
+      const todayStr = today.toISOString().split("T")[0];
+      const futureStr = futureDate.toISOString().split("T")[0];
+
+      // One-time dates: plain range query on date_value.
+      const { data: oneTime, error: oneTimeError } = await supabase
         .from("important_dates")
         .select(
           `
@@ -282,17 +286,54 @@ app.post("*", async (c) => {
         `
         )
         .eq("user_id", userId)
-        .gte("date_value", today.toISOString().split("T")[0])
-        .lte("date_value", futureDate.toISOString().split("T")[0])
+        .eq("recurring_yearly", false)
+        .gte("date_value", todayStr)
+        .lte("date_value", futureStr)
         .order("date_value");
 
-      if (error) throw error;
+      if (oneTimeError) throw oneTimeError;
+
+      // Recurring dates (birthdays, anniversaries) store the original year, so a
+      // range query on date_value only matches them in that one year. Fetch them
+      // all and project each onto the current or next year to see whether the
+      // next occurrence falls inside the window.
+      const { data: recurring, error: recurringError } = await supabase
+        .from("important_dates")
+        .select(
+          `
+          *,
+          family_members:family_member_id (name, relationship)
+        `
+        )
+        .eq("user_id", userId)
+        .eq("recurring_yearly", true);
+
+      if (recurringError) throw recurringError;
+
+      const results: Record<string, unknown>[] = [...(oneTime || [])];
+
+      for (const d of recurring || []) {
+        const [, mm, dd] = d.date_value.split("-");
+        for (const yr of [today.getFullYear(), today.getFullYear() + 1]) {
+          const projected = `${yr}-${mm}-${dd}`;
+          if (projected >= todayStr && projected <= futureStr) {
+            results.push({ ...d, next_occurrence: projected });
+            break;
+          }
+        }
+      }
+
+      results.sort((a, b) =>
+        String(a.next_occurrence ?? a.date_value).localeCompare(
+          String(b.next_occurrence ?? b.date_value)
+        )
+      );
 
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify(data, null, 2),
+            text: JSON.stringify(results, null, 2),
           },
         ],
       };
