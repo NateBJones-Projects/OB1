@@ -1,0 +1,9 @@
+{
+  "id": "rec_1001",
+  "name": "Weekly product standup",
+  "start_at": "2026-05-04T15:00:00Z",
+  "duration": 1380000,
+  "serial_number": "FIXTURE-0001",
+  "has_transcript": true,
+  "has_summary": true
+}

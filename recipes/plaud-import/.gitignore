@@ -1,0 +1,13 @@
+# Never commit credentials, exports, sync logs, or reports — they contain
+# personal transcript content.
+.env
+.env.local
+plaud-sync-log.json
+triage-report.md
+import-report.md
+plaud-tier-map.csv
+atomization-errors.json
+triage-rules.json
+speakers.json
+tiers.csv
+plaud-export/

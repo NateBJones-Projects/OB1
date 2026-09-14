@@ -1,0 +1,17 @@
+{
+  "file": {
+    "id": "rec_1003",
+    "file_name": "Vendor sync - project codename alpha",
+    "start_time": 1778500800000,
+    "duration": 2040000
+  },
+  "recording": {
+    "trans_result": [
+      { "start_time": 2000, "speaker": "Dana", "content": "Before we start, remember this whole project is under NDA, so nothing here goes in the shared drive." },
+      { "start_time": 14000, "speaker": "Priya", "content": "Understood. The confidential pricing sheet stays with legal until the agreement is signed." },
+      { "start_time": 31000, "speaker": "Dana", "content": "Decision: we delay the integration kickoff until the signed agreement is back, target the first week of June." },
+      { "start_time": 52000, "speaker": "Priya", "content": "I will send the revised scope document on Monday and copy the legal contact." },
+      { "start_time": 74000, "speaker": "Dana", "content": "One open question is whether their security review covers the staging environment as well." }
+    ]
+  }
+}
