@@ -1,0 +1,11 @@
+{
+  "_comment": "Copy to alias-map.json (gitignored) and edit. Keys are the canonical label; values are the variants to fold into it. Matching is case-insensitive and whitespace-insensitive. Pass with --alias-map alias-map.json.",
+  "people": {
+    "Jane Doe": ["Jane", "J. Doe", "jane doe"],
+    "Acme Corp": ["Acme", "ACME Corporation"]
+  },
+  "topics": {
+    "real-estate": ["real estate", "realestate", "Real Estate"],
+    "machine-learning": ["ml", "machine learning"]
+  }
+}

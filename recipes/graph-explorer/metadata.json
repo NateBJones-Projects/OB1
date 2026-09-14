@@ -1,0 +1,21 @@
+{
+  "name": "Graph Explorer",
+  "description": "Self-contained force-directed knowledge graph viewer for Open Brain: one Node script exports thoughts, topics, people (or the entity-extraction graph) into a single HTML file you open from disk.",
+  "category": "recipes",
+  "author": {
+    "name": "Chris Fellows",
+    "github": "chriscfellows"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+"]
+  },
+  "requires_skills": [],
+  "tags": ["graph", "visualization", "knowledge-graph", "wiki", "d3"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-09-13",
+  "updated": "2026-09-13"
+}

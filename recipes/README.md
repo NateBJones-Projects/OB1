@@ -66,6 +66,7 @@ Use Open Brain search_thoughts to find Obsidian notes about my home maintenance 
 | [Bring Your Own Context](bring-your-own-context/) | Portable context workflow that packages extraction prompts, profile generation, and remote MCP deployment into one entrypoint |
 | [Daily Digest](daily-digest/) | Automated summary of recent thoughts via email or Slack |
 | [Wiki Compiler](wiki-compiler/) | Compiles graph-backed entity pages and topic synthesis into a regenerable wiki layer you can run on demand or on a schedule |
+| [Graph Explorer](graph-explorer/) | Exports thoughts, topics, and people (or the entity-extraction graph) into a single self-contained HTML file with a force-directed, searchable graph viewer |
 | [Work Operating Model Activation](work-operating-model-activation/) | Interview-driven workflow that stores how you actually work and generates agent-ready operating files |
 | [World Model Diagnostic Activation](world-model-diagnostic-activation/) | Lightweight activation path for a 20-minute world-model diagnostic that uses the base OB1 connector and a direct-paste fallback |
 | [Research-to-Decision Workflow](research-to-decision-workflow/) | Compose canonical skills into operator and investor paths for analysis, synthesis, meetings, and decision documents |

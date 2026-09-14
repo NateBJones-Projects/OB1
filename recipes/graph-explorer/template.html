@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Brain — Graph Explorer</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f9f9f7;
+    --surface: #fcfcfb;
+    --panel: #ffffff;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --line: #e1e0d9;
+    --accent: #2a78d6;
+    --edge: #b8b7b0;
+    --edge-hi: #52514e;
+    --shadow: 0 8px 24px rgba(0,0,0,.10);
+    /* node kinds */
+    --k-thought: #2a78d6;
+    --k-topic: #1baf7a;
+    --k-person: #eb6834;
+    --k-project: #4a3aa7;
+    --k-tool: #eda100;
+    --k-organization: #e87ba4;
+    --k-place: #008300;
+    --k-other: #898781;
+    /* edge relations */
+    --r-supports: #0ca30c;
+    --r-contradicts: #d03b3b;
+    --r-supersedes: #4a3aa7;
+    --r-evolved_into: #1baf7a;
+    --r-depends_on: #eda100;
+    --r-related_to: #898781;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0d0d0d; --surface: #1a1a19; --panel: #1f1f1e;
+      --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781; --line: #2c2c2a;
+      --accent: #3987e5; --edge: #383835; --edge-hi: #c3c2b7;
+      --shadow: 0 8px 24px rgba(0,0,0,.5);
+      --k-thought: #3987e5; --k-topic: #199e70; --k-person: #d95926; --k-project: #9085e9;
+      --k-tool: #c98500; --k-organization: #d55181; --k-place: #008300; --k-other: #898781;
+      --r-supports: #0ca30c; --r-contradicts: #e66767; --r-supersedes: #9085e9;
+      --r-evolved_into: #199e70; --r-depends_on: #c98500; --r-related_to: #898781;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d0d0d; --surface: #1a1a19; --panel: #1f1f1e;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781; --line: #2c2c2a;
+    --accent: #3987e5; --edge: #383835; --edge-hi: #c3c2b7;
+    --shadow: 0 8px 24px rgba(0,0,0,.5);
+    --k-thought: #3987e5; --k-topic: #199e70; --k-person: #d95926; --k-project: #9085e9;
+    --k-tool: #c98500; --k-organization: #d55181; --k-place: #008300; --k-other: #898781;
+    --r-supports: #0ca30c; --r-contradicts: #e66767; --r-supersedes: #9085e9;
+    --r-evolved_into: #199e70; --r-depends_on: #c98500; --r-related_to: #898781;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; white-space: nowrap; }
+  header .stats { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .search { position: relative; flex: 1 1 220px; max-width: 420px; }
+  .search input {
+    width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--surface); color: var(--ink); font: inherit;
+  }
+  .search input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .search .results {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 20; margin-top: 4px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow);
+    max-height: 320px; overflow: auto;
+  }
+  .search .results button {
+    display: flex; gap: 8px; align-items: center; width: 100%; text-align: left;
+    padding: 6px 10px; border: 0; background: none; color: var(--ink); font: inherit; cursor: pointer;
+  }
+  .search .results button:hover, .search .results button.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .search .results .more { padding: 6px 10px; color: var(--muted); font-size: 12px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; display: inline-block; }
+  button.btn {
+    padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface);
+    color: var(--ink); font: inherit; cursor: pointer; white-space: nowrap;
+  }
+  button.btn:hover { border-color: var(--accent); }
+
+  main { position: relative; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  canvas.grab { cursor: pointer; }
+
+  aside {
+    position: absolute; top: 12px; bottom: 12px; overflow: auto; z-index: 10;
+    background: color-mix(in srgb, var(--panel) 92%, transparent); backdrop-filter: blur(6px);
+    border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 12px 14px;
+  }
+  #controls { left: 12px; width: 240px; }
+  #details { right: 12px; width: 340px; max-width: calc(100% - 24px); }
+  aside h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 12px 0 6px; }
+  aside h2:first-child { margin-top: 0; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+  .row label { display: flex; align-items: center; gap: 8px; flex: 1; cursor: pointer; }
+  .row .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; }
+  .line-swatch { width: 18px; height: 0; border-top: 2px solid; }
+  input[type=range] { width: 100%; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  select { font: inherit; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
+
+  #details .title { font-size: 15px; font-weight: 600; margin: 0 28px 6px 0; overflow-wrap: anywhere; }
+  #details .close { position: absolute; top: 8px; right: 8px; }
+  .badge { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11px; color: #fff; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 8px 0; font-size: 12px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .content { white-space: pre-wrap; font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 8px; max-height: 240px; overflow: auto; }
+  .links button {
+    display: flex; gap: 8px; align-items: center; width: 100%; text-align: left; padding: 4px 6px; margin: 0 -6px;
+    border: 0; background: none; color: var(--ink); font: inherit; cursor: pointer; border-radius: 4px;
+  }
+  .links button:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .links .rel { color: var(--muted); font-size: 11px; margin-left: auto; white-space: nowrap; }
+
+  #tooltip {
+    position: absolute; pointer-events: none; z-index: 30; max-width: 320px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: var(--shadow);
+    padding: 6px 9px; font-size: 12px; color: var(--ink);
+  }
+  #banner {
+    position: absolute; inset: auto 12px 12px 12px; z-index: 40; padding: 10px 14px; border-radius: 8px;
+    background: #d03b3b; color: #fff; font-weight: 600;
+  }
+  @media (max-width: 720px) {
+    #controls { width: 200px; }
+    #details { width: calc(100% - 24px); top: auto; max-height: 55%; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Open Brain · Graph Explorer</h1>
+  <span class="stats" id="stats"></span>
+  <div class="search">
+    <input id="search" type="search" placeholder="Search nodes by label…  (Enter selects, Esc clears)" autocomplete="off">
+    <div class="results" id="results" hidden></div>
+  </div>
+  <button class="btn" id="fit" title="Fit graph to window">Fit</button>
+  <button class="btn" id="reheat" title="Re-run the layout">Reheat</button>
+  <button class="btn" id="theme" title="Toggle light / dark">Theme</button>
+</header>
+<main>
+  <canvas id="canvas"></canvas>
+
+  <aside id="controls">
+    <h2>Node kinds</h2>
+    <div id="kinds"></div>
+    <h2>Edges</h2>
+    <div id="edgeLegend"></div>
+    <h2>Min degree <span id="degreeValue" class="count"></span></h2>
+    <input type="range" id="degree" min="0" max="10" value="0" step="1">
+    <h2>Labels</h2>
+    <select id="labels">
+      <option value="auto">Auto (hubs, zoom in for more)</option>
+      <option value="hubs">Hubs only</option>
+      <option value="all">All visible</option>
+      <option value="none">None</option>
+    </select>
+    <h2>Focus</h2>
+    <div class="row"><label><input type="checkbox" id="focus"> Neighbors only (click a node)</label></div>
+    <div class="hint">Scroll to zoom, drag the background to pan, drag a node to pin it. Click a node for details.</div>
+  </aside>
+
+  <aside id="details" hidden>
+    <button class="btn close" id="close" aria-label="Close">×</button>
+    <div id="detailsBody"></div>
+  </aside>
+
+  <div id="tooltip" hidden></div>
+  <div id="banner" hidden></div>
+</main>
+
+<script id="graph-data" type="application/json">__GRAPH_DATA__</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  // ── Data ────────────────────────────────────────────────────────────────
+  const DATA = JSON.parse(document.getElementById("graph-data").textContent);
+  const NODES = DATA.nodes;
+  const EDGES = DATA.edges;
+  const META = DATA.meta || {};
+  const byId = new Map(NODES.map((n) => [n.id, n]));
+
+  // Adjacency over the full graph (independent of filters).
+  const adj = new Map();
+  for (const n of NODES) adj.set(n.id, []);
+  for (const e of EDGES) {
+    adj.get(e.source).push({ id: e.target, edge: e });
+    adj.get(e.target).push({ id: e.source, edge: e });
+  }
+  for (const n of NODES) if (typeof n.degree !== "number") n.degree = adj.get(n.id).length;
+
+  const KIND_ORDER = ["thought", "topic", "person", "project", "tool", "organization", "place"];
+  const KINDS = [...new Set(NODES.map((n) => n.kind))].sort(
+    (a, b) => (KIND_ORDER.indexOf(a) + 1 || 99) - (KIND_ORDER.indexOf(b) + 1 || 99) || a.localeCompare(b),
+  );
+  const RELATIONS = [...new Set(EDGES.filter((e) => e.kind === "typed" || e.kind === "entity").map((e) => e.relation))].filter(Boolean).sort();
+  const HAS_COOC = EDGES.some((e) => e.kind === "cooccurrence");
+  const MAX_DEGREE = NODES.reduce((m, n) => Math.max(m, n.degree), 0);
+
+  if (typeof d3 === "undefined") {
+    const b = document.getElementById("banner");
+    b.hidden = false;
+    b.textContent = "d3 failed to load from cdnjs.cloudflare.com. This file needs internet access the first time it is opened (the graph data itself is embedded).";
+    return;
+  }
+
+  // ── Theme ───────────────────────────────────────────────────────────────
+  const root = document.documentElement;
+  let colors = {};
+  function cssVar(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+  function readColors() {
+    colors = {
+      surface: cssVar("--surface"), ink: cssVar("--ink"), ink2: cssVar("--ink-2"), muted: cssVar("--muted"),
+      edge: cssVar("--edge"), edgeHi: cssVar("--edge-hi"), accent: cssVar("--accent"),
+      kinds: Object.fromEntries(KINDS.map((k) => [k, cssVar(`--k-${k}`) || cssVar("--k-other")])),
+      relations: Object.fromEntries(RELATIONS.map((r) => [r, cssVar(`--r-${r}`) || cssVar("--r-related_to")])),
+    };
+    for (const k of KINDS) if (!colors.kinds[k]) colors.kinds[k] = cssVar("--k-other");
+    for (const r of RELATIONS) if (!colors.relations[r]) colors.relations[r] = cssVar("--r-related_to");
+  }
+  document.getElementById("theme").addEventListener("click", () => {
+    const cur = root.getAttribute("data-theme");
+    const systemDark = matchMedia("(prefers-color-scheme: dark)").matches;
+    const isDark = cur ? cur === "dark" : systemDark;
+    root.setAttribute("data-theme", isDark ? "light" : "dark");
+    readColors(); buildLegend(); dirty = true;
+  });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { readColors(); buildLegend(); dirty = true; });
+  readColors();
+
+  // ── State ───────────────────────────────────────────────────────────────
+  const state = {
+    kinds: new Set(KINDS),
+    minDegree: 0,
+    search: "",
+    matches: new Set(),
+    selected: null,
+    focus: false,
+    hover: null,
+    labels: "auto",
+  };
+  let visibleNodes = [];
+  let visibleEdges = [];
+  let visibleSet = new Set();
+  let neighborSet = new Set();
+  let dirty = true;
+
+  // ── Canvas + simulation ─────────────────────────────────────────────────
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let width = 0, height = 0, dpr = 1;
+  let transform = d3.zoomIdentity;
+
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    width = r.width; height = r.height;
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    center.x(width / 2).y(height / 2);
+    dirty = true;
+  }
+
+  const center = d3.forceCenter(0, 0);
+  const linkForce = d3.forceLink().id((d) => d.id)
+    .distance((l) => (l.kind === "cooccurrence" ? 90 : l.kind === "entity" ? 60 : 32))
+    .strength((l) => (l.kind === "cooccurrence" ? 0.15 : l.kind === "typed" ? 0.4 : 0.5));
+  const simulation = d3.forceSimulation()
+    .force("link", linkForce)
+    .force("charge", d3.forceManyBody().strength((d) => (d.kind === "thought" ? -14 : -45)).theta(0.9).distanceMax(500))
+    .force("center", center)
+    .force("x", d3.forceX().strength(0.015))
+    .force("y", d3.forceY().strength(0.015))
+    .alphaDecay(0.03)
+    .on("tick", () => { dirty = true; })
+    .on("end", () => {
+      // Positions only mean something once the layout settles, so pans and
+      // fits requested while the simulation was hot are replayed here.
+      if (pendingPan) { const n = pendingPan; pendingPan = null; fitOnEnd = false; panTo(n); }
+      else if (fitOnEnd) { fitOnEnd = false; fit(); }
+    });
+  let pendingPan = null;
+  let fitOnEnd = true;
+
+  function radius(n) {
+    const base = n.kind === "thought" ? 2.2 : 3.5;
+    return base + Math.min(16, Math.sqrt(n.degree) * 1.15);
+  }
+
+  // ── Filtering ───────────────────────────────────────────────────────────
+  function applyFilters(reheat = true) {
+    neighborSet = new Set();
+    if (state.selected) {
+      neighborSet.add(state.selected.id);
+      for (const { id } of adj.get(state.selected.id)) neighborSet.add(id);
+    }
+    visibleNodes = NODES.filter((n) => {
+      if (!state.kinds.has(n.kind)) return false;
+      if (n.degree < state.minDegree) return false;
+      if (state.focus && state.selected && !neighborSet.has(n.id)) return false;
+      return true;
+    });
+    visibleSet = new Set(visibleNodes.map((n) => n.id));
+    visibleEdges = EDGES.filter((e) => visibleSet.has(e.source) && visibleSet.has(e.target)).map((e) => ({ ...e }));
+    simulation.nodes(visibleNodes);
+    linkForce.links(visibleEdges);
+    if (reheat) { simulation.alpha(0.6).restart(); fitOnEnd = true; }
+    updateStats();
+    updateMatches();
+    dirty = true;
+  }
+
+  function updateMatches() {
+    state.matches = new Set();
+    if (!state.search) return;
+    const q = state.search;
+    for (const n of visibleNodes) if (n.label.toLowerCase().includes(q)) state.matches.add(n.id);
+  }
+
+  function updateStats() {
+    const el = document.getElementById("stats");
+    const gen = META.generated_at ? new Date(META.generated_at).toLocaleString() : "";
+    el.textContent = `${visibleNodes.length.toLocaleString()} / ${NODES.length.toLocaleString()} nodes · ` +
+      `${visibleEdges.length.toLocaleString()} / ${EDGES.length.toLocaleString()} edges · ${META.mode || "?"} mode` +
+      (gen ? ` · ${gen}` : "");
+  }
+
+  // ── Rendering ───────────────────────────────────────────────────────────
+  function draw() {
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = colors.surface;
+    ctx.fillRect(0, 0, width, height);
+    ctx.translate(transform.x, transform.y);
+    ctx.scale(transform.k, transform.k);
+    const k = transform.k;
+
+    const searching = state.matches.size > 0 || state.search.length > 0;
+    const sel = state.selected;
+    const hi = new Set();
+    if (sel) { hi.add(sel.id); for (const { id } of adj.get(sel.id)) hi.add(id); }
+    const hov = state.hover;
+
+    // Edges, batched by stroke style.
+    const groups = new Map();
+    for (const l of visibleEdges) {
+      const s = l.source, t = l.target;
+      let color = colors.edge, alpha = 0.55, w = 1;
+      if (l.relation && colors.relations[l.relation]) { color = colors.relations[l.relation]; alpha = 0.8; w = 1.4; }
+      if (l.kind === "cooccurrence") { w = 0.8 + Math.min(4, Math.log2(l.weight || 1)); alpha = 0.45; }
+      if (sel) {
+        if (s.id === sel.id || t.id === sel.id) { color = l.relation && colors.relations[l.relation] ? color : colors.edgeHi; alpha = 0.95; w = Math.max(w, 1.6); }
+        else alpha *= 0.15;
+      } else if (searching) alpha *= 0.25;
+      const key = `${color}|${alpha.toFixed(2)}|${w.toFixed(1)}`;
+      let g = groups.get(key);
+      if (!g) { g = { color, alpha, w, path: new Path2D() }; groups.set(key, g); }
+      g.path.moveTo(s.x, s.y);
+      g.path.lineTo(t.x, t.y);
+    }
+    for (const g of groups.values()) {
+      ctx.globalAlpha = g.alpha;
+      ctx.strokeStyle = g.color;
+      ctx.lineWidth = g.w / k;
+      ctx.stroke(g.path);
+    }
+    ctx.globalAlpha = 1;
+
+    // Nodes, batched by fill style.
+    const fills = new Map();
+    const ring = new Path2D();
+    for (const n of visibleNodes) {
+      const r = radius(n);
+      let alpha = 1;
+      if (sel && !hi.has(n.id)) alpha = 0.18;
+      else if (searching && !state.matches.has(n.id)) alpha = 0.15;
+      const color = colors.kinds[n.kind];
+      const key = `${color}|${alpha.toFixed(2)}`;
+      let p = fills.get(key);
+      if (!p) { p = { color, alpha, path: new Path2D() }; fills.set(key, p); }
+      p.path.moveTo(n.x + r, n.y);
+      p.path.arc(n.x, n.y, r, 0, Math.PI * 2);
+      if (state.matches.has(n.id) || (sel && n.id === sel.id) || (hov && n.id === hov.id)) {
+        ring.moveTo(n.x + r + 2 / k, n.y);
+        ring.arc(n.x, n.y, r + 2 / k, 0, Math.PI * 2);
+      }
+    }
+    for (const p of fills.values()) {
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.fill(p.path);
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = colors.ink;
+    ctx.lineWidth = 1.5 / k;
+    ctx.stroke(ring);
+
+    // Labels.
+    if (state.labels !== "none") {
+      const fontPx = 11 / k;
+      ctx.font = `${fontPx}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif`;
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = colors.ink;
+      const hubCut = state.labels === "hubs" ? 10 : 30;
+      let budget = 600;
+      const candidates = [];
+      // Label every neighbor / match only while there are few enough to read;
+      // past that, hubs and zoom level decide (the detail pane lists the rest).
+      const manyMatches = state.matches.size > 60;
+      const manyNeighbors = hi.size > 40;
+      for (const n of visibleNodes) {
+        const forced = (sel && n.id === sel.id) || (sel && hi.has(n.id) && !manyNeighbors) ||
+          (hov && n.id === hov.id) || (state.matches.has(n.id) && !manyMatches);
+        if (forced) { candidates.push([2, n]); continue; }
+        if (state.labels === "all") { candidates.push([0, n]); continue; }
+        if (n.kind !== "thought" && n.degree >= hubCut) { candidates.push([1, n]); continue; }
+        if (state.labels === "auto" && radius(n) * k >= 7) candidates.push([0, n]);
+      }
+      candidates.sort((a, b) => b[0] - a[0] || b[1].degree - a[1].degree);
+      for (const [pri, n] of candidates) {
+        if (budget-- <= 0) break;
+        const dim = (sel && !hi.has(n.id)) || (searching && !state.matches.has(n.id));
+        ctx.globalAlpha = dim ? 0.25 : pri === 2 ? 1 : 0.85;
+        const text = n.label.length > 40 && pri < 2 ? n.label.slice(0, 39) + "…" : n.label;
+        const x = n.x + radius(n) + 3 / k;
+        const w = ctx.measureText(text).width;
+        ctx.fillStyle = colors.surface;
+        ctx.globalAlpha *= 0.75;
+        ctx.fillRect(x - 2 / k, n.y - fontPx * 0.65, w + 4 / k, fontPx * 1.3);
+        ctx.globalAlpha = dim ? 0.35 : 1;
+        ctx.fillStyle = colors.ink;
+        ctx.fillText(text, x, n.y);
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
+
+  function frame() {
+    if (dirty) { dirty = false; draw(); }
+    requestAnimationFrame(frame);
+  }
+
+  // ── Interaction ─────────────────────────────────────────────────────────
+  function nodeAt(px, py) {
+    const [x, y] = transform.invert([px, py]);
+    const n = simulation.find(x, y, 14 / transform.k);
+    if (!n) return null;
+    const dx = n.x - x, dy = n.y - y;
+    return Math.sqrt(dx * dx + dy * dy) <= radius(n) + 6 / transform.k ? n : null;
+  }
+  function pointer(event) {
+    const [px, py] = d3.pointer(event, canvas);
+    return [px, py];
+  }
+
+  const zoom = d3.zoom()
+    .scaleExtent([0.05, 12])
+    .filter((event) => {
+      if (event.type === "wheel") return true;
+      if (event.button !== undefined && event.button !== 0) return false;
+      const [px, py] = pointer(event);
+      return !nodeAt(px, py);
+    })
+    .on("zoom", (event) => { transform = event.transform; dirty = true; });
+
+  const drag = d3.drag()
+    .container(canvas)
+    .clickDistance(4)
+    .subject((event) => nodeAt(event.x, event.y))
+    .on("start", (event) => {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      const [x, y] = transform.invert([event.x, event.y]);
+      event.subject.fx = x; event.subject.fy = y;
+    })
+    .on("drag", (event) => {
+      const [x, y] = transform.invert([event.x, event.y]);
+      event.subject.fx = x; event.subject.fy = y;
+    })
+    .on("end", (event) => {
+      if (!event.active) simulation.alphaTarget(0);
+      // Keep the node pinned where it was dropped; double-click unpins.
+    });
+
+  d3.select(canvas).call(drag).call(zoom).on("dblclick.zoom", null);
+
+  const tooltip = document.getElementById("tooltip");
+  canvas.addEventListener("mousemove", (event) => {
+    const [px, py] = pointer(event);
+    const n = nodeAt(px, py);
+    if (n !== state.hover) { state.hover = n; dirty = true; }
+    canvas.classList.toggle("grab", Boolean(n));
+    if (n) {
+      tooltip.hidden = false;
+      tooltip.innerHTML = `<span class="dot" style="background:${colors.kinds[n.kind]}"></span> ` +
+        `<strong>${esc(n.kind)}</strong> · ${n.degree} link${n.degree === 1 ? "" : "s"}<br>${esc(n.label)}`;
+      const r = canvas.getBoundingClientRect();
+      tooltip.style.left = `${Math.min(px + 14, r.width - 330)}px`;
+      tooltip.style.top = `${py + 14}px`;
+    } else tooltip.hidden = true;
+  });
+  canvas.addEventListener("mouseleave", () => { tooltip.hidden = true; state.hover = null; dirty = true; });
+  canvas.addEventListener("click", (event) => {
+    const [px, py] = pointer(event);
+    const n = nodeAt(px, py);
+    if (n) select(n); else if (state.selected) select(null);
+  });
+  canvas.addEventListener("dblclick", (event) => {
+    const [px, py] = pointer(event);
+    const n = nodeAt(px, py);
+    if (n) { n.fx = null; n.fy = null; simulation.alpha(0.3).restart(); }
+  });
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      if (document.activeElement === searchInput && searchInput.value) { searchInput.value = ""; onSearch(); }
+      else select(null);
+    }
+  });
+
+  // ── Selection + details panel ───────────────────────────────────────────
+  const details = document.getElementById("details");
+  const detailsBody = document.getElementById("detailsBody");
+  document.getElementById("close").addEventListener("click", () => select(null));
+
+  function select(n, pan = false) {
+    state.selected = n;
+    if (!n) {
+      details.hidden = true;
+      applyFilters(state.focus);
+      return;
+    }
+    if (!state.kinds.has(n.kind)) { state.kinds.add(n.kind); buildLegend(); }
+    if (n.degree < state.minDegree) { state.minDegree = 0; syncDegreeUI(); }
+    applyFilters(state.focus);
+    renderDetails(n);
+    details.hidden = false;
+    if (pan) {
+      panTo(n);
+      if (simulation.alpha() > 0.3) pendingPan = n; // layout still moving: pan again once it settles
+    }
+  }
+
+  function renderDetails(n) {
+    const kindColor = colors.kinds[n.kind];
+    let html = `<div class="title">${esc(n.label)}</div>`;
+    html += `<span class="badge" style="background:${kindColor}">${esc(n.kind)}</span>`;
+    if (n.type) html += ` <span class="badge" style="background:var(--muted)">${esc(n.type)}</span>`;
+    if (n.sensitivity_tier && n.sensitivity_tier !== "standard") html += ` <span class="badge" style="background:var(--r-contradicts)">${esc(n.sensitivity_tier)}</span>`;
+    html += `<dl>`;
+    if (n.created_at) html += `<dt>Created</dt><dd>${esc(new Date(n.created_at).toLocaleString())}</dd>`;
+    if (n.importance != null) html += `<dt>Importance</dt><dd>${esc(String(n.importance))} / 5</dd>`;
+    if (n.source_type) html += `<dt>Source</dt><dd>${esc(n.source_type)}</dd>`;
+    if (n.first_seen_at) html += `<dt>First seen</dt><dd>${esc(new Date(n.first_seen_at).toLocaleDateString())}</dd>`;
+    if (n.last_seen_at) html += `<dt>Last seen</dt><dd>${esc(new Date(n.last_seen_at).toLocaleDateString())}</dd>`;
+    if (n.aliases && n.aliases.length) html += `<dt>Aliases</dt><dd>${esc(n.aliases.join(", "))}</dd>`;
+    html += `<dt>Links</dt><dd>${n.degree}</dd>`;
+    html += `<dt>ID</dt><dd><code>${esc(n.id)}</code></dd>`;
+    html += `</dl>`;
+    if (n.content) html += `<h2>Content</h2><div class="content">${esc(n.content)}</div>`;
+
+    const groups = new Map();
+    for (const { id, edge } of adj.get(n.id)) {
+      const other = byId.get(id);
+      if (!other) continue;
+      const key = other.kind;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ other, edge });
+    }
+    const orderedKinds = [...groups.keys()].sort((a, b) => KINDS.indexOf(a) - KINDS.indexOf(b));
+    for (const kind of orderedKinds) {
+      const items = groups.get(kind).sort((a, b) => b.other.degree - a.other.degree);
+      html += `<h2>${esc(kind)} (${items.length})</h2><div class="links">`;
+      for (const { other, edge } of items.slice(0, 200)) {
+        const rel = edge.relation || (edge.kind === "cooccurrence" ? `×${edge.weight}` : "");
+        html += `<button data-id="${esc(other.id)}"><span class="dot" style="background:${colors.kinds[other.kind]}"></span>` +
+          `<span>${esc(other.label)}</span>${rel ? `<span class="rel">${esc(rel)}</span>` : ""}</button>`;
+      }
+      if (items.length > 200) html += `<div class="hint">…and ${items.length - 200} more</div>`;
+      html += `</div>`;
+    }
+    detailsBody.innerHTML = html;
+    detailsBody.querySelectorAll("button[data-id]").forEach((b) => {
+      b.addEventListener("click", () => select(byId.get(b.dataset.id), true));
+    });
+    details.scrollTop = 0;
+  }
+
+  function panTo(n) {
+    const k = Math.max(transform.k, 1.2);
+    const t = d3.zoomIdentity.translate(width / 2, height / 2).scale(k).translate(-n.x, -n.y);
+    d3.select(canvas).transition().duration(450).call(zoom.transform, t);
+  }
+
+  function fit() {
+    if (!visibleNodes.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const n of visibleNodes) { x0 = Math.min(x0, n.x); y0 = Math.min(y0, n.y); x1 = Math.max(x1, n.x); y1 = Math.max(y1, n.y); }
+    const w = Math.max(1, x1 - x0), h = Math.max(1, y1 - y0);
+    const k = Math.min(12, 0.9 / Math.max(w / width, h / height));
+    const t = d3.zoomIdentity.translate(width / 2, height / 2).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+    d3.select(canvas).transition().duration(500).call(zoom.transform, t);
+  }
+  document.getElementById("fit").addEventListener("click", fit);
+  document.getElementById("reheat").addEventListener("click", () => {
+    for (const n of visibleNodes) { n.fx = null; n.fy = null; }
+    simulation.alpha(1).restart();
+  });
+
+  // ── Search ──────────────────────────────────────────────────────────────
+  const searchInput = document.getElementById("search");
+  const results = document.getElementById("results");
+  let searchList = [];
+  function onSearch() {
+    state.search = searchInput.value.trim().toLowerCase();
+    updateMatches();
+    dirty = true;
+    if (!state.search) { results.hidden = true; searchList = []; return; }
+    searchList = visibleNodes.filter((n) => state.matches.has(n.id)).sort((a, b) => b.degree - a.degree);
+    const top = searchList.slice(0, 15);
+    results.innerHTML = top.map((n, i) =>
+      `<button data-id="${esc(n.id)}" class="${i === 0 ? "active" : ""}"><span class="dot" style="background:${colors.kinds[n.kind]}"></span>` +
+      `<span>${esc(n.label)}</span><span class="rel" style="margin-left:auto;color:var(--muted);font-size:11px">${esc(n.kind)} · ${n.degree}</span></button>`).join("") +
+      `<div class="more">${searchList.length.toLocaleString()} match${searchList.length === 1 ? "" : "es"}${searchList.length > 15 ? " (top 15 shown)" : ""}</div>`;
+    results.hidden = false;
+    results.querySelectorAll("button[data-id]").forEach((b) => {
+      b.addEventListener("click", () => { select(byId.get(b.dataset.id), true); results.hidden = true; });
+    });
+  }
+  searchInput.addEventListener("input", onSearch);
+  searchInput.addEventListener("focus", () => { if (searchList.length) results.hidden = false; });
+  searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && searchList.length) { select(searchList[0], true); results.hidden = true; searchInput.blur(); }
+  });
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".search")) results.hidden = true;
+  });
+
+  // ── Controls / legend ───────────────────────────────────────────────────
+  function buildLegend() {
+    const counts = {};
+    for (const n of NODES) counts[n.kind] = (counts[n.kind] || 0) + 1;
+    const kinds = document.getElementById("kinds");
+    kinds.innerHTML = KINDS.map((k) =>
+      `<div class="row"><label><input type="checkbox" data-kind="${esc(k)}" ${state.kinds.has(k) ? "checked" : ""}>` +
+      `<span class="swatch" style="background:${colors.kinds[k]}"></span>${esc(k)}</label><span class="count">${(counts[k] || 0).toLocaleString()}</span></div>`).join("");
+    kinds.querySelectorAll("input[data-kind]").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        if (cb.checked) state.kinds.add(cb.dataset.kind); else state.kinds.delete(cb.dataset.kind);
+        applyFilters();
+      });
+    });
+
+    const legend = document.getElementById("edgeLegend");
+    const rows = [];
+    const plain = EDGES.some((e) => e.kind === "topic" || e.kind === "person" || e.kind === "mention");
+    if (plain) rows.push(`<div class="row"><span class="line-swatch" style="border-color:${colors.edge}"></span><span>thought → node</span></div>`);
+    if (HAS_COOC) rows.push(`<div class="row"><span class="line-swatch" style="border-color:${colors.edge};border-top-width:3px"></span><span>topic ↔ topic (width = shared thoughts)</span></div>`);
+    for (const r of RELATIONS) rows.push(`<div class="row"><span class="line-swatch" style="border-color:${colors.relations[r]}"></span><span>${esc(r)}</span></div>`);
+    legend.innerHTML = rows.join("") || `<div class="hint">No edges.</div>`;
+  }
+
+  const degreeInput = document.getElementById("degree");
+  const degreeValue = document.getElementById("degreeValue");
+  degreeInput.max = String(Math.min(MAX_DEGREE, 200));
+  function syncDegreeUI() { degreeInput.value = String(state.minDegree); degreeValue.textContent = `≥ ${state.minDegree}`; }
+  degreeInput.addEventListener("input", () => { state.minDegree = Number(degreeInput.value); syncDegreeUI(); applyFilters(); });
+  syncDegreeUI();
+
+  document.getElementById("labels").addEventListener("change", (e) => { state.labels = e.target.value; dirty = true; });
+  document.getElementById("focus").addEventListener("change", (e) => { state.focus = e.target.checked; applyFilters(); });
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ── Deep links ──────────────────────────────────────────────────────────
+  // graph-explorer.html#select=<node id>&focus=1&q=<search>&theme=dark
+  function applyHash() {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ""));
+    if (params.get("theme") === "dark" || params.get("theme") === "light") {
+      root.setAttribute("data-theme", params.get("theme"));
+      readColors(); buildLegend();
+    }
+    if (params.get("focus") === "1") { state.focus = true; document.getElementById("focus").checked = true; }
+    if (params.get("q")) { searchInput.value = params.get("q"); onSearch(); results.hidden = true; }
+    const id = params.get("select");
+    if (id && byId.has(id)) select(byId.get(id), true);
+  }
+
+  // ── Boot ────────────────────────────────────────────────────────────────
+  window.addEventListener("resize", resize);
+  resize();
+  buildLegend();
+  applyFilters();
+  frame();
+  applyHash();
+
+  // Small scripting hook for console use and automated checks.
+  window.graphExplorer = {
+    meta: META,
+    nodeCount: NODES.length,
+    edgeCount: EDGES.length,
+    visible: () => ({ nodes: visibleNodes.length, edges: visibleEdges.length }),
+    select: (id) => select(byId.get(id) || null, true),
+    selected: () => (state.selected ? state.selected.id : null),
+    screenPosition: (id) => { const n = byId.get(id); return n ? transform.apply([n.x, n.y]) : null; },
+    search: (q) => { searchInput.value = q; onSearch(); return state.matches.size; },
+  };
+})();
+</script>
+</body>
+</html>
