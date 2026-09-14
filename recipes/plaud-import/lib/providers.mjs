@@ -172,7 +172,7 @@ async function postJson(url, headers, body, timeoutMs) {
 }
 
 /** OpenAI-compatible /chat/completions — used by OpenRouter and Gemini. */
-async function viaOpenAICompatible({ url, apiKey, model, prompt, text, timeoutMs, maxTokens, extraHeaders }) {
+async function viaOpenAICompatible({ url, apiKey, model, prompt, text, timeoutMs, maxTokens, extraHeaders, suffix }) {
   const data = await postJson(
     url,
     { Authorization: `Bearer ${apiKey}`, ...(extraHeaders || {}) },
@@ -181,7 +181,7 @@ async function viaOpenAICompatible({ url, apiKey, model, prompt, text, timeoutMs
       max_tokens: maxTokens,
       messages: [
         { role: "system", content: prompt },
-        { role: "user", content: `${wrapInput(text)}\n\nOUTPUT (JSON array of atomic thoughts):` },
+        { role: "user", content: `${wrapInput(text)}${suffix}` },
       ],
     },
     timeoutMs,
@@ -189,7 +189,7 @@ async function viaOpenAICompatible({ url, apiKey, model, prompt, text, timeoutMs
   const content = data?.choices?.[0]?.message?.content;
   if (!content) throw new Error("provider response had no message content");
   return {
-    atoms: parseAtomsFromResponse(content),
+    text: content,
     usage: {
       input_tokens: data?.usage?.prompt_tokens ?? null,
       output_tokens: data?.usage?.completion_tokens ?? null,
@@ -197,7 +197,7 @@ async function viaOpenAICompatible({ url, apiKey, model, prompt, text, timeoutMs
   };
 }
 
-async function viaAnthropic({ apiKey, model, prompt, text, timeoutMs, maxTokens }) {
+async function viaAnthropic({ apiKey, model, prompt, text, timeoutMs, maxTokens, suffix }) {
   const data = await postJson(
     "https://api.anthropic.com/v1/messages",
     { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
@@ -206,7 +206,7 @@ async function viaAnthropic({ apiKey, model, prompt, text, timeoutMs, maxTokens 
       max_tokens: maxTokens,
       system: prompt,
       messages: [
-        { role: "user", content: `${wrapInput(text)}\n\nOUTPUT (JSON array of atomic thoughts):` },
+        { role: "user", content: `${wrapInput(text)}${suffix}` },
       ],
     },
     timeoutMs,
@@ -214,7 +214,7 @@ async function viaAnthropic({ apiKey, model, prompt, text, timeoutMs, maxTokens 
   const block = (Array.isArray(data.content) ? data.content : []).find((b) => b.type === "text");
   if (!block) throw new Error("anthropic response had no text block");
   return {
-    atoms: parseAtomsFromResponse(block.text),
+    text: block.text,
     usage: {
       input_tokens: data?.usage?.input_tokens ?? null,
       output_tokens: data?.usage?.output_tokens ?? null,
@@ -222,36 +222,42 @@ async function viaAnthropic({ apiKey, model, prompt, text, timeoutMs, maxTokens 
   };
 }
 
-async function viaClaudeCli({ prompt, text, timeoutMs }) {
-  const fullPrompt = `${prompt}\n\n${wrapInput(text)}\n\nOUTPUT (JSON array of atomic thoughts):`;
+async function viaClaudeCli({ prompt, text, timeoutMs, suffix }) {
+  const fullPrompt = `${prompt}\n\n${wrapInput(text)}${suffix}`;
   const { stdout } = await spawnClaudeCli(
     [process.env.CLAUDE_CLI_PATH || "claude", "-p"],
     buildCleanEnv(),
     timeoutMs,
     fullPrompt,
   );
-  return { atoms: parseAtomsFromResponse(stdout), usage: { input_tokens: null, output_tokens: null } };
+  return { text: stdout, usage: { input_tokens: null, output_tokens: null } };
 }
 
 /**
- * Split a transcript into atomic thoughts.
+ * Prompt for synthesising a summary when Plaud did not supply one.
  *
- * @returns {Promise<{atoms: string[], usage: {input_tokens:number|null, output_tokens:number|null}}>}
+ * Plaud normally writes its own AI summary and the importer uses that verbatim.
+ * Some exports carry a transcript with no summary file; without this the parent
+ * thought would be nothing but its bracketed header, which still embeds and
+ * still shows up in the graph as an empty husk.
  */
-export async function atomizeTranscript(text, options) {
-  const {
-    provider,
-    model,
-    apiKey,
-    baseUrl,
-    prompt = TRANSCRIPT_ATOMIZE_PROMPT,
-    timeoutMs = 120_000,
-    maxTokens = 8192,
-  } = options;
+export const TRANSCRIPT_SUMMARIZE_PROMPT = [
+  "You summarise a transcript of a voice recording for someone's personal knowledge base.",
+  "",
+  "Write 3-6 sentences of plain prose covering what the recording was about, what was",
+  "decided, and what was left open. Lead with the substance, not with \"this recording\".",
+  "Name people and specifics that appear in the transcript. Do not invent anything that",
+  "is not there. If the transcript is too fragmentary to summarise, say so in one sentence.",
+  "",
+  "Return the summary text only. No preamble, no markdown headings, no bullet list.",
+].join("\n");
 
-  if (typeof text !== "string" || text.trim().length === 0) {
-    throw new Error("atomizeTranscript: text must be a non-empty string");
-  }
+const ATOM_SUFFIX = "\n\nOUTPUT (JSON array of atomic thoughts):";
+const SUMMARY_SUFFIX = "\n\nOUTPUT (the summary, as plain prose):";
+
+/** Dispatch one chat call to the selected provider. Returns the raw text. */
+function callProvider(text, options, prompt, suffix) {
+  const { provider, model, apiKey, baseUrl, timeoutMs = 120_000, maxTokens = 8192 } = options;
 
   if (provider === "openrouter") {
     return viaOpenAICompatible({
@@ -262,6 +268,7 @@ export async function atomizeTranscript(text, options) {
       text,
       timeoutMs,
       maxTokens,
+      suffix,
       extraHeaders: {
         "HTTP-Referer": "https://github.com/NateBJones-Projects/OB1",
         "X-Title": "OB1 Plaud Import",
@@ -277,13 +284,59 @@ export async function atomizeTranscript(text, options) {
       text,
       timeoutMs,
       maxTokens,
+      suffix,
     });
   }
   if (provider === "anthropic") {
-    return viaAnthropic({ apiKey, model, prompt, text, timeoutMs, maxTokens });
+    return viaAnthropic({ apiKey, model, prompt, text, timeoutMs, maxTokens, suffix });
   }
   if (provider === "claude-cli") {
-    return viaClaudeCli({ prompt, text, timeoutMs });
+    return viaClaudeCli({ prompt, text, timeoutMs, suffix });
   }
   throw new Error(`Unknown provider "${provider}". Supported: ${PROVIDERS.join(", ")}`);
+}
+
+/**
+ * Split a transcript into atomic thoughts.
+ *
+ * @returns {Promise<{atoms: string[], usage: {input_tokens:number|null, output_tokens:number|null}}>}
+ */
+export async function atomizeTranscript(text, options) {
+  if (typeof text !== "string" || text.trim().length === 0) {
+    throw new Error("atomizeTranscript: text must be a non-empty string");
+  }
+  const prompt = options.prompt || TRANSCRIPT_ATOMIZE_PROMPT;
+  const res = await callProvider(text, options, prompt, ATOM_SUFFIX);
+  return { atoms: parseAtomsFromResponse(res.text), usage: res.usage };
+}
+
+/**
+ * Synthesise a summary from a transcript. Only called when the export carried
+ * no Plaud summary of its own — a Plaud-written summary is always preferred and
+ * is never regenerated.
+ *
+ * @returns {Promise<{summary: string, usage: {input_tokens:number|null, output_tokens:number|null}}>}
+ */
+export async function summarizeTranscript(text, options) {
+  if (typeof text !== "string" || text.trim().length === 0) {
+    throw new Error("summarizeTranscript: text must be a non-empty string");
+  }
+  const prompt = options.prompt || TRANSCRIPT_SUMMARIZE_PROMPT;
+  const res = await callProvider(text, options, prompt, SUMMARY_SUFFIX);
+  const summary = String(res.text || "").trim();
+  if (!summary) throw new Error("summarizeTranscript: provider returned an empty summary");
+  return { summary, usage: res.usage };
+}
+
+/**
+ * Deterministic fallback used with --no-llm: the opening of the transcript,
+ * trimmed to a whole word. Not a summary and labelled as such by the caller, but
+ * far better than a parent thought with no body at all.
+ */
+export function excerptTranscript(text, words = 120) {
+  const clean = String(text || "").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const parts = clean.split(" ");
+  if (parts.length <= words) return clean;
+  return `${parts.slice(0, words).join(" ")}…`;
 }

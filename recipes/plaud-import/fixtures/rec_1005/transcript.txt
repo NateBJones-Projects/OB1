@@ -1,0 +1,11 @@
+[00:00:01] Speaker 1: Okay, recording. The thing I keep circling back to is that the
+intake form is doing two jobs and doing neither well. It collects contact details and
+it also tries to qualify. We should split it.
+[00:00:22] Speaker 1: Second thing. The follow-up window is too long. Three days is
+where the drop-off happens, and we are consistently landing on day four or five.
+[00:00:41] Speaker 1: I want to test a shorter form against the current one for two
+weeks before committing to a rebuild. If the shorter one wins on completion rate we
+have our answer without arguing about it.
+[00:01:05] Speaker 1: Last thought, and this is the one I might be wrong about. I think
+the qualifying questions belong in the first call, not the form. Worth checking whether
+that just moves the drop-off somewhere less visible.

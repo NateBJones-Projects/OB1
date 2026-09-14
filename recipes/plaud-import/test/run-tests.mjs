@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { contentFingerprint, parseArgs } from "../lib/common.mjs";
 import { chunkTurns, discoverRecordings, parseTranscriptText, splitSections } from "../lib/plaud-parse.mjs";
 import { loadTierMap, loadTriageRules, triageRecording } from "../lib/triage.mjs";
-import { parseAtomsFromResponse, resolveProvider } from "../lib/providers.mjs";
+import { parseAtomsFromResponse, resolveProvider, excerptTranscript } from "../lib/providers.mjs";
 import { entriesToRecords, parseListing } from "../export-plaud.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -163,8 +163,11 @@ test("chunkTurns splits on turn boundaries, never mid-line", () => {
 test("discoverRecordings reads all three fixture layouts", () => {
   const { records } = discoverRecordings(path.join(recipeDir, "fixtures"));
   const byId = Object.fromEntries(records.map((r) => [r.recording_id, r]));
-  assert.equal(records.length, 4);
+  assert.equal(records.length, 5);
   assert.equal(byId.rec_1001.layout, "directory");
+  // rec_1005 is the no-summary case: a transcript with no summary.md.
+  assert.equal(byId.rec_1005.summary, "");
+  assert.ok(byId.rec_1005.transcript.trim().length > 0);
   assert.equal(byId.rec_1003.layout, "flat");
   assert.equal(byId.rec_1004.layout, "obsidian-md");
   // The unofficial-CLI JSON's trans_result wins over the rendered text file.
@@ -188,6 +191,17 @@ test("entriesToRecords fails loudly when no entry carries an id", () => {
 });
 
 console.log("providers");
+test("excerptTranscript trims to whole words and marks truncation", () => {
+  const long = Array.from({ length: 300 }, (_, i) => `word${i}`).join(" ");
+  const out = excerptTranscript(long, 10);
+  assert.equal(out.split(" ").length, 10, "keeps exactly the requested word count");
+  assert.ok(out.endsWith("…"), "marks that it was cut");
+  assert.ok(!out.includes("  "), "collapses whitespace");
+  assert.equal(excerptTranscript("short one", 10), "short one", "returns short input unchanged");
+  assert.equal(excerptTranscript("", 10), "", "empty in, empty out");
+  assert.equal(excerptTranscript(null, 10), "", "null is not a crash");
+});
+
 test("parseAtomsFromResponse pulls the array out of chatty output", () => {
   const atoms = parseAtomsFromResponse('Sure!\n```json\n["one", "two", ""]\n```');
   assert.deepEqual(atoms, ["one", "two"]);

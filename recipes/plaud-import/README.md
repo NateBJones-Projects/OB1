@@ -25,6 +25,32 @@ A 45-minute transcript is roughly 6,500 words — past `text-embedding-3-small`'
 
 `--no-llm` falls back to deterministic ~500-word chunks split on speaker turns — no LLM cost, lower retrieval quality.
 
+## Where The Summary Comes From
+
+The parent thought's body is **Plaud's own AI summary, used verbatim**. This recipe
+never rewrites a summary Plaud already wrote. It reads `summary.md` (falling back to
+`summary.txt` or `note.md`), or the `.md` file in a flat export, or the `## Summary`
+section of an Obsidian-plugin note, then splits that document by heading: anything
+titled highlights, action items, key points, takeaways, or todo becomes the highlights
+block and the rest is the summary.
+
+Some exports carry a transcript with **no summary at all**. Without a fallback the
+parent would be its bracketed header line and nothing else — an empty husk that still
+gets embedded and still shows up in a graph. So when the summary is missing:
+
+| Situation | What the body becomes | `metadata.plaud.summary_source` |
+|---|---|---|
+| Plaud wrote a summary | that summary, verbatim | `plaud` |
+| No summary, LLM available, full-transcript mode | 3–6 sentences synthesised from the transcript | `synthesized` |
+| No summary, `--no-llm`, `summary` triage mode, or the call failed | the opening ~120 words of the transcript, labelled as such | `transcript_excerpt` |
+| No summary and no transcript | the recording is skipped entirely | n/a |
+
+Two things worth knowing. A `summary` triage verdict means the transcript must not
+reach a model at all, so those recordings always take the excerpt path even when an
+LLM is configured — the tier wins over convenience. And synthesising costs one extra
+LLM call for each affected recording, counted in `--report` and against `--max-calls`
+like any other.
+
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md)) with a `thoughts` table

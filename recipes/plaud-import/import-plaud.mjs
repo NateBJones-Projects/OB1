@@ -40,7 +40,14 @@ import {
 } from "./lib/common.mjs";
 import { applySpeakerMap, chunkTurns, discoverRecordings } from "./lib/plaud-parse.mjs";
 import { loadTierMap, loadTriageRules, MODES, TIERS } from "./lib/triage.mjs";
-import { atomizeTranscript, DEFAULT_MODELS, PROVIDERS, resolveProvider } from "./lib/providers.mjs";
+import {
+  atomizeTranscript,
+  DEFAULT_MODELS,
+  excerptTranscript,
+  PROVIDERS,
+  resolveProvider,
+  summarizeTranscript,
+} from "./lib/providers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -721,6 +728,8 @@ async function main() {
     secretsSkipped: 0,
     llmCalls: 0,
     llmFailures: 0,
+    summariesSynthesized: 0,
+    summariesExcerpted: 0,
     embedFailures: 0,
     insertFailures: 0,
     byTier: {},
@@ -815,6 +824,43 @@ async function main() {
       if (flags.reimport) await purgeRecording(record.recording_id, db);
 
       // ── Parent ──────────────────────────────────────────────────────────
+      // Plaud's own summary is preferred and never regenerated. Some exports
+      // carry a transcript with no summary file at all; without a fallback the
+      // parent would be its bracketed header and nothing else -- an empty husk
+      // that still gets embedded and still shows up in the graph.
+      let summarySource = record.summary.trim() ? "plaud" : null;
+      if (!summarySource && record.transcript.trim()) {
+        if (useLlm && triage.mode === "full") {
+          if (maxCalls > 0 && llmCallsUsed >= maxCalls) {
+            throw new Error(`--max-calls ${maxCalls} reached; stopping before summarising this recording`);
+          }
+          llmCallsUsed++;
+          stats.llmCalls++;
+          try {
+            const res = await summarizeTranscript(record.transcript, llm);
+            record.summary = res.summary;
+            summarySource = "synthesized";
+            stats.summariesSynthesized++;
+            stats.usage.input_tokens += res.usage.input_tokens || 0;
+            stats.usage.output_tokens += res.usage.output_tokens || 0;
+            if (verbose) console.log(`  summarised ${record.recording_id} (no Plaud summary in export)`);
+          } catch (err) {
+            stats.llmFailures++;
+            console.warn(`  summarisation failed for ${record.recording_id}: ${err.message} — using a transcript excerpt`);
+          }
+        }
+        // --no-llm, a summary-only triage verdict (transcript must not reach a
+        // model), or a failed call: fall back to the opening of the transcript.
+        if (!summarySource) {
+          const excerpt = excerptTranscript(record.transcript);
+          if (excerpt) {
+            record.summary = `(No Plaud summary in the export. Opening of the transcript:)\n\n${excerpt}`;
+            summarySource = "transcript_excerpt";
+            stats.summariesExcerpted++;
+          }
+        }
+      }
+
       const content = parentContent(record);
       if (!flags["no-secret-scan"]) {
         const secret = scanForSecrets(content);
@@ -826,7 +872,7 @@ async function main() {
       }
       const fingerprint = contentFingerprint(content);
       const metadata = baseMetadata(record, triage, {
-        plaud: { role: "parent", atom_count: 0 },
+        plaud: { role: "parent", atom_count: 0, summary_source: summarySource },
         rest: {
           type: thoughtType(record),
           content_fingerprint: fingerprint,
