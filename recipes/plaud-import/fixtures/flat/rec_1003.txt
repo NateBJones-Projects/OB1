@@ -1,0 +1,5 @@
+[00:00:02] Dana: Before we start, remember this whole project is under NDA, so nothing here goes in the shared drive.
+[00:00:14] Priya: Understood. The confidential pricing sheet stays with legal until the agreement is signed.
+[00:00:31] Dana: Decision: we delay the integration kickoff until the signed agreement is back, target the first week of June.
+[00:00:52] Priya: I will send the revised scope document on Monday and copy the legal contact.
+[00:01:14] Dana: One open question is whether their security review covers the staging environment as well.

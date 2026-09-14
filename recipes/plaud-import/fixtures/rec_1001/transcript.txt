@@ -1,0 +1,8 @@
+[00:00:03] Speaker 1: Morning everyone, quick standup before the sprint review.
+[00:00:09] Speaker 2: I finished the importer spike. The backlog item for the CSV mapper is still open.
+[00:00:21] Speaker 1: Good. Decision: we ship the mapper behind a flag on Friday rather than holding the release.
+[00:00:34] Speaker 2: Works for me. I'll write the rollback note in the runbook by Wednesday.
+[00:01:02] Speaker 3: One risk on the roadmap side — the partner integration review slipped a week.
+[00:01:15] Speaker 1: Note it, but it does not block Friday. Let's keep the retro at 30 minutes this week.
+[00:01:40] Speaker 2: Last thing, the marketing page copy needs a final pass before launch.
+[00:01:52] Speaker 1: I'll own that. Anything else? Good, we're done.

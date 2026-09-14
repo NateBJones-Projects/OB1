@@ -1,0 +1,114 @@
+{
+  "_readme": [
+    "Sensitivity triage rules for recipes/plaud-import.",
+    "Copy to triage-rules.json and replace the EXAMPLE keywords with your own.",
+    "Every term below is a generic placeholder. Real client names, employer names,",
+    "family names and project code names belong in YOUR copy, which is gitignored.",
+    "",
+    "Rules are evaluated top to bottom, first match wins, and the rule that fired is",
+    "written to metadata.triage.rule so you can audit and re-tier later.",
+    "Anything that matches nothing gets default_tier, which defaults to 'personal'.",
+    "Setting default_tier to 'standard' means anything your keywords miss is treated",
+    "as freely readable, so it requires \"acknowledge_default_standard\": true in this",
+    "same file. Regex escalation to restricted still applies either way.",
+    "A 'standard' verdict is re-checked against both regex sets before it is accepted,",
+    "so a badly ordered file cannot silently downgrade a recording containing an SSN."
+  ],
+  "version": 1,
+  "default_tier": "personal",
+  "default_mode": "full",
+
+  "regex": {
+    "restricted": [
+      { "pattern": "\\b\\d{3}-?\\d{2}-?\\d{4}\\b", "flags": "", "label": "ssn_pattern" },
+      { "pattern": "\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b", "flags": "", "label": "credit_card" },
+      { "pattern": "\\b(account|routing)\\b[^\\n]{0,80}\\b\\d{8,17}\\b", "flags": "i", "label": "bank_account" },
+      { "pattern": "\\b(sk-|pk_live_|sk_live_|ghp_|gho_|AKIA)[A-Za-z0-9]{10,}", "flags": "i", "label": "api_key" },
+      { "pattern": "\\bpassword\\s*[:=]\\s*\\S+", "flags": "i", "label": "password_value" }
+    ],
+    "personal": [
+      { "pattern": "\\b\\d+\\s*mg\\b(?!\\s*\\/\\s*(dL|kg|L|ml))", "flags": "i", "label": "medication_dosage" },
+      { "pattern": "\\b(glucose|a1c|cholesterol|blood pressure|bp|hrv|bmi)\\b[^\\n]{0,80}\\b\\d+", "flags": "i", "label": "health_measurement" },
+      { "pattern": "\\b(diagnosed|diagnosis|prescription|surgery|biopsy)\\b", "flags": "i", "label": "medical_condition" },
+      { "pattern": "\\b(salary|income|net worth|401k|ira|portfolio)\\b[^\\n]{0,80}\\b\\$?\\d", "flags": "i", "label": "financial_detail" },
+      { "pattern": "\\b\\$\\d{3,}[,\\d]*\\b", "flags": "i", "label": "financial_amount" }
+    ]
+  },
+
+  "rules": [
+    {
+      "name": "secrets",
+      "kind": "regex",
+      "set": "restricted",
+      "tier": "restricted",
+      "_comment": "Credentials and identifiers. Always first: nothing should be able to outrank it."
+    },
+    {
+      "name": "confidential-work",
+      "kind": "keyword",
+      "tier": "restricted",
+      "mode": "summary",
+      "_comment": "EXAMPLE TERMS — replace with your NDA clients, employers, and code names. mode 'summary' imports the Plaud summary only; the transcript is never sent to an LLM. Use mode 'skip' to import nothing, or 'full' to atomize normally.",
+      "keywords": [
+        "nda",
+        "under nda",
+        "confidential",
+        "privileged",
+        "attorney-client",
+        "example client inc",
+        "example staffing agency",
+        "project codename alpha"
+      ]
+    },
+    {
+      "name": "personal-life",
+      "kind": "keyword",
+      "tier": "personal",
+      "_comment": "EXAMPLE TERMS — replace with your own health, family, legal, and finance vocabulary.",
+      "keywords": [
+        "therapy",
+        "therapist",
+        "doctor",
+        "dentist",
+        "medication",
+        "custody",
+        "divorce",
+        "child support",
+        "my spouse",
+        "my kids",
+        "irs",
+        "tax return",
+        "debt",
+        "mortgage",
+        "estate planning",
+        "last will and testament"
+      ]
+    },
+    {
+      "name": "personal-signals",
+      "kind": "regex",
+      "set": "personal",
+      "tier": "personal",
+      "_comment": "Health measurements, dosages, and money amounts anywhere in the scanned text."
+    },
+    {
+      "name": "business-as-usual",
+      "kind": "keyword",
+      "tier": "standard",
+      "_comment": "EXAMPLE TERMS — replace with your own company, product, and teammate vocabulary. This is the ONLY rule that produces 'standard', and its verdict is still re-checked against both regex sets.",
+      "keywords": [
+        "standup",
+        "sprint",
+        "roadmap",
+        "backlog",
+        "retro",
+        "retrospective",
+        "product review",
+        "marketing",
+        "pipeline",
+        "example product",
+        "example company"
+      ]
+    }
+  ]
+}

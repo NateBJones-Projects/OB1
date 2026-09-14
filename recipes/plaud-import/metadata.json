@@ -1,0 +1,21 @@
+{
+  "name": "Plaud Import",
+  "description": "Import Plaud AI voice-recorder transcripts and summaries into Open Brain as one parent thought plus LLM-extracted atomic child thoughts, with sensitivity triage, client-side fingerprint dedup, and contract-compliant provenance.",
+  "category": "recipes",
+  "author": {
+    "name": "Chris Fellows",
+    "github": "chriscfellows"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Plaud account", "OpenAI or OpenRouter (embeddings)", "OpenRouter, Anthropic, or Gemini (atomization, optional)"],
+    "tools": ["Node.js 18+", "@plaud-ai/cli"]
+  },
+  "requires_skills": [],
+  "tags": ["plaud", "import", "transcripts", "voice", "meetings", "share-link"],
+  "difficulty": "intermediate",
+  "estimated_time": "60 minutes",
+  "created": "2026-09-14",
+  "updated": "2026-09-14"
+}

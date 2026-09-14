@@ -28,6 +28,7 @@ Most importers write rows into the same `thoughts` table used by the core MCP se
 | Gmail history through Gmail API | [Email History Import](email-history-import/) | `deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --dry-run --limit=5` |
 | Google Takeout My Activity | [Google Activity Import](google-activity-import/) | `node import-google-activity.mjs "/path/to/Takeout/My Activity" --dry-run --limit 5` |
 | Readwise highlight history | [Readwise Import](readwise-import/) | `python import-readwise.py --dry-run --limit 50 --verbose` |
+| Plaud voice recorder transcripts and summaries | [Plaud Import](plaud-import/) | `node import-plaud.mjs ~/plaud-export --dry-run --verbose --report` |
 | X/Twitter archive | [X/Twitter Import](x-twitter-import/) | `node import-x-twitter.mjs /path/to/twitter-export --dry-run` |
 | Instagram archive | [Instagram Import](instagram-import/) | Read the recipe README, then run its dry-run command before importing. |
 | Grok/xAI conversation export | [Grok Export Import](grok-export-import/) | Read the recipe README, then run its dry-run command before importing. |
