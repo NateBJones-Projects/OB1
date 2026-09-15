@@ -66,7 +66,7 @@ Plus a moderate cache layer with tag-based invalidation: `thought_stats` (5 min,
 | Invocations per "open Claude" | ~16 | ~4 (drops to 1 after warm session) |
 | `thought_stats` data transferred | full table scan | single aggregated row |
 
-Free tier: **500,000/month**. This recipe brings a 1.8M/month workload comfortably under the cap.
+Expected outcome: a 1.8M/month workload drops to roughly 440k invocations — comfortably under the free tier cap of **500,000/month** — with one edge function and one connector to maintain instead of four.
 
 ## Prerequisites
 
@@ -114,6 +114,17 @@ const sessions = new Map<string, Session>();
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
 app.all("*", async (c) => {
+  // Reject non-POST requests up front. This server is stateless over
+  // streamable HTTP: there is no standalone SSE stream (GET) or session
+  // termination (DELETE) to serve. Without this guard a GET falls through to
+  // StreamableHTTPTransport.handleRequest, which parks it on an SSE stream
+  // that never emits and never closes. mcp-remote always sends a GET probe
+  // (OAuth discovery) before its initialize POST, so that probe hangs and
+  // the MCP handshake times out at the client with no error server-side.
+  if (c.req.method !== "POST") {
+    return c.json({ error: "Method not allowed" }, 405, { ...corsHeaders, Allow: "POST, OPTIONS" });
+  }
+
   // ... auth check first ...
 
   const sid = c.req.header("mcp-session-id") || undefined;

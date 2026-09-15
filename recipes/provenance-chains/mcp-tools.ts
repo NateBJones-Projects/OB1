@@ -1,7 +1,7 @@
 // Provenance Chains — MCP tool handlers for open-brain-mcp (Supabase Edge Function).
 //
-// Drop these two tool registrations into your existing open-brain-mcp
-// index.ts after the other registerTool() calls. Both tools assume the
+// Drop these three tool registrations into your existing open-brain-mcp
+// index.ts after the other registerTool() calls. All three assume the
 // schemas/provenance-chains SQL migration has been applied to your
 // Supabase project (adds the derived_from / derivation_* columns and the
 // trace_provenance / find_derivatives helper functions).
@@ -12,9 +12,16 @@
 // and update the id casts accordingly.
 //
 // Expected surrounding context (already present in index.ts):
-//   - `server`    instance of McpServer
-//   - `supabase`  createClient<...>(…, service_role_key)
-//   - `z`         imported from "npm:zod@3"
+//   - `server`          instance of McpServer
+//   - `supabase`        createClient<...>(…, service_role_key)
+//   - `z`               imported from "npm:zod@3"
+//   - `getEmbedding`    (Tool 3 only) canonical index.ts helper — text → vector
+//   - `extractMetadata` (Tool 3 only) canonical index.ts helper — text → metadata
+//
+// Tool 3 (capture_derived_thought) is a WRITE tool and is deliberately a
+// SEPARATE tool from the canonical `capture_thought`, so the everyday
+// capture hot path used by every connected client is left untouched. Use
+// it only when saving an artifact derived from other thoughts.
 //
 // Return envelopes are inlined as the literal
 //   { content: [{ type: "text", text: JSON.stringify(...) }] }
@@ -346,6 +353,186 @@ server.registerTool(
       };
     } catch (error) {
       console.error("find_derivatives failed", error);
+      return {
+        content: [{ type: "text", text: String(error) }],
+        isError: true,
+      };
+    }
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Tool 3: capture_derived_thought
+//   WRITE tool. Saves a synthesized/derived artifact (digest, wiki, summary)
+//   together with its provenance — the parent thoughts it was built from —
+//   so the derivation graph is populated at capture time instead of only by
+//   the recipe's one-time backfill.mjs.
+//
+//   Deliberately a SEPARATE tool from the canonical `capture_thought`
+//   (Option B): the everyday capture path used by every connected client is
+//   never touched, so a bug here can only affect callers that opt into
+//   provenance.
+//
+//   The 3-step write path mirrors canonical capture_thought because
+//   upsert_thought writes only content/content_fingerprint/metadata and
+//   MERGES metadata on a fingerprint conflict — it never touches the
+//   top-level derived_from / derivation_* columns:
+//     1. embed + extract metadata, folding a `provenance` mirror INTO
+//        metadata so it rides through upsert_thought and survives the
+//        conflict-time `metadata || EXCLUDED.metadata` merge on re-capture;
+//     2. upsert_thought(content, { metadata }) -> id;
+//     3. a single UPDATE writes the embedding AND the top-level provenance
+//        columns that upsert_thought ignored.
+// ---------------------------------------------------------------------------
+
+server.registerTool(
+  "capture_derived_thought",
+  {
+    title: "Capture Derived Thought",
+    description:
+      "Save a synthesized/derived artifact (digest, wiki, research summary, report) to Open Brain WITH its provenance. Use this instead of capture_thought ONLY when the thing you are saving was derived from other thoughts already in the brain. Records the parent thought IDs so 'why do I believe this?' and 'what uses this?' stay answerable.",
+    annotations: {
+      readOnlyHint: false,
+      openWorldHint: false,
+      destructiveHint: false,
+      idempotentHint: false,
+    },
+    inputSchema: z.object({
+      content: z.string().describe(
+        "The derived artifact text — a clear, standalone statement that will make sense when retrieved later"),
+      derived_from: z.array(z.string()).optional().describe(
+        "Parent thought IDs this artifact was synthesized from. UUID strings only; non-UUID refs (e.g. legacy #412) are moved to metadata.provenance.unresolved_refs rather than rejected"),
+      derivation_layer: z.enum(["primary", "derived"]).optional().describe(
+        "'derived' for a synthesized artifact (default when derived_from is provided). The DB CHECK allows only these two values"),
+      derivation_method: z.enum(["synthesis"]).optional().describe(
+        "How it was produced. 'synthesis' is the only value a stock install accepts; defaults to 'synthesis' when derived_from is provided"),
+      supersedes: z.string().uuid().optional().describe(
+        "UUID of a prior thought this one replaces (e.g. a regenerated digest replacing yesterday's)"),
+    }),
+  },
+  async (params) => {
+    try {
+      const raw = params as Record<string, unknown>;
+      const content = String(raw.content ?? "").trim();
+      if (!content) {
+        return {
+          content: [{ type: "text", text: "content is required" }],
+          isError: true,
+        };
+      }
+
+      // Partition derived_from into valid UUID parents vs. unresolved refs.
+      // We accept z.array(z.string()) (not z.array(z.string().uuid())) on
+      // purpose: a single legacy ref like "#412" must NOT reject the whole
+      // capture. Valid UUIDs go into the derived_from column; everything else
+      // is preserved under metadata.provenance.unresolved_refs so the loss is
+      // visible instead of silently poisoning the array (trace_provenance
+      // casts each element ::uuid and would raise 22P02 on a non-UUID).
+      const UUID_RE =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const rawRefs = Array.isArray(raw.derived_from)
+        ? (raw.derived_from as unknown[]).map((r) => String(r).trim())
+        : [];
+      const derivedFrom = rawRefs.filter((r) => UUID_RE.test(r));
+      const unresolvedRefs = rawRefs.filter((r) => !UUID_RE.test(r));
+
+      // Defaults: when parents are present but layer/method were omitted, fill
+      // in the CHECK-valid values so the caller doesn't have to. z.enum already
+      // guarantees any PROVIDED value is legal, so no clamping is needed.
+      const layer =
+        (raw.derivation_layer as string | undefined) ??
+        (derivedFrom.length > 0 ? "derived" : undefined);
+      const method =
+        (raw.derivation_method as string | undefined) ??
+        (derivedFrom.length > 0 ? "synthesis" : undefined);
+      const supersedes = raw.supersedes as string | undefined;
+
+      const hasProvenance =
+        derivedFrom.length > 0 ||
+        unresolvedRefs.length > 0 ||
+        layer !== undefined ||
+        method !== undefined ||
+        supersedes !== undefined;
+
+      // Step 1: embed + extract metadata, folding in the provenance mirror.
+      // The mirror lives inside metadata so it survives upsert_thought's
+      // conflict-time `metadata || EXCLUDED.metadata` merge: a later stock
+      // capture of identical content won't drop it.
+      const [embedding, extracted] = await Promise.all([
+        getEmbedding(content),
+        extractMetadata(content),
+      ]);
+      const metadata: Record<string, unknown> = { ...extracted, source: "mcp" };
+      if (hasProvenance) {
+        metadata.provenance = {
+          ...(derivedFrom.length ? { derived_from: derivedFrom } : {}),
+          ...(layer ? { derivation_layer: layer } : {}),
+          ...(method ? { derivation_method: method } : {}),
+          ...(supersedes ? { supersedes } : {}),
+          ...(unresolvedRefs.length ? { unresolved_refs: unresolvedRefs } : {}),
+        };
+      }
+
+      // Step 2: upsert content + metadata. upsert_thought returns the row id
+      // and, on a fingerprint conflict, merges the incoming metadata.
+      const { data: upsertResult, error: upsertError } = await supabase.rpc(
+        "upsert_thought",
+        { p_content: content, p_payload: { metadata } },
+      );
+      if (upsertError) {
+        return {
+          content: [{ type: "text", text: `Failed to capture: ${upsertError.message}` }],
+          isError: true,
+        };
+      }
+      const thoughtId = (upsertResult as { id?: string } | null)?.id;
+      if (!thoughtId) {
+        return {
+          content: [{ type: "text", text: "upsert_thought returned no id" }],
+          isError: true,
+        };
+      }
+
+      // Step 3: one UPDATE for the embedding AND the top-level provenance
+      // columns upsert_thought ignored. On a re-capture this overwrites the
+      // columns with the new values, which is intended.
+      const patch: Record<string, unknown> = { embedding };
+      if (derivedFrom.length) patch.derived_from = derivedFrom;
+      if (layer) patch.derivation_layer = layer;
+      if (method) patch.derivation_method = method;
+      if (supersedes) patch.supersedes = supersedes;
+
+      const { error: patchError } = await supabase
+        .from("thoughts")
+        .update(patch)
+        .eq("id", thoughtId);
+      if (patchError) {
+        // The thought IS saved; only the provenance/embedding write failed.
+        // Surface it explicitly rather than pretending success.
+        return {
+          content: [{
+            type: "text",
+            text:
+              `Captured thought ${thoughtId}, but failed to write provenance/embedding: ` +
+              `${patchError.message}`,
+          }],
+          isError: true,
+        };
+      }
+
+      // Confirmation.
+      const parts = [`Captured derived thought ${thoughtId}`];
+      if (derivedFrom.length) parts.push(`from ${derivedFrom.length} parent(s)`);
+      if (layer) parts.push(`[layer=${layer}${method ? `, method=${method}` : ""}]`);
+      if (supersedes) parts.push(`supersedes ${supersedes}`);
+      if (unresolvedRefs.length) {
+        parts.push(
+          `— ${unresolvedRefs.length} non-UUID ref(s) moved to ` +
+          `metadata.provenance.unresolved_refs: ${unresolvedRefs.join(", ")}`);
+      }
+      return { content: [{ type: "text", text: parts.join(" ") }] };
+    } catch (error) {
+      console.error("capture_derived_thought failed", error);
       return {
         content: [{ type: "text", text: String(error) }],
         isError: true,

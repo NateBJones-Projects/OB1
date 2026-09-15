@@ -11,49 +11,63 @@ name: OB1 PR Gate
 # This means: automated agent passes → human admin approves → merge allowed
 
 on:
-  pull_request_target:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
     branches: [main]
   workflow_dispatch:
 
+# Fork code is inspected only in the unprivileged PR event. Never opt into
+# unsafe checkout under pull_request_target; privileged follow-ups stay separate.
 permissions:
   contents: read
 
 jobs:
   event_guard:
     name: OB1 Gate Event Guard
-    if: github.event_name != 'pull_request_target'
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Explain non-review gate run
         run: |
           echo "OB1 PR Gate received a ${GITHUB_EVENT_NAME} event."
-          echo "The contribution review only runs for pull_request_target events."
+          echo "The contribution review only runs for pull_request events."
 
   review:
     name: OB1 Review
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR head safely
         uses: actions/checkout@v4
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/head
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
-      - name: Fetch base branch
+      - name: Read schema from the exact base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          git fetch origin "${{ github.event.pull_request.base.ref }}:refs/remotes/origin/${{ github.event.pull_request.base.ref }}" --depth=1
-          git show "origin/${{ github.event.pull_request.base.ref }}:.github/metadata.schema.json" > /tmp/ob1-metadata.schema.json
+          git cat-file -e "$BASE_SHA^{commit}"
+          git show "$BASE_SHA:.github/metadata.schema.json" > /tmp/ob1-metadata.schema.json
+
+      - name: Test gate security helpers when present
+        run: |
+          if [ -f .github/scripts/gate-context.test.cjs ]; then
+            node --test .github/scripts/gate-context.test.cjs
+            python3 -B .github/scripts/test_gate_artifact.py
+          fi
 
       - name: Install metadata schema validator
         run: python3 -m pip install check-jsonschema
 
       - name: Get changed files
         id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           # Get files changed in this PR
-          changed=$(git diff --name-only origin/main...HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD)
+          changed=$(git diff --name-only "$BASE_SHA...HEAD")
           echo "files<<EOF" >> $GITHUB_OUTPUT
           echo "$changed" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT

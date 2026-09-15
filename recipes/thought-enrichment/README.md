@@ -19,7 +19,7 @@ Retroactively classify and enrich your existing thoughts with structured metadat
 
    ```
    SUPABASE_URL=https://your-project-ref.supabase.co
-   SUPABASE_SERVICE_ROLE_KEY=eyJ...
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
    OPENROUTER_API_KEY=sk-or-v1-...
    ```
 
@@ -104,6 +104,20 @@ Scans thought content for patterns matching SSNs, credit cards, API keys, passwo
 
 - **Prompt injection:** thought content is wrapped in `<thought_content>` tags and the system prompt instructs the model to treat everything inside as untrusted data. Any literal tag occurrences in content are escaped. Output fields (`summary`, `topics`, `tags`, `people`, `action_items`) are length-capped and control-char-stripped before they are written to `metadata`. Even so, enriching hostile third-party imports (shared chat exports, scraped feeds) can still influence classification labels — review before trusting them as ground truth.
 - **Bearer token on the wire:** every request carries your Supabase service-role key. Double-check that `SUPABASE_URL` points at your own Supabase project, not a proxy or debug server.
+
+## Repairing double-encoded metadata (versions before this fix)
+
+Earlier versions of `enrich-thoughts.mjs` pre-stringified `metadata` before the request body was itself stringified, so PostgREST stored the `metadata` jsonb column as a JSON *string* instead of an object on every enriched row. Symptoms: `metadata->'topics'` returns NULL everywhere, `metadata @>` filters stop matching, and stats/dashboard topic lists go empty, while the raw value looks like `"{\"type\":...}"`.
+
+The inner string is the complete, valid metadata — nothing is lost. Repair in one transactional statement (SQL Editor):
+
+```sql
+UPDATE thoughts
+SET metadata = (metadata #>> '{}')::jsonb
+WHERE jsonb_typeof(metadata) = 'string';
+```
+
+If any row held a non-JSON string the statement aborts as a whole and changes nothing.
 
 ## Cost expectations
 

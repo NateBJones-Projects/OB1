@@ -1,0 +1,20 @@
+{
+  "name": "Deleting Thoughts",
+  "description": "Safety-focused behavioral skill for removing an Open Brain thought with the delete_thought MCP tool — a hard, irreversible delete that requires resolving the id, showing the target, and confirming before firing.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["delete-thought-mcp connector", "AI client with reusable skills, rules, or custom instructions"]
+  },
+  "tags": ["skill", "delete", "safety", "hard-delete", "mcp", "open-brain"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-07-11",
+  "updated": "2026-07-11"
+}
