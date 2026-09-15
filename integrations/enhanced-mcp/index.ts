@@ -8,12 +8,9 @@ import { createClient } from "@supabase/supabase-js";
 
 import {
   embedText,
-  extractMetadata,
   detectSensitivity,
-  resolveSensitivityTier,
   computeContentFingerprint,
   prepareThoughtPayload,
-  applyEvergreenTag,
   normalizeStringArray,
   safeEmbedding,
   tableExists,
