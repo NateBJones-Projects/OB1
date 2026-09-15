@@ -6,7 +6,9 @@ supabase/
 # Maintainer-local overlays (not part of upstream contribution contract)
 .local/
 .agent/
+.agents/
 .claude.json
+.workbuddy-ai/
 
 # Python caches
 __pycache__/
@@ -27,3 +29,8 @@ docs/walkthroughs/*/public/
 docs/assets/agent-memory/promotional/generated-backgrounds/**/result.json
 docs/assets/agent-memory/screenshots/**/.chrome-*/
 integrations/openclaw-agent-memory/dist/
+
+# Local run output — generated against a personal brain, may contain personal data
+compiled-wiki/
+recipes/thought-enrichment/data/
+recipes/readmes_merged.txt
