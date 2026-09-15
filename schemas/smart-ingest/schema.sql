@@ -40,9 +40,9 @@ CREATE TABLE IF NOT EXISTS public.ingestion_items (
   action text NOT NULL DEFAULT 'pending',   -- pending, add, skip, append_evidence, create_revision
   status text NOT NULL DEFAULT 'pending',   -- pending, ready, executed, failed
   reason text,
-  matched_thought_id bigint,
+  matched_thought_id uuid,
   similarity_score numeric(5,4),
-  result_thought_id bigint,
+  result_thought_id uuid,
   error_message text,
   metadata jsonb DEFAULT '{}',
   created_at timestamptz DEFAULT now()
