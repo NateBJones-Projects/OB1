@@ -165,6 +165,8 @@ The filtering is aggressive by design — most Google activity is noise. The scr
 
 **Stage 2: Day grouping & summarization** — Surviving entries are grouped by date. Each day goes to an LLM (gpt-4o-mini via OpenRouter) with a tuned prompt. The LLM extracts 1-3 standalone thoughts per day, focusing on research patterns, decisions, and interests. Days with only trivial activity get empty summaries.
 
+> **Gemini Apps answers:** contrary to what most guides claim, Takeout does not export prompts only — most Gemini prompt records include Gemini's answer as HTML in a `safeHtmlItem` field. The importer strips that HTML to plain text and appends it beneath the prompt (capped at 1,000 chars per answer), so day summaries reflect what was answered, not just what was asked. Records without `safeHtmlItem` behave exactly as before.
+
 **Stage 3: Ingestion** — Each thought gets a vector embedding (text-embedding-3-small, 1536 dimensions) and is inserted into your `thoughts` table with metadata linking back to the source category and date.
 
 ### Deduplication

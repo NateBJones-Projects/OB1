@@ -832,6 +832,14 @@ app.get("/health", (c) =>
 );
 
 app.all("*", async (c) => {
+  // Reject non-POST requests (OPTIONS excepted — no preflight route exists
+  // above): a GET would fall through to StreamableHTTPTransport.handleRequest
+  // and park on an SSE stream that never emits and never closes, hanging
+  // mcp-remote's OAuth-discovery GET probe and timing out the MCP handshake.
+  if (c.req.method !== "POST" && c.req.method !== "OPTIONS") {
+    return c.json({ error: "Method not allowed" }, 405);
+  }
+
   if (!c.req.header("accept")?.includes("text/event-stream")) {
     const headers = new Headers(c.req.raw.headers);
     headers.set("Accept", "application/json, text/event-stream");

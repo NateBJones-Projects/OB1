@@ -1,0 +1,20 @@
+{
+  "name": "Thought Work Claims",
+  "description": "A blackboard claim table (public.thought_work_claims) plus RPCs (claim_thoughts, release_thought, release_claims_for_worker) that let many parallel workers process the same pool of thoughts without two of them grabbing the same one. Claims are made exclusive by a (thought_id, work_type) primary key with INSERT ... ON CONFLICT DO NOTHING, and a per-claim TTL with inline stale-claim reaping recovers work stranded by crashed workers. Thought ids are UUID, matching public.thoughts.id.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Node.js 18+ (for the example worker)"]
+  },
+  "tags": ["blackboard", "parallel-workers", "claims", "coordination", "batch-processing", "schema"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-06-13",
+  "updated": "2026-06-14"
+}

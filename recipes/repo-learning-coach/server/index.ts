@@ -1,3 +1,5 @@
+import 'dotenv/config'
+
 import express from 'express'
 import { existsSync } from 'node:fs'
 import { z } from 'zod'
