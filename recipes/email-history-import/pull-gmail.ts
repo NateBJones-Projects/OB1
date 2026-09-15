@@ -756,25 +756,32 @@ async function ingestThoughtEndpoint(
   source: string,
   extraMetadata?: Record<string, unknown>,
 ): Promise<IngestResult> {
-  const fingerprint = await sha256(content);
-
   const body: Record<string, unknown> = {
     content,
-    source,
-    content_fingerprint: fingerprint,
+    source_type: source,
+    metadata: { source, ...extraMetadata },
   };
-  if (extraMetadata) body.extra_metadata = extraMetadata;
 
   const res = await fetch(INGEST_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-ingest-key": INGEST_KEY,
+      "x-brain-key": INGEST_KEY,
     },
     body: JSON.stringify(body),
   });
 
-  return (await res.json()) as IngestResult;
+  if (!res.ok) {
+    const text = await res.text();
+    return { ok: false, error: `HTTP ${res.status}: ${text}` };
+  }
+
+  const data = await res.json() as Record<string, unknown>;
+  return {
+    ok: true,
+    id: data.thought_id as string,
+    type: data.type as string,
+  };
 }
 
 function buildEmailContent(
