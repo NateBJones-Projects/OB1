@@ -100,7 +100,7 @@ deno run --allow-net --allow-read --allow-write --allow-env pull-gmail.ts --list
 4. **Deduplicate** via sync-log (tracks Gmail message IDs already imported)
 5. **Embed** content via OpenRouter (`text-embedding-3-small`)
 6. **Classify** via LLM (topics, type, people, action items)
-7. **Upsert** into Supabase with SHA-256 [content fingerprint](../../primitives/content-fingerprint-dedup/README.md) — re-running produces zero duplicates
+7. **Upsert** into Supabase with SHA-256 [content fingerprint](../content-fingerprint-dedup/README.md) — re-running produces zero duplicates
 
 ### What gets filtered out
 
@@ -115,7 +115,7 @@ Each imported email becomes one row in the `thoughts` table:
 - `content`: Email body with context prefix (`[Email from X | Subject: Y | Date: Z]`)
 - `embedding`: 1536-dim vector for semantic search (truncated to 8K chars)
 - `metadata`: LLM-extracted topics, type, people, action items, plus `source: "gmail"`, `gmail_id`, `gmail_labels`, `gmail_thread_id`
-- `content_fingerprint`: Normalized SHA-256 hash for dedup (see [content fingerprint primitive](../../primitives/content-fingerprint-dedup/README.md))
+- `content_fingerprint`: Normalized SHA-256 hash for dedup (see [content fingerprint primitive](../content-fingerprint-dedup/README.md))
 
 ## Troubleshooting
 
