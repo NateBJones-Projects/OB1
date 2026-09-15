@@ -76,9 +76,9 @@ export interface IngestionItem {
   action: string; // add, skip, create_revision, append_evidence
   reason: string | null;
   status: string;
-  matched_thought_id: number | null;
+  matched_thought_id: string | null;
   similarity_score: number | null;
-  result_thought_id: number | null;
+  result_thought_id: string | null;
   /** Parsed metadata — type, importance, tags, source_snippet */
   meta: IngestionItemMeta;
 }

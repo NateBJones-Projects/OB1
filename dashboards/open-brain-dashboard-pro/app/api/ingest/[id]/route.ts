@@ -19,9 +19,9 @@ function normalizeItem(raw: Record<string, unknown>): IngestionItem {
     action: (raw.action ?? "skip") as string,
     reason: (raw.reason as string) ?? null,
     status: (raw.status ?? "pending") as string,
-    matched_thought_id: (raw.matched_thought_id as number) ?? null,
+    matched_thought_id: (raw.matched_thought_id as string) ?? null,
     similarity_score: raw.similarity_score != null ? Number(raw.similarity_score) : null,
-    result_thought_id: (raw.result_thought_id as number) ?? null,
+    result_thought_id: (raw.result_thought_id as string) ?? null,
     meta: parsedMeta,
   };
 }

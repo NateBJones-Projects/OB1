@@ -141,7 +141,7 @@ interface IngestionItem {
   content_fingerprint: string;
   action: ReconcileAction;
   reason: string;
-  matched_thought_id: number | null;
+  matched_thought_id: string | null;
   similarity_score: number | null;
   status: "pending" | "executed" | "failed";
   error_message: string | null;
@@ -164,8 +164,8 @@ interface IngestionJob {
 }
 
 type UpsertThoughtResult = {
-  thought_id?: number;
-  id?: number;
+  id?: string;
+  fingerprint?: string;
 };
 
 // ── Auth ────────────────────────────────────────────────────────────────────
@@ -347,15 +347,14 @@ function mergeTags(existing: unknown, extras: string[]): string[] {
   ]);
 }
 
-function extractThoughtId(value: unknown): number | null {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (value && typeof value === "object" && "thought_id" in value) {
-    const thoughtId = (value as UpsertThoughtResult).thought_id;
-    if (typeof thoughtId === "number" && Number.isFinite(thoughtId)) return thoughtId;
-  }
+function extractThoughtId(value: unknown): string | null {
+  // Post-2026-07-06 fix: upsert_thought() returns {id: uuid, fingerprint: sha}.
+  // The previous shape (thought_id: bigint) is dead — the thoughts table PK
+  // migrated to uuid before this integration shipped.
+  if (typeof value === "string" && value.length > 0) return value;
   if (value && typeof value === "object" && "id" in value) {
     const id = (value as UpsertThoughtResult).id;
-    if (typeof id === "number" && Number.isFinite(id)) return id;
+    if (typeof id === "string" && id.length > 0) return id;
   }
   return null;
 }
@@ -595,7 +594,7 @@ async function reconcileThought(
     tags: thought.tags,
     source_snippet: thought.source_snippet,
     content_fingerprint: fingerprint,
-    matched_thought_id: null as number | null,
+    matched_thought_id: null as string | null,
     similarity_score: null as number | null,
   };
 
@@ -649,7 +648,7 @@ async function reconcileThought(
 
   const topMatch = matches[0];
   const similarity = topMatch.similarity as number;
-  const matchedId = topMatch.id as number;
+  const matchedId = topMatch.id as string;
   const existingContent = (topMatch.content ?? "") as string;
 
   base.matched_thought_id = matchedId;
@@ -679,7 +678,7 @@ async function executeItem(
   sourceType: string | null,
   sourceMetadata?: Record<string, unknown> | null,
   skipClassification = false,
-): Promise<number | null> {
+): Promise<string | null> {
   switch (item.action) {
     case "add": {
       const prepared = await prepareThoughtPayload(item.content, {
