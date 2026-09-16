@@ -1157,27 +1157,38 @@ server.registerTool(
         });
       }
 
-      // Get thought counts for each entity, excluding restricted thoughts
-      const entityIds = entities.map(
-        (e: Record<string, unknown>) => e.id as number,
-      );
-      const { data: countRows, error: countError } = await supabase
-        .from("thought_entities")
-        .select("entity_id, thoughts!inner(sensitivity_tier)")
-        .in("entity_id", entityIds)
-        .neq("thoughts.sensitivity_tier", "restricted");
-
-      if (countError) {
-        console.error("thought count query failed", countError);
-      }
-
+      // Thought counts per entity, excluding restricted thoughts.
+      //
+      // Counted with an exact head count per entity rather than fetching every
+      // thought_entities row for the batch and tallying client-side. The batch
+      // fetch carried no limit, so PostgREST's max-rows cap silently truncated
+      // it: once a high-volume entity consumed the budget, every remaining
+      // entity in the same result set reported 0 thoughts despite having links.
+      // The zero was indistinguishable from a genuinely unlinked entity, which
+      // makes it unsafe to use thought_count as a prune signal.
       const countMap = new Map<number, number>();
-      if (countRows) {
-        for (const row of countRows) {
-          const eid = (row as Record<string, unknown>).entity_id as number;
-          countMap.set(eid, (countMap.get(eid) ?? 0) + 1);
-        }
-      }
+      await Promise.all(
+        entities.map(async (e: Record<string, unknown>) => {
+          const eid = e.id as number;
+          const { count, error: countError } = await supabase
+            .from("thought_entities")
+            .select("thought_id, thoughts!inner(sensitivity_tier)", {
+              count: "exact",
+              head: true,
+            })
+            .eq("entity_id", eid)
+            .neq("thoughts.sensitivity_tier", "restricted");
+
+          if (countError) {
+            console.error(
+              `thought count query failed for entity ${eid}`,
+              countError,
+            );
+            return;
+          }
+          countMap.set(eid, count ?? 0);
+        }),
+      );
 
       const results = entities.map((e: Record<string, unknown>) => ({
         ...e,
