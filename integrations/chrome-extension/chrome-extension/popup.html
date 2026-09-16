@@ -650,8 +650,8 @@
   <!-- Stats bar -->
   <div class="stats-bar" id="stats-bar">
     <div class="stat">Thoughts: <span class="stat-value" id="stat-total">--</span></div>
-    <div class="stat">Today: <span class="stat-value" id="stat-today">--</span></div>
-    <div class="stat">This week: <span class="stat-value" id="stat-week">--</span></div>
+    <div class="stat" title="Captured in the last 24 hours">24h: <span class="stat-value" id="stat-today">--</span></div>
+    <div class="stat" title="Captured in the last 7 days">7 days: <span class="stat-value" id="stat-week">--</span></div>
   </div>
 
   <!-- Save section -->
@@ -680,6 +680,7 @@
         <option value="telegram">Telegram</option>
         <option value="slack">Slack</option>
         <option value="claude">Claude</option>
+        <option value="mcp">MCP</option>
       </select>
       <button id="search-btn">Search</button>
     </div>
@@ -696,7 +697,7 @@
     </div>
     <div class="settings-content" id="settings-content">
       <label for="setting-api-url">API URL</label>
-      <input type="text" id="setting-api-url" placeholder="https://xxx.supabase.co/functions/v1/brain-api">
+      <input type="text" id="setting-api-url" placeholder="https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-rest">
       <label for="setting-api-key">API Key</label>
       <input type="password" id="setting-api-key" placeholder="Your API key">
       <div class="settings-actions">
@@ -706,6 +707,7 @@
     </div>
   </div>
 
+  <script src="api.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

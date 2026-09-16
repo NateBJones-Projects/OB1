@@ -1,6 +1,6 @@
 {
-  "name": "Chrome Extension — Browser Capture & Search",
-  "description": "Save thoughts from any webpage and search your entire Open Brain directly from your browser. Includes right-click context menu, omnibox search, auto-capture of selected text, source tracking, and keyboard shortcuts.",
+  "name": "Chrome Extension: Browser Capture & Search",
+  "description": "Save thoughts from any webpage and search your entire Open Brain directly from your browser via the open-brain-rest gateway. Includes right-click context menu, omnibox search, auto-capture of selected text, source tracking, related thoughts, and keyboard shortcuts.",
   "category": "integrations",
   "author": {
     "name": "Karin Gutenbrunner",
@@ -9,12 +9,12 @@
   "version": "1.0.0",
   "requires": {
     "open_brain": true,
-    "services": ["OpenRouter API"],
-    "tools": ["Chrome or Chromium-based browser"]
+    "services": ["OpenRouter API", "REST API gateway (integrations/open-brain-rest)"],
+    "tools": ["Chrome or Chromium-based browser", "Supabase CLI"]
   },
   "tags": ["chrome", "browser", "extension", "capture", "search", "semantic-search"],
-  "difficulty": "beginner",
-  "estimated_time": "15 minutes",
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
   "created": "2026-03-15",
-  "updated": "2026-03-15"
+  "updated": "2026-09-16"
 }

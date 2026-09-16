@@ -47,28 +47,6 @@ function clearStatus(el, delay = 3000) {
   }, delay);
 }
 
-async function apiCall(payload) {
-  if (!apiUrl || !apiKey) {
-    throw new Error("API not configured. Please check settings.");
-  }
-
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-brain-key": apiKey,
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`API error (${response.status}): ${text}`);
-  }
-
-  return response.json();
-}
-
 function formatDate(dateStr) {
   if (!dateStr) return "";
   try {
@@ -111,24 +89,12 @@ function linkifyUrls(escapedHtml) {
 }
 
 function getSourceBadgeClass(source) {
-  if (!source) return "source-unknown";
-  const s = source.toLowerCase();
-  if (s.includes("browser") || s.includes("chrome") || s.includes("extension")) return "source-browser";
-  if (s.includes("telegram")) return "source-telegram";
-  if (s.includes("slack")) return "source-slack";
-  if (s.includes("claude") || s.includes("mcp")) return "source-mcp";
+  const label = sourceLabel(source);
+  if (label === "browser") return "source-browser";
+  if (label === "telegram") return "source-telegram";
+  if (label === "slack") return "source-slack";
+  if (label === "claude" || label === "mcp") return "source-mcp";
   return "source-unknown";
-}
-
-function getSourceLabel(source) {
-  if (!source) return "";
-  const s = source.toLowerCase();
-  if (s.includes("browser") || s.includes("chrome") || s.includes("extension")) return "browser";
-  if (s.includes("telegram")) return "telegram";
-  if (s.includes("slack")) return "slack";
-  if (s.includes("claude")) return "claude";
-  if (s.includes("mcp")) return "mcp";
-  return source;
 }
 
 // --- Page Context ---
@@ -223,7 +189,7 @@ function toggleSettings(forceOpen) {
 settingsToggle.addEventListener("click", () => toggleSettings());
 
 settingsSaveBtn.addEventListener("click", async () => {
-  const newUrl = settingApiUrl.value.trim();
+  const newUrl = normalizeApiUrl(settingApiUrl.value);
   const newKey = settingApiKey.value.trim();
 
   if (!newUrl || !newKey) {
@@ -252,9 +218,7 @@ settingsSaveBtn.addEventListener("click", async () => {
 
 async function loadSettings() {
   try {
-    const data = await chrome.storage.sync.get(["apiUrl", "apiKey"]);
-    apiUrl = data.apiUrl || "";
-    apiKey = data.apiKey || "";
+    ({ apiUrl, apiKey } = await getApiConfig());
 
     settingApiUrl.value = apiUrl;
     settingApiKey.value = apiKey;
@@ -294,14 +258,9 @@ saveBtn.addEventListener("click", async () => {
   relatedThoughts.classList.remove("visible");
 
   try {
-    await apiCall({
-      action: "save",
-      content: content,
-      metadata: {
-        source: "browser",
-        url: currentPageUrl || undefined,
-        title: currentPageTitle || undefined,
-      },
+    await captureThought(content, {
+      url: currentPageUrl,
+      title: currentPageTitle,
     });
 
     // Save confirmation animation
@@ -339,18 +298,15 @@ saveInput.addEventListener("keydown", (e) => {
 
 async function fetchRelatedThoughts(query) {
   try {
-    const data = await apiCall({ action: "search", query: query });
-    const results = data.results || data.thoughts || [];
-
     // Show max 3 related thoughts
-    const topResults = results.slice(0, 3);
+    const topResults = await searchThoughts(query, { limit: 3 });
     if (topResults.length === 0) return;
 
     let html = '<div class="related-label">Related thoughts</div>';
     topResults.forEach((item) => {
-      const text = item.content || item.thought || item.text || "";
-      const score = item.similarity != null ? item.similarity : item.score;
-      const date = item.created_at || item.date || "";
+      const text = item.content || "";
+      const score = item.similarity;
+      const date = item.created_at || "";
 
       html += '<div class="related-item">';
       html += `<div class="related-text">${escapeHtml(truncateText(text, 120))}</div>`;
@@ -403,15 +359,7 @@ async function performSearch() {
     '<div class="no-results status-loading">Searching...</div>';
 
   try {
-    // Build search payload with optional source filter
-    const payload = { action: "search", query: query };
-    const selectedSource = sourceFilter.value;
-    if (selectedSource) {
-      payload.source = selectedSource;
-    }
-
-    const data = await apiCall(payload);
-    const results = data.results || data.thoughts || [];
+    const results = await searchThoughts(query, { source: sourceFilter.value });
 
     if (results.length === 0) {
       searchResults.innerHTML =
@@ -421,15 +369,15 @@ async function performSearch() {
 
     searchResults.innerHTML = results
       .map((item) => {
-        const text = item.content || item.thought || item.text || "";
-        const score = item.similarity != null ? item.similarity : item.score;
-        const date = item.created_at || item.date || "";
-        const source = item.source || item.metadata?.source || "";
+        const text = item.content || "";
+        const score = item.similarity;
+        const date = item.created_at || "";
+        const source = sourceOf(item);
 
         const sourceUrl = extractSourceUrl(text);
         const itemId = item.id || "";
-        const isTask = item.metadata?.type === "task";
-        const taskStatus = item.metadata?.status || "open";
+        const isTask = (item.type || item.metadata?.type) === "task";
+        const taskStatus = item.status || "new";
 
         let html = `<div class="result-item" data-id="${escapeHtml(itemId)}">`;
         // Delete button (X)
@@ -443,7 +391,7 @@ async function performSearch() {
         html += '<div class="result-meta">';
         if (source) {
           const badgeClass = getSourceBadgeClass(source);
-          const label = getSourceLabel(source);
+          const label = sourceLabel(source);
           html += `<span class="source-badge ${badgeClass}">${escapeHtml(label)}</span>`;
         }
         if (sourceUrl) {
@@ -506,7 +454,7 @@ function attachResultHandlers() {
       if (!id) return;
 
       try {
-        await apiCall({ action: "update_status", id, status: "done" });
+        await updateThoughtStatus(id, "done");
         btn.textContent = "Done!";
         btn.style.opacity = "1";
         btn.style.borderColor = "#4caf50";
@@ -521,6 +469,8 @@ function attachResultHandlers() {
         }, 800);
       } catch (err) {
         console.error("Status update failed:", err);
+        btn.textContent = "Failed";
+        btn.title = err.message;
       }
     });
   });
@@ -564,17 +514,13 @@ function showDeleteConfirm(resultItem) {
   // "Yes" -- delete
   confirm.querySelector(".confirm-yes").addEventListener("click", async () => {
     try {
-      if (thoughtId) {
-        await apiCall({ action: "delete", id: thoughtId });
-      } else {
-        // Fallback: use content if no id available
-        const textEl = resultItem.querySelector(".result-text");
-        const content = textEl ? (textEl.getAttribute("data-full-text") || textEl.textContent) : "";
-        await apiCall({ action: "delete", content: content });
-      }
+      if (!thoughtId) throw new Error("This result has no id.");
+      await deleteThought(thoughtId);
     } catch (err) {
       console.error("Delete failed:", err);
-      // Still remove from UI even if API call fails (API may not support delete yet)
+      // Keep the result visible so a failed delete is not mistaken for success
+      confirm.querySelector("span").textContent = "Delete failed: " + err.message;
+      return;
     }
 
     // Fade out and remove
@@ -594,10 +540,10 @@ function showDeleteConfirm(resultItem) {
 
 async function loadStats() {
   try {
-    const data = await apiCall({ action: "stats" });
-    statTotal.textContent = data.total ?? data.total_thoughts ?? "--";
-    statToday.textContent = data.today ?? data.thoughts_today ?? "--";
-    statWeek.textContent = data.this_week ?? data.thoughts_this_week ?? "--";
+    const stats = await getStats();
+    statTotal.textContent = stats.total;
+    statToday.textContent = stats.lastDay;
+    statWeek.textContent = stats.lastWeek;
   } catch {
     statTotal.textContent = "--";
     statToday.textContent = "--";

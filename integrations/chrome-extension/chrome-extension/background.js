@@ -1,3 +1,5 @@
+importScripts("api.js");
+
 // --- Context Menu Setup ---
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -48,10 +50,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   const content = `${selectedText}\n\n(Source: ${pageTitle} \u2014 ${pageUrl})`;
 
   try {
-    const { apiUrl, apiKey } = await chrome.storage.sync.get([
-      "apiUrl",
-      "apiKey",
-    ]);
+    const { apiUrl, apiKey } = await getApiConfig();
 
     if (!apiUrl || !apiKey) {
       showNotification(
@@ -62,27 +61,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       return;
     }
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-brain-key": apiKey,
-      },
-      body: JSON.stringify({
-        action: "save",
-        content: content,
-        metadata: {
-          source: "browser",
-          url: pageUrl,
-          title: pageTitle,
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`API error (${response.status}): ${text}`);
-    }
+    await captureThought(content, { url: tab?.url, title: tab?.title });
 
     showNotification(
       "Thought saved",
@@ -115,31 +94,16 @@ chrome.omnibox.onInputChanged.addListener(async (text, suggest) => {
   }
 
   try {
-    const { apiUrl, apiKey } = await chrome.storage.sync.get(["apiUrl", "apiKey"]);
+    const { apiUrl, apiKey } = await getApiConfig();
     if (!apiUrl || !apiKey) {
       suggest([]);
       return;
     }
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-brain-key": apiKey,
-      },
-      body: JSON.stringify({ action: "search", query: query }),
-    });
+    const results = await searchThoughts(query, { limit: 5 });
 
-    if (!response.ok) {
-      suggest([]);
-      return;
-    }
-
-    const data = await response.json();
-    const results = data.results || data.thoughts || [];
-
-    const suggestions = results.slice(0, 5).map((item) => {
-      const content = item.content || item.thought || item.text || "";
+    const suggestions = results.map((item) => {
+      const content = item.content || "";
       // Omnibox description supports XML: escape special chars
       const desc = escapeXml(truncate(content, 200));
       // content field is used when suggestion is selected
