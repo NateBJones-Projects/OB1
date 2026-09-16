@@ -1,0 +1,60 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are triaging a new issue for Open Brain (OB1). Read CLAUDE.md
+            and CONTRIBUTING.md first.
+
+            Your job is simple:
+
+            1. Classify the issue into exactly one type:
+               - bug
+               - recipe idea
+               - schema idea
+               - extension proposal
+               - primitive proposal
+               - dashboard idea
+               - integration idea
+               - skill idea
+               - documentation improvement
+               - question
+
+            2. Check if it is probably a duplicate of:
+               - an existing open issue
+               - or an existing contribution already in the repo
+
+            3. Decide whether it fits OB1.
+               OB1 issues should relate to capturing, storing, retrieving, or
+               processing thoughts in the Open Brain system.
+
+            4. Pick a short label set from existing repo labels only.
+
+            5. Post one helpful comment that:
+               - acknowledges the issue
+               - says what category it appears to be
+               - points to the right template or docs when useful
+               - links a duplicate if you find one
+               - politely says when something seems out of scope
+
+            Keep the output practical and brief.
+            Do not over-explain.
+            Do not invent labels that do not exist.
+            If unsure, prefer fewer labels and a cautious comment.
+          claude_args: |
+            --model haiku

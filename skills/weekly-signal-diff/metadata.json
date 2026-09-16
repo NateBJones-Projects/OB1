@@ -1,0 +1,27 @@
+{
+  "name": "Weekly Signal Diff",
+  "description": "Standalone skill pack for turning a week's worth of market or AI news into a personalized structural diff using Open Brain memory, a suggested starter universe, and optional live web search.",
+  "category": "skills",
+  "author": {
+    "name": "Jonathan Edwards",
+    "github": "justfinethanku"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Optional: OpenRouter (Perplexity Sonar family) for live search"],
+    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+  },
+  "tags": [
+    "weekly-review",
+    "signal-diff",
+    "market-intelligence",
+    "news",
+    "openrouter",
+    "research"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-13",
+  "updated": "2026-04-13"
+}

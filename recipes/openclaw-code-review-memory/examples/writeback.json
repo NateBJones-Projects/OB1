@@ -1,0 +1,70 @@
+{
+  "schema_version": "openbrain.openclaw.writeback.v1",
+  "workspace_id": "workspace_123",
+  "project_id": "project_ob1",
+  "task_id": "pr_review_123",
+  "flow_id": null,
+  "idempotency_key": "workspace_123:openclaw:pr_review_123:summary:7ad12c",
+  "content_hash": "7ad12c929a2c4d1b92e36df15bf8a813",
+  "channel": {
+    "kind": "github",
+    "id": "NateBJones-Projects/OB1",
+    "thread_id": "pull/123"
+  },
+  "runtime": {
+    "name": "openclaw",
+    "version": "2026.3.24-beta.2"
+  },
+  "models_used": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "role": "review"
+    }
+  ],
+  "source_refs": [
+    {
+      "kind": "pull_request",
+      "uri": "https://github.com/NateBJones-Projects/OB1/pull/123",
+      "title": "Agent Memory launch",
+      "timestamp": "2026-05-03T18:00:00Z"
+    }
+  ],
+  "memory_payload": {
+    "decisions": [],
+    "outputs": ["The review confirmed that Agent Memory schema should stay sidecar-based over thoughts."],
+    "lessons": ["For OB1 migrations, add service-role-only RLS policies when exposing runtime write APIs."],
+    "constraints": ["Do not promote generated review lessons to instruction without maintainer confirmation."],
+    "unresolved_questions": [],
+    "next_steps": ["Add a contract test fixture before marking the workflow stable."],
+    "failures": ["A raw PR diff should not be stored in Agent Memory; store a PR link instead."],
+    "artifacts": [
+      {
+        "kind": "pull_request",
+        "uri": "https://github.com/NateBJones-Projects/OB1/pull/123",
+        "description": "Review source artifact."
+      }
+    ],
+    "entities": {
+      "people": ["Jonathan Edwards"],
+      "repos": ["NateBJones-Projects/OB1"],
+      "files": ["schemas/agent-memory/schema.sql"],
+      "customers": [],
+      "topics": ["code review", "rls", "agent memory"]
+    }
+  },
+  "provenance": {
+    "default_status": "generated",
+    "confidence": 0.78,
+    "requires_review": true
+  },
+  "retention": {
+    "ttl_days": null,
+    "stale_after_days": 365
+  },
+  "visibility": {
+    "workspace": "restricted",
+    "project": "shared",
+    "channel": "restricted"
+  }
+}

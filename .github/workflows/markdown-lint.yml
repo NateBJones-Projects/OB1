@@ -2,10 +2,8 @@ name: Markdown Lint
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
-    paths:
-      - '**/*.md'
 
 permissions:
   contents: read
@@ -14,16 +12,20 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      # Required checks must run for every PR, including code-only changes.
+      - name: Checkout PR merge commit
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install markdownlint-cli2
-        run: npm install -g markdownlint-cli2
+        run: npm install --global markdownlint-cli2
 
       - name: Run markdownlint
         run: markdownlint-cli2 --config .github/.markdownlint.jsonc "**/*.md" "#node_modules"

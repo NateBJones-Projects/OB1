@@ -1,0 +1,11 @@
+{
+  "generated_at": "2026-05-04T04:45:10Z",
+  "models": {
+    "gpt-image-2": {
+      "duration_ms": 176554.13,
+      "image_path": "/Users/jonathanedwards/AUTOMATION/NATE/OB1/docs/assets/agent-memory/promotional/generated-backgrounds/loop-card/openai-gpt-image-2/image.png",
+      "status": "ok"
+    }
+  },
+  "prompt": "Editorial explainer background for a governed agent memory loop. Four abstract stations connected by thin lines, dark graphite board, olive and cream highlights, subtle source/provenance cues as abstract labels, no readable text, no logos, clean technical diagram atmosphere."
+}

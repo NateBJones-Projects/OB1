@@ -1,0 +1,20 @@
+{
+  "name": "Hermes Agent Memory (OB1)",
+  "description": "Native Hermes MemoryProvider for the OB1 governed memory system. Auto-recall before each LLM turn, auto-writeback after, with full governance — review queue, use_policy, recall traces, instruction-vs-evidence labeling. Parity with the OpenClaw OB1 plugin so Hermes agents and OpenClaw agents share one governed memory.",
+  "category": "integrations",
+  "author": {
+    "name": "Mike Scalise",
+    "github": "scalisemichael"
+  },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Hermes Agent 0.13.0+", "OB1 Agent Memory API"],
+    "tools": ["Python 3.11+"]
+  },
+  "tags": ["hermes", "agent-memory", "memory-provider", "plugin", "governance"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-05-09",
+  "updated": "2026-05-09"
+}

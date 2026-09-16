@@ -1,5 +1,5 @@
 name: Recipe / Contribution Idea
-description: Propose a new recipe, schema, dashboard, or integration
+description: Propose a new recipe, schema, dashboard, integration, or skill
 labels: ["contribution-idea"]
 body:
   - type: markdown
@@ -17,6 +17,7 @@ body:
         - Schema (database extension)
         - Dashboard (frontend template)
         - Integration (MCP extension, webhook, capture source)
+        - Skill (reusable AI client skill or prompt pack)
         - Primitive (reusable concept guide)
         - Extension (curated learning path build)
         - Not sure

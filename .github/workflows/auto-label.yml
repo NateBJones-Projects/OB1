@@ -1,7 +1,7 @@
 name: Auto-Label PRs
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize]
     branches: [main]
 
@@ -13,11 +13,6 @@ jobs:
   label:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Detect contribution types and apply labels
         uses: actions/github-script@v7
         with:
@@ -35,6 +30,7 @@ jobs:
               'schemas/': 'schema',
               'dashboards/': 'dashboard',
               'integrations/': 'integration',
+              'skills/': 'skill',
               'primitives/': 'primitive',
               'extensions/': 'extension',
             };

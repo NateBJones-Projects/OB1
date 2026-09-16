@@ -1,0 +1,53 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+template: |
+  ## What's New
+
+  $CHANGES
+
+  ## Contributors
+
+  $CONTRIBUTORS
+
+categories:
+  - title: 'Recipes'
+    labels:
+      - 'recipe'
+  - title: 'Extensions'
+    labels:
+      - 'extension'
+  - title: 'Primitives'
+    labels:
+      - 'primitive'
+  - title: 'Schemas'
+    labels:
+      - 'schema'
+  - title: 'Dashboards'
+    labels:
+      - 'dashboard'
+  - title: 'Integrations'
+    labels:
+      - 'integration'
+  - title: 'Documentation'
+    labels:
+      - 'documentation'
+  - title: 'Infrastructure'
+    labels:
+      - 'infrastructure'
+      - 'ci'
+
+change-template: '- $TITLE @$AUTHOR (#$NUMBER)'
+change-title-escapes: '\<*_&'
+version-resolver:
+  minor:
+    labels:
+      - 'extension'
+      - 'recipe'
+      - 'schema'
+      - 'integration'
+  patch:
+    labels:
+      - 'documentation'
+      - 'infrastructure'
+      - 'bug'
+  default: patch

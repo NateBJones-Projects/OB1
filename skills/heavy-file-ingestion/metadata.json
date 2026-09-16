@@ -1,0 +1,20 @@
+{
+  "name": "Heavy File Ingestion",
+  "description": "Converts heavyweight files such as PDFs, slide decks, spreadsheets, and documents into markdown, CSV, and lightweight indexes before an agent spends model tokens on them.",
+  "category": "skills",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Python 3.10+", "uv or pip", "AI client with reusable skills/prompts"]
+  },
+  "tags": ["skill", "file-conversion", "markdown", "pdf", "spreadsheet", "token-efficiency"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}

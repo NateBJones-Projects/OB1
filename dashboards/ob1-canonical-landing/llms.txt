@@ -1,0 +1,36 @@
+# Open Brain
+
+> The infrastructure layer for persistent AI memory.
+
+Every AI you use has a different memory of you. Open Brain fixes that: one Supabase
+database with pgvector, one MCP server deployed as an Edge Function, shared persistent
+context across Claude, ChatGPT, Cursor, and any AI client that speaks MCP.
+
+## Concepts
+
+- Open Brain: An open protocol and database architecture giving any AI tool persistent memory of its user
+- MCP (Model Context Protocol): The open protocol connecting AI clients to the Open Brain database
+- thoughts table: The core Supabase table storing all captured memories, with vector embeddings for semantic search
+- Edge Function: Supabase serverless function hosting the MCP server — remote, no local Node.js required
+- Extensions: Guided capability builds (6 in the learning path) that compound on top of the core setup
+- Recipes: Community-contributed standalone builds — data importers, workflows, and tools
+
+## Key files
+
+- [Setup Guide](https://github.com/NateBJones-Projects/OB1/blob/main/docs/01-getting-started.md): Step-by-step build instructions (~45 min, no coding experience required)
+- [README](https://github.com/NateBJones-Projects/OB1/blob/main/README.md): Project overview, extensions, and community contributions
+- [CONTRIBUTING](https://github.com/NateBJones-Projects/OB1/blob/main/CONTRIBUTING.md): How to contribute recipes, skills, dashboards, integrations
+- [Landing page](https://openbrain.fyi/): Canonical homepage
+
+## Links
+
+- GitHub: https://github.com/NateBJones-Projects/OB1
+- Homepage: https://openbrain.fyi/
+- Discord: https://discord.gg/Cgh9WJEkeG
+- Substack: https://natesnewsletter.substack.com/
+
+## Related
+
+- [Model Context Protocol](https://modelcontextprotocol.io/): The open protocol Open Brain uses for AI client connections
+- [Supabase](https://supabase.com): The database platform hosting the Open Brain backend
+- [pgvector](https://github.com/pgvector/pgvector): The PostgreSQL extension enabling vector search in Open Brain

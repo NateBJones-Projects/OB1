@@ -1,0 +1,7 @@
+{
+  "model": "gpt-image-2",
+  "output_format": "png",
+  "prompt": "Square promotional background for an open-source agent memory tool. Dark textured surface, minimal technical diagram feel, soft olive-green glow, precise grid alignment, faint cards and provenance tags as abstract shapes, no readable text, no people, clean and trustworthy.",
+  "quality": "high",
+  "size": "1024x1024"
+}

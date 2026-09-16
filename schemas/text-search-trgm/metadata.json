@@ -1,0 +1,20 @@
+{
+  "name": "Text Search Trigram Index",
+  "description": "pg_trgm GIN index on public.thoughts.content to accelerate search_thoughts_text ILIKE fallback by ~50x on rare-word queries.",
+  "category": "schemas",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "tags": ["performance", "search", "pg_trgm", "indexing"],
+  "difficulty": "beginner",
+  "estimated_time": "5 minutes",
+  "created": "2026-04-18",
+  "updated": "2026-04-18"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "ob1-recipe-journals-blogger-import",
+  "version": "1.0.0",
+  "description": "Import Google Blogger Atom XML blog exports into Open Brain as journal thoughts",
+  "type": "module",
+  "main": "import-blogger.mjs",
+  "scripts": {
+    "import": "node import-blogger.mjs",
+    "dry-run": "node import-blogger.mjs --dry-run"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "dotenv": "^16.4.0"
+  }
+}

@@ -1,0 +1,29 @@
+flowchart LR
+  subgraph Channels["Channels"]
+    Slack["Slack"]
+    Teams["Teams"]
+    GitHub["GitHub"]
+    LocalCLI["Local CLI"]
+  end
+
+  subgraph Runtimes["Agent runtimes"]
+    OpenClaw["OpenClaw"]
+    Codex["Codex"]
+    ClaudeCode["Claude Code"]
+    InternalAgents["Internal agents"]
+  end
+
+  subgraph Models["Swappable model layer"]
+    OpenAI["OpenAI"]
+    Anthropic["Anthropic"]
+    Gemini["Gemini"]
+    LocalModels["Local models"]
+  end
+
+  Channels --> Runtimes
+  Runtimes --> Models
+  Runtimes --> OB1["OB1 Agent Memory"]
+  OB1 --> Recall["Governed recall"]
+  OB1 --> WriteBack["Structured write-back"]
+  OB1 --> Trust["Provenance, scope, review"]
+  OB1 --> Reuse["Portable operational knowledge"]

@@ -1,0 +1,75 @@
+{
+  "schema_version": "openbrain.openclaw.writeback.v1",
+  "workspace_id": "workspace_123",
+  "project_id": "project_ob1",
+  "task_id": "taskflow_step_002",
+  "flow_id": "taskflow_agent_memory_launch",
+  "idempotency_key": "workspace_123:openclaw:taskflow_step_002:worklog:0319cc",
+  "content_hash": "0319cc692a6406de11ad1ceac9828f9a",
+  "channel": {
+    "kind": "openclaw",
+    "id": "flow_agent_memory_launch",
+    "thread_id": "step_002"
+  },
+  "runtime": {
+    "name": "openclaw",
+    "version": "2026.3.24-beta.2"
+  },
+  "models_used": [
+    {
+      "provider": "gemini",
+      "model": "gemma-class-local",
+      "role": "triage"
+    },
+    {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "role": "implementation"
+    }
+  ],
+  "source_refs": [
+    {
+      "kind": "taskflow_step",
+      "uri": "openclaw://flows/taskflow_agent_memory_launch/steps/002",
+      "title": "Agent Memory launch step 002",
+      "timestamp": "2026-05-03T18:30:00Z"
+    }
+  ],
+  "memory_payload": {
+    "decisions": ["The launch package keeps the core API runtime-neutral and uses OpenClaw only as the first runtime adapter."],
+    "outputs": ["Added schema, API, plugin, skill, recipes, contracts, and visual docs scaffolding."],
+    "lessons": ["TaskFlow handoffs should store the next useful action and blockers, not the full task transcript."],
+    "constraints": ["Update Linear at meaningful implementation checkpoints."],
+    "unresolved_questions": ["Confirm whether SQLite adapter moves into v1 after Nate reviews the launch scope."],
+    "next_steps": ["Run schema and TypeScript validation, then capture verification results in Linear."],
+    "failures": [],
+    "artifacts": [
+      {
+        "kind": "linear_issue",
+        "uri": "https://linear.app/nate-jones/issue/NAT-833/ob1-agent-memory-runtime-neutral-memory-layer-openclaw-plugin-launch",
+        "description": "Parent implementation log."
+      }
+    ],
+    "entities": {
+      "people": ["Nate Jones", "Jonathan Edwards"],
+      "repos": ["NateBJones-Projects/OB1"],
+      "files": ["AGENTS.md"],
+      "customers": [],
+      "topics": ["taskflow", "linear", "agent memory"]
+    }
+  },
+  "provenance": {
+    "default_status": "generated",
+    "confidence": 0.86,
+    "requires_review": true
+  },
+  "retention": {
+    "ttl_days": null,
+    "stale_after_days": 90
+  },
+  "visibility": {
+    "workspace": "restricted",
+    "project": "shared",
+    "channel": "restricted"
+  }
+}

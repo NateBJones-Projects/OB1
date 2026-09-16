@@ -1,0 +1,277 @@
+# Open Brain Dashboard (Next.js)
+
+<div align="center">
+
+![Community Contribution](https://img.shields.io/badge/OB1_COMMUNITY-Approved_Contribution-2ea44f?style=for-the-badge&logo=github)
+
+**Created by [@alanshurafa](https://github.com/alanshurafa)**
+
+*Reviewed and merged by the Open Brain maintainer team — thank you for building the future of AI memory!*
+
+</div>
+
+A full-featured web dashboard for your Open Brain second brain. Browse, search, capture, and manage thoughts through a modern dark-themed UI. Built with Next.js, React, TypeScript, and Tailwind CSS. Deploy to Vercel or any Node.js host.
+
+## What It Does
+
+Provides 9 pages for managing your thoughts:
+
+| Page | Description |
+|------|-------------|
+| **Dashboard** | Stats overview (total thoughts, type distribution, top topics), recent activity, quick capture, workflow summary widget |
+| **Workflow** | Kanban board for tasks and ideas with drag-and-drop status management (New → Planning → Active → Review → Done → Archived) |
+| **Browse** | Paginated thought table with filters for type, source, and importance |
+| **Detail** | Full thought view with inline editing, delete, linked reflections, and related connections |
+| **Search** | Semantic (vector similarity) and full-text search with match scores and pagination |
+| **Add to Brain** | Smart ingest with auto-routing — short text goes to single capture, long text to extraction with dry-run preview |
+| **Audit** | Quality review for low-score thoughts with bulk delete |
+| **Duplicates** | Semantic similarity detection with keep/delete/keep-both resolution |
+| **Agent Memory** | Review queue, memory inspector, and recall trace debugging for OB1 Agent Memory |
+| **Login** | API key authentication via encrypted session cookie |
+
+## Prerequisites
+
+- A working Open Brain setup with the **REST API gateway** (`open-brain-rest`) deployed from [integrations/open-brain-rest](../../integrations/open-brain-rest/)
+- **Node.js 18+** installed
+- A **Vercel account** (free tier works) or any Node.js hosting
+
+### Credential Tracker
+
+| Credential | Where to get it | Where it goes |
+|------------|----------------|---------------|
+| `NEXT_PUBLIC_API_URL` | Your Supabase project URL + `/functions/v1/open-brain-rest` | `.env` or hosting env vars |
+| `AGENT_MEMORY_API_URL` | Optional. Your Supabase project URL + `/functions/v1/agent-memory-api` | `.env` or hosting env vars |
+| `AGENT_MEMORY_WORKSPACE_ID` | Optional. Default workspace for Agent Memory governance views | `.env` or hosting env vars |
+| `AGENT_MEMORY_PROJECT_ID` | Optional. Default project filter for Agent Memory governance views | `.env` or hosting env vars |
+| `SESSION_SECRET` | Generate: `openssl rand -hex 32` | `.env` or hosting env vars |
+| `AUTH_COOKIE_SECURE` | Optional. Force HTTPS-only auth cookies when set to `true`; leave unset for localhost previews | `.env` or hosting env vars |
+| `OB1_DEMO_AUTH_BYPASS` | Optional. Local walkthrough capture only; bypasses login when set to `true` | local shell only |
+| `OB1_DASHBOARD_DEMO_KEY` | Optional. Local walkthrough capture key used by the demo REST shim | local shell only |
+| `RESTRICTED_PASSPHRASE_HASH` | Optional. Generate: `echo -n "passphrase" \| shasum -a 256` | `.env` or hosting env vars |
+
+## Steps
+
+### Step 1: Clone the dashboard
+
+```bash
+# From the OB1 repo
+cd dashboards/open-brain-dashboard
+```
+
+Or copy the folder to your own project directory.
+
+### Step 2: Install dependencies
+
+```bash
+npm install
+```
+
+### Step 3: Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and set your values:
+
+```
+NEXT_PUBLIC_API_URL=https://YOUR-PROJECT-REF.supabase.co/functions/v1/open-brain-rest
+# Optional if your Agent Memory function follows the standard slug:
+# AGENT_MEMORY_API_URL=https://YOUR-PROJECT-REF.supabase.co/functions/v1/agent-memory-api
+# AGENT_MEMORY_WORKSPACE_ID=ob1-staging
+SESSION_SECRET=your-32-char-secret-here
+# Optional on HTTPS hosts:
+# AUTH_COOKIE_SECURE=true
+```
+
+### Step 4: Run locally
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). You should see the login page.
+
+Enter your Open Brain API key (the `MCP_ACCESS_KEY` from your Supabase Edge Function secrets). After login, the dashboard loads with your stats and recent thoughts.
+
+### Step 5: Deploy to Vercel (optional)
+
+```bash
+npx vercel --prod
+```
+
+Or connect the folder to Vercel via the dashboard. Set the environment variables (`NEXT_PUBLIC_API_URL`, `SESSION_SECRET`) in your Vercel project settings.
+
+> [!TIP]
+> The free Vercel tier is sufficient. The dashboard makes server-side API calls to your Open Brain REST endpoint — there's no heavy compute.
+
+### Step 5 (alternative): Deploy to Cloudflare Workers (optional)
+
+If you're already on Cloudflare for the [`open-brain-rest`](../../integrations/cloudflare-rest-worker/) gateway, you can host the dashboard on the same platform via the [`@opennextjs/cloudflare`](https://opennext.js.org/cloudflare) adapter. The older `@cloudflare/next-on-pages` adapter caps at Next 15.5.x and doesn't support this dashboard's Next 16.
+
+The repo ships the two config files this needs out of the box (`open-next.config.ts` and `wrangler.jsonc`); rename the Worker in `wrangler.jsonc` if you want something other than `ob-dashboard`.
+
+```bash
+# 1. Make sure .env has NEXT_PUBLIC_API_URL set — it's read at *build*
+#    time and baked into the client bundle.
+npx opennextjs-cloudflare build
+
+# 2. First-time deploy creates the Worker.
+npx opennextjs-cloudflare deploy
+
+# 3. Set SESSION_SECRET as a *runtime* secret on the deployed Worker.
+#    (NEXT_PUBLIC_API_URL is build-time only, so no Worker secret for it.)
+wrangler secret put SESSION_SECRET --name ob-dashboard
+```
+
+The dashboard ends up at `https://ob-dashboard.<your-cf-subdomain>.workers.dev`.
+
+> [!TIP]
+> `NEXT_PUBLIC_API_URL` is build-time, `SESSION_SECRET` is runtime. If you change the API URL later you have to rebuild and redeploy; rotating the session secret only needs `wrangler secret put`.
+
+## Expected Outcome
+
+When working correctly:
+
+- **Login page** accepts your Open Brain API key and redirects to the dashboard
+- **Dashboard** shows thought count, type distribution chart, top topics, and recent thoughts
+- **Browse** displays a paginated table of all thoughts with working type/source/importance filters
+- **Search** returns results with similarity scores (semantic mode) or rank scores (full-text mode)
+- **Add to Brain** auto-routes short text (< 500 chars, single paragraph) to single capture, and long/structured text to extraction with dry-run preview
+- **Detail page** shows full thought content with metadata, inline edit for content/type/importance, and linked reflections
+- **Agent Memory** shows pending agent-written memories, lets you confirm/evidence-only/reject them, inspects provenance/source data, and loads recall traces by request id
+
+## Workflow Board
+
+The Workflow page adds a visual kanban board for managing `task` and `idea` thoughts through status stages.
+
+### Features
+
+- **Drag-and-drop** between status columns using @dnd-kit (touch-friendly with 200ms hold delay)
+- **Collapsible columns** — click the arrow to collapse any column to a slim vertical bar (persisted in localStorage)
+- **Auto-adjusting widths** — expanded columns share available space equally, no horizontal scrollbar
+- **Inline editing** — tap a card to open the edit modal (status, priority, type, content)
+- **Priority dots** — click to change priority (Critical/High/Medium/Low mapped from importance 0-100)
+- **Dashboard widget** — summary of active workflow items on the main dashboard
+- **Mobile-first** — responsive layout, pinch-to-zoom enabled, full-screen edit modal on small screens
+
+### Status Flow
+
+```
+New → Planning → Active → Review → Done → (Archived)
+```
+
+Cards auto-archive from Done after 30 days. Archived cards are hidden by default (toggle with "Show archived").
+
+### Database Requirements
+
+The Workflow board requires two additional columns on the `thoughts` table. See the [workflow-status schema](../../schemas/workflow-status/) for the migration SQL.
+
+### MCP Integration
+
+The `progress_task` tool in the Open Brain MCP server allows AI assistants to update task status and priority conversationally:
+
+```
+"Move the API redesign task to active"
+"Set priority on thought 42 to high"
+```
+
+When a new task or idea is captured, the MCP server auto-assigns `status: "new"`.
+
+## REST API Endpoints Required
+
+The dashboard calls these endpoints on your Open Brain REST API:
+
+| Endpoint | Method | Used By |
+|----------|--------|---------|
+| `/health` | GET | Login validation |
+| `/thoughts` | GET | Browse page (paginated, filtered) |
+| `/thought/:id` | GET | Detail page |
+| `/thought/:id` | PUT | Inline edit (content, type, importance) |
+| `/thought/:id` | DELETE | Delete button |
+| `/search` | POST | Search page (semantic + full-text) |
+| `/stats` | GET | Dashboard stats widget |
+| `/capture` | POST | Quick capture (single thought) |
+| `/thought/:id/reflection` | GET | Detail page (linked reflections) |
+| `/ingest` | POST | Smart ingest (extraction) |
+| `/ingestion-jobs` | GET | Ingest page (job history) |
+| `/duplicates` | GET | Duplicates page |
+| `/thoughts?type=task` | GET | Workflow board (filtered by type) |
+| `/thought/:id` | PUT | Workflow board (status/priority updates) |
+
+Agent Memory pages also call these endpoints on `agent-memory-api`:
+
+| Endpoint | Method | Used By |
+|----------|--------|---------|
+| `/memories` | GET | Agent Memory list by status/scope |
+| `/memories/review` | GET | Pending review queue |
+| `/memories/:id` | GET | Memory inspector |
+| `/memories/:id/review` | PATCH | Confirm, evidence-only, reject, stale, or restrict memory |
+| `/recall-traces/:request_id` | GET | Recall trace debugger |
+
+> [!NOTE]
+> If your Open Brain instance doesn't have all these endpoints (e.g., no smart-ingest or duplicates), those pages will show errors but the core pages (dashboard, browse, search, detail) will still work.
+
+<!-- -->
+
+> [!IMPORTANT]
+> OB1's real `thoughts.id` values are UUID strings. The dashboard treats thought IDs as strings end to end so detail links, workflow updates, audit deletes, and duplicate resolution work against production Supabase rows.
+
+## Optional: Restricted Content
+
+If you've applied the [sensitivity-tiers](https://github.com/NateBJones-Projects/OB1/pull/110) primitive and want to control access to sensitive thoughts:
+
+1. Set `RESTRICTED_PASSPHRASE_HASH` in your environment
+2. A lock/unlock toggle appears in the sidebar
+3. When locked (default), restricted thoughts are filtered from all views
+4. Enter your passphrase to temporarily unlock restricted content for the session
+
+If `RESTRICTED_PASSPHRASE_HASH` is not set, the toggle is hidden — no action needed.
+
+## Authentication
+
+The dashboard uses **iron-session** for encrypted HTTP-only session cookies:
+
+1. User enters their Open Brain API key once at login
+2. Key is validated against the `/health` endpoint
+3. Key is stored in an encrypted session cookie (not in client-side JS or localStorage)
+4. All server-side API calls use the key from the session
+5. Sessions expire after 24 hours
+
+No API key is stored in environment variables or exposed to the browser.
+
+## Local Walkthrough Capture
+
+The walkthrough asset pipeline lives in [docs/walkthroughs/ob1-agent-dashboard](../../docs/walkthroughs/ob1-agent-dashboard). It seeds the Dashboard, Thoughts, Workflow, Duplicates, Audit, Agent Memory, and Recall Trace surfaces with Nate B. Jones / OB1 demo data for screenshots, PDF guides, and video walkthroughs.
+
+The dashboard has a gated local-only bypass for that capture flow:
+
+```bash
+OB1_DEMO_AUTH_BYPASS=true
+OB1_DASHBOARD_DEMO_KEY=local-screenshot-key
+NEXT_PUBLIC_API_URL=http://127.0.0.1:3024
+AGENT_MEMORY_API_URL=http://127.0.0.1:3022
+```
+
+Do not enable `OB1_DEMO_AUTH_BYPASS` in shared previews or production. It exists so repeatable screenshot and video generation can run without putting real API keys in browser automation.
+
+## Tech Stack
+
+- **Next.js 16** (App Router)
+- **React 19** with TypeScript
+- **Tailwind CSS 4** (dark theme)
+- **iron-session 8** (encrypted cookies)
+- **@dnd-kit** (drag-and-drop for workflow board)
+- Zero external runtime dependencies beyond these
+
+## Troubleshooting
+
+1. **"Could not reach API" on login** — Verify `NEXT_PUBLIC_API_URL` is correct and your REST API gateway (`open-brain-rest`) is deployed. Test with: `curl https://YOUR-REF.supabase.co/functions/v1/open-brain-rest/health -H "x-brain-key: YOUR_KEY"`.
+
+2. **"SESSION_SECRET env var is required"** — The app requires a 32+ character secret for cookie encryption. Generate one with `openssl rand -hex 32`.
+
+3. **Build fails with SWC error** — This happens when `node_modules` was installed on a different platform (e.g., Windows modules on Linux). Delete `node_modules` and `package-lock.json`, then run `npm install` on your target platform.
+
+4. **Search returns no results** — Ensure your thoughts have embeddings. Semantic search requires the `embedding` column to be populated. Run an embedding backfill if needed.
+
+5. **Ingest page shows "extracting" forever** — Check that the `smart-ingest` Edge Function is deployed. The ingest feature depends on a separate Edge Function for document extraction.

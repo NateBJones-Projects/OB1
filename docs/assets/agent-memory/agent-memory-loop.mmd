@@ -1,0 +1,11 @@
+flowchart TD
+  Start["Agent task starts"] --> Recall["Recall scoped OB1 memory"]
+  Recall --> Work["Agent works across model or channel"]
+  Work --> WriteBack["Write compact operational memory"]
+  WriteBack --> Review["Human or policy review"]
+  Review --> Confirmed["Confirmed or evidence-only memory"]
+  Confirmed --> Future["Future agent task"]
+  Future --> Recall
+
+  Review --> Reject["Reject, stale, dispute, or supersede"]
+  Reject --> Inspector["Memory inspector and audit trail"]

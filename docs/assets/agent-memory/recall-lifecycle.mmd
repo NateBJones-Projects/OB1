@@ -1,0 +1,14 @@
+sequenceDiagram
+  participant Runtime as Agent runtime
+  participant API as OB1 Agent Memory API
+  participant DB as OB1 thoughts plus sidecars
+  participant Agent as Agent worker
+
+  Runtime->>API: POST /recall with task, scope, entities, limits
+  API->>DB: Search thoughts and sidecar policy
+  DB-->>API: Candidate memories
+  API->>API: Rank by scope, provenance, freshness, confidence
+  API-->>Runtime: Memories with use_policy
+  Runtime->>Agent: Inject evidence, preferences, or instructions allowed by policy
+  Runtime->>API: POST /recall/:id/usage
+  API->>DB: Record usage and audit events

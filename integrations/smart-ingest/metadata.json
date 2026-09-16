@@ -1,0 +1,18 @@
+{
+  "name": "Smart Ingest",
+  "description": "LLM-powered document extraction that turns raw text into atomic thoughts with fingerprint and semantic deduplication, dry-run preview, and safe job execution.",
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter or OpenAI (embeddings + extraction)", "Supabase"],
+    "tools": ["Supabase CLI", "Deno"]
+  },
+  "tags": ["ingestion", "extraction", "llm", "deduplication", "edge-function"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes"
+}

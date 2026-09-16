@@ -1,0 +1,28 @@
+{
+  "name": "Editorial Policy + Weekly Auditor",
+  "description": "A 40-rule constitution that governs every synthesis prompt in your Open Brain, paired with a weekly drift/contradiction auditor that enforces it. When synthesis drifts, you fix the policy first and the rules propagate to prompts — making drift detectable and giving the brain a stable identity.",
+  "category": "recipes",
+  "author": {
+    "name": "Hans Bohlmann",
+    "github": "HansBohlmann"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter", "Slack (optional, for posting critical findings)"],
+    "tools": ["Supabase CLI", "Deno (via Supabase Edge Functions)"]
+  },
+  "requires_skills": [],
+  "tags": [
+    "governance",
+    "synthesis",
+    "audit",
+    "drift-detection",
+    "anti-inflation",
+    "policy"
+  ],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-05-09",
+  "updated": "2026-05-09"
+}

@@ -1,0 +1,20 @@
+{
+  "name": "Wiki Compiler",
+  "description": "Compiled wiki layer for Open Brain that orchestrates graph extraction, typed edges, entity pages, and topic synthesis into scheduled or on-demand wiki refreshes.",
+  "category": "recipes",
+  "author": {
+    "name": "Jonathan Edwards",
+    "github": "jonathanedwards"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase", "OpenRouter or Anthropic-compatible LLM APIs"],
+    "tools": ["Node.js 18+", "cron or any scheduled task runner"]
+  },
+  "tags": ["wiki", "compiler", "knowledge-graph", "scheduled-task", "automation", "synthesis"],
+  "difficulty": "advanced",
+  "estimated_time": "45 minutes",
+  "created": "2026-04-21",
+  "updated": "2026-04-21"
+}

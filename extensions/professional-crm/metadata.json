@@ -6,7 +6,14 @@
     "name": "Nate B. Jones",
     "github": "NateBJones"
   },
-  "version": "1.0.0",
+  "contributors": [
+    {
+      "name": "Cesar Pinto",
+      "github": "pintomatic",
+      "contribution": "Original proposal (#93), crm_ prefix convention, FTS search, meeting prep tool, stale contact detection"
+    }
+  ],
+  "version": "1.1.0",
   "requires": {
     "open_brain": true,
     "services": [],
@@ -14,9 +21,9 @@
   },
   "requires_primitives": ["deploy-edge-function", "remote-mcp", "rls"],
   "learning_order": 5,
-  "tags": ["crm", "contacts", "networking", "professional", "rls"],
+  "tags": ["crm", "contacts", "networking", "professional", "rls", "fts"],
   "difficulty": "intermediate",
   "estimated_time": "45 minutes",
   "created": "2026-03-12",
-  "updated": "2026-03-12"
+  "updated": "2026-04-17"
 }

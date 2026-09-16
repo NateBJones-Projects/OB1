@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbrain.dev/schemas/openclaw-agent-memory/writeback.v1.json",
+  "title": "OB1 Agent Memory Write-Back Request",
+  "type": "object",
+  "required": ["schema_version", "workspace_id", "idempotency_key", "content_hash", "models_used", "source_refs", "memory_payload", "provenance", "retention", "visibility"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "openbrain.openclaw.writeback.v1" },
+    "workspace_id": { "type": "string", "minLength": 1 },
+    "project_id": { "type": ["string", "null"] },
+    "task_id": { "type": ["string", "null"] },
+    "flow_id": { "type": ["string", "null"] },
+    "idempotency_key": { "type": "string", "minLength": 1 },
+    "content_hash": { "type": "string", "minLength": 16 },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string" },
+        "id": { "type": ["string", "null"] },
+        "thread_id": { "type": ["string", "null"] }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "const": "openclaw" },
+        "version": { "type": ["string", "null"] }
+      }
+    },
+    "models_used": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["provider", "model", "role"],
+        "additionalProperties": false,
+        "properties": {
+          "provider": { "type": "string" },
+          "model": { "type": "string" },
+          "role": { "type": "string", "enum": ["triage", "implementation", "review", "summary", "extraction", "routing"] }
+        }
+      }
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string" },
+          "uri": { "type": ["string", "null"] },
+          "title": { "type": ["string", "null"] },
+          "timestamp": { "type": ["string", "null"], "format": "date-time" }
+        }
+      }
+    },
+    "memory_payload": {
+      "type": "object",
+      "required": ["decisions", "outputs", "lessons", "unresolved_questions", "next_steps", "artifacts", "entities"],
+      "additionalProperties": false,
+      "properties": {
+        "decisions": { "type": "array", "items": { "type": "string" } },
+        "outputs": { "type": "array", "items": { "type": "string" } },
+        "lessons": { "type": "array", "items": { "type": "string" } },
+        "constraints": { "type": "array", "items": { "type": "string" } },
+        "unresolved_questions": { "type": "array", "items": { "type": "string" } },
+        "next_steps": { "type": "array", "items": { "type": "string" } },
+        "failures": { "type": "array", "items": { "type": "string" } },
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "uri", "description"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string" },
+              "uri": { "type": "string" },
+              "description": { "type": "string" }
+            }
+          }
+        },
+        "entities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "people": { "type": "array", "items": { "type": "string" } },
+            "repos": { "type": "array", "items": { "type": "string" } },
+            "files": { "type": "array", "items": { "type": "string" } },
+            "customers": { "type": "array", "items": { "type": "string" } },
+            "topics": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["default_status", "confidence", "requires_review"],
+      "additionalProperties": false,
+      "properties": {
+        "default_status": { "type": "string", "enum": ["observed", "inferred", "user_confirmed", "imported", "generated"] },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "requires_review": { "type": "boolean" }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "required": ["ttl_days", "stale_after_days"],
+      "additionalProperties": false,
+      "properties": {
+        "ttl_days": { "type": ["integer", "null"], "minimum": 1 },
+        "stale_after_days": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "visibility": {
+      "type": "object",
+      "required": ["workspace", "project", "channel"],
+      "additionalProperties": false,
+      "properties": {
+        "workspace": { "type": "string", "enum": ["private", "shared", "restricted"] },
+        "project": { "type": "string", "enum": ["none", "private", "shared", "restricted"] },
+        "channel": { "type": "string", "enum": ["none", "private", "shared", "restricted"] }
+      }
+    }
+  }
+}

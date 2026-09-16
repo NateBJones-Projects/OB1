@@ -1,0 +1,20 @@
+{
+  "name": "Financial Model Review",
+  "description": "Standalone skill pack for reviewing an existing financial model, forecast, or scenario set for assumption quality, structural risk, and decision usefulness.",
+  "category": "skills",
+  "author": {
+    "name": "Nate B. Jones",
+    "github": "NateBJones"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+  },
+  "tags": ["financial-model", "forecast-review", "diligence", "assumptions", "finance"],
+  "difficulty": "intermediate",
+  "estimated_time": "10 minutes",
+  "created": "2026-03-31",
+  "updated": "2026-03-31"
+}

@@ -1,0 +1,16 @@
+flowchart TD
+  NewMemory["Agent-written memory"] --> Gate{"Needs review?"}
+  Gate -->|High impact, inferred, low confidence| Queue["Review queue"]
+  Gate -->|Trusted import or low-risk evidence| Evidence["Evidence-only memory"]
+  Queue --> Confirm["Confirm"]
+  Queue --> Edit["Edit"]
+  Queue --> Scope["Restrict scope"]
+  Queue --> EvidenceOnly["Mark evidence only"]
+  Queue --> Merge["Merge or supersede"]
+  Queue --> Reject["Reject or dispute"]
+  Confirm --> Instruction["Instruction-grade if scope allows"]
+  Edit --> Instruction
+  Scope --> Evidence
+  EvidenceOnly --> Evidence
+  Merge --> Evidence
+  Reject --> Inspector["Inspector and audit trail"]

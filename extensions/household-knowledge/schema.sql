@@ -5,7 +5,7 @@
 -- Stores facts about things in your home (paint colors, appliances, measurements, etc.)
 CREATE TABLE IF NOT EXISTS household_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     category TEXT, -- e.g. 'paint', 'appliance', 'measurement', 'document'
     location TEXT, -- where in the home this item is
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS household_items (
 -- Tracks service providers (plumbers, electricians, landscapers, etc.)
 CREATE TABLE IF NOT EXISTS household_vendors (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     service_type TEXT, -- e.g. 'plumber', 'electrician', 'landscaper'
     phone TEXT,

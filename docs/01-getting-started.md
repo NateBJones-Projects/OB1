@@ -2,10 +2,14 @@
 
 This is the core of Open Brain — the foundation everything else builds on. Once this is running, you'll have a personal knowledge system that any AI can read from and write to. Every extension, recipe, and integration in this repo starts here.
 
-About 30 minutes. Zero coding experience. Two free services:
+> **Prefer video?** Watch the [Open Brain Startup Guide](https://vimeo.com/1174979042/f883f6489a) (~27 min) for a full video walkthrough of this setup process. Follow along with the video or use this written guide — they cover the same steps.
+>
+> **Have an AI coding tool?** Copy the [Setup Wizard prompt](04-ai-assisted-setup.md) into Claude Code, Cursor, Codex, or any similar tool. It interviews you, trims this guide down to just your path, runs the terminal steps for you, and verifies each checkpoint as you go.
 
-- **[Supabase](https://supabase.com)** — Your database
-- **[OpenRouter](https://openrouter.ai)** — Your AI gateway
+About 30 minutes. Zero coding experience. Two services:
+
+- **[Supabase](https://supabase.com)** — Your database (free tier)
+- **[OpenRouter](https://openrouter.ai)** — Your AI gateway (~$5 in credits, lasts months)
 
 ---
 
@@ -23,7 +27,6 @@ You're going to generate API keys, passwords, and IDs across three different ser
 > Open it now. Keep it open. Fill it in as you go.
 >
 > 🛑🛑🛑 **Do not skip this.** 🛑🛑🛑
-
 
 ---
 
@@ -48,13 +51,13 @@ Supabase is your database. It stores your thoughts as raw text, vector embedding
 
 ![Step 2](https://img.shields.io/badge/Step_2-Set_Up_the_Database-F4511E?style=for-the-badge)
 
-Three SQL commands, pasted one at a time. This creates your storage table, your search function, and your security policy.
+Four SQL commands, pasted one at a time. This creates your storage table, your search function, your security policy, and the permissions your server needs to read and write data.
 
-### 2.1 — Enable the Vector Extension
+![2.1](https://img.shields.io/badge/2.1-Enable_the_Vector_Extension-555?style=for-the-badge&labelColor=F4511E)
 
 In the left sidebar: **Database → Extensions** → search for "vector" → flip **pgvector ON**.
 
-### 2.2 — Create the Thoughts Table
+![2.2](https://img.shields.io/badge/2.2-Create_the_Thoughts_Table-555?style=for-the-badge&labelColor=F4511E)
 
 In the left sidebar: **SQL Editor → New query** → paste and Run:
 
@@ -99,7 +102,7 @@ create trigger thoughts_updated_at
 
 </details>
 
-### 2.3 — Create the Search Function
+![2.3](https://img.shields.io/badge/2.3-Create_the_Search_Function-555?style=for-the-badge&labelColor=F4511E)
 
 New query → paste and Run:
 
@@ -141,7 +144,7 @@ $$;
 
 </details>
 
-### 2.4 — Lock Down Security
+![2.4](https://img.shields.io/badge/2.4-Lock_Down_Security-555?style=for-the-badge&labelColor=F4511E)
 
 One more new query:
 
@@ -159,21 +162,88 @@ create policy "Service role full access"
 
 </details>
 
-### 2.5 — Verify
+![2.5](https://img.shields.io/badge/2.5-Grant_Table_Permissions-555?style=for-the-badge&labelColor=F4511E)
 
-✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, created_at, updated_at. Database → Functions shows `match_thoughts`.
+New query → paste and Run:
+
+<details>
+<summary>📋 <strong>SQL: Grant service_role access</strong> (click to expand)</summary>
+
+```sql
+-- Allow the service_role to read and write thoughts
+grant select, insert, update, delete on table public.thoughts to service_role;
+```
+
+</details>
+
+> [!IMPORTANT]
+> This step is required. Supabase no longer grants full table permissions to `service_role` by default on new projects. Without this, your MCP server will return "permission denied for table thoughts" when trying to capture or search.
+
+![2.6](https://img.shields.io/badge/2.6-Add_Deduplication-555?style=for-the-badge&labelColor=F4511E)
+
+New query → paste and Run:
+
+<details>
+<summary>📋 <strong>SQL: Content fingerprint column + upsert function</strong> (click to expand)</summary>
+
+```sql
+-- Add fingerprint column for deduplication
+ALTER TABLE thoughts ADD COLUMN content_fingerprint TEXT;
+
+-- Unique index so duplicate content is detected
+CREATE UNIQUE INDEX idx_thoughts_fingerprint
+  ON thoughts (content_fingerprint)
+  WHERE content_fingerprint IS NOT NULL;
+
+-- Upsert function: inserts new thoughts, merges metadata on duplicates
+CREATE OR REPLACE FUNCTION upsert_thought(p_content TEXT, p_payload JSONB DEFAULT '{}')
+RETURNS JSONB AS $$
+DECLARE
+  v_fingerprint TEXT;
+  v_result JSONB;
+  v_id UUID;
+BEGIN
+  v_fingerprint := encode(sha256(convert_to(
+    lower(trim(regexp_replace(p_content, '\s+', ' ', 'g'))),
+    'UTF8'
+  )), 'hex');
+
+  INSERT INTO thoughts (content, content_fingerprint, metadata)
+  VALUES (p_content, v_fingerprint, COALESCE(p_payload->'metadata', '{}'::jsonb))
+  ON CONFLICT (content_fingerprint) WHERE content_fingerprint IS NOT NULL DO UPDATE
+  SET updated_at = now(),
+      metadata = thoughts.metadata || COALESCE(EXCLUDED.metadata, '{}'::jsonb)
+  RETURNING id INTO v_id;
+
+  v_result := jsonb_build_object('id', v_id, 'fingerprint', v_fingerprint);
+  RETURN v_result;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+</details>
+
+> This prevents duplicate thoughts from cluttering your database. When you capture the same thought twice, it merges the metadata instead of creating a second row.
+
+![2.7](https://img.shields.io/badge/2.7-Verify-555?style=for-the-badge&labelColor=F4511E)
+
+✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, content_fingerprint, created_at, updated_at. Database → Functions shows `match_thoughts` and `upsert_thought`.
 
 ---
 
 ![Step 3](https://img.shields.io/badge/Step_3-Save_Your_Connection_Details-FB8C00?style=for-the-badge)
 
-In the left sidebar: **Settings** (gear icon) → **API**. Copy these into your credential tracker:
+In the left sidebar: **Settings** (gear icon) → **API Keys**.
 
-- 🔖 **Project URL** — Listed in the API settings section under "Project URL"
-- 🔖 **Secret key** — Under "API keys," this is the key formerly labeled "Service role key." Same key, new name — click reveal and copy it.
+You'll land on the **"Publishable and secret API keys"** tab. Copy these into your credential tracker:
+
+- 🔖 **Project URL** — Shown at the top of the page under "Project URL"
+- 🔖 **Secret key** — Scroll down to the **"Secret keys"** section on the same page. You'll see a `default` key. Click the copy button to copy it. (You can also click **"+ New secret key"** to create a dedicated one named `open-brain` — this makes it easier to revoke later without affecting other services, but using the default is fine too.)
 
 > [!WARNING]
-> Treat the Secret key like a password. Anyone with it has full access to your data. You may also see a "Publishable key" listed — that's the anon key surfaced more prominently in the updated Supabase UI. You don't need it for this setup.
+> Treat the Secret key like a password. Anyone with it has full access to your data. The "Publishable key" at the top of the page is safe to expose publicly — you don't need it for this setup.
+>
+> You may also see a **"Legacy anon, service_role API keys"** tab — those are the old-style JWT keys. You don't need them. Everything in this guide uses the new key format.
 
 ✅ **Done when:** Your credential tracker has both **Project URL** and **Secret key** filled in.
 
@@ -220,6 +290,9 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 
 > [!WARNING]
 > Copy and paste the command for **your operating system only**. The Mac command won't work on Windows and vice versa.
+>
+> [!IMPORTANT]
+> This is your **one access key for all of Open Brain** — core setup and every extension you add later. Save it somewhere permanent. Never generate a new one unless you want to replace it for ALL deployed functions.
 
 ✅ **Done when:** Your credential tracker has the **MCP Access Key** filled in.
 
@@ -227,7 +300,7 @@ Copy the output — it'll look something like `a3f8b2c1d4e5...` (64 characters).
 
 ![Step 6](https://img.shields.io/badge/Step_6-Deploy_the_MCP_Server-1E88E5?style=for-the-badge)
 
-One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stats, and capture. This gives any MCP-connected AI the ability to read and write to your brain.
+One Edge Function. Four core MCP tools: semantic search, browse recent thoughts, stats, and capture. It also exposes read-only `search` and `fetch` aliases for ChatGPT compatibility. Full-MCP-capable AI clients can read and write to your brain; restricted ChatGPT sessions can still use the standard read-only search/fetch path.
 
 > [!WARNING]
 > **Tried this before and starting over?** If you have a `supabase/` folder in your home directory from a previous attempt, delete it first — it will silently hijack your setup. Run `rm -rf ~/supabase` (Mac/Linux) or `Remove-Item -Recurse ~\supabase` (Windows) to clean it out.
@@ -237,7 +310,7 @@ One Edge Function. Four MCP tools: semantic search, browse recent thoughts, stat
 <details>
 <summary>🟩 <strong>Step 6 — Mac / Linux</strong> (click to expand)</summary>
 
-### 6.1 — Create a Project Folder
+![6.1](https://img.shields.io/badge/6.1-Create_a_Project_Folder-555?style=for-the-badge&labelColor=1E88E5)
 
 You need a folder on your computer for this project. The Supabase CLI will put your server files here, and you'll deploy from this folder.
 
@@ -262,7 +335,7 @@ This should print the path to your `open-brain` folder. If it shows your home di
 > [!IMPORTANT]
 > From this point on, every terminal command should be run from this folder. If you close your terminal and come back later, `cd` into this folder again.
 
-### 6.2 — Install the Supabase CLI
+![6.2](https://img.shields.io/badge/6.2-Install_the_Supabase_CLI-555?style=for-the-badge&labelColor=1E88E5)
 
 **With Homebrew:**
 
@@ -270,11 +343,22 @@ This should print the path to your `open-brain` folder. If it shows your home di
 brew install supabase/tap/supabase
 ```
 
-**Without Homebrew:**
+<details>
+<summary>🍺 <strong>Don't have Homebrew?</strong> (click to expand)</summary>
+
+Homebrew is the standard package manager for Mac. If you've never installed it, paste this into your terminal:
 
 ```bash
-npm install -g supabase
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
+
+Follow the prompts — it may ask for your Mac password. Once it finishes, close and reopen your terminal, then come back to the `brew install` command above.
+
+</details>
+
+**Without Homebrew:**
+
+`npm install -g supabase` is not supported. If you want a global `supabase` command, install the standalone CLI from the [official Supabase CLI guide](https://supabase.com/docs/guides/local-development/cli/getting-started). Otherwise, run every command below with `npx supabase ...`.
 
 Verify it worked:
 
@@ -282,13 +366,18 @@ Verify it worked:
 supabase --version
 ```
 
-### 6.3 — Log In
+> [!NOTE]
+> If you're using `npx` instead of a global `supabase` binary, run `npx supabase --version` here and prefix the rest of the commands in this section the same way.
+
+![6.3](https://img.shields.io/badge/6.3-Log_In-555?style=for-the-badge&labelColor=1E88E5)
+
+This connects your local terminal to your Supabase account so the CLI can deploy to your project. It'll open your browser to authenticate — just follow the prompts and come back here when it says "You are now logged in."
 
 ```bash
 supabase login
 ```
 
-### 6.4 — Initialize and Link
+![6.4](https://img.shields.io/badge/6.4-Initialize_and_Link-555?style=for-the-badge&labelColor=1E88E5)
 
 Set up the Supabase project structure in your folder:
 
@@ -311,7 +400,7 @@ Link it to your Supabase project — replace `YOUR_PROJECT_REF` with the project
 supabase link --project-ref YOUR_PROJECT_REF
 ```
 
-### 6.5 — Set Your Secrets
+![6.5](https://img.shields.io/badge/6.5-Set_Your_Secrets-555?style=for-the-badge&labelColor=1E88E5)
 
 Set your access key from Step 5:
 
@@ -327,38 +416,42 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+>
+> Optional: if you have an Open Brain dashboard or another stable page for viewing individual thoughts, set `OPEN_BRAIN_CITATION_BASE_URL` to that base URL. ChatGPT's `search`/`fetch` compatibility tools use it when returning citation URLs.
+
+<!-- -->
 
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
+>
+> **If you ever rotate your OpenRouter key:** you must re-run the `supabase secrets set` command above with the new key, AND update any local `.env` files that reference it. The edge function reads from Supabase secrets at runtime — updating the key on openrouter.ai alone won't propagate here. See the [FAQ on key rotation](03-faq.md#api-key-rotation) for the full checklist.
 
-### 6.6 — Download the Server Files
+### Create the Function
 
-Create the function folder, then download the two server files directly from GitHub:
+![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
+
+Three commands, run them one at a time in order:
+
+**1. Create the function folder:**
 
 ```bash
 supabase functions new open-brain-mcp
 ```
 
+**2. Download the server code:**
+
 ```bash
 curl -o supabase/functions/open-brain-mcp/index.ts https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts
 ```
+
+**3. Download the dependencies file:**
 
 ```bash
 curl -o supabase/functions/open-brain-mcp/deno.json https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json
 ```
 
-> [!TIP]
-> These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
-
 > [!WARNING]
-> ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
->
-> ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
-> ```bash
-> rm -rf supabase/functions/open-brain-mcp
-> supabase functions new open-brain-mcp
-> ```
-> Then retry the curl commands.
+> ❌ **`No such file or directory`** on command 2 or 3 — you skipped command 1. Run it first, then retry.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
 
@@ -371,7 +464,7 @@ head -1 supabase/functions/open-brain-mcp/index.ts
 >
 > ✅ If you see `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — you're good.
 
-### 6.7 — Deploy
+![6.7](https://img.shields.io/badge/6.7-Deploy-555?style=for-the-badge&labelColor=1E88E5)
 
 ```bash
 supabase functions deploy open-brain-mcp --no-verify-jwt
@@ -406,7 +499,7 @@ Paste this into your credential tracker as the MCP Connection URL. This is what 
 <details>
 <summary>🟦 <strong>Step 6 — Windows</strong> (click to expand)</summary>
 
-### 6.1 — Create a Project Folder
+![6.1](https://img.shields.io/badge/6.1-Create_a_Project_Folder-555?style=for-the-badge&labelColor=1E88E5)
 
 You need a folder on your computer for this project. The Supabase CLI will put your server files here, and you'll deploy from this folder.
 
@@ -431,7 +524,7 @@ This should print the path to your `open-brain` folder. If it shows your home di
 > [!IMPORTANT]
 > From this point on, every terminal command should be run from this folder. If you close PowerShell and come back later, `cd` into this folder again.
 
-### 6.2 — Install the Supabase CLI
+![6.2](https://img.shields.io/badge/6.2-Install_the_Supabase_CLI-555?style=for-the-badge&labelColor=1E88E5)
 
 If you don't have Scoop yet, install it first ([recommended by Supabase](https://supabase.com/docs/guides/local-development/cli/getting-started)):
 
@@ -458,13 +551,15 @@ Verify it worked:
 supabase --version
 ```
 
-### 6.3 — Log In
+![6.3](https://img.shields.io/badge/6.3-Log_In-555?style=for-the-badge&labelColor=1E88E5)
+
+This connects your local terminal to your Supabase account so the CLI can deploy to your project. It'll open your browser to authenticate — just follow the prompts and come back here when it says "You are now logged in."
 
 ```powershell
 supabase login
 ```
 
-### 6.4 — Initialize and Link
+![6.4](https://img.shields.io/badge/6.4-Initialize_and_Link-555?style=for-the-badge&labelColor=1E88E5)
 
 Set up the Supabase project structure in your folder:
 
@@ -487,7 +582,7 @@ Link it to your Supabase project — replace `YOUR_PROJECT_REF` with the project
 supabase link --project-ref YOUR_PROJECT_REF
 ```
 
-### 6.5 — Set Your Secrets
+![6.5](https://img.shields.io/badge/6.5-Set_Your_Secrets-555?style=for-the-badge&labelColor=1E88E5)
 
 Set your access key from Step 5:
 
@@ -503,38 +598,38 @@ supabase secrets set OPENROUTER_API_KEY=your-openrouter-key-here
 
 > [!NOTE]
 > `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are automatically available inside Edge Functions — you don't need to set them.
+>
+> Optional: if you have an Open Brain dashboard or another stable page for viewing individual thoughts, set `OPEN_BRAIN_CITATION_BASE_URL` to that base URL. ChatGPT's `search`/`fetch` compatibility tools use it when returning citation URLs.
+
+<!-- -->
 
 > [!CAUTION]
 > Make sure the access key you set here **exactly matches** what you saved in your credential tracker. If they don't match, you'll get 401 errors when connecting your AI.
 
-### 6.6 — Download the Server Files
+![6.6](https://img.shields.io/badge/6.6-Download_the_Server_Files-555?style=for-the-badge&labelColor=1E88E5)
 
-Create the function folder, then download the two server files directly from GitHub:
+Three commands, run them one at a time in order:
+
+**1. Create the function folder:**
 
 ```powershell
 supabase functions new open-brain-mcp
 ```
 
+**2. Download the server code:**
+
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/index.ts -OutFile supabase\functions\open-brain-mcp\index.ts
 ```
+
+**3. Download the dependencies file:**
 
 ```powershell
 Invoke-WebRequest -Uri https://raw.githubusercontent.com/NateBJones-Projects/OB1/main/server/deno.json -OutFile supabase\functions\open-brain-mcp\deno.json
 ```
 
-> [!TIP]
-> These commands download the server code and its dependencies file straight into the right folder. No need to create or edit any files yourself.
-
 > [!WARNING]
-> ❌ **`No such file or directory`** — you skipped the `supabase functions new` command above. Run it first, then retry the downloads.
->
-> ❌ **`file exists`** — you already have files from a previous attempt. Delete the old folder and re-create it:
-> ```powershell
-> Remove-Item -Recurse supabase\functions\open-brain-mcp
-> supabase functions new open-brain-mcp
-> ```
-> Then retry the download commands.
+> ❌ **`No such file or directory`** on command 2 or 3 — you skipped command 1. Run it first, then retry.
 
 Verify the download worked — this should print the first line of the server code, **not** "Hello from Functions":
 
@@ -544,10 +639,9 @@ Get-Content supabase\functions\open-brain-mcp\index.ts -Head 1
 
 > [!CAUTION]
 > ❌ If you see `console.log("Hello from Functions!")` — the download didn't overwrite the starter file. Delete the folder, re-create it, and retry the download commands.
->
 > ✅ If you see `import "jsr:@supabase/functions-js/edge-runtime.d.ts";` — you're good.
 
-### 6.7 — Deploy
+![6.7](https://img.shields.io/badge/6.7-Deploy-555?style=for-the-badge&labelColor=1E88E5)
 
 ```powershell
 supabase functions deploy open-brain-mcp --no-verify-jwt
@@ -594,7 +688,7 @@ Pick your AI client below:
 <summary>🤖 <strong>7.1 — Claude Desktop</strong></summary>
 
 > [!NOTE]
-> No JSON config files. No Node.js. No terminal. This is the simplest connection method.
+> These steps are for Anthropic's official Claude Desktop app on macOS and Windows. Linux/community ports vary and aren't officially covered by this Connectors UI flow. No JSON config files. No Node.js. No terminal. This is the simplest connection method.
 
 1. Open Claude Desktop → **Settings** → **Connectors**
 2. Click **Add custom connector**
@@ -611,6 +705,8 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 
 > [!WARNING]
 > Requires a paid ChatGPT plan (Plus, Pro, Business, Enterprise, or Edu). Works on the web at [chatgpt.com](https://chatgpt.com) only — not available on mobile.
+>
+> ChatGPT's custom MCP support is still beta, plan-sensitive, and sometimes model-sensitive. As of May 2026, OpenAI's docs list Developer Mode for Plus, Pro, Business, Enterprise, and Edu, while workspace app publishing and action controls are documented mainly for Business, Enterprise, and Edu. In practice, some Pro model variants expose fewer custom tools than thinking models.
 
 **Enable Developer Mode (one-time setup):**
 
@@ -632,6 +728,8 @@ That's it. Start a new conversation, and Claude will have access to your Open Br
 
 > [!TIP]
 > ChatGPT is less intuitive than Claude at picking the right MCP tool automatically. If it doesn't use your brain on its own, be explicit: "Use the Open Brain search_thoughts tool to find my notes about project planning." After it gets the pattern once or twice in a conversation, it usually picks up the habit.
+>
+> If ChatGPT says an Open Brain tool is unavailable and your Supabase Edge Function logs show zero requests, the connector did not reach your server. Refresh or recreate the ChatGPT app, start a fresh chat, select the Open Brain app in Developer Mode, and try a thinking model. On restricted Pro sessions, expect read tools, especially `search` and `fetch`, to be more reliable than the write tool (`capture_thought`).
 
 </details>
 
@@ -649,13 +747,36 @@ claude mcp add --transport http open-brain \
 </details>
 
 <details>
-<summary>🤖 <strong>7.4 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
+<summary>🤖 <strong>7.4 — OpenAI Codex</strong></summary>
+
+Codex uses `mcp-remote` to bridge to remote MCP servers. Add the following to your `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.open-brain]
+command = "npx"
+args = [
+  "-y",
+  "mcp-remote",
+  "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+]
+startup_timeout_sec = 30
+```
+
+> [!CAUTION]
+> The `startup_timeout_sec = 30` line is required. Without it, Codex times out after 10 seconds because `mcp-remote` needs longer to establish the connection to the remote Supabase edge function. If you see `MCP client for open-brain timed out after 10 seconds`, add or increase this value.
+
+Restart Codex and the four Open Brain tools should be available immediately.
+
+</details>
+
+<details>
+<summary>🤖 <strong>7.5 — Other Clients (Cursor, VS Code Copilot, Windsurf)</strong></summary>
 
 Every MCP client handles remote servers slightly differently. The server accepts your access key two ways — pick whichever your client supports:
 
 **Option A: URL with key (easiest).** If your client has a field for a remote MCP server URL, paste the full MCP Connection URL including `?key=your-access-key`. This works for any client that supports remote MCP without requiring headers.
 
-**Option B: mcp-remote bridge.** If your client only supports local stdio servers (configured via a JSON config file), use `mcp-remote` to bridge to the remote server. This requires Node.js installed.
+**Option B: supergateway bridge (recommended).** If your client only supports local stdio servers (configured via a JSON config file), use `supergateway` to bridge to the remote server. This requires Node.js installed.
 
 ```json
 {
@@ -663,6 +784,25 @@ Every MCP client handles remote servers slightly differently. The server accepts
     "open-brain": {
       "command": "npx",
       "args": [
+        "-y",
+        "supergateway",
+        "--streamableHttp",
+        "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp?key=your-access-key-from-step-5"
+      ]
+    }
+  }
+}
+```
+
+**Option C: mcp-remote bridge (alternative).** `mcp-remote` also works but performs OAuth discovery on startup, which can cause timeouts with Supabase Edge Function URLs. If you use it, set a generous startup timeout (30+ seconds) in clients that support it.
+
+```json
+{
+  "mcpServers": {
+    "open-brain": {
+      "command": "npx",
+      "args": [
+        "-y",
         "mcp-remote",
         "https://YOUR_PROJECT_REF.supabase.co/functions/v1/open-brain-mcp",
         "--header",
@@ -681,7 +821,7 @@ Every MCP client handles remote servers slightly differently. The server accepts
 
 </details>
 
-✅ **Done when:** You can start a conversation in your AI client and it has access to Open Brain tools (search_thoughts, list_thoughts, thought_stats, capture_thought).
+✅ **Done when:** You can start a conversation in your AI client and it has access to Open Brain tools (`search_thoughts`, `list_thoughts`, `thought_stats`, `capture_thought`). ChatGPT may also show `search` and `fetch` compatibility tools.
 
 ---
 
@@ -731,11 +871,19 @@ Your AI should retrieve the thought you just saved.
 
 **❌ Claude Desktop tools don't appear**
 
-Make sure you added the connector in Settings → Connectors (not by editing the JSON config file). Verify the connector is enabled for your conversation — click the "+" button at the bottom of the chat, then Connectors, and check that Open Brain is toggled on. If the connector was added but tools still don't show, try removing and re-adding it with the same URL.
+On the official macOS/Windows Claude Desktop app, make sure you added the connector in Settings → Connectors. Verify the connector is enabled for your conversation — click the "+" button at the bottom of the chat, then Connectors, and check that Open Brain is toggled on. If the connector was added but tools still don't show, try removing and re-adding it with the same URL. If you're using a Linux/community port, its connector behavior can differ and isn't covered by this guide.
 
 **❌ ChatGPT doesn't use the Open Brain tools**
 
 First, confirm Developer Mode is enabled (Settings → Apps & Connectors → Advanced settings). Without it, ChatGPT only exposes limited MCP functionality that won't cover Open Brain's full toolset. Next, check that the connector is active for your current conversation — look for it in the tools/apps panel. If it's connected but ChatGPT ignores it, be direct: "Use the Open Brain search_thoughts tool to search for [topic]." ChatGPT often needs explicit tool references the first few times before it starts picking them up automatically.
+
+**❌ ChatGPT says an Open Brain tool is unavailable**
+
+Check Supabase dashboard → Edge Functions → `open-brain-mcp` → Logs. If no request appears when ChatGPT fails, your server is not the problem. ChatGPT did not expose that tool to the current chat. Redeploy the current MCP server, refresh or recreate the ChatGPT app so it pulls updated tool metadata, start a fresh chat, and try a thinking model. On Pro, the read-only `search`/`fetch` compatibility tools may work where `capture_thought` is hidden or blocked because full MCP/write access is plan-dependent.
+
+**❌ "Permission denied for table thoughts"**
+
+Your `service_role` doesn't have table-level permissions. This happens on newer Supabase projects where CRUD grants are no longer automatic. Go back to Step 2.5 and run the `GRANT` SQL, then retry.
 
 **❌ Getting 401 errors**
 
@@ -808,6 +956,17 @@ Your Open Brain is live. Now make it work for you. The **[Companion Prompts](02-
 - ✅ **The Weekly Review** — A Friday ritual that surfaces themes, forgotten action items, and connections you missed
 
 Start with the Memory Migration. If you have an existing second brain, run the Second Brain Migration next. Then use the Spark to figure out what to capture going forward. The templates build the daily habit. The weekly review closes the loop.
+
+### Then start importing your data
+
+The companion prompts pull out what your AI already knows. **Recipes** go further — they connect directly to your existing services and bulk-import real data.
+
+| Recipe | What It Does | Time |
+| ------ | ------------ | ---- |
+| [Email History Import](../recipes/email-history-import/) | Pull your Gmail archive into searchable thoughts | 30 min |
+| [ChatGPT Conversation Import](../recipes/chatgpt-conversation-import/) | Ingest your full ChatGPT data export | 30 min |
+
+Browse all recipes in [`/recipes`](../recipes/).
 
 ---
 

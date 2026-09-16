@@ -1,0 +1,15 @@
+{
+  "name": "ob1-recipe-instagram-import",
+  "version": "1.0.0",
+  "description": "Import Instagram data exports — DMs, comments, captions — into Open Brain",
+  "type": "module",
+  "main": "import-instagram.mjs",
+  "scripts": {
+    "import": "node import-instagram.mjs",
+    "dry-run": "node import-instagram.mjs --dry-run"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
+    "dotenv": "^16.4.0"
+  }
+}

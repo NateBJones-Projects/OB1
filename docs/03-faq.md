@@ -30,6 +30,18 @@ Fair warning: if you've been a heavy ChatGPT user, the export is A LOT of data. 
 
 ChatGPT is less intuitive than Claude at picking the right MCP tool on its own. Be explicit the first few times: "Use the Open Brain search_thoughts tool to find my notes about [topic]." After it gets the pattern once or twice in a conversation, it usually starts picking them up automatically.
 
+### "ChatGPT says the Open Brain tool is not available"
+
+First check Supabase dashboard → Edge Functions → `open-brain-mcp` → Logs. If you see **zero requests** while ChatGPT is failing, stop debugging keys, URLs, and Edge Function code. ChatGPT never called your server; the problem is the tools exposed to that chat session.
+
+As of May 2026, OpenAI's ChatGPT developer-mode docs are in beta and the plan/model behavior is not perfectly stable. The important implementation detail: ChatGPT treats MCP tools without `readOnlyHint` as write actions. Open Brain now marks `search_thoughts`, `list_thoughts`, `thought_stats`, `search`, and `fetch` as read-only. It marks `capture_thought` as a bounded, non-destructive write action.
+
+After updating your deployed MCP server, redeploy it, then refresh or recreate the ChatGPT app so ChatGPT pulls the new tool metadata. Expected behavior:
+
+- Full MCP-capable chats should expose the four core tools, plus ChatGPT compatibility aliases (`search` and `fetch`).
+- Restricted Pro/read-only sessions may expose only read tools and hide or block `capture_thought`.
+- If a Pro chat exposes none of the tools, switch that chat to a thinking model, start a fresh chat, and make sure the Open Brain app is selected in Developer Mode.
+
 ### "I'm stuck and Claude is rewriting my edge function code to fix the connection"
 
 Pause. The problems are almost never in the code. They're in the configuration: a secret that doesn't match, a URL that's missing the key, a step that got skipped. Letting an AI rewrite working code when the issue is a mismatched environment variable will make things harder to debug, not easier.
@@ -45,6 +57,22 @@ Most likely culprits: the vector extension isn't enabled (run `create extension 
 Quickest diagnosis: Supabase dashboard → Edge Functions → click on the search function → check the Logs tab.
 
 And don't forget the Supabase AI assistant covered in the [setup guide](01-getting-started.md). Paste your edge function code and the error logs right into it — it's surprisingly good at diagnosing Supabase-specific issues since it has direct context on their APIs.
+
+---
+
+## Importing Data
+
+### "Can I import my Gmail into the Open Brain?"
+
+Yes. The [Email History Import](../recipes/email-history-import/) recipe connects to Gmail via OAuth, pulls emails by label and time window, strips noise (signatures, quoted replies, auto-generated messages), and loads each email as a thought with sender, subject, and date metadata. Takes about 30 minutes to set up. You need a Google Cloud project with Gmail API enabled.
+
+### "How do I import my ChatGPT conversations?"
+
+Export your data from ChatGPT (Settings → Data controls → Export data), then use the [ChatGPT Conversation Import](../recipes/chatgpt-conversation-import/) recipe. It processes the JSON export, extracts the meaningful exchanges, and loads them as thoughts. Unlike the manual approach described in the FAQ above, this handles the full export automatically.
+
+### "What other data sources can I import?"
+
+Check [`/recipes`](../recipes/) for the current list. The community is actively building importers for Google Activity (Takeout), Twitter/X archives, Claude conversations, Gemini, and more. Each recipe is a standalone build — pick the ones that match your data.
 
 ---
 
@@ -145,6 +173,39 @@ That's the whole point of the Open Brain. It's a foundation, not a finished prod
 ### "The agent's experience of pulling from the Open Brain felt like 'remembering' vs 'reading someone else's notes'"
 
 This is a precise description of what vector retrieval does differently from file reads. When an agent reads a file, it's processing someone else's organized structure. When it pulls from vector search, the retrieval is associative — finding what's relevant to the current context by meaning, not by where it was filed. That IS closer to how recall works.
+
+---
+
+## API Key Rotation
+
+### "I rotated my OpenRouter API key and now nothing works"
+
+When you generate a new key on openrouter.ai/keys, the old key is revoked immediately. But your Open Brain uses that key in multiple places — and updating it in one spot doesn't update the others. Everything downstream of the old key breaks silently.
+
+**Places your OpenRouter key lives (update ALL of them):**
+
+1. **Supabase Edge Function secrets** — This is the most common one to miss. Your MCP server reads the key from here at runtime.
+
+   ```bash
+   supabase secrets set OPENROUTER_API_KEY=sk-or-v1-your-new-key
+   supabase functions deploy open-brain-mcp --no-verify-jwt
+   ```
+
+   `secrets set` stores the new value, but Edge Functions read environment variables once at cold start and cache them. Already-running ("warm") instances keep using the old key until they recycle — which can take minutes and produce intermittent 401s in the meantime. Redeploying forces a fresh boot so the new key takes effect immediately. If you've deployed extension functions that also read `OPENROUTER_API_KEY`, redeploy each of them too (or run `supabase functions deploy` with no arg to redeploy all).
+
+2. **Local `.env` files** — Any recipes or integrations you run locally (e.g., `recipes/chatgpt-conversation-import/.env`). Open each one and replace the old key value.
+
+3. **CI/CD or deployment configs** — If you've set the key in any deployment pipeline, update it there too.
+
+**How to verify the new key works:**
+
+```bash
+curl https://openrouter.ai/api/v1/models -H "Authorization: Bearer sk-or-v1-your-new-key"
+```
+
+If you get a JSON list of models back, the key is valid. If you get a 401, the key is wrong or not yet active.
+
+**Tip:** After rotating a key, test your Open Brain immediately — capture a test thought and search for it. Don't wait days to discover it's broken.
 
 ---
 

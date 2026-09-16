@@ -1,0 +1,6 @@
+{
+  "name": "open-brain-rest",
+  "description": "Supabase Edge Function REST gateway for the OB1 dashboard thoughts, workflow, search, audit, and duplicate-review surfaces.",
+  "type": "integration",
+  "status": "experimental"
+}

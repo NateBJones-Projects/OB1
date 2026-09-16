@@ -1,0 +1,7 @@
+*.env
+__pycache__/
+*.pyc
+.venv/
+test.txt
+test.jsonl
+test_empty_lines.txt

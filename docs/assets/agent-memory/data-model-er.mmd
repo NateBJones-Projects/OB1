@@ -1,0 +1,28 @@
+erDiagram
+  thoughts ||--o| agent_memories : "has sidecar"
+  agent_memories ||--o{ agent_memory_source_refs : " cites"
+  agent_memories ||--o{ agent_memory_artifacts : "links"
+  agent_memories ||--o{ agent_memory_relations : "relates"
+  agent_memories ||--o{ agent_memory_review_actions : "reviewed by"
+  agent_memory_recall_traces ||--o{ agent_memory_recall_items : "returns"
+  agent_memories ||--o{ agent_memory_recall_items : "included in"
+  agent_memories ||--o{ agent_memory_audit_events : "audited"
+  agent_memory_recall_traces ||--o{ agent_memory_audit_events : "audited"
+
+  thoughts {
+    uuid id PK
+    text content
+    vector embedding
+  }
+
+  agent_memories {
+    uuid id PK
+    uuid thought_id FK
+    uuid workspace_id
+    uuid project_id
+    text memory_type
+    text provenance_status
+    text review_status
+    boolean can_use_as_instruction
+    boolean can_use_as_evidence
+  }

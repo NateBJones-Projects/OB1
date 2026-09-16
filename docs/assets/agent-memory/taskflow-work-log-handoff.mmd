@@ -1,0 +1,13 @@
+sequenceDiagram
+  participant A as Agent A
+  participant OB1 as OB1 Agent Memory
+  participant B as Agent B
+  participant Human as Human reviewer
+
+  A->>OB1: Recall prior attempts and constraints
+  A->>A: Triage or implement step
+  A->>OB1: Write compact work log
+  OB1->>Human: Queue high-impact lessons
+  Human->>OB1: Confirm, edit, or evidence-only
+  B->>OB1: Recall work log and confirmed constraints
+  B->>B: Continue without raw transcript

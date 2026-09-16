@@ -1,0 +1,72 @@
+{
+  "id": "nbj-ob1-agent-memory",
+  "name": "NBJ OB1 Agent Memory for OpenClaw",
+  "description": "Typed OpenClaw tools for governed Nate Jones OB1 memory recall, write-back, review, inspection, and trace debugging.",
+  "skills": ["./skills/openclaw-agent-memory"],
+  "kind": "memory",
+  "contracts": {
+    "tools": [
+      "openbrain_recall",
+      "openbrain_writeback",
+      "openbrain_report_usage",
+      "openbrain_inspect_memory",
+      "openbrain_list_review_queue",
+      "openbrain_review_memory",
+      "openbrain_get_recall_trace"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+      "endpoint": {
+        "type": "string",
+        "description": "Base URL for the OB1 Agent Memory API, without a trailing slash."
+      },
+      "accessKey": {
+        "description": "OB1 Agent Memory access key. Prefer an OpenClaw SecretRef so the key does not live in plaintext config.",
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "provider", "id"],
+            "properties": {
+              "source": {
+                "type": "string",
+                "enum": ["file", "exec"]
+              },
+              "provider": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "workspaceId": {
+        "type": "string",
+        "description": "Default OB1 workspace ID."
+      },
+      "projectId": {
+        "type": "string",
+        "description": "Default OB1 project ID."
+      },
+      "requireReviewByDefault": {
+        "type": "boolean",
+        "description": "Keep agent-written memory pending review by default.",
+        "default": true
+      },
+      "includeUnconfirmedRecall": {
+        "type": "boolean",
+        "description": "Allow unconfirmed memories in recall responses.",
+        "default": false
+      }
+    }
+  }
+}

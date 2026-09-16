@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openbrain.dev/schemas/openclaw-agent-memory/recall-response.v1.json",
+  "title": "OB1 Agent Memory Recall Response",
+  "type": "object",
+  "required": ["schema_version", "request_id", "memories"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "const": "openbrain.openclaw.recall_response.v1" },
+    "request_id": { "type": "string", "minLength": 1 },
+    "memories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["memory_id", "summary", "content", "source", "provenance", "scope", "use_policy", "freshness", "related_artifacts"],
+        "additionalProperties": false,
+        "properties": {
+          "memory_id": { "type": "string" },
+          "summary": { "type": "string" },
+          "content": { "type": "string" },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string" },
+              "uri": { "type": ["string", "null"] },
+              "title": { "type": ["string", "null"] },
+              "timestamp": { "type": ["string", "null"], "format": "date-time" }
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "required": ["status", "confidence", "created_by"],
+            "additionalProperties": false,
+            "properties": {
+              "status": { "type": "string", "enum": ["observed", "inferred", "user_confirmed", "imported", "generated"] },
+              "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+              "created_by": { "type": "string", "enum": ["user", "agent", "system", "import"] },
+              "model": { "type": ["string", "null"] },
+              "runtime": { "type": ["string", "null"] }
+            }
+          },
+          "scope": {
+            "type": "object",
+            "required": ["workspace_id", "visibility"],
+            "additionalProperties": false,
+            "properties": {
+              "workspace_id": { "type": "string" },
+              "project_id": { "type": ["string", "null"] },
+              "channel_id": { "type": ["string", "null"] },
+              "visibility": { "type": "string", "enum": ["personal", "channel", "project", "workspace", "organization"] }
+            }
+          },
+          "use_policy": {
+            "type": "object",
+            "required": ["can_use_as_instruction", "can_use_as_evidence", "requires_user_confirmation"],
+            "additionalProperties": false,
+            "properties": {
+              "can_use_as_instruction": { "type": "boolean" },
+              "can_use_as_evidence": { "type": "boolean" },
+              "requires_user_confirmation": { "type": "boolean" }
+            }
+          },
+          "freshness": {
+            "type": "object",
+            "required": ["created_at"],
+            "additionalProperties": false,
+            "properties": {
+              "created_at": { "type": "string", "format": "date-time" },
+              "last_confirmed_at": { "type": ["string", "null"], "format": "date-time" },
+              "stale_after": { "type": ["string", "null"], "format": "date-time" }
+            }
+          },
+          "related_artifacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kind", "uri"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": { "type": "string" },
+                "uri": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

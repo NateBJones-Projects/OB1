@@ -1,0 +1,20 @@
+{
+  "name": "Wiki Synthesis",
+  "description": "Synthesize topic-scoped wiki articles and per-thread email wikis from atomic thoughts, using any OpenAI-compatible LLM.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter or any Chat-Completions-compatible LLM API"],
+    "tools": ["Node.js 18+"]
+  },
+  "tags": ["wiki", "synthesis", "autobiography", "email", "summarization", "knowledge-graph"],
+  "difficulty": "intermediate",
+  "estimated_time": "30 minutes",
+  "created": "2026-04-21",
+  "updated": "2026-04-21"
+}

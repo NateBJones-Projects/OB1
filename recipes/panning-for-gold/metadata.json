@@ -6,7 +6,7 @@
     "name": "Jared Irish",
     "github": "jaredirish"
   },
-  "version": "1.0.0",
+  "version": "2.0.0",
   "requires": {
     "open_brain": true,
     "services": ["OpenRouter"],
@@ -16,5 +16,5 @@
   "difficulty": "intermediate",
   "estimated_time": "20 minutes",
   "created": "2026-03-13",
-  "updated": "2026-03-13"
+  "updated": "2026-03-19"
 }

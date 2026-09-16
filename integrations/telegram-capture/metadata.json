@@ -1,0 +1,20 @@
+{
+  "name": "Telegram Capture",
+  "description": "Add Telegram as a quick-capture interface for your Open Brain. Send a message to your bot (DM or private group) and it's embedded, classified, and stored automatically, with a threaded confirmation back in the chat.",
+  "category": "integrations",
+  "author": {
+    "name": "Elle",
+    "github": "Reb-Elle-Art"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Telegram Bot API", "OpenRouter"],
+    "tools": ["Supabase CLI"]
+  },
+  "tags": ["telegram", "capture", "bot", "messaging"],
+  "difficulty": "beginner",
+  "estimated_time": "20 minutes",
+  "created": "2026-04-16",
+  "updated": "2026-04-16"
+}

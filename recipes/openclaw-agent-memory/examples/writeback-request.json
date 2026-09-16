@@ -1,0 +1,70 @@
+{
+  "schema_version": "openbrain.openclaw.writeback.v1",
+  "workspace_id": "workspace_123",
+  "project_id": "project_ob1",
+  "task_id": "openclaw_task_456",
+  "flow_id": null,
+  "idempotency_key": "workspace_123:openclaw:openclaw_task_456:review:8af31e",
+  "content_hash": "8af31e7f7a2f6b5b4a317bb28cb574db",
+  "channel": {
+    "kind": "github",
+    "id": "NateBJones-Projects/OB1",
+    "thread_id": "pull/123"
+  },
+  "runtime": {
+    "name": "openclaw",
+    "version": "2026.3.24-beta.2"
+  },
+  "models_used": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "role": "review"
+    }
+  ],
+  "source_refs": [
+    {
+      "kind": "pull_request",
+      "uri": "https://github.com/NateBJones-Projects/OB1/pull/123",
+      "title": "Agent Memory API PR",
+      "timestamp": "2026-05-03T16:00:00Z"
+    }
+  ],
+  "memory_payload": {
+    "decisions": [],
+    "outputs": ["Reviewed PR 123 and confirmed the Agent Memory API keeps OpenClaw metadata as runtime references."],
+    "lessons": ["Agent Memory write-back should store source references instead of full diffs."],
+    "constraints": ["Do not allow inferred memory to become instruction-grade without human confirmation."],
+    "unresolved_questions": ["Should SQLite adapter support ship in v1 or remain a follow-up?"],
+    "next_steps": ["Run contract validation against sample payloads."],
+    "failures": [],
+    "artifacts": [
+      {
+        "kind": "pull_request",
+        "uri": "https://github.com/NateBJones-Projects/OB1/pull/123",
+        "description": "Source PR reviewed by OpenClaw."
+      }
+    ],
+    "entities": {
+      "people": ["Jonathan Edwards"],
+      "repos": ["NateBJones-Projects/OB1"],
+      "files": ["integrations/agent-memory-api/index.ts"],
+      "customers": [],
+      "topics": ["agent memory", "write-back"]
+    }
+  },
+  "provenance": {
+    "default_status": "generated",
+    "confidence": 0.82,
+    "requires_review": true
+  },
+  "retention": {
+    "ttl_days": null,
+    "stale_after_days": 180
+  },
+  "visibility": {
+    "workspace": "restricted",
+    "project": "shared",
+    "channel": "restricted"
+  }
+}

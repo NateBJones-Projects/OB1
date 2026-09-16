@@ -1,0 +1,21 @@
+{
+  "name": "Readwise Import",
+  "description": "One-shot backfill of your Readwise highlight history into Open Brain via the /api/v2/export/ endpoint. Pair with the readwise-capture integration to keep it live.",
+  "category": "recipes",
+  "author": {
+    "name": "Mark Lavercombe",
+    "github": "mlava"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Readwise"],
+    "tools": ["Python 3.10+"]
+  },
+  "requires_skills": [],
+  "tags": ["readwise", "highlights", "import", "backfill", "reading"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-04-24",
+  "updated": "2026-04-24"
+}

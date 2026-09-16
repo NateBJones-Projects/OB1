@@ -1,0 +1,9 @@
+{
+  "used_memory_ids": ["memory_123", "memory_456"],
+  "ignored_memory_ids": ["memory_789"],
+  "usage_notes": {
+    "memory_123": "Used as confirmed project instruction.",
+    "memory_456": "Used as supporting evidence.",
+    "memory_789": "Ignored because it was stale and evidence-only."
+  }
+}

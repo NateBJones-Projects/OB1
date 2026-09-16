@@ -1,0 +1,222 @@
+---
+# Open Brain - Self-hosted on Kubernetes
+# Multi-container pod: PostgreSQL+pgvector + MCP Server (Deno)
+# Containers share network namespace (communicate via 127.0.0.1)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openbrain
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openbrain-init-sql
+  namespace: openbrain
+data:
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS vector;
+
+    CREATE TABLE IF NOT EXISTS thoughts (
+        id BIGSERIAL PRIMARY KEY,
+        content TEXT NOT NULL,
+        embedding vector(1536),
+        metadata JSONB DEFAULT '{}'::jsonb,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_thoughts_created_at ON thoughts (created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_thoughts_metadata ON thoughts USING GIN (metadata);
+
+    CREATE OR REPLACE FUNCTION match_thoughts(
+        query_embedding vector(1536),
+        match_threshold FLOAT DEFAULT 0.5,
+        match_count INT DEFAULT 10,
+        filter JSONB DEFAULT '{}'::jsonb
+    )
+    RETURNS TABLE (
+        id BIGINT,
+        content TEXT,
+        metadata JSONB,
+        similarity FLOAT,
+        created_at TIMESTAMP WITH TIME ZONE
+    )
+    LANGUAGE plpgsql
+    AS $$
+    BEGIN
+        RETURN QUERY
+        SELECT
+            t.id,
+            t.content,
+            t.metadata,
+            (1 - (t.embedding <=> query_embedding))::FLOAT AS similarity,
+            t.created_at
+        FROM thoughts t
+        WHERE 1 - (t.embedding <=> query_embedding) >= match_threshold
+        ORDER BY t.embedding <=> query_embedding
+        LIMIT match_count;
+    END;
+    $$;
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: openbrain
+  namespace: openbrain
+spec:
+  serviceName: "openbrain"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openbrain
+  template:
+    metadata:
+      labels:
+        app: openbrain
+    spec:
+      containers:
+        # Container 1: PostgreSQL + pgvector
+        - name: db
+          image: ankane/pgvector:v0.5.1
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openbrain-secret
+                  key: postgres-password
+            - name: POSTGRES_DB
+              value: "openbrain"
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: db-data
+              mountPath: /var/lib/postgresql/data
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d/init.sql
+              subPath: init.sql
+          readinessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+
+        # Container 2: Open Brain MCP Server (Deno)
+        - name: mcp-server
+          image: openbrain-mcp-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DB_HOST
+              value: "127.0.0.1"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: "openbrain"
+            - name: DB_USER
+              value: "postgres"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: openbrain-secret
+                  key: postgres-password
+            - name: MCP_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openbrain-secret
+                  key: mcp-access-key
+            # Configure your embedding/chat API provider:
+            # For OpenRouter (default):
+            - name: EMBEDDING_API_BASE
+              value: "https://openrouter.ai/api/v1"
+            - name: EMBEDDING_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openbrain-secret
+                  key: embedding-api-key
+            - name: EMBEDDING_MODEL
+              value: "openai/text-embedding-3-small"
+            - name: CHAT_API_BASE
+              value: "https://openrouter.ai/api/v1"
+            - name: CHAT_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openbrain-secret
+                  key: chat-api-key
+            - name: CHAT_MODEL
+              value: "openai/gpt-4o-mini"
+            - name: PORT
+              value: "8000"
+          readinessProbe:
+            tcpSocket:
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+
+      volumes:
+        - name: db-data
+          hostPath:
+            path: /var/openbrain/db
+            type: DirectoryOrCreate
+        - name: init-sql
+          configMap:
+            name: openbrain-init-sql
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openbrain
+  namespace: openbrain
+spec:
+  selector:
+    app: openbrain
+  ports:
+    - protocol: TCP
+      port: 8000
+      targetPort: http
+      name: mcp
+  type: ClusterIP
+
+---
+# Optional: Ingress for remote MCP access
+# Uncomment and configure for your ingress controller
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: openbrain
+#   namespace: openbrain
+# spec:
+#   ingressClassName: nginx  # or traefik, etc.
+#   tls:
+#   - hosts:
+#     - brain.yourdomain.com
+#     secretName: brain-tls
+#   rules:
+#     - host: brain.yourdomain.com
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: openbrain
+#                 port:
+#                   number: 8000

@@ -1,0 +1,38 @@
+name: Update README Contributions
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 9 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Update README recent contributions
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/update-readme-contributions.mjs
+
+      - name: Open README update PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "[docs] Refresh README recent contributions"
+          title: "[docs] Refresh README recent contributions"
+          body: "Automated refresh of the generated Recent Contributions section in README.md."
+          branch: automation/readme-recent-contributions
+          delete-branch: true

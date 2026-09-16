@@ -5,7 +5,7 @@
 -- Recurring or one-time maintenance items
 CREATE TABLE IF NOT EXISTS maintenance_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     name TEXT NOT NULL,
     category TEXT, -- e.g. 'hvac', 'plumbing', 'exterior', 'appliance', 'landscaping'
     frequency_days INTEGER, -- null for one-time tasks; e.g. 90 for quarterly, 365 for annual
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS maintenance_tasks (
 CREATE TABLE IF NOT EXISTS maintenance_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id UUID REFERENCES maintenance_tasks(id) ON DELETE CASCADE NOT NULL,
-    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    user_id UUID NOT NULL,
     completed_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     performed_by TEXT, -- who did the work (self, vendor name, etc.)
     cost DECIMAL(10, 2), -- cost in dollars (or your currency)

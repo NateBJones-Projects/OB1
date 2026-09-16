@@ -1,0 +1,20 @@
+{
+  "name": "Grok Export Import",
+  "description": "Import xAI Grok conversation exports (JSON format with MongoDB-style dates) into Open Brain as searchable thoughts.",
+  "category": "recipes",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OpenRouter API", "Supabase"],
+    "tools": ["Node.js 18+"]
+  },
+  "tags": ["import", "grok", "xai", "conversations", "ai-history"],
+  "difficulty": "beginner",
+  "estimated_time": "15 minutes",
+  "created": "2026-03-15",
+  "updated": "2026-03-15"
+}
