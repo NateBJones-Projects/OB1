@@ -8,12 +8,9 @@ import { createClient } from "@supabase/supabase-js";
 
 import {
   embedText,
-  extractMetadata,
   detectSensitivity,
-  resolveSensitivityTier,
   computeContentFingerprint,
   prepareThoughtPayload,
-  applyEvergreenTag,
   normalizeStringArray,
   safeEmbedding,
   tableExists,
@@ -52,9 +49,8 @@ type ThoughtRow = {
 };
 
 type UpsertThoughtResult = {
-  thought_id: number;
-  action: string;
-  content_fingerprint: string;
+  id: string;
+  fingerprint: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -446,146 +442,15 @@ server.registerTool(
   },
 );
 
-// ── 4. update_thought ───────────────────────────────────────────────────
-
-server.registerTool(
-  "update_thought",
-  {
-    title: "Update Thought",
-    description:
-      "Update the content of an existing thought. Re-generates embedding and metadata.",
-    inputSchema: z.object({
-      id: z.number().int().min(1).describe("Thought ID to update"),
-      content: z
-        .string()
-        .min(1)
-        .describe("New content for the thought"),
-    }),
-  },
-  async (params) => {
-    try {
-      const id = asInteger(
-        (params as Record<string, unknown>).id,
-        0,
-        1,
-        Number.MAX_SAFE_INTEGER,
-      );
-      const content = asString(
-        (params as Record<string, unknown>).content,
-        "",
-      ).trim();
-
-      if (!id) {
-        return toolFailure("id is required");
-      }
-      if (!content) {
-        return toolFailure("content is required");
-      }
-
-      const { data: existing, error: fetchError } = await supabase
-        .from("thoughts")
-        .select("id, content, type, sensitivity_tier, importance, metadata")
-        .eq("id", id)
-        .single();
-
-      if (fetchError || !existing) {
-        return toolFailure(`Thought #${id} not found`);
-      }
-
-      if (existing.sensitivity_tier === "restricted") {
-        return toolFailure("Cannot update restricted thought");
-      }
-
-      const oldType =
-        existing.type ??
-        asString(
-          (existing.metadata as Record<string, unknown>)?.type,
-          "unknown",
-        );
-
-      // Detect sensitivity on the NEW content first so we can reject
-      // restricted updates before paying for embedding + classification.
-      const sensitivity = detectSensitivity(content);
-      if (sensitivity.tier === "restricted") {
-        const reasons =
-          sensitivity.reasons.length > 0
-            ? ` Reasons: ${sensitivity.reasons.join(", ")}.`
-            : "";
-        return toolFailure(
-          "Updated content contains restricted patterns (SSN, credit card, " +
-            "API key, etc). Restricted content is local-only and cannot be " +
-            "stored in cloud MCP." +
-            reasons,
-        );
-      }
-
-      const [embedding, extracted] = await Promise.all([
-        embedText(content),
-        extractMetadata(content),
-      ]);
-
-      const oldMetadata = isRecord(existing.metadata)
-        ? existing.metadata
-        : {};
-      const fingerprint = await computeContentFingerprint(content);
-
-      // Escalation-only tier resolution — never downgrade the stored tier.
-      // If an existing `personal` thought is edited to remove the sensitive
-      // phrasing, the row stays `personal` rather than silently becoming
-      // `standard` and leaking into broad list/search responses. This
-      // matches the invariant enforced in brain_capture_thought's pipeline
-      // via resolveSensitivityTier (existing tier acts as the floor).
-      const resolvedTier = resolveSensitivityTier(
-        sensitivity.tier,
-        existing.sensitivity_tier ?? undefined,
-      );
-
-      const metadata = {
-        ...oldMetadata,
-        type: extracted.type,
-        summary: extracted.summary,
-        topics: extracted.topics,
-        tags: extracted.tags,
-        people: extracted.people,
-        action_items: extracted.action_items,
-        confidence: extracted.confidence,
-        sensitivity_reasons: sensitivity.reasons,
-      };
-
-      const finalizedMetadata = applyEvergreenTag(content, metadata);
-
-      const { error: updateError } = await supabase
-        .from("thoughts")
-        .update({
-          content,
-          content_fingerprint: fingerprint,
-          embedding,
-          type: extracted.type,
-          sensitivity_tier: resolvedTier,
-          importance: existing.importance ?? 3,
-          metadata: finalizedMetadata,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", id);
-
-      if (updateError) {
-        throw new Error(`update_thought failed: ${updateError.message}`);
-      }
-
-      const newType = asString(
-        (finalizedMetadata as Record<string, unknown>).type,
-        "unknown",
-      );
-      return toolSuccess(
-        `Updated thought #${id}. Type: ${oldType} \u2192 ${newType}.`,
-        { id, old_type: oldType, new_type: newType },
-      );
-    } catch (error) {
-      console.error("update_thought failed", error);
-      return toolFailure(String(error));
-    }
-  },
-);
+// ── 4. update_thought (removed) ─────────────────────────────────────────
+//
+// Removed 2026-07-06. This tool declared `id: z.number().int()` but the
+// enhanced-thoughts schema uses UUID primary keys on `thoughts`, so the
+// tool was uncallable — no valid integer would ever match a real row. The
+// working replacement lives in a separate Edge Function at
+// OB1/integrations/update-thought-mcp/ (deployed as
+// mcp__open-brain-update__update_thought) with UUID + metadata_patch +
+// if_unchanged_since optimistic concurrency.
 
 // ── 5. brain_capture_thought ────────────────────────────────────────────
 //
@@ -688,16 +553,21 @@ server.registerTool(
       }
 
       const result = data as UpsertThoughtResult | null;
-      if (!result?.thought_id) {
+      if (!result?.id) {
         throw new Error("upsert_thought returned no result");
       }
 
+      // Reaching the RPC path means the pre-flight fingerprint dedup above
+      // did not find an existing row, so this is a new insert. If a race
+      // slipped past the pre-flight, the SQL function's ON CONFLICT branch
+      // handled it as an update — the row still exists with valid id, so
+      // reporting the outcome as "inserted" is safe for callers.
       return toolSuccess(
-        `${result.action === "inserted" ? "Captured new" : "Updated"} thought #${result.thought_id} as ${prepared.type}.`,
+        `Captured new thought #${result.id} as ${prepared.type}.`,
         {
-          thought_id: result.thought_id,
-          action: result.action,
-          content_fingerprint: result.content_fingerprint,
+          thought_id: result.id,
+          action: "inserted",
+          content_fingerprint: result.fingerprint,
           type: prepared.type,
           sensitivity_tier: prepared.sensitivity_tier,
           metadata: prepared.metadata,
