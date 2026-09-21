@@ -225,7 +225,33 @@ $$ LANGUAGE plpgsql;
 
 > This prevents duplicate thoughts from cluttering your database. When you capture the same thought twice, it merges the metadata instead of creating a second row.
 
-![2.7](https://img.shields.io/badge/2.7-Verify-555?style=for-the-badge&labelColor=F4511E)
+![2.7](https://img.shields.io/badge/2.7-Lock_Down_the_Functions-555?style=for-the-badge&labelColor=F4511E)
+
+New query → paste and Run:
+
+<details>
+<summary>📋 <strong>SQL: Restrict who can call the functions</strong> (click to expand)</summary>
+
+```sql
+-- Postgres lets every role call a new function by default, and Supabase
+-- exposes public functions over its REST API. Only your MCP server
+-- (service_role) needs these two.
+revoke execute on function public.match_thoughts(vector, float, int, jsonb)
+  from public, anon, authenticated;
+revoke execute on function public.upsert_thought(text, jsonb)
+  from public, anon, authenticated;
+
+grant execute on function public.match_thoughts(vector, float, int, jsonb)
+  to service_role;
+grant execute on function public.upsert_thought(text, jsonb)
+  to service_role;
+```
+
+</details>
+
+> Without this, `match_thoughts` and `upsert_thought` can be called at `/rest/v1/rpc/...` by anyone holding your project's publishable key. Row Level Security from step 2.4 still stops those calls from reading or writing thoughts, so this is a second lock rather than a fix for an open door. It means a later change to a function or a policy can't quietly expose your brain. Safe to re-run. If you later redefine either function with a different argument list, run the matching `revoke` again for the new signature.
+
+![2.8](https://img.shields.io/badge/2.8-Verify-555?style=for-the-badge&labelColor=F4511E)
 
 ✅ **Done when:** Table Editor shows the `thoughts` table with columns: id, content, embedding, metadata, content_fingerprint, created_at, updated_at. Database → Functions shows `match_thoughts` and `upsert_thought`.
 
