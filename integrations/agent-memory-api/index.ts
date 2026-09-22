@@ -657,6 +657,18 @@ app.get("/memories/review", async (c) => {
   return c.json({ memories: (data || []).map(responseMemory) }, 200, corsHeaders);
 });
 
+// Same filters as GET /memories/review, without its 100-row cap.
+app.get("/memories/review/count", async (c) => {
+  const workspace_id = c.req.query("workspace_id");
+  if (!workspace_id) return c.json({ error: "workspace_id is required" }, 400, corsHeaders);
+  const project_id = c.req.query("project_id");
+  let q = supabase.from("agent_memories").select("id", { count: "exact", head: true }).eq("workspace_id", workspace_id).eq("review_status", "pending");
+  if (project_id) q = q.eq("project_id", project_id);
+  const { count, error } = await q;
+  if (error) return c.json({ error: error.message }, 500, corsHeaders);
+  return c.json({ count: count ?? 0 }, 200, corsHeaders);
+});
+
 app.get("/memories", async (c) => {
   const workspace_id = c.req.query("workspace_id");
   if (!workspace_id) return c.json({ error: "workspace_id is required" }, 400, corsHeaders);
