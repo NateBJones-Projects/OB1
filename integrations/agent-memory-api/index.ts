@@ -10,6 +10,8 @@ const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const EMBEDDING_TIMEOUT_MS = 2000;
+const EMBEDDING_BATCH_SIZE = 32;
+const EMBEDDING_CONCURRENCY = 4;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -184,7 +186,7 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function getEmbedding(text: string): Promise<number[]> {
+async function requestEmbeddings(input: string[]): Promise<number[][]> {
   const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
     method: "POST",
     headers: {
@@ -193,13 +195,36 @@ async function getEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: "openai/text-embedding-3-small",
-      input: text,
+      input,
     }),
     signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
   });
   if (!r.ok) throw new Error(`OpenRouter embeddings failed: ${r.status} ${await r.text()}`);
   const d = await r.json();
-  return d.data[0].embedding;
+  const data = d.data as { index: number; embedding: number[] }[];
+  if (data.length !== input.length) throw new Error(`OpenRouter embeddings returned ${data.length} vectors for ${input.length} inputs`);
+  return data.sort((a, b) => a.index - b.index).map((item) => item.embedding);
+}
+
+async function getEmbedding(text: string): Promise<number[]> {
+  const [embedding] = await requestEmbeddings([text]);
+  return embedding;
+}
+
+// One request per EMBEDDING_BATCH_SIZE texts, at most EMBEDDING_CONCURRENCY in flight.
+async function getEmbeddings(texts: string[]): Promise<number[][]> {
+  const batches: string[][] = [];
+  for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) batches.push(texts.slice(i, i + EMBEDDING_BATCH_SIZE));
+  const results: number[][][] = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < batches.length) {
+      const i = next++;
+      results[i] = await requestEmbeddings(batches[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(EMBEDDING_CONCURRENCY, batches.length) }, worker));
+  return results.flat();
 }
 
 function isTimeout(err: unknown): boolean {
@@ -473,6 +498,7 @@ app.post("/writeback", async (c) => {
   const model = req.models_used[0]?.model ?? null;
   const defaultInstruction = ["user_confirmed", "imported"].includes(req.provenance.default_status) && !req.provenance.requires_review;
 
+  const planned = [];
   for (const [index, row] of rows.entries()) {
     const content_hash = await sha256Hex(`${row.memory_type}:${row.content}`);
     const baseKey = req.idempotency_key || `${req.workspace_id}:${req.runtime.name}:${req.task_id || "taskless"}:${req.step_id || "step"}:${content_hash}`;
@@ -483,18 +509,26 @@ app.post("/writeback", async (c) => {
       .select("*")
       .eq("idempotency_key", idempotency_key)
       .maybeSingle();
+    planned.push({ row, content_hash, idempotency_key, existing });
+  }
+
+  const pending = planned.filter((p) => !p.existing);
+  let embeddings: number[][];
+  try {
+    embeddings = await getEmbeddings(pending.map((p) => p.row.content));
+  } catch (err) {
+    if (isTimeout(err)) return c.json({ error: "Embedding request timed out" }, 504, corsHeaders);
+    throw err;
+  }
+  const embeddingByKey = new Map(pending.map((p, i) => [p.idempotency_key, embeddings[i]]));
+
+  for (const { row, content_hash, idempotency_key, existing } of planned) {
     if (existing) {
       created.push(existing);
       continue;
     }
 
-    let embedding: number[];
-    try {
-      embedding = await getEmbedding(row.content);
-    } catch (err) {
-      if (isTimeout(err)) return c.json({ error: "Embedding request timed out" }, 504, corsHeaders);
-      throw err;
-    }
+    const embedding = embeddingByKey.get(idempotency_key);
     const { data: upsertResult, error: upsertError } = await supabase.rpc("upsert_thought", {
       p_content: row.content,
       p_payload: {
