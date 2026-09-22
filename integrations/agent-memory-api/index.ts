@@ -13,6 +13,10 @@ const EMBEDDING_TIMEOUT_MS = 2000;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+// Provided by the Supabase Edge Runtime. Declared locally because some Deno
+// versions do not pick up globals from the remote edge-runtime.d.ts import.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-brain-key",
@@ -386,49 +390,59 @@ app.post("/recall", async (c) => {
     .sort((a, b) => b.ranking_score - a.ranking_score)
     .slice(0, req.limits.max_items);
 
-  const { data: trace, error: traceError } = await supabase.from("agent_memory_recall_traces").insert({
-    workspace_id: req.workspace_id,
-    project_id: req.project_id ?? null,
-    runtime_name: req.runtime.name,
-    runtime_version: req.runtime.version ?? null,
-    task_id: req.task_id ?? null,
-    flow_id: req.flow_id ?? null,
-    channel_kind: req.channel.kind ?? null,
-    channel_id: req.channel.id ?? null,
-    query: req.query,
-    schema_version: req.schema_version,
-    request_payload: req,
-    response_policy: { max_items: req.limits.max_items, include_unconfirmed: req.scope.include_unconfirmed },
-  }).select("*").single();
-  if (traceError) return c.json({ error: traceError.message }, 500, corsHeaders);
+  // Trace, item and audit rows are written in the background so they do not
+  // delay the recall response. request_id is generated here so the caller
+  // gets it without waiting for the trace insert.
+  const request_id = crypto.randomUUID();
+  EdgeRuntime.waitUntil((async () => {
+    const { data: trace, error: traceError } = await supabase.from("agent_memory_recall_traces").insert({
+      request_id,
+      workspace_id: req.workspace_id,
+      project_id: req.project_id ?? null,
+      runtime_name: req.runtime.name,
+      runtime_version: req.runtime.version ?? null,
+      task_id: req.task_id ?? null,
+      flow_id: req.flow_id ?? null,
+      channel_kind: req.channel.kind ?? null,
+      channel_id: req.channel.id ?? null,
+      query: req.query,
+      schema_version: req.schema_version,
+      request_payload: req,
+      response_policy: { max_items: req.limits.max_items, include_unconfirmed: req.scope.include_unconfirmed },
+    }).select("id").single();
+    if (traceError) {
+      console.error(`recall trace write failed: ${traceError.message}`);
+      return;
+    }
 
-  if (ranked.length > 0) {
-    await supabase.from("agent_memory_recall_items").insert(ranked.map((memory, index) => ({
+    if (ranked.length > 0) {
+      await supabase.from("agent_memory_recall_items").insert(ranked.map((memory, index) => ({
+        trace_id: trace.id,
+        memory_id: memory.id,
+        rank: index + 1,
+        similarity: memory.similarity,
+        ranking_score: memory.ranking_score,
+        use_policy_snapshot: {
+          can_use_as_instruction: memory.can_use_as_instruction,
+          can_use_as_evidence: memory.can_use_as_evidence,
+          requires_user_confirmation: memory.requires_user_confirmation,
+        },
+      })));
+    }
+
+    await audit("recall_requested", {
+      workspace_id: req.workspace_id,
+      project_id: req.project_id,
       trace_id: trace.id,
-      memory_id: memory.id,
-      rank: index + 1,
-      similarity: memory.similarity,
-      ranking_score: memory.ranking_score,
-      use_policy_snapshot: {
-        can_use_as_instruction: memory.can_use_as_instruction,
-        can_use_as_evidence: memory.can_use_as_evidence,
-        requires_user_confirmation: memory.requires_user_confirmation,
-      },
-    })));
-  }
-
-  await audit("recall_requested", {
-    workspace_id: req.workspace_id,
-    project_id: req.project_id,
-    trace_id: trace.id,
-    runtime_name: req.runtime.name,
-    task_id: req.task_id,
-    returned_count: ranked.length,
-  });
+      runtime_name: req.runtime.name,
+      task_id: req.task_id,
+      returned_count: ranked.length,
+    });
+  })().catch((err) => console.error("recall trace write failed", err)));
 
   return c.json({
     schema_version: recallResponseSchema(req.schema_version),
-    request_id: trace.request_id,
+    request_id,
     memories: ranked.map(responseMemory),
   }, 200, corsHeaders);
 });
