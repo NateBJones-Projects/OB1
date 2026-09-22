@@ -9,6 +9,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const EMBEDDING_TIMEOUT_MS = 2000;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -190,10 +191,15 @@ async function getEmbedding(text: string): Promise<number[]> {
       model: "openai/text-embedding-3-small",
       input: text,
     }),
+    signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
   });
   if (!r.ok) throw new Error(`OpenRouter embeddings failed: ${r.status} ${await r.text()}`);
   const d = await r.json();
   return d.data[0].embedding;
+}
+
+function isTimeout(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "TimeoutError";
 }
 
 function auth(c: { req: { header: (name: string) => string | undefined; url: string } }) {
@@ -341,7 +347,13 @@ app.post("/recall", async (c) => {
   if (!parsed.success) return c.json({ error: "Invalid recall payload", details: parsed.error.flatten() }, 400, corsHeaders);
   const req = parsed.data;
 
-  const embedding = await getEmbedding(req.query);
+  let embedding: number[];
+  try {
+    embedding = await getEmbedding(req.query);
+  } catch (err) {
+    if (isTimeout(err)) return c.json({ error: "Embedding request timed out" }, 504, corsHeaders);
+    throw err;
+  }
   const { data: matches, error: matchError } = await supabase.rpc("match_thoughts", {
     query_embedding: embedding,
     match_threshold: 0.25,
@@ -462,7 +474,13 @@ app.post("/writeback", async (c) => {
       continue;
     }
 
-    const embedding = await getEmbedding(row.content);
+    let embedding: number[];
+    try {
+      embedding = await getEmbedding(row.content);
+    } catch (err) {
+      if (isTimeout(err)) return c.json({ error: "Embedding request timed out" }, 504, corsHeaders);
+      throw err;
+    }
     const { data: upsertResult, error: upsertError } = await supabase.rpc("upsert_thought", {
       p_content: row.content,
       p_payload: {
