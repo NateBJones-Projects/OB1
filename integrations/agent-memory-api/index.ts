@@ -12,6 +12,8 @@ const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 const EMBEDDING_TIMEOUT_MS = 2000;
 const EMBEDDING_BATCH_SIZE = 32;
 const EMBEDDING_CONCURRENCY = 4;
+const QUERY_EMBEDDING_TTL_MS = 60_000;
+const QUERY_EMBEDDING_CACHE_MAX = 128;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -211,6 +213,24 @@ async function getEmbedding(text: string): Promise<number[]> {
   return embedding;
 }
 
+// Short-lived, per-isolate cache for recall query embeddings only. Write-back
+// embeddings and memory content are never cached.
+const queryEmbeddingCache = new Map<string, { embedding: number[]; expires: number }>();
+
+async function getQueryEmbedding(query: string): Promise<number[]> {
+  const cached = queryEmbeddingCache.get(query);
+  if (cached && cached.expires > Date.now()) return cached.embedding;
+  queryEmbeddingCache.delete(query);
+
+  const embedding = await getEmbedding(query);
+  if (queryEmbeddingCache.size >= QUERY_EMBEDDING_CACHE_MAX) {
+    const oldest = queryEmbeddingCache.keys().next().value;
+    if (oldest !== undefined) queryEmbeddingCache.delete(oldest);
+  }
+  queryEmbeddingCache.set(query, { embedding, expires: Date.now() + QUERY_EMBEDDING_TTL_MS });
+  return embedding;
+}
+
 // One request per EMBEDDING_BATCH_SIZE texts, at most EMBEDDING_CONCURRENCY in flight.
 async function getEmbeddings(texts: string[]): Promise<number[][]> {
   const batches: string[][] = [];
@@ -378,7 +398,7 @@ app.post("/recall", async (c) => {
 
   let embedding: number[];
   try {
-    embedding = await getEmbedding(req.query);
+    embedding = await getQueryEmbedding(req.query);
   } catch (err) {
     if (isTimeout(err)) return c.json({ error: "Embedding request timed out" }, 504, corsHeaders);
     throw err;
