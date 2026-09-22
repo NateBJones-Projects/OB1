@@ -9,8 +9,17 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const OPENROUTER_API_KEY = Deno.env.get("OPENROUTER_API_KEY")!;
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+const EMBEDDING_TIMEOUT_MS = 2000;
+const EMBEDDING_BATCH_SIZE = 32;
+const EMBEDDING_CONCURRENCY = 4;
+const QUERY_EMBEDDING_TTL_MS = 60_000;
+const QUERY_EMBEDDING_CACHE_MAX = 128;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// Provided by the Supabase Edge Runtime. Declared locally because some Deno
+// versions do not pick up globals from the remote edge-runtime.d.ts import.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void };
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -179,7 +188,7 @@ async function sha256Hex(text: string): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function getEmbedding(text: string): Promise<number[]> {
+async function requestEmbeddings(input: string[]): Promise<number[][]> {
   const r = await fetch(`${OPENROUTER_BASE}/embeddings`, {
     method: "POST",
     headers: {
@@ -188,12 +197,58 @@ async function getEmbedding(text: string): Promise<number[]> {
     },
     body: JSON.stringify({
       model: "openai/text-embedding-3-small",
-      input: text,
+      input,
     }),
+    signal: AbortSignal.timeout(EMBEDDING_TIMEOUT_MS),
   });
   if (!r.ok) throw new Error(`OpenRouter embeddings failed: ${r.status} ${await r.text()}`);
   const d = await r.json();
-  return d.data[0].embedding;
+  const data = d.data as { index: number; embedding: number[] }[];
+  if (data.length !== input.length) throw new Error(`OpenRouter embeddings returned ${data.length} vectors for ${input.length} inputs`);
+  return data.sort((a, b) => a.index - b.index).map((item) => item.embedding);
+}
+
+async function getEmbedding(text: string): Promise<number[]> {
+  const [embedding] = await requestEmbeddings([text]);
+  return embedding;
+}
+
+// Short-lived, per-isolate cache for recall query embeddings only. Write-back
+// embeddings and memory content are never cached.
+const queryEmbeddingCache = new Map<string, { embedding: number[]; expires: number }>();
+
+async function getQueryEmbedding(query: string): Promise<number[]> {
+  const cached = queryEmbeddingCache.get(query);
+  if (cached && cached.expires > Date.now()) return cached.embedding;
+  queryEmbeddingCache.delete(query);
+
+  const embedding = await getEmbedding(query);
+  if (queryEmbeddingCache.size >= QUERY_EMBEDDING_CACHE_MAX) {
+    const oldest = queryEmbeddingCache.keys().next().value;
+    if (oldest !== undefined) queryEmbeddingCache.delete(oldest);
+  }
+  queryEmbeddingCache.set(query, { embedding, expires: Date.now() + QUERY_EMBEDDING_TTL_MS });
+  return embedding;
+}
+
+// One request per EMBEDDING_BATCH_SIZE texts, at most EMBEDDING_CONCURRENCY in flight.
+async function getEmbeddings(texts: string[]): Promise<number[][]> {
+  const batches: string[][] = [];
+  for (let i = 0; i < texts.length; i += EMBEDDING_BATCH_SIZE) batches.push(texts.slice(i, i + EMBEDDING_BATCH_SIZE));
+  const results: number[][][] = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < batches.length) {
+      const i = next++;
+      results[i] = await requestEmbeddings(batches[i]);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(EMBEDDING_CONCURRENCY, batches.length) }, worker));
+  return results.flat();
+}
+
+function isTimeout(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "TimeoutError";
 }
 
 function auth(c: { req: { header: (name: string) => string | undefined; url: string } }) {
@@ -341,7 +396,13 @@ app.post("/recall", async (c) => {
   if (!parsed.success) return c.json({ error: "Invalid recall payload", details: parsed.error.flatten() }, 400, corsHeaders);
   const req = parsed.data;
 
-  const embedding = await getEmbedding(req.query);
+  let embedding: number[];
+  try {
+    embedding = await getQueryEmbedding(req.query);
+  } catch (err) {
+    if (isTimeout(err)) return c.json({ error: "Embedding request timed out" }, 504, corsHeaders);
+    throw err;
+  }
   const { data: matches, error: matchError } = await supabase.rpc("match_thoughts", {
     query_embedding: embedding,
     match_threshold: 0.25,
@@ -374,49 +435,59 @@ app.post("/recall", async (c) => {
     .sort((a, b) => b.ranking_score - a.ranking_score)
     .slice(0, req.limits.max_items);
 
-  const { data: trace, error: traceError } = await supabase.from("agent_memory_recall_traces").insert({
-    workspace_id: req.workspace_id,
-    project_id: req.project_id ?? null,
-    runtime_name: req.runtime.name,
-    runtime_version: req.runtime.version ?? null,
-    task_id: req.task_id ?? null,
-    flow_id: req.flow_id ?? null,
-    channel_kind: req.channel.kind ?? null,
-    channel_id: req.channel.id ?? null,
-    query: req.query,
-    schema_version: req.schema_version,
-    request_payload: req,
-    response_policy: { max_items: req.limits.max_items, include_unconfirmed: req.scope.include_unconfirmed },
-  }).select("*").single();
-  if (traceError) return c.json({ error: traceError.message }, 500, corsHeaders);
+  // Trace, item and audit rows are written in the background so they do not
+  // delay the recall response. request_id is generated here so the caller
+  // gets it without waiting for the trace insert.
+  const request_id = crypto.randomUUID();
+  EdgeRuntime.waitUntil((async () => {
+    const { data: trace, error: traceError } = await supabase.from("agent_memory_recall_traces").insert({
+      request_id,
+      workspace_id: req.workspace_id,
+      project_id: req.project_id ?? null,
+      runtime_name: req.runtime.name,
+      runtime_version: req.runtime.version ?? null,
+      task_id: req.task_id ?? null,
+      flow_id: req.flow_id ?? null,
+      channel_kind: req.channel.kind ?? null,
+      channel_id: req.channel.id ?? null,
+      query: req.query,
+      schema_version: req.schema_version,
+      request_payload: req,
+      response_policy: { max_items: req.limits.max_items, include_unconfirmed: req.scope.include_unconfirmed },
+    }).select("id").single();
+    if (traceError) {
+      console.error(`recall trace write failed: ${traceError.message}`);
+      return;
+    }
 
-  if (ranked.length > 0) {
-    await supabase.from("agent_memory_recall_items").insert(ranked.map((memory, index) => ({
+    if (ranked.length > 0) {
+      await supabase.from("agent_memory_recall_items").insert(ranked.map((memory, index) => ({
+        trace_id: trace.id,
+        memory_id: memory.id,
+        rank: index + 1,
+        similarity: memory.similarity,
+        ranking_score: memory.ranking_score,
+        use_policy_snapshot: {
+          can_use_as_instruction: memory.can_use_as_instruction,
+          can_use_as_evidence: memory.can_use_as_evidence,
+          requires_user_confirmation: memory.requires_user_confirmation,
+        },
+      })));
+    }
+
+    await audit("recall_requested", {
+      workspace_id: req.workspace_id,
+      project_id: req.project_id,
       trace_id: trace.id,
-      memory_id: memory.id,
-      rank: index + 1,
-      similarity: memory.similarity,
-      ranking_score: memory.ranking_score,
-      use_policy_snapshot: {
-        can_use_as_instruction: memory.can_use_as_instruction,
-        can_use_as_evidence: memory.can_use_as_evidence,
-        requires_user_confirmation: memory.requires_user_confirmation,
-      },
-    })));
-  }
-
-  await audit("recall_requested", {
-    workspace_id: req.workspace_id,
-    project_id: req.project_id,
-    trace_id: trace.id,
-    runtime_name: req.runtime.name,
-    task_id: req.task_id,
-    returned_count: ranked.length,
-  });
+      runtime_name: req.runtime.name,
+      task_id: req.task_id,
+      returned_count: ranked.length,
+    });
+  })().catch((err) => console.error("recall trace write failed", err)));
 
   return c.json({
     schema_version: recallResponseSchema(req.schema_version),
-    request_id: trace.request_id,
+    request_id,
     memories: ranked.map(responseMemory),
   }, 200, corsHeaders);
 });
@@ -447,6 +518,7 @@ app.post("/writeback", async (c) => {
   const model = req.models_used[0]?.model ?? null;
   const defaultInstruction = ["user_confirmed", "imported"].includes(req.provenance.default_status) && !req.provenance.requires_review;
 
+  const planned = [];
   for (const [index, row] of rows.entries()) {
     const content_hash = await sha256Hex(`${row.memory_type}:${row.content}`);
     const baseKey = req.idempotency_key || `${req.workspace_id}:${req.runtime.name}:${req.task_id || "taskless"}:${req.step_id || "step"}:${content_hash}`;
@@ -457,12 +529,26 @@ app.post("/writeback", async (c) => {
       .select("*")
       .eq("idempotency_key", idempotency_key)
       .maybeSingle();
+    planned.push({ row, content_hash, idempotency_key, existing });
+  }
+
+  const pending = planned.filter((p) => !p.existing);
+  let embeddings: number[][];
+  try {
+    embeddings = await getEmbeddings(pending.map((p) => p.row.content));
+  } catch (err) {
+    if (isTimeout(err)) return c.json({ error: "Embedding request timed out" }, 504, corsHeaders);
+    throw err;
+  }
+  const embeddingByKey = new Map(pending.map((p, i) => [p.idempotency_key, embeddings[i]]));
+
+  for (const { row, content_hash, idempotency_key, existing } of planned) {
     if (existing) {
       created.push(existing);
       continue;
     }
 
-    const embedding = await getEmbedding(row.content);
+    const embedding = embeddingByKey.get(idempotency_key);
     const { data: upsertResult, error: upsertError } = await supabase.rpc("upsert_thought", {
       p_content: row.content,
       p_payload: {
@@ -589,6 +675,18 @@ app.get("/memories/review", async (c) => {
   const { data, error } = await q;
   if (error) return c.json({ error: error.message }, 500, corsHeaders);
   return c.json({ memories: (data || []).map(responseMemory) }, 200, corsHeaders);
+});
+
+// Same filters as GET /memories/review, without its 100-row cap.
+app.get("/memories/review/count", async (c) => {
+  const workspace_id = c.req.query("workspace_id");
+  if (!workspace_id) return c.json({ error: "workspace_id is required" }, 400, corsHeaders);
+  const project_id = c.req.query("project_id");
+  let q = supabase.from("agent_memories").select("id", { count: "exact", head: true }).eq("workspace_id", workspace_id).eq("review_status", "pending");
+  if (project_id) q = q.eq("project_id", project_id);
+  const { count, error } = await q;
+  if (error) return c.json({ error: error.message }, 500, corsHeaders);
+  return c.json({ count: count ?? 0 }, 200, corsHeaders);
 });
 
 app.get("/memories", async (c) => {

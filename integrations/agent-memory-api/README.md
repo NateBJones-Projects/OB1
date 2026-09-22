@@ -95,6 +95,7 @@ The API accepts the runtime-neutral core schema versions and the OpenClaw launch
 | `/recall/:request_id/usage` | POST | Report which recalled memories were used or ignored |
 | `/memories` | GET | List memories by workspace, project, status, runtime, type, or task prefix |
 | `/memories/review` | GET | List pending agent-written memories |
+| `/memories/review/count` | GET | Count pending agent-written memories (same filters as `/memories/review`) |
 | `/memories/:id` | GET | Inspect one memory with source/artifact details |
 | `/memories/:id/review` | PATCH | Confirm, edit, reject, restrict, stale, dispute, or supersede |
 | `/recall-traces/:request_id` | GET | Debug what was recalled and how it was used |
