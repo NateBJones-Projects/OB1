@@ -6,15 +6,15 @@
     "name": "Alan Shurafa",
     "github": "alanshurafa"
   },
-  "version": "1.0.0",
+  "version": "1.1.0",
   "requires": {
     "open_brain": true,
-    "services": ["Anthropic API"],
+    "services": ["OpenRouter or any OpenAI-compatible LLM API", "Anthropic API"],
     "tools": ["Node.js 18+"]
   },
-  "tags": ["classifier", "llm", "anthropic", "reasoning", "edges"],
+  "tags": ["classifier", "llm", "anthropic", "openai-compatible", "reasoning", "edges"],
   "difficulty": "advanced",
   "estimated_time": "45 minutes",
   "created": "2026-04-17",
-  "updated": "2026-04-17"
+  "updated": "2026-09-26"
 }

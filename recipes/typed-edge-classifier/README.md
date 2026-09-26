@@ -16,7 +16,7 @@ Walks candidate pairs of thoughts (pairs that share at least N entities via `tho
 - [`schemas/typed-reasoning-edges/`](../../schemas/typed-reasoning-edges/) applied (this recipe writes to `thought_edges`)
 - [`entity-extraction` schema (PR #197)](https://github.com/NateBJones-Projects/OB1/pull/197) applied — this is where candidate pairs come from (thoughts that share entities via `thought_entities`). You can skip this if you only ever pass explicit `--pair UUID_A,UUID_B`.
 - Node.js 18+
-- An LLM API key — `OPENROUTER_API_KEY` (preferred — one key covers every OB1 recipe) or `ANTHROPIC_API_KEY` (direct, retained for back-compat)
+- An LLM credential — `OPENROUTER_API_KEY` (preferred — one key covers every OB1 recipe), `ANTHROPIC_API_KEY` (direct, retained for back-compat), or `LLM_API_KEY` + `LLM_BASE_URL` for a self-hosted or any OpenAI-compatible router (see [Self-hosted or OpenAI-compatible router](#self-hosted-or-openai-compatible-router))
 
 ## Credential Tracker
 
@@ -34,6 +34,10 @@ LLM PROVIDER (pick ONE)
   OpenRouter key:        ____________   -> OPENROUTER_API_KEY   (preferred)
   -- OR --
   Anthropic key:         ____________   -> ANTHROPIC_API_KEY    (direct)
+  -- OR --
+  Router base URL:       ____________   -> LLM_BASE_URL         (self-hosted / OpenAI-compatible;
+                                                                  default https://openrouter.ai/api/v1)
+  Router key:            ____________   -> LLM_API_KEY          (falls back to OPENROUTER_API_KEY)
 
 COST CAP FOR FIRST RUN
   Max USD:               ____________   (recommend $1-2 for a dry run first)
@@ -55,9 +59,13 @@ COST CAP FOR FIRST RUN
 
    # Option B — Anthropic direct (retained for back-compat)
    export ANTHROPIC_API_KEY="sk-ant-..."
+
+   # Option C — self-hosted or any OpenAI-compatible router (LiteLLM, vLLM, Ollama, ...)
+   export LLM_BASE_URL="http://localhost:4000/v1"   # requests go to ${LLM_BASE_URL}/chat/completions
+   export LLM_API_KEY="..."
    ```
 
-   When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are auto-prefixed with `anthropic/` so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`).
+   When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are auto-prefixed with `anthropic/` so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`). Any other `LLM_BASE_URL` host receives model names exactly as given — see [Self-hosted or OpenAI-compatible router](#self-hosted-or-openai-compatible-router).
 
 3. Run a **dry run** first with a small limit and a low cost cap:
 
@@ -95,9 +103,63 @@ The default pipeline is two-stage:
 
 You can disable the hybrid and run a single model end-to-end with `--model <model>` (e.g., `--model claude-haiku-4-5-20251001` for a cheap pass).
 
+## Self-hosted or OpenAI-compatible router
+
+The classifier honours the same `LLM_BASE_URL` / `LLM_API_KEY` convention as the sibling recipes [`entity-wiki`](../entity-wiki/) and [`wiki-synthesis`](../wiki-synthesis/), so one env block can drive the whole [`wiki-compiler`](../wiki-compiler/) pipeline against a local router without `--skip-edges`. Nothing changes when these variables are unset: the defaults are OpenRouter and `api.anthropic.com`, exactly as before.
+
+```bash
+export OPEN_BRAIN_URL="https://YOUR-PROJECT.supabase.co"
+export OPEN_BRAIN_SERVICE_KEY="..."                     # service_role key — server-side only
+
+export LLM_BASE_URL="http://localhost:4000/v1"          # OpenAI-compatible; the script POSTs to ${LLM_BASE_URL}/chat/completions
+export LLM_API_KEY="..."                                # bearer token for that endpoint; falls back to OPENROUTER_API_KEY
+
+# Optional
+export LLM_PROVIDER="openrouter"                        # force the generic path ("anthropic" forces the direct path)
+export ANTHROPIC_BASE_URL="https://api.anthropic.com"   # base for the direct path, if you proxy it; POSTs to ${ANTHROPIC_BASE_URL}/v1/messages
+```
+
+| Variable | Default | Effect |
+|---|---|---|
+| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` | Base of an OpenAI-compatible chat-completions API. Trailing slashes are stripped. Setting it selects the generic path. |
+| `LLM_API_KEY` | falls back to `OPENROUTER_API_KEY` | Bearer token sent as `Authorization: Bearer ...`. Setting it selects the generic path. |
+| `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Base for the direct Anthropic Messages path (`ANTHROPIC_API_KEY`). |
+| `LLM_PROVIDER` | auto-detected | `openrouter` = generic OpenAI-compatible path (the name is historical), `anthropic` = direct path. Anything else is rejected at startup. |
+
+**Provider selection.** An explicit `LLM_PROVIDER` always wins. Otherwise, setting any of `LLM_BASE_URL`, `LLM_API_KEY` or `OPENROUTER_API_KEY` selects the generic path (so OpenRouter still beats a direct key when both legacy keys are set), and `ANTHROPIC_API_KEY` alone selects the direct path. The startup log prints the resolved provider and endpoint:
+
+```
+[classify-edges] llm provider=openrouter endpoint=http://localhost:4000/v1/chat/completions
+```
+
+**Prefixing rule.** Bare Anthropic model names are prefixed with `anthropic/` **only** when the `LLM_BASE_URL` host is `openrouter.ai`. Every other host — including a router that happens to proxy Anthropic models — receives the model string exactly as given, because a self-hosted router defines its own aliases.
+
+**Router aliases.** `--filter-model`, `--classify-model` and `--model` take whatever names your router understands:
+
+```bash
+node classify-edges.mjs --limit 10 --dry-run \
+  --filter-model local-fast --classify-model local-strong
+```
+
+The defaults (`claude-haiku-4-5-20251001` for the filter, `claude-opus-4-7` for classification) are sent untouched too, so either pass the flags above or teach your router those two aliases. `wiki-compiler` does not forward model flags, so a pipeline run through it relies on the router aliasing the default names.
+
+**Cost estimation on a custom host.** Router aliases cannot appear in the hand-maintained `PRICING` map. When the active endpoint is a host other than `openrouter.ai` or `api.anthropic.com`, an unknown model does **not** trigger the pricing-unknown refusal: the classifier prints one notice line, estimates that model at $0, and `--max-cost-usd` keeps applying to any model the table does know. If your endpoint bills per token, add rows to `PRICING` so the cap stays meaningful. On the two public hosts the guard is unchanged.
+
+```
+[classify-edges] note: no pricing entry for model(s) local-fast, local-strong; localhost:4000 is not a public metered host, so their spend is estimated at $0 and --max-cost-usd only tracks models in PRICING.
+```
+
+**Routers without authentication.** `LLM_API_KEY` is still required (matching the sibling recipes). For a router that ignores auth, set it to any placeholder; the bearer header is sent and ignored.
+
+**Tests.** The recipe ships a dependency-free `node:test` suite that stands up a local http server and checks the URL, auth header and payload reached for every provider / base-URL combination, plus the prefixing and pricing rules:
+
+```bash
+node --test recipes/typed-edge-classifier/test/*.test.mjs
+```
+
 ## Cost bound
 
-> **Pricing disclaimer.** The `--max-cost-usd` cap uses a hand-maintained `PRICING` map in `classify-edges.mjs` that is updated manually. Check [Anthropic's pricing page](https://www.anthropic.com/pricing) before large runs. If you run with a model that is NOT in the PRICING map, the classifier will **refuse to run** when `--max-cost-usd` is set, and will log `WARNING: no pricing info for model "X"` otherwise. Pass `--no-cost-cap` to explicitly acknowledge an uncapped run; see "Pricing-unknown guard" below.
+> **Pricing disclaimer.** The `--max-cost-usd` cap uses a hand-maintained `PRICING` map in `classify-edges.mjs` that is updated manually. Check [Anthropic's pricing page](https://www.anthropic.com/pricing) before large runs. If you run with a model that is NOT in the PRICING map, the classifier will **refuse to run** when `--max-cost-usd` is set, and will log `WARNING: no pricing info for model "X"` otherwise. Pass `--no-cost-cap` to explicitly acknowledge an uncapped run; see "Pricing-unknown guard" below. The one exception is a custom `LLM_BASE_URL` / `ANTHROPIC_BASE_URL` host, where an unknown model is a one-line notice and a $0 estimate instead (see [Self-hosted or OpenAI-compatible router](#self-hosted-or-openai-compatible-router)).
 
 | Stage | Rough tokens / pair | Model | Approx cost / pair |
 |---|---|---|---|
@@ -112,6 +174,7 @@ The classifier refuses to start when all of these are true:
 
 1. `--max-cost-usd` is set (which is the default at $5.00).
 2. At least one of the models actually going to be called (filter model, classify model, or `--model`) is not present in the `PRICING` map in `classify-edges.mjs`.
+3. The active endpoint is one of the public metered hosts (`openrouter.ai` or `api.anthropic.com`). On any other host — a self-hosted router via `LLM_BASE_URL`, or a proxy via `ANTHROPIC_BASE_URL` — the refusal becomes a single notice and the unknown model is estimated at $0.
 
 Error looks like:
 
@@ -244,8 +307,14 @@ For now: flag off by default, behavior documented, decision deferred to dev-revi
 
 ## Troubleshooting
 
-**Issue: `Missing env vars: OPEN_BRAIN_URL, OPEN_BRAIN_SERVICE_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY`**
-Solution: Export `OPEN_BRAIN_URL` + `OPEN_BRAIN_SERVICE_KEY` plus one LLM provider key (either `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`). The service-role key is required because the classifier writes to `thought_edges` directly via PostgREST; the anon key won't have permission. Never commit any of these keys or paste them into a browser-facing app.
+**Issue: `Missing env vars: OPEN_BRAIN_URL, OPEN_BRAIN_SERVICE_KEY, LLM_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY`**
+Solution: Export `OPEN_BRAIN_URL` + `OPEN_BRAIN_SERVICE_KEY` plus one LLM credential (`OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, or `LLM_API_KEY` for a router set via `LLM_BASE_URL`). The service-role key is required because the classifier writes to `thought_edges` directly via PostgREST; the anon key won't have permission. Never commit any of these keys or paste them into a browser-facing app.
+
+**Issue: `Missing env vars: LLM_API_KEY (or OPENROUTER_API_KEY)` although `ANTHROPIC_API_KEY` is set**
+Solution: `LLM_BASE_URL` (or `LLM_API_KEY`, or an explicit `LLM_PROVIDER=openrouter`) selects the generic OpenAI-compatible path, which needs its own bearer token. Either export `LLM_API_KEY`, or unset the `LLM_*` variables (or set `LLM_PROVIDER=anthropic`) to use the direct Anthropic path.
+
+**Issue: `LLM localhost:4000 my-alias: 404 ...` or `... 400 ... model not found`**
+Solution: The router at `LLM_BASE_URL` does not know that model name. Model strings are sent untouched to non-OpenRouter hosts, so check the alias in your router's model list, and pass it via `--filter-model` / `--classify-model` / `--model` (the defaults `claude-haiku-4-5-20251001` and `claude-opus-4-7` are sent as-is too). A 404 on every call usually means `LLM_BASE_URL` is missing its version segment — the script appends `/chat/completions`, so for most routers the base ends in `/v1`.
 
 **Issue: `Candidate sampling requires thought_entities (from schemas/entity-extraction/)`**
 Solution: Either apply the `entity-extraction` schema (so this recipe has a pool to sample from), or skip sampling entirely by passing `--pair UUID_A,UUID_B` for each pair you want classified.
@@ -253,7 +322,7 @@ Solution: Either apply the `entity-extraction` schema (so this recipe has a pool
 **Issue: Classifier returns `filter_rejected` for most pairs**
 Solution: That's usually correct — most co-mentioning pairs don't have a reasoning relation. If you're sure there are real relations being missed, try `--no-hybrid` to send every pair to Opus directly. Be warned: cost goes up roughly 15-20x.
 
-**Issue: `Anthropic claude-opus-4-7: 429` or `OpenRouter anthropic/claude-opus-4-7: 429` (rate limit)**
+**Issue: `Anthropic claude-opus-4-7: 429`, `OpenRouter anthropic/claude-opus-4-7: 429` or `LLM <host> <model>: 429` (rate limit)**
 Solution: The classifier retries 429 and 5xx responses automatically with exponential backoff + jitter (base 1s, doubles each attempt, capped at 60s, up to 5 retries per call). You will see `[classify-edges] LLM ... 429: retry N/5 in Nms` lines on each retry. If retries still run out, drop `--parallelism` to 1 or 2; sustained 429s usually mean the account-level rate limit is saturated, not a transient burst.
 
 **Issue: Duplicate-key errors on insert**
