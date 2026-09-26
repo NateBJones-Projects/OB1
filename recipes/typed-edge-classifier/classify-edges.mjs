@@ -38,14 +38,32 @@
  *   OPEN_BRAIN_URL            e.g. https://YOUR-PROJECT.supabase.co
  *   OPEN_BRAIN_SERVICE_KEY    service_role key (server-side only!)
  *
- *   And ONE of (OpenRouter is preferred to match the rest of OB1's recipes):
- *     OPENROUTER_API_KEY      sk-or-v1-...   (routes to Anthropic models)
+ *   And ONE LLM credential (OpenRouter is preferred to match the rest of
+ *   OB1's recipes):
+ *     LLM_API_KEY             bearer token for an OpenAI-compatible
+ *                             chat-completions API (OpenRouter by default,
+ *                             or any router via LLM_BASE_URL)
+ *     OPENROUTER_API_KEY      sk-or-v1-...   (fallback for LLM_API_KEY)
  *     ANTHROPIC_API_KEY       sk-ant-...     (direct, retained for back-compat)
  *
- *   When using OpenRouter, the default models (claude-haiku-4-5-20251001
- *   and claude-opus-4-7) are auto-prefixed with "anthropic/". Pass an
- *   already-prefixed string (e.g. "anthropic/claude-haiku-4-5") via
- *   --filter-model / --classify-model to override.
+ * OPTIONAL ENV VARS
+ *   LLM_BASE_URL              default https://openrouter.ai/api/v1. Base of
+ *                             an OpenAI-compatible API; requests go to
+ *                             ${LLM_BASE_URL}/chat/completions. Setting it
+ *                             (or LLM_API_KEY) selects the generic path.
+ *   ANTHROPIC_BASE_URL        default https://api.anthropic.com. Base for
+ *                             the direct path; requests go to
+ *                             ${ANTHROPIC_BASE_URL}/v1/messages.
+ *   LLM_PROVIDER              "openrouter" (the generic OpenAI-compatible
+ *                             path) or "anthropic". Auto-detected from the
+ *                             keys when unset.
+ *
+ *   Bare model names (claude-haiku-4-5-20251001, claude-opus-4-7) are
+ *   auto-prefixed with "anthropic/" ONLY when LLM_BASE_URL points at
+ *   openrouter.ai. Any other host receives the name exactly as given, so a
+ *   self-hosted router's own aliases work via --filter-model /
+ *   --classify-model / --model. Pass an already-prefixed string (e.g.
+ *   "anthropic/claude-haiku-4-5") to bypass the OpenRouter prefixing.
  *
  * USAGE
  *   node classify-edges.mjs --dry-run
@@ -55,11 +73,26 @@
  *   node classify-edges.mjs --mirror-supersedes  # optional, OFF by default
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 // ── constants ──────────────────────────────────────────────────────────────
 
 const CLASSIFIER_VERSION = "typed-edge-classifier-1.0.0";
+
+// Default endpoints. The generic path speaks OpenAI-flavoured chat
+// completions (OpenRouter, LiteLLM, vLLM, Ollama, ...); the direct path
+// speaks the Anthropic Messages API. Both are overridable from the env so a
+// deployment can point the whole wiki-compiler pipeline at a local router.
+const DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
+// Accepted LLM_PROVIDER values. "openrouter" is the generic
+// OpenAI-compatible path (it kept its historical name so existing logs and
+// env files keep meaning the same thing).
+const LLM_PROVIDERS = new Set(["openrouter", "anthropic"]);
 
 // Must match the CHECK constraint in schemas/typed-reasoning-edges/schema.sql
 const TYPED_RELATIONS = new Set([
@@ -122,14 +155,32 @@ function estimateCost(model, inTokens, outTokens) {
  * no cap at all — which is exactly the pricing-drift failure mode that
  * WARN-1 in REVIEW.md calls out. Better to fail loudly at startup than
  * to under-report spend.
+ *
+ * Exception: when `env` says the active endpoint is NOT one of the public
+ * metered hosts (openrouter.ai, api.anthropic.com), the operator has
+ * pointed the recipe at their own router. Router aliases cannot be in
+ * PRICING and the spend is their own hardware, so an unknown model is
+ * estimated at $0 with a single notice line instead of a refusal.
+ * --max-cost-usd keeps working for any model the table does know.
  */
-function assertPricingKnown(args) {
+function assertPricingKnown(args, env) {
   const used = new Set();
   if (args.hybrid) used.add(args.filterModel);
   used.add(args.singleModel || args.classifyModel);
 
   const unknown = [...used].filter((m) => !PRICING[normalizeModelForPricing(m)]);
   if (unknown.length === 0) return;
+
+  if (env && !isPublicMeteredHost(activeEndpoint(env))) {
+    // Mark them seen so estimateCost does not repeat the warning per call.
+    for (const m of unknown) _warnedUnknownPricing.add(m);
+    console.log(
+      `[classify-edges] note: no pricing entry for model(s) ${unknown.join(", ")}; ` +
+        `${hostLabel(activeEndpoint(env))} is not a public metered host, so their spend is ` +
+        `estimated at $0 and --max-cost-usd only tracks models in PRICING.`,
+    );
+    return;
+  }
 
   if (args.noCostCap) {
     console.warn(
@@ -249,27 +300,80 @@ function printHelp() {
       "                           is classified. OFF by default (requires the",
       "                           provenance-chains schema).",
       "",
+      "Environment:",
+      "  OPEN_BRAIN_URL           Supabase project URL (required)",
+      "  OPEN_BRAIN_SERVICE_KEY   service_role key, server-side only (required)",
+      "  LLM_API_KEY              Bearer token for an OpenAI-compatible chat-completions",
+      "                           API; falls back to OPENROUTER_API_KEY",
+      `  LLM_BASE_URL             Base URL of that API (default ${DEFAULT_LLM_BASE_URL});`,
+      "                           set it to use a self-hosted router",
+      "  ANTHROPIC_API_KEY        Direct Anthropic path, used when no LLM_* variable is set",
+      `  ANTHROPIC_BASE_URL       Base URL for the direct path (default ${DEFAULT_ANTHROPIC_BASE_URL})`,
+      '  LLM_PROVIDER             Force "openrouter" (generic path) or "anthropic";',
+      "                           auto-detected from the keys when unset",
+      "",
+      '  Bare model names are prefixed with "anthropic/" only when LLM_BASE_URL points',
+      "  at openrouter.ai. Any other host receives --filter-model / --classify-model /",
+      "  --model exactly as given, so router aliases work untouched.",
+      "",
     ].join("\n"),
   );
 }
 
-function loadEnv() {
-  const env = process.env;
+/**
+ * Read configuration from `source` (process.env by default; tests pass a
+ * plain object). Resolves the LLM provider, endpoint and credential:
+ *
+ *   generic  — any OpenAI-compatible chat-completions API. Endpoint is
+ *              LLM_BASE_URL (default OpenRouter), credential is LLM_API_KEY
+ *              falling back to OPENROUTER_API_KEY. This is the convention
+ *              entity-wiki and wiki-synthesis already use, so one env block
+ *              drives the whole wiki-compiler pipeline.
+ *   anthropic — the Messages API at ANTHROPIC_BASE_URL (default
+ *              api.anthropic.com) with ANTHROPIC_API_KEY. Retained so
+ *              existing direct-key users see no change.
+ *
+ * Provider precedence: an explicit LLM_PROVIDER wins. Otherwise setting
+ * LLM_BASE_URL, LLM_API_KEY or OPENROUTER_API_KEY selects the generic path
+ * (OpenRouter wins when both an OpenRouter and an Anthropic key are set,
+ * matching entity-extraction-worker), and ANTHROPIC_API_KEY alone selects
+ * the direct path.
+ */
+function loadEnv(source = process.env) {
+  const env = source;
   const missing = [];
   for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY"]) {
     if (!env[k]) missing.push(k);
   }
-  // Need at least one LLM provider key. Prefer OpenRouter to match the
-  // multi-provider pattern in entity-extraction-worker (and so a single
-  // OPENROUTER_API_KEY can serve every recipe in OB1).
-  const hasOpenrouter = Boolean(env.OPENROUTER_API_KEY);
-  const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
-  if (!hasOpenrouter && !hasAnthropic) {
-    missing.push("OPENROUTER_API_KEY or ANTHROPIC_API_KEY");
+
+  const llmBaseUrl = normalizeBaseUrl(env.LLM_BASE_URL) || DEFAULT_LLM_BASE_URL;
+  const llmApiKey = env.LLM_API_KEY || env.OPENROUTER_API_KEY || "";
+  const anthropicBaseUrl = normalizeBaseUrl(env.ANTHROPIC_BASE_URL) || DEFAULT_ANTHROPIC_BASE_URL;
+  const anthropicApiKey = env.ANTHROPIC_API_KEY || "";
+
+  let provider = String(env.LLM_PROVIDER || "").trim().toLowerCase();
+  if (provider && !LLM_PROVIDERS.has(provider)) {
+    throw new Error(
+      `LLM_PROVIDER="${env.LLM_PROVIDER}" is not recognised; use "openrouter" ` +
+        `(any OpenAI-compatible endpoint, see LLM_BASE_URL) or "anthropic".`,
+    );
+  }
+  if (!provider) {
+    if (env.LLM_BASE_URL || env.LLM_API_KEY || env.OPENROUTER_API_KEY) provider = "openrouter";
+    else if (anthropicApiKey) provider = "anthropic";
+  }
+
+  if (provider === "anthropic") {
+    if (!anthropicApiKey) missing.push("ANTHROPIC_API_KEY");
+  } else if (provider === "openrouter") {
+    if (!llmApiKey) missing.push("LLM_API_KEY (or OPENROUTER_API_KEY)");
+  } else {
+    missing.push("LLM_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY");
   }
   if (missing.length > 0) {
     throw new Error(`Missing env vars: ${missing.join(", ")}`);
   }
+
   // Normalize URL — allow OPEN_BRAIN_URL with or without trailing slash,
   // with or without /rest/v1. Store the base project URL.
   let base = String(env.OPEN_BRAIN_URL).replace(/\/+$/, "");
@@ -277,9 +381,11 @@ function loadEnv() {
   return {
     OPEN_BRAIN_URL: base,
     OPEN_BRAIN_SERVICE_KEY: env.OPEN_BRAIN_SERVICE_KEY,
-    OPENROUTER_API_KEY: env.OPENROUTER_API_KEY || "",
-    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY || "",
-    LLM_PROVIDER: hasOpenrouter ? "openrouter" : "anthropic",
+    LLM_PROVIDER: provider,
+    LLM_BASE_URL: llmBaseUrl,
+    LLM_API_KEY: llmApiKey,
+    ANTHROPIC_BASE_URL: anthropicBaseUrl,
+    ANTHROPIC_API_KEY: anthropicApiKey,
   };
 }
 
@@ -287,19 +393,72 @@ function loadEnv() {
 //
 // Both providers accept the same conceptual call (system prompt + user
 // message + max_tokens) but differ in payload shape, response shape, and
-// auth headers. resolveModel/resolveProvider/normalizeModelForPricing
-// keep that switch contained so callLlmOnce stays readable.
+// auth headers. resolveModel/normalizeModelForPricing and the host helpers
+// keep that switch contained so callAnthropicOnce stays readable.
+
+function normalizeBaseUrl(value) {
+  if (!value) return "";
+  return String(value).trim().replace(/\/+$/, "");
+}
+
+/** Lower-cased hostname of a URL, or "" when it does not parse. */
+function hostOf(url) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/** host[:port] for log lines; falls back to the raw string. */
+function hostLabel(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return String(url);
+  }
+}
+
+function isOpenRouterHost(baseUrl) {
+  const host = hostOf(baseUrl);
+  return host === "openrouter.ai" || host.endsWith(".openrouter.ai");
+}
+
+function isAnthropicHost(baseUrl) {
+  const host = hostOf(baseUrl);
+  return host === "anthropic.com" || host.endsWith(".anthropic.com");
+}
+
+/**
+ * The two hosts whose per-token billing PRICING models. Anything else is
+ * an operator-controlled endpoint (self-hosted router, proxy) whose cost
+ * the table cannot know.
+ */
+function isPublicMeteredHost(url) {
+  return isOpenRouterHost(url) || isAnthropicHost(url);
+}
+
+/** Full URL the active provider will POST to. */
+function activeEndpoint(env) {
+  return env.LLM_PROVIDER === "anthropic"
+    ? `${env.ANTHROPIC_BASE_URL}/v1/messages`
+    : `${env.LLM_BASE_URL}/chat/completions`;
+}
 
 /**
  * When the operator passes a bare Anthropic model name like
- * "claude-haiku-4-5-20251001" but the active provider is OpenRouter,
- * prefix it with "anthropic/" so OpenRouter routes correctly. Already-
- * prefixed names ("anthropic/...", "openai/...", etc.) pass through.
+ * "claude-haiku-4-5-20251001" and the generic path is pointed at
+ * OpenRouter, prefix it with "anthropic/" so OpenRouter routes correctly.
+ * Already-prefixed names ("anthropic/...", "openai/...", etc.) pass
+ * through, and so does EVERY name when the base URL is any other host: a
+ * self-hosted router defines its own aliases and must receive them
+ * untouched.
  */
-function resolveModel(model, provider) {
+function resolveModel(model, provider, baseUrl = DEFAULT_LLM_BASE_URL) {
   if (provider !== "openrouter") return model;
   if (!model) return model;
   if (model.includes("/")) return model;
+  if (!isOpenRouterHost(baseUrl)) return model;
   return `anthropic/${model}`;
 }
 
@@ -479,18 +638,19 @@ function backoffDelayMs(attempt) {
 }
 
 async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
-  // Provider router. OpenRouter takes priority when both keys are set
-  // (matches entity-extraction-worker preference order). The shared
-  // retry policy in callAnthropic treats 429 + 5xx as retryable for
-  // both providers, which their public docs confirm.
+  // Provider router. loadEnv has already resolved LLM_PROVIDER (generic
+  // OpenAI-compatible path vs. direct Anthropic). The shared retry policy
+  // in callAnthropic treats 429 + 5xx as retryable for both paths, which
+  // the public docs of both API shapes confirm.
   if (env.LLM_PROVIDER === "openrouter") {
-    return callOpenRouterOnce(env, model, system, userMsg, maxTokens);
+    return callChatCompletionsOnce(env, model, system, userMsg, maxTokens);
   }
   return callAnthropicDirectOnce(env, model, system, userMsg, maxTokens);
 }
 
 async function callAnthropicDirectOnce(env, model, system, userMsg, maxTokens) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const baseUrl = env.ANTHROPIC_BASE_URL || DEFAULT_ANTHROPIC_BASE_URL;
+  const res = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "x-api-key": env.ANTHROPIC_API_KEY,
@@ -521,17 +681,20 @@ async function callAnthropicDirectOnce(env, model, system, userMsg, maxTokens) {
   };
 }
 
-async function callOpenRouterOnce(env, model, system, userMsg, maxTokens) {
-  // OpenRouter speaks OpenAI-flavored chat completions. The Anthropic
-  // "system" parameter becomes the first message with role:"system";
+async function callChatCompletionsOnce(env, model, system, userMsg, maxTokens) {
+  // Generic OpenAI-flavored chat completions: OpenRouter by default, or
+  // whatever LLM_BASE_URL points at. The Anthropic "system" parameter
+  // becomes the first message with role:"system";
   // response.choices[0].message.content carries the text; usage uses
-  // prompt_tokens / completion_tokens. Auto-prefix bare Anthropic
-  // model names with "anthropic/" so callers don't have to.
-  const routedModel = resolveModel(model, "openrouter");
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // prompt_tokens / completion_tokens. Bare Anthropic model names are
+  // auto-prefixed with "anthropic/" only for OpenRouter (see resolveModel).
+  const baseUrl = env.LLM_BASE_URL || DEFAULT_LLM_BASE_URL;
+  const routedModel = resolveModel(model, "openrouter", baseUrl);
+  const label = isOpenRouterHost(baseUrl) ? "OpenRouter" : `LLM ${hostLabel(baseUrl)}`;
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      "authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+      "authorization": `Bearer ${env.LLM_API_KEY}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({
@@ -545,7 +708,7 @@ async function callOpenRouterOnce(env, model, system, userMsg, maxTokens) {
   });
   if (!res.ok) {
     const body = await res.text();
-    const err = new Error(`OpenRouter ${routedModel}: ${res.status} ${body.slice(0, 400)}`);
+    const err = new Error(`${label} ${routedModel}: ${res.status} ${body.slice(0, 400)}`);
     err.status = res.status;
     err.retryable = shouldRetryAnthropicStatus(res.status);
     throw err;
@@ -950,14 +1113,15 @@ async function processInChunks(items, fn, parallelism, costState, maxCostUsd, wo
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const env = loadEnv();
 
   // Preflight: if any model we're about to call has no pricing entry,
   // refuse to run with --max-cost-usd unless --no-cost-cap is set. See
   // WARN-1 in REVIEW.md. This catches the "unknown model silently runs
-  // uncapped" failure mode before any LLM spend.
-  assertPricingKnown(args);
+  // uncapped" failure mode before any LLM spend. (Needs env: a custom
+  // LLM_BASE_URL / ANTHROPIC_BASE_URL host downgrades this to a notice.)
+  assertPricingKnown(args, env);
 
-  const env = loadEnv();
   const sb = sbClient(env);
 
   let pairs;
@@ -980,6 +1144,7 @@ async function main() {
       ` | max-cost=$${args.maxCostUsd.toFixed(2)}` +
       ` | mirror-supersedes=${args.mirrorSupersedes}`,
   );
+  console.log(`[classify-edges] llm provider=${env.LLM_PROVIDER} endpoint=${activeEndpoint(env)}`);
 
   const costState = { spent: 0 };
   // Worst-case per-pair cost for the hard cost cap. In hybrid mode this
@@ -1023,7 +1188,43 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("[classify-edges] FAILED:", err.message);
-  process.exit(1);
-});
+// ── entry point ────────────────────────────────────────────────────────────
+//
+// Only run main() when this file is the script Node was asked to execute.
+// `import`ing it (the test suite does) just exposes the helpers below.
+
+function isEntryPoint() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  let resolved = path.resolve(entry);
+  try {
+    resolved = fs.realpathSync(resolved);
+  } catch {
+    // Keep the unresolved path; the comparison below simply fails.
+  }
+  return import.meta.url === pathToFileURL(resolved).href;
+}
+
+if (isEntryPoint()) {
+  main().catch((err) => {
+    console.error("[classify-edges] FAILED:", err.message);
+    process.exit(1);
+  });
+}
+
+export {
+  DEFAULT_ANTHROPIC_BASE_URL,
+  DEFAULT_LLM_BASE_URL,
+  PRICING,
+  assertPricingKnown,
+  callAnthropic,
+  callAnthropicOnce,
+  estimateCost,
+  isOpenRouterHost,
+  isPublicMeteredHost,
+  loadEnv,
+  normalizeModelForPricing,
+  parseArgs,
+  resolveModel,
+  worstCasePerPair,
+};
