@@ -295,7 +295,8 @@ test("assertPricingKnown: --no-cost-cap still acknowledges on a metered host", (
 });
 
 test("assertPricingKnown: known default models are silent on every host", () => {
-  const args = parseArgs([]);
+  // Explicit empty source: the developer's shell may export LLM_*MODEL.
+  const args = parseArgs([], {});
   for (const env of [
     loadEnv({ ...BASE, OPENROUTER_API_KEY: "k" }),
     loadEnv({ ...BASE, ANTHROPIC_API_KEY: "k" }),
