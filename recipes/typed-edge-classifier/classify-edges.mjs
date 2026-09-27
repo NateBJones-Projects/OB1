@@ -57,13 +57,23 @@
  *   LLM_PROVIDER              "openrouter" (the generic OpenAI-compatible
  *                             path) or "anthropic". Auto-detected from the
  *                             keys when unset.
+ *   LLM_FILTER_MODEL          default for --filter-model
+ *   LLM_CLASSIFY_MODEL        default for --classify-model
+ *   LLM_MODEL                 the model for every leg not named by a flag
+ *                             or one of the two variables above. On its own
+ *                             it behaves like --model: one model end-to-end
+ *                             with the hybrid filter off. Flags always win.
+ *                             This is the sibling recipes' convention, so
+ *                             one env block drives the wiki-compiler
+ *                             pipeline (which forwards no model flags).
  *
  *   Bare model names (claude-haiku-4-5-20251001, claude-opus-4-7) are
  *   auto-prefixed with "anthropic/" ONLY when LLM_BASE_URL points at
  *   openrouter.ai. Any other host receives the name exactly as given, so a
  *   self-hosted router's own aliases work via --filter-model /
- *   --classify-model / --model. Pass an already-prefixed string (e.g.
- *   "anthropic/claude-haiku-4-5") to bypass the OpenRouter prefixing.
+ *   --classify-model / --model or the LLM_*MODEL variables. Pass an
+ *   already-prefixed string (e.g. "anthropic/claude-haiku-4-5") to bypass
+ *   the OpenRouter prefixing.
  *
  * USAGE
  *   node classify-edges.mjs --dry-run
@@ -88,6 +98,13 @@ const CLASSIFIER_VERSION = "typed-edge-classifier-1.0.0";
 // deployment can point the whole wiki-compiler pipeline at a local router.
 const DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1";
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
+// Default models for the two hybrid legs. Overridable per leg from the CLI
+// (--filter-model / --classify-model / --model) and from the environment
+// (LLM_FILTER_MODEL / LLM_CLASSIFY_MODEL / LLM_MODEL); see
+// resolveModelSelection for the precedence.
+const DEFAULT_FILTER_MODEL = "claude-haiku-4-5-20251001";
+const DEFAULT_CLASSIFY_MODEL = "claude-opus-4-7";
 
 // Accepted LLM_PROVIDER values. "openrouter" is the generic
 // OpenAI-compatible path (it kept its historical name so existing logs and
@@ -226,7 +243,12 @@ function worstCasePerPair(args) {
 
 // ── args + env ─────────────────────────────────────────────────────────────
 
-function parseArgs(argv) {
+/**
+ * Parse the command line. `source` (process.env by default; tests pass a
+ * plain object) supplies the LLM_*MODEL defaults for the model flags, see
+ * resolveModelSelection. Everything else is unchanged.
+ */
+function parseArgs(argv, source = process.env) {
   const args = {
     dryRun: false,
     limit: 20,
@@ -234,14 +256,22 @@ function parseArgs(argv) {
     minConfidence: 0.75,
     parallelism: 3,
     pair: null, // explicit [uuid, uuid]
-    filterModel: "claude-haiku-4-5-20251001",
-    classifyModel: "claude-opus-4-7",
+    // Model selection is filled in by resolveModelSelection below: flags
+    // win, then LLM_FILTER_MODEL / LLM_CLASSIFY_MODEL / LLM_MODEL from
+    // `source`, then the built-in defaults.
+    filterModel: null,
+    classifyModel: null,
     singleModel: null, // if set, skip hybrid and use this model end-to-end
     hybrid: true,
+    modelSources: null, // where each model came from, for the startup log
     maxCostUsd: 5.0,
     noCostCap: false,
     mirrorSupersedes: false,
   };
+  // Only the model flags actually present on the command line. A present
+  // flag wins over the environment even when its value is missing, exactly
+  // as it did before the variables existed.
+  const modelFlags = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--dry-run") args.dryRun = true;
@@ -251,11 +281,9 @@ function parseArgs(argv) {
     else if (a === "--parallelism") args.parallelism = Number(argv[++i]) || 3;
     else if (a === "--pair") {
       args.pair = String(argv[++i]).split(",").map((s) => s.trim());
-    } else if (a === "--model") {
-      args.singleModel = argv[++i];
-      args.hybrid = false;
-    } else if (a === "--filter-model") args.filterModel = argv[++i];
-    else if (a === "--classify-model") args.classifyModel = argv[++i];
+    } else if (a === "--model") modelFlags.model = argv[++i];
+    else if (a === "--filter-model") modelFlags.filterModel = argv[++i];
+    else if (a === "--classify-model") modelFlags.classifyModel = argv[++i];
     else if (a === "--no-hybrid") args.hybrid = false;
     else if (a === "--max-cost-usd") args.maxCostUsd = Number(argv[++i]) || 5.0;
     else if (a === "--no-cost-cap") args.noCostCap = true;
@@ -265,7 +293,86 @@ function parseArgs(argv) {
       process.exit(0);
     }
   }
+  Object.assign(args, resolveModelSelection(modelFlags, source, args.hybrid));
   return args;
+}
+
+/** Trimmed value of an environment variable, or "" when unset or blank. */
+function envModel(source, name) {
+  const value = source ? source[name] : undefined;
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
+}
+
+/**
+ * Merge the model flags present on the command line with the LLM_*MODEL
+ * environment variables and the built-in defaults:
+ *
+ *   filter   --filter-model   > LLM_FILTER_MODEL   > LLM_MODEL > DEFAULT_FILTER_MODEL
+ *   classify --classify-model > LLM_CLASSIFY_MODEL > LLM_MODEL > DEFAULT_CLASSIFY_MODEL
+ *   single   --model          > LLM_MODEL, but only when no stage model is named
+ *
+ * LLM_MODEL is the model for every leg not named by a more specific flag or
+ * variable. When nothing else is named it behaves like --model: one model
+ * end-to-end with the hybrid filter off, because filtering with the same
+ * model that classifies would only add a second call per pair. Naming a
+ * stage model (flag or variable) keeps the hybrid on and LLM_MODEL fills the
+ * other leg. This mirrors entity-wiki and wiki-synthesis, which read
+ * LLM_MODEL, so one env block drives the whole wiki-compiler pipeline: the
+ * compiler passes its environment through but forwards no model flags.
+ *
+ * `flags` holds only the model flags actually given (see parseArgs). Empty
+ * or whitespace-only variables count as unset. `hybrid` is false when
+ * --no-hybrid was passed. Returns the four model fields of `args` plus
+ * `modelSources`, which names where each model came from for the log.
+ */
+function resolveModelSelection(flags = {}, source = process.env, hybrid = true) {
+  const has = (key) => Object.prototype.hasOwnProperty.call(flags, key);
+  const env = {
+    LLM_MODEL: envModel(source, "LLM_MODEL"),
+    LLM_FILTER_MODEL: envModel(source, "LLM_FILTER_MODEL"),
+    LLM_CLASSIFY_MODEL: envModel(source, "LLM_CLASSIFY_MODEL"),
+  };
+  const stageNamed =
+    has("filterModel") || has("classifyModel") || Boolean(env.LLM_FILTER_MODEL || env.LLM_CLASSIFY_MODEL);
+
+  const leg = (flagKey, flagName, envName, fallback) => {
+    if (has(flagKey)) return { model: flags[flagKey], source: flagName };
+    if (env[envName]) return { model: env[envName], source: envName };
+    if (env.LLM_MODEL) return { model: env.LLM_MODEL, source: "LLM_MODEL" };
+    return { model: fallback, source: "default" };
+  };
+  const filter = leg("filterModel", "--filter-model", "LLM_FILTER_MODEL", DEFAULT_FILTER_MODEL);
+  const classify = leg("classifyModel", "--classify-model", "LLM_CLASSIFY_MODEL", DEFAULT_CLASSIFY_MODEL);
+
+  let single = { model: null, source: null };
+  if (has("model")) single = { model: flags.model, source: "--model" };
+  else if (env.LLM_MODEL && !stageNamed) single = { model: env.LLM_MODEL, source: "LLM_MODEL" };
+
+  return {
+    filterModel: filter.model,
+    classifyModel: classify.model,
+    singleModel: single.model,
+    hybrid: hybrid && single.source === null,
+    modelSources: { filter: filter.source, classify: classify.source, single: single.source },
+  };
+}
+
+/**
+ * One log line naming the model(s) that will run and where each came from,
+ * so an operator can see that an LLM_*MODEL variable (or a flag) took
+ * effect before any spend happens.
+ */
+function modelSelectionSummary(args) {
+  const src = args.modelSources || {};
+  const tag = (s) => (s ? ` (${s})` : "");
+  if (args.hybrid) {
+    return `filter=${args.filterModel}${tag(src.filter)} classify=${args.classifyModel}${tag(src.classify)}`;
+  }
+  // --model / LLM_MODEL, or --no-hybrid running the classify model on every pair.
+  return args.singleModel
+    ? `model=${args.singleModel}${tag(src.single)} for every pair`
+    : `model=${args.classifyModel}${tag(src.classify)} for every pair`;
 }
 
 function printHelp() {
@@ -282,8 +389,8 @@ function printHelp() {
       "",
       "Model selection:",
       "  --model MODEL            Use one model end-to-end; disables hybrid",
-      "  --filter-model MODEL     Haiku model for candidate filter (default claude-haiku-4-5-20251001)",
-      "  --classify-model MODEL   Opus model for final classification (default claude-opus-4-7)",
+      `  --filter-model MODEL     Haiku model for candidate filter (default ${DEFAULT_FILTER_MODEL})`,
+      `  --classify-model MODEL   Opus model for final classification (default ${DEFAULT_CLASSIFY_MODEL})`,
       "  --no-hybrid              Skip Haiku filter; run --classify-model on every pair",
       "",
       "Cost / safety:",
@@ -311,10 +418,15 @@ function printHelp() {
       `  ANTHROPIC_BASE_URL       Base URL for the direct path (default ${DEFAULT_ANTHROPIC_BASE_URL})`,
       '  LLM_PROVIDER             Force "openrouter" (generic path) or "anthropic";',
       "                           auto-detected from the keys when unset",
+      "  LLM_FILTER_MODEL         Default for --filter-model",
+      "  LLM_CLASSIFY_MODEL       Default for --classify-model",
+      "  LLM_MODEL                Model for every leg not named by a flag or one of the",
+      "                           two variables above; on its own it runs end-to-end",
+      "                           like --model (hybrid off). Flags always win.",
       "",
       '  Bare model names are prefixed with "anthropic/" only when LLM_BASE_URL points',
-      "  at openrouter.ai. Any other host receives --filter-model / --classify-model /",
-      "  --model exactly as given, so router aliases work untouched.",
+      "  at openrouter.ai. Any other host receives the model names exactly as given,",
+      "  from flags or variables, so router aliases work untouched.",
       "",
     ].join("\n"),
   );
@@ -1145,6 +1257,7 @@ async function main() {
       ` | mirror-supersedes=${args.mirrorSupersedes}`,
   );
   console.log(`[classify-edges] llm provider=${env.LLM_PROVIDER} endpoint=${activeEndpoint(env)}`);
+  console.log(`[classify-edges] models: ${modelSelectionSummary(args)}`);
 
   const costState = { spent: 0 };
   // Worst-case per-pair cost for the hard cost cap. In hybrid mode this
@@ -1214,6 +1327,8 @@ if (isEntryPoint()) {
 
 export {
   DEFAULT_ANTHROPIC_BASE_URL,
+  DEFAULT_CLASSIFY_MODEL,
+  DEFAULT_FILTER_MODEL,
   DEFAULT_LLM_BASE_URL,
   PRICING,
   assertPricingKnown,
@@ -1223,8 +1338,10 @@ export {
   isOpenRouterHost,
   isPublicMeteredHost,
   loadEnv,
+  modelSelectionSummary,
   normalizeModelForPricing,
   parseArgs,
   resolveModel,
+  resolveModelSelection,
   worstCasePerPair,
 };
