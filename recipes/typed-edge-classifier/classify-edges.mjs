@@ -38,14 +38,42 @@
  *   OPEN_BRAIN_URL            e.g. https://YOUR-PROJECT.supabase.co
  *   OPEN_BRAIN_SERVICE_KEY    service_role key (server-side only!)
  *
- *   And ONE of (OpenRouter is preferred to match the rest of OB1's recipes):
- *     OPENROUTER_API_KEY      sk-or-v1-...   (routes to Anthropic models)
+ *   And ONE LLM credential (OpenRouter is preferred to match the rest of
+ *   OB1's recipes):
+ *     LLM_API_KEY             bearer token for an OpenAI-compatible
+ *                             chat-completions API (OpenRouter by default,
+ *                             or any router via LLM_BASE_URL)
+ *     OPENROUTER_API_KEY      sk-or-v1-...   (fallback for LLM_API_KEY)
  *     ANTHROPIC_API_KEY       sk-ant-...     (direct, retained for back-compat)
  *
- *   When using OpenRouter, the default models (claude-haiku-4-5-20251001
- *   and claude-opus-4-7) are auto-prefixed with "anthropic/". Pass an
- *   already-prefixed string (e.g. "anthropic/claude-haiku-4-5") via
- *   --filter-model / --classify-model to override.
+ * OPTIONAL ENV VARS
+ *   LLM_BASE_URL              default https://openrouter.ai/api/v1. Base of
+ *                             an OpenAI-compatible API; requests go to
+ *                             ${LLM_BASE_URL}/chat/completions. Setting it
+ *                             (or LLM_API_KEY) selects the generic path.
+ *   ANTHROPIC_BASE_URL        default https://api.anthropic.com. Base for
+ *                             the direct path; requests go to
+ *                             ${ANTHROPIC_BASE_URL}/v1/messages.
+ *   LLM_PROVIDER              "openrouter" (the generic OpenAI-compatible
+ *                             path) or "anthropic". Auto-detected from the
+ *                             keys when unset.
+ *   LLM_FILTER_MODEL          default for --filter-model
+ *   LLM_CLASSIFY_MODEL        default for --classify-model
+ *   LLM_MODEL                 the model for every leg not named by a flag
+ *                             or one of the two variables above. On its own
+ *                             it behaves like --model: one model end-to-end
+ *                             with the hybrid filter off. Flags always win.
+ *                             This is the sibling recipes' convention, so
+ *                             one env block drives the wiki-compiler
+ *                             pipeline (which forwards no model flags).
+ *
+ *   Bare model names (claude-haiku-4-5-20251001, claude-opus-4-7) are
+ *   auto-prefixed with "anthropic/" ONLY when LLM_BASE_URL points at
+ *   openrouter.ai. Any other host receives the name exactly as given, so a
+ *   self-hosted router's own aliases work via --filter-model /
+ *   --classify-model / --model or the LLM_*MODEL variables. Pass an
+ *   already-prefixed string (e.g. "anthropic/claude-haiku-4-5") to bypass
+ *   the OpenRouter prefixing.
  *
  * USAGE
  *   node classify-edges.mjs --dry-run
@@ -55,11 +83,33 @@
  *   node classify-edges.mjs --mirror-supersedes  # optional, OFF by default
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import process from "node:process";
+import { pathToFileURL } from "node:url";
 
 // ── constants ──────────────────────────────────────────────────────────────
 
 const CLASSIFIER_VERSION = "typed-edge-classifier-1.0.0";
+
+// Default endpoints. The generic path speaks OpenAI-flavoured chat
+// completions (OpenRouter, LiteLLM, vLLM, Ollama, ...); the direct path
+// speaks the Anthropic Messages API. Both are overridable from the env so a
+// deployment can point the whole wiki-compiler pipeline at a local router.
+const DEFAULT_LLM_BASE_URL = "https://openrouter.ai/api/v1";
+const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
+
+// Default models for the two hybrid legs. Overridable per leg from the CLI
+// (--filter-model / --classify-model / --model) and from the environment
+// (LLM_FILTER_MODEL / LLM_CLASSIFY_MODEL / LLM_MODEL); see
+// resolveModelSelection for the precedence.
+const DEFAULT_FILTER_MODEL = "claude-haiku-4-5-20251001";
+const DEFAULT_CLASSIFY_MODEL = "claude-opus-4-7";
+
+// Accepted LLM_PROVIDER values. "openrouter" is the generic
+// OpenAI-compatible path (it kept its historical name so existing logs and
+// env files keep meaning the same thing).
+const LLM_PROVIDERS = new Set(["openrouter", "anthropic"]);
 
 // Must match the CHECK constraint in schemas/typed-reasoning-edges/schema.sql
 const TYPED_RELATIONS = new Set([
@@ -122,14 +172,32 @@ function estimateCost(model, inTokens, outTokens) {
  * no cap at all — which is exactly the pricing-drift failure mode that
  * WARN-1 in REVIEW.md calls out. Better to fail loudly at startup than
  * to under-report spend.
+ *
+ * Exception: when `env` says the active endpoint is NOT one of the public
+ * metered hosts (openrouter.ai, api.anthropic.com), the operator has
+ * pointed the recipe at their own router. Router aliases cannot be in
+ * PRICING and the spend is their own hardware, so an unknown model is
+ * estimated at $0 with a single notice line instead of a refusal.
+ * --max-cost-usd keeps working for any model the table does know.
  */
-function assertPricingKnown(args) {
+function assertPricingKnown(args, env) {
   const used = new Set();
   if (args.hybrid) used.add(args.filterModel);
   used.add(args.singleModel || args.classifyModel);
 
   const unknown = [...used].filter((m) => !PRICING[normalizeModelForPricing(m)]);
   if (unknown.length === 0) return;
+
+  if (env && !isPublicMeteredHost(activeEndpoint(env))) {
+    // Mark them seen so estimateCost does not repeat the warning per call.
+    for (const m of unknown) _warnedUnknownPricing.add(m);
+    console.log(
+      `[classify-edges] note: no pricing entry for model(s) ${unknown.join(", ")}; ` +
+        `${hostLabel(activeEndpoint(env))} is not a public metered host, so their spend is ` +
+        `estimated at $0 and --max-cost-usd only tracks models in PRICING.`,
+    );
+    return;
+  }
 
   if (args.noCostCap) {
     console.warn(
@@ -175,7 +243,12 @@ function worstCasePerPair(args) {
 
 // ── args + env ─────────────────────────────────────────────────────────────
 
-function parseArgs(argv) {
+/**
+ * Parse the command line. `source` (process.env by default; tests pass a
+ * plain object) supplies the LLM_*MODEL defaults for the model flags, see
+ * resolveModelSelection. Everything else is unchanged.
+ */
+function parseArgs(argv, source = process.env) {
   const args = {
     dryRun: false,
     limit: 20,
@@ -183,14 +256,22 @@ function parseArgs(argv) {
     minConfidence: 0.75,
     parallelism: 3,
     pair: null, // explicit [uuid, uuid]
-    filterModel: "claude-haiku-4-5-20251001",
-    classifyModel: "claude-opus-4-7",
+    // Model selection is filled in by resolveModelSelection below: flags
+    // win, then LLM_FILTER_MODEL / LLM_CLASSIFY_MODEL / LLM_MODEL from
+    // `source`, then the built-in defaults.
+    filterModel: null,
+    classifyModel: null,
     singleModel: null, // if set, skip hybrid and use this model end-to-end
     hybrid: true,
+    modelSources: null, // where each model came from, for the startup log
     maxCostUsd: 5.0,
     noCostCap: false,
     mirrorSupersedes: false,
   };
+  // Only the model flags actually present on the command line. A present
+  // flag wins over the environment even when its value is missing, exactly
+  // as it did before the variables existed.
+  const modelFlags = {};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--dry-run") args.dryRun = true;
@@ -200,11 +281,9 @@ function parseArgs(argv) {
     else if (a === "--parallelism") args.parallelism = Number(argv[++i]) || 3;
     else if (a === "--pair") {
       args.pair = String(argv[++i]).split(",").map((s) => s.trim());
-    } else if (a === "--model") {
-      args.singleModel = argv[++i];
-      args.hybrid = false;
-    } else if (a === "--filter-model") args.filterModel = argv[++i];
-    else if (a === "--classify-model") args.classifyModel = argv[++i];
+    } else if (a === "--model") modelFlags.model = argv[++i];
+    else if (a === "--filter-model") modelFlags.filterModel = argv[++i];
+    else if (a === "--classify-model") modelFlags.classifyModel = argv[++i];
     else if (a === "--no-hybrid") args.hybrid = false;
     else if (a === "--max-cost-usd") args.maxCostUsd = Number(argv[++i]) || 5.0;
     else if (a === "--no-cost-cap") args.noCostCap = true;
@@ -214,7 +293,86 @@ function parseArgs(argv) {
       process.exit(0);
     }
   }
+  Object.assign(args, resolveModelSelection(modelFlags, source, args.hybrid));
   return args;
+}
+
+/** Trimmed value of an environment variable, or "" when unset or blank. */
+function envModel(source, name) {
+  const value = source ? source[name] : undefined;
+  if (value === undefined || value === null) return "";
+  return String(value).trim();
+}
+
+/**
+ * Merge the model flags present on the command line with the LLM_*MODEL
+ * environment variables and the built-in defaults:
+ *
+ *   filter   --filter-model   > LLM_FILTER_MODEL   > LLM_MODEL > DEFAULT_FILTER_MODEL
+ *   classify --classify-model > LLM_CLASSIFY_MODEL > LLM_MODEL > DEFAULT_CLASSIFY_MODEL
+ *   single   --model          > LLM_MODEL, but only when no stage model is named
+ *
+ * LLM_MODEL is the model for every leg not named by a more specific flag or
+ * variable. When nothing else is named it behaves like --model: one model
+ * end-to-end with the hybrid filter off, because filtering with the same
+ * model that classifies would only add a second call per pair. Naming a
+ * stage model (flag or variable) keeps the hybrid on and LLM_MODEL fills the
+ * other leg. This mirrors entity-wiki and wiki-synthesis, which read
+ * LLM_MODEL, so one env block drives the whole wiki-compiler pipeline: the
+ * compiler passes its environment through but forwards no model flags.
+ *
+ * `flags` holds only the model flags actually given (see parseArgs). Empty
+ * or whitespace-only variables count as unset. `hybrid` is false when
+ * --no-hybrid was passed. Returns the four model fields of `args` plus
+ * `modelSources`, which names where each model came from for the log.
+ */
+function resolveModelSelection(flags = {}, source = process.env, hybrid = true) {
+  const has = (key) => Object.prototype.hasOwnProperty.call(flags, key);
+  const env = {
+    LLM_MODEL: envModel(source, "LLM_MODEL"),
+    LLM_FILTER_MODEL: envModel(source, "LLM_FILTER_MODEL"),
+    LLM_CLASSIFY_MODEL: envModel(source, "LLM_CLASSIFY_MODEL"),
+  };
+  const stageNamed =
+    has("filterModel") || has("classifyModel") || Boolean(env.LLM_FILTER_MODEL || env.LLM_CLASSIFY_MODEL);
+
+  const leg = (flagKey, flagName, envName, fallback) => {
+    if (has(flagKey)) return { model: flags[flagKey], source: flagName };
+    if (env[envName]) return { model: env[envName], source: envName };
+    if (env.LLM_MODEL) return { model: env.LLM_MODEL, source: "LLM_MODEL" };
+    return { model: fallback, source: "default" };
+  };
+  const filter = leg("filterModel", "--filter-model", "LLM_FILTER_MODEL", DEFAULT_FILTER_MODEL);
+  const classify = leg("classifyModel", "--classify-model", "LLM_CLASSIFY_MODEL", DEFAULT_CLASSIFY_MODEL);
+
+  let single = { model: null, source: null };
+  if (has("model")) single = { model: flags.model, source: "--model" };
+  else if (env.LLM_MODEL && !stageNamed) single = { model: env.LLM_MODEL, source: "LLM_MODEL" };
+
+  return {
+    filterModel: filter.model,
+    classifyModel: classify.model,
+    singleModel: single.model,
+    hybrid: hybrid && single.source === null,
+    modelSources: { filter: filter.source, classify: classify.source, single: single.source },
+  };
+}
+
+/**
+ * One log line naming the model(s) that will run and where each came from,
+ * so an operator can see that an LLM_*MODEL variable (or a flag) took
+ * effect before any spend happens.
+ */
+function modelSelectionSummary(args) {
+  const src = args.modelSources || {};
+  const tag = (s) => (s ? ` (${s})` : "");
+  if (args.hybrid) {
+    return `filter=${args.filterModel}${tag(src.filter)} classify=${args.classifyModel}${tag(src.classify)}`;
+  }
+  // --model / LLM_MODEL, or --no-hybrid running the classify model on every pair.
+  return args.singleModel
+    ? `model=${args.singleModel}${tag(src.single)} for every pair`
+    : `model=${args.classifyModel}${tag(src.classify)} for every pair`;
 }
 
 function printHelp() {
@@ -231,8 +389,8 @@ function printHelp() {
       "",
       "Model selection:",
       "  --model MODEL            Use one model end-to-end; disables hybrid",
-      "  --filter-model MODEL     Haiku model for candidate filter (default claude-haiku-4-5-20251001)",
-      "  --classify-model MODEL   Opus model for final classification (default claude-opus-4-7)",
+      `  --filter-model MODEL     Haiku model for candidate filter (default ${DEFAULT_FILTER_MODEL})`,
+      `  --classify-model MODEL   Opus model for final classification (default ${DEFAULT_CLASSIFY_MODEL})`,
       "  --no-hybrid              Skip Haiku filter; run --classify-model on every pair",
       "",
       "Cost / safety:",
@@ -249,27 +407,85 @@ function printHelp() {
       "                           is classified. OFF by default (requires the",
       "                           provenance-chains schema).",
       "",
+      "Environment:",
+      "  OPEN_BRAIN_URL           Supabase project URL (required)",
+      "  OPEN_BRAIN_SERVICE_KEY   service_role key, server-side only (required)",
+      "  LLM_API_KEY              Bearer token for an OpenAI-compatible chat-completions",
+      "                           API; falls back to OPENROUTER_API_KEY",
+      `  LLM_BASE_URL             Base URL of that API (default ${DEFAULT_LLM_BASE_URL});`,
+      "                           set it to use a self-hosted router",
+      "  ANTHROPIC_API_KEY        Direct Anthropic path, used when no LLM_* variable is set",
+      `  ANTHROPIC_BASE_URL       Base URL for the direct path (default ${DEFAULT_ANTHROPIC_BASE_URL})`,
+      '  LLM_PROVIDER             Force "openrouter" (generic path) or "anthropic";',
+      "                           auto-detected from the keys when unset",
+      "  LLM_FILTER_MODEL         Default for --filter-model",
+      "  LLM_CLASSIFY_MODEL       Default for --classify-model",
+      "  LLM_MODEL                Model for every leg not named by a flag or one of the",
+      "                           two variables above; on its own it runs end-to-end",
+      "                           like --model (hybrid off). Flags always win.",
+      "",
+      '  Bare model names are prefixed with "anthropic/" only when LLM_BASE_URL points',
+      "  at openrouter.ai. Any other host receives the model names exactly as given,",
+      "  from flags or variables, so router aliases work untouched.",
+      "",
     ].join("\n"),
   );
 }
 
-function loadEnv() {
-  const env = process.env;
+/**
+ * Read configuration from `source` (process.env by default; tests pass a
+ * plain object). Resolves the LLM provider, endpoint and credential:
+ *
+ *   generic  — any OpenAI-compatible chat-completions API. Endpoint is
+ *              LLM_BASE_URL (default OpenRouter), credential is LLM_API_KEY
+ *              falling back to OPENROUTER_API_KEY. This is the convention
+ *              entity-wiki and wiki-synthesis already use, so one env block
+ *              drives the whole wiki-compiler pipeline.
+ *   anthropic — the Messages API at ANTHROPIC_BASE_URL (default
+ *              api.anthropic.com) with ANTHROPIC_API_KEY. Retained so
+ *              existing direct-key users see no change.
+ *
+ * Provider precedence: an explicit LLM_PROVIDER wins. Otherwise setting
+ * LLM_BASE_URL, LLM_API_KEY or OPENROUTER_API_KEY selects the generic path
+ * (OpenRouter wins when both an OpenRouter and an Anthropic key are set,
+ * matching entity-extraction-worker), and ANTHROPIC_API_KEY alone selects
+ * the direct path.
+ */
+function loadEnv(source = process.env) {
+  const env = source;
   const missing = [];
   for (const k of ["OPEN_BRAIN_URL", "OPEN_BRAIN_SERVICE_KEY"]) {
     if (!env[k]) missing.push(k);
   }
-  // Need at least one LLM provider key. Prefer OpenRouter to match the
-  // multi-provider pattern in entity-extraction-worker (and so a single
-  // OPENROUTER_API_KEY can serve every recipe in OB1).
-  const hasOpenrouter = Boolean(env.OPENROUTER_API_KEY);
-  const hasAnthropic = Boolean(env.ANTHROPIC_API_KEY);
-  if (!hasOpenrouter && !hasAnthropic) {
-    missing.push("OPENROUTER_API_KEY or ANTHROPIC_API_KEY");
+
+  const llmBaseUrl = normalizeBaseUrl(env.LLM_BASE_URL) || DEFAULT_LLM_BASE_URL;
+  const llmApiKey = env.LLM_API_KEY || env.OPENROUTER_API_KEY || "";
+  const anthropicBaseUrl = normalizeBaseUrl(env.ANTHROPIC_BASE_URL) || DEFAULT_ANTHROPIC_BASE_URL;
+  const anthropicApiKey = env.ANTHROPIC_API_KEY || "";
+
+  let provider = String(env.LLM_PROVIDER || "").trim().toLowerCase();
+  if (provider && !LLM_PROVIDERS.has(provider)) {
+    throw new Error(
+      `LLM_PROVIDER="${env.LLM_PROVIDER}" is not recognised; use "openrouter" ` +
+        `(any OpenAI-compatible endpoint, see LLM_BASE_URL) or "anthropic".`,
+    );
+  }
+  if (!provider) {
+    if (env.LLM_BASE_URL || env.LLM_API_KEY || env.OPENROUTER_API_KEY) provider = "openrouter";
+    else if (anthropicApiKey) provider = "anthropic";
+  }
+
+  if (provider === "anthropic") {
+    if (!anthropicApiKey) missing.push("ANTHROPIC_API_KEY");
+  } else if (provider === "openrouter") {
+    if (!llmApiKey) missing.push("LLM_API_KEY (or OPENROUTER_API_KEY)");
+  } else {
+    missing.push("LLM_API_KEY, OPENROUTER_API_KEY or ANTHROPIC_API_KEY");
   }
   if (missing.length > 0) {
     throw new Error(`Missing env vars: ${missing.join(", ")}`);
   }
+
   // Normalize URL — allow OPEN_BRAIN_URL with or without trailing slash,
   // with or without /rest/v1. Store the base project URL.
   let base = String(env.OPEN_BRAIN_URL).replace(/\/+$/, "");
@@ -277,9 +493,11 @@ function loadEnv() {
   return {
     OPEN_BRAIN_URL: base,
     OPEN_BRAIN_SERVICE_KEY: env.OPEN_BRAIN_SERVICE_KEY,
-    OPENROUTER_API_KEY: env.OPENROUTER_API_KEY || "",
-    ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY || "",
-    LLM_PROVIDER: hasOpenrouter ? "openrouter" : "anthropic",
+    LLM_PROVIDER: provider,
+    LLM_BASE_URL: llmBaseUrl,
+    LLM_API_KEY: llmApiKey,
+    ANTHROPIC_BASE_URL: anthropicBaseUrl,
+    ANTHROPIC_API_KEY: anthropicApiKey,
   };
 }
 
@@ -287,19 +505,72 @@ function loadEnv() {
 //
 // Both providers accept the same conceptual call (system prompt + user
 // message + max_tokens) but differ in payload shape, response shape, and
-// auth headers. resolveModel/resolveProvider/normalizeModelForPricing
-// keep that switch contained so callLlmOnce stays readable.
+// auth headers. resolveModel/normalizeModelForPricing and the host helpers
+// keep that switch contained so callAnthropicOnce stays readable.
+
+function normalizeBaseUrl(value) {
+  if (!value) return "";
+  return String(value).trim().replace(/\/+$/, "");
+}
+
+/** Lower-cased hostname of a URL, or "" when it does not parse. */
+function hostOf(url) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+/** host[:port] for log lines; falls back to the raw string. */
+function hostLabel(url) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return String(url);
+  }
+}
+
+function isOpenRouterHost(baseUrl) {
+  const host = hostOf(baseUrl);
+  return host === "openrouter.ai" || host.endsWith(".openrouter.ai");
+}
+
+function isAnthropicHost(baseUrl) {
+  const host = hostOf(baseUrl);
+  return host === "anthropic.com" || host.endsWith(".anthropic.com");
+}
+
+/**
+ * The two hosts whose per-token billing PRICING models. Anything else is
+ * an operator-controlled endpoint (self-hosted router, proxy) whose cost
+ * the table cannot know.
+ */
+function isPublicMeteredHost(url) {
+  return isOpenRouterHost(url) || isAnthropicHost(url);
+}
+
+/** Full URL the active provider will POST to. */
+function activeEndpoint(env) {
+  return env.LLM_PROVIDER === "anthropic"
+    ? `${env.ANTHROPIC_BASE_URL}/v1/messages`
+    : `${env.LLM_BASE_URL}/chat/completions`;
+}
 
 /**
  * When the operator passes a bare Anthropic model name like
- * "claude-haiku-4-5-20251001" but the active provider is OpenRouter,
- * prefix it with "anthropic/" so OpenRouter routes correctly. Already-
- * prefixed names ("anthropic/...", "openai/...", etc.) pass through.
+ * "claude-haiku-4-5-20251001" and the generic path is pointed at
+ * OpenRouter, prefix it with "anthropic/" so OpenRouter routes correctly.
+ * Already-prefixed names ("anthropic/...", "openai/...", etc.) pass
+ * through, and so does EVERY name when the base URL is any other host: a
+ * self-hosted router defines its own aliases and must receive them
+ * untouched.
  */
-function resolveModel(model, provider) {
+function resolveModel(model, provider, baseUrl = DEFAULT_LLM_BASE_URL) {
   if (provider !== "openrouter") return model;
   if (!model) return model;
   if (model.includes("/")) return model;
+  if (!isOpenRouterHost(baseUrl)) return model;
   return `anthropic/${model}`;
 }
 
@@ -374,6 +645,11 @@ function sbClient(env) {
  * If `thought_entities` is not installed (i.e. the caller hasn't set up
  * entity-extraction), fall back to nothing — force them to use --pair.
  */
+// Upper bound on candidate pairs collected before ranking. Bounds the O(n^2)
+// scan over the 5000-row thought_entities window; the old bound was limit*4,
+// too few to see past a classified backlog.
+const MAX_CANDIDATE_PAIRS = 5000;
+
 async function sampleCandidatePairs(sb, minSupport, limit) {
   // Pull recent thought_entities rows, build a thought -> [entity_ids]
   // map in JS, then find pairs with overlap >= minSupport. We cap the
@@ -418,14 +694,83 @@ async function sampleCandidatePairs(sb, minSupport, limit) {
           support: overlap,
         });
       }
-      if (pairs.length >= limit * 4) break;
+      if (pairs.length >= MAX_CANDIDATE_PAIRS) break;
     }
-    if (pairs.length >= limit * 4) break;
+    if (pairs.length >= MAX_CANDIDATE_PAIRS) break;
   }
 
-  // Sort by support desc, then trim to limit
+  // Sort by support desc, then take the first `limit` pairs that are NOT
+  // already classified. The check used to run after trimming, so a scheduled
+  // run kept re-sampling the same top-ranked pairs and never reached the rest
+  // of a backlog once those were classified.
   pairs.sort((a, b) => b.support - a.support);
-  return pairs.slice(0, limit);
+  return selectUnclassifiedPairs(sb, pairs, limit);
+}
+
+/** Canonical key for an unordered pair of thought ids. */
+function pairKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/**
+ * Walk ranked candidate pairs and return the first `limit` that have no typed
+ * edge yet, checking thought_edges a batch of pairs at a time so a long
+ * backlog costs a handful of requests rather than one per pair. Selected
+ * pairs are marked alreadyChecked so processPair does not query again.
+ */
+async function selectUnclassifiedPairs(sb, rankedPairs, limit, batchSize = 100) {
+  const selected = [];
+  let checked = 0;
+  let skipped = 0;
+  for (let i = 0; i < rankedPairs.length && selected.length < limit; i += batchSize) {
+    const batch = rankedPairs.slice(i, i + batchSize);
+    const classified = await fetchClassifiedPairKeys(sb, batch);
+    for (const p of batch) {
+      checked++;
+      if (classified.has(pairKey(p.from_thought_id, p.to_thought_id))) {
+        skipped++;
+        continue;
+      }
+      selected.push({ ...p, alreadyChecked: true });
+      if (selected.length >= limit) break;
+    }
+  }
+  console.log(
+    `[classify-edges] sampling: ${rankedPairs.length} candidate pairs ranked, ` +
+      `${checked} checked, ${skipped} already classified, ${selected.length} selected (limit ${limit})`,
+  );
+  return selected;
+}
+
+/**
+ * Keys of every pair among `pairs` that already has an edge other than
+ * related_to, in either direction. One request per chunk of thought ids;
+ * an edge touching a chunk's id is returned whichever side it is on.
+ */
+async function fetchClassifiedPairKeys(sb, pairs, chunkSize = 60) {
+  const ids = [...new Set(pairs.flatMap((p) => [p.from_thought_id, p.to_thought_id]))];
+  const keys = new Set();
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const list = ids.slice(i, i + chunkSize).join(",");
+    let rows;
+    try {
+      rows = await sb.get(
+        `thought_edges?select=from_thought_id,to_thought_id` +
+          `&relation=neq.related_to` +
+          `&or=(from_thought_id.in.(${list}),to_thought_id.in.(${list}))`,
+      );
+    } catch (e) {
+      if (String(e.message).includes("404") || String(e.message).includes("42P01")) {
+        throw new Error(
+          "Candidate selection requires thought_edges (from schemas/typed-reasoning-edges/). " +
+            "Apply that schema first.",
+        );
+      }
+      throw e;
+    }
+    for (const r of rows) keys.add(pairKey(r.from_thought_id, r.to_thought_id));
+  }
+  return keys;
 }
 
 async function fetchPairAlreadyClassified(sb, a, b) {
@@ -479,18 +824,19 @@ function backoffDelayMs(attempt) {
 }
 
 async function callAnthropicOnce(env, model, system, userMsg, maxTokens) {
-  // Provider router. OpenRouter takes priority when both keys are set
-  // (matches entity-extraction-worker preference order). The shared
-  // retry policy in callAnthropic treats 429 + 5xx as retryable for
-  // both providers, which their public docs confirm.
+  // Provider router. loadEnv has already resolved LLM_PROVIDER (generic
+  // OpenAI-compatible path vs. direct Anthropic). The shared retry policy
+  // in callAnthropic treats 429 + 5xx as retryable for both paths, which
+  // the public docs of both API shapes confirm.
   if (env.LLM_PROVIDER === "openrouter") {
-    return callOpenRouterOnce(env, model, system, userMsg, maxTokens);
+    return callChatCompletionsOnce(env, model, system, userMsg, maxTokens);
   }
   return callAnthropicDirectOnce(env, model, system, userMsg, maxTokens);
 }
 
 async function callAnthropicDirectOnce(env, model, system, userMsg, maxTokens) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const baseUrl = env.ANTHROPIC_BASE_URL || DEFAULT_ANTHROPIC_BASE_URL;
+  const res = await fetch(`${baseUrl}/v1/messages`, {
     method: "POST",
     headers: {
       "x-api-key": env.ANTHROPIC_API_KEY,
@@ -521,17 +867,20 @@ async function callAnthropicDirectOnce(env, model, system, userMsg, maxTokens) {
   };
 }
 
-async function callOpenRouterOnce(env, model, system, userMsg, maxTokens) {
-  // OpenRouter speaks OpenAI-flavored chat completions. The Anthropic
-  // "system" parameter becomes the first message with role:"system";
+async function callChatCompletionsOnce(env, model, system, userMsg, maxTokens) {
+  // Generic OpenAI-flavored chat completions: OpenRouter by default, or
+  // whatever LLM_BASE_URL points at. The Anthropic "system" parameter
+  // becomes the first message with role:"system";
   // response.choices[0].message.content carries the text; usage uses
-  // prompt_tokens / completion_tokens. Auto-prefix bare Anthropic
-  // model names with "anthropic/" so callers don't have to.
-  const routedModel = resolveModel(model, "openrouter");
-  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  // prompt_tokens / completion_tokens. Bare Anthropic model names are
+  // auto-prefixed with "anthropic/" only for OpenRouter (see resolveModel).
+  const baseUrl = env.LLM_BASE_URL || DEFAULT_LLM_BASE_URL;
+  const routedModel = resolveModel(model, "openrouter", baseUrl);
+  const label = isOpenRouterHost(baseUrl) ? "OpenRouter" : `LLM ${hostLabel(baseUrl)}`;
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      "authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
+      "authorization": `Bearer ${env.LLM_API_KEY}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({
@@ -545,7 +894,7 @@ async function callOpenRouterOnce(env, model, system, userMsg, maxTokens) {
   });
   if (!res.ok) {
     const body = await res.text();
-    const err = new Error(`OpenRouter ${routedModel}: ${res.status} ${body.slice(0, 400)}`);
+    const err = new Error(`${label} ${routedModel}: ${res.status} ${body.slice(0, 400)}`);
     err.status = res.status;
     err.retryable = shouldRetryAnthropicStatus(res.status);
     throw err;
@@ -780,8 +1129,10 @@ async function processPair(env, sb, args, pair, costState) {
 
   const { from_thought_id: a, to_thought_id: b } = pair;
 
-  const already = await fetchPairAlreadyClassified(sb, a, b);
-  if (already) return { ...pair, status: "skip_already_classified" };
+  if (!pair.alreadyChecked) {
+    const already = await fetchPairAlreadyClassified(sb, a, b);
+    if (already) return { ...pair, status: "skip_already_classified" };
+  }
 
   // PostgREST `id=in.(A,B)` does NOT guarantee result order. Build a
   // Map<id, row> and look up by ID so A/B cannot silently swap — a
@@ -950,14 +1301,15 @@ async function processInChunks(items, fn, parallelism, costState, maxCostUsd, wo
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const env = loadEnv();
 
   // Preflight: if any model we're about to call has no pricing entry,
   // refuse to run with --max-cost-usd unless --no-cost-cap is set. See
   // WARN-1 in REVIEW.md. This catches the "unknown model silently runs
-  // uncapped" failure mode before any LLM spend.
-  assertPricingKnown(args);
+  // uncapped" failure mode before any LLM spend. (Needs env: a custom
+  // LLM_BASE_URL / ANTHROPIC_BASE_URL host downgrades this to a notice.)
+  assertPricingKnown(args, env);
 
-  const env = loadEnv();
   const sb = sbClient(env);
 
   let pairs;
@@ -980,6 +1332,8 @@ async function main() {
       ` | max-cost=$${args.maxCostUsd.toFixed(2)}` +
       ` | mirror-supersedes=${args.mirrorSupersedes}`,
   );
+  console.log(`[classify-edges] llm provider=${env.LLM_PROVIDER} endpoint=${activeEndpoint(env)}`);
+  console.log(`[classify-edges] models: ${modelSelectionSummary(args)}`);
 
   const costState = { spent: 0 };
   // Worst-case per-pair cost for the hard cost cap. In hybrid mode this
@@ -1023,7 +1377,51 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error("[classify-edges] FAILED:", err.message);
-  process.exit(1);
-});
+// ── entry point ────────────────────────────────────────────────────────────
+//
+// Only run main() when this file is the script Node was asked to execute.
+// `import`ing it (the test suite does) just exposes the helpers below.
+
+function isEntryPoint() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  let resolved = path.resolve(entry);
+  try {
+    resolved = fs.realpathSync(resolved);
+  } catch {
+    // Keep the unresolved path; the comparison below simply fails.
+  }
+  return import.meta.url === pathToFileURL(resolved).href;
+}
+
+if (isEntryPoint()) {
+  main().catch((err) => {
+    console.error("[classify-edges] FAILED:", err.message);
+    process.exit(1);
+  });
+}
+
+export {
+  DEFAULT_ANTHROPIC_BASE_URL,
+  DEFAULT_CLASSIFY_MODEL,
+  DEFAULT_FILTER_MODEL,
+  DEFAULT_LLM_BASE_URL,
+  PRICING,
+  assertPricingKnown,
+  callAnthropic,
+  callAnthropicOnce,
+  estimateCost,
+  isOpenRouterHost,
+  isPublicMeteredHost,
+  loadEnv,
+  modelSelectionSummary,
+  normalizeModelForPricing,
+  parseArgs,
+  resolveModel,
+  resolveModelSelection,
+  worstCasePerPair,
+  fetchClassifiedPairKeys,
+  pairKey,
+  sampleCandidatePairs,
+  selectUnclassifiedPairs,
+};
