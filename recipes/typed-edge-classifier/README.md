@@ -206,6 +206,18 @@ The defaults (`claude-haiku-4-5-20251001` for the filter, `claude-opus-4-7` for 
 node --test recipes/typed-edge-classifier/test/*.test.mjs
 ```
 
+### Scheduled runs
+
+The classifier is safe to run on a schedule, for example nightly from `wiki-compiler`: it never re-classifies or duplicates a pair it has already decided.
+
+- Before any model call, each sampled pair is checked against `thought_edges`. A pair that already has an edge other than `related_to`, in either direction, is reported as `skip_already_classified` and costs nothing.
+- Pairs the filter rejected, and pairs classified below `--min-confidence`, leave no row, so they are looked at again on the next run. A later run can therefore insert an edge for a pair an earlier run declined.
+- Rows carry `classifier_version`. After a vocabulary bump, delete the old rows (see Troubleshooting) and the next run reclassifies those pairs.
+
+One limit to know about: sampling ranks candidate pairs by shared-entity support and trims to `--limit` (`wiki-compiler` passes its own edge limit, 50 by default) **before** the already-classified check runs. Once the top-ranked pairs are all classified, a run reports them as skipped and does not reach further down the ranking until the ranking changes (new thoughts and entity links) or `--limit` is raised. For a backlog larger than `--limit`, raise the limit rather than relying on repeated runs.
+
+Observed on a nightly schedule: a pair inserted by hand during the day came back as `skip_already_classified` that night, and only a new pair was classified.
+
 ## Cost bound
 
 > **Pricing disclaimer.** The `--max-cost-usd` cap uses a hand-maintained `PRICING` map in `classify-edges.mjs` that is updated manually. Check [Anthropic's pricing page](https://www.anthropic.com/pricing) before large runs. If you run with a model that is NOT in the PRICING map, the classifier will **refuse to run** when `--max-cost-usd` is set, and will log `WARNING: no pricing info for model "X"` otherwise. Pass `--no-cost-cap` to explicitly acknowledge an uncapped run; see "Pricing-unknown guard" below. The one exception is a custom `LLM_BASE_URL` / `ANTHROPIC_BASE_URL` host, where an unknown model is a one-line notice and a $0 estimate instead (see [Self-hosted or OpenAI-compatible router](#self-hosted-or-openai-compatible-router)).
