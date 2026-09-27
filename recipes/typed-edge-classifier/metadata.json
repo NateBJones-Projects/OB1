@@ -6,7 +6,7 @@
     "name": "Alan Shurafa",
     "github": "alanshurafa"
   },
-  "version": "1.1.0",
+  "version": "1.2.0",
   "requires": {
     "open_brain": true,
     "services": ["OpenRouter or any OpenAI-compatible LLM API", "Anthropic API"],
@@ -16,5 +16,5 @@
   "difficulty": "advanced",
   "estimated_time": "45 minutes",
   "created": "2026-04-17",
-  "updated": "2026-09-26"
+  "updated": "2026-09-27"
 }

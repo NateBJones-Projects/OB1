@@ -39,6 +39,12 @@ LLM PROVIDER (pick ONE)
                                                                   default https://openrouter.ai/api/v1)
   Router key:            ____________   -> LLM_API_KEY          (falls back to OPENROUTER_API_KEY)
 
+MODELS (optional; the flags win, the defaults are Haiku -> Opus)
+  Filter model:          ____________   -> LLM_FILTER_MODEL     (default for --filter-model)
+  Classify model:        ____________   -> LLM_CLASSIFY_MODEL   (default for --classify-model)
+  -- OR --
+  One model end-to-end:  ____________   -> LLM_MODEL            (like --model; hybrid off)
+
 COST CAP FOR FIRST RUN
   Max USD:               ____________   (recommend $1-2 for a dry run first)
 
@@ -63,9 +69,11 @@ COST CAP FOR FIRST RUN
    # Option C — self-hosted or any OpenAI-compatible router (LiteLLM, vLLM, Ollama, ...)
    export LLM_BASE_URL="http://localhost:4000/v1"   # requests go to ${LLM_BASE_URL}/chat/completions
    export LLM_API_KEY="..."
+   export LLM_FILTER_MODEL="local-fast"             # optional: your router's aliases for the two legs
+   export LLM_CLASSIFY_MODEL="local-strong"         # (or LLM_MODEL="local" for one model end-to-end)
    ```
 
-   When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are auto-prefixed with `anthropic/` so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`). Any other `LLM_BASE_URL` host receives model names exactly as given — see [Self-hosted or OpenAI-compatible router](#self-hosted-or-openai-compatible-router).
+   When OpenRouter is used, the default Anthropic model names (`claude-haiku-4-5-20251001`, `claude-opus-4-7`) are auto-prefixed with `anthropic/` so OpenRouter routes correctly. Pass an already-prefixed string via `--filter-model` / `--classify-model` (or `LLM_FILTER_MODEL` / `LLM_CLASSIFY_MODEL`) to override. If both keys are set, OpenRouter wins (matches the priority order in `entity-extraction-worker`). Any other `LLM_BASE_URL` host receives model names exactly as given — see [Self-hosted or OpenAI-compatible router](#self-hosted-or-openai-compatible-router).
 
 3. Run a **dry run** first with a small limit and a low cost cap:
 
@@ -101,7 +109,36 @@ The default pipeline is two-stage:
 1. **Stage 1 — Haiku filter.** For each candidate pair, Haiku reads the two thoughts and answers a single strict-JSON question: "is there any meaningful relation here, yes or no?" This is ~10-20x cheaper than asking Opus to classify everything up front.
 2. **Stage 2 — Opus classify.** For pairs that pass the filter, Opus does the full classification with the six-label vocabulary + direction + confidence + optional temporal bounds.
 
-You can disable the hybrid and run a single model end-to-end with `--model <model>` (e.g., `--model claude-haiku-4-5-20251001` for a cheap pass).
+You can disable the hybrid and run a single model end-to-end with `--model <model>` (e.g., `--model claude-haiku-4-5-20251001` for a cheap pass), or by exporting `LLM_MODEL` (below).
+
+### Model selection from the environment
+
+Each model flag has an environment variable that supplies its default, following the `LLM_MODEL` convention of [`entity-wiki`](../entity-wiki/) and [`wiki-synthesis`](../wiki-synthesis/). This matters for [`wiki-compiler`](../wiki-compiler/), which passes its environment through to every recipe but forwards no model flags: with these variables set, one env block drives the whole pipeline, typed-edge step included.
+
+| Variable | Supplies the default for | Notes |
+|---|---|---|
+| `LLM_FILTER_MODEL` | `--filter-model` | The cheap filter leg of the hybrid. |
+| `LLM_CLASSIFY_MODEL` | `--classify-model` | The classify leg. |
+| `LLM_MODEL` | `--model`, and any leg left unnamed | On its own it runs one model end-to-end with the hybrid off, exactly like `--model` (filtering with the model that also classifies would only add a second call per pair). If a stage model is named, by flag or variable, the hybrid stays on and `LLM_MODEL` fills the other leg. |
+
+Precedence, per leg: flag, then the leg's own variable, then `LLM_MODEL`, then the built-in default (`claude-haiku-4-5-20251001` / `claude-opus-4-7`). Flags always win, blank variables count as unset, and nothing changes when none of them are set.
+
+| Environment | Flags | Result |
+|---|---|---|
+| none | none | hybrid `claude-haiku-4-5-20251001` -> `claude-opus-4-7` (unchanged) |
+| `LLM_FILTER_MODEL=local-fast LLM_CLASSIFY_MODEL=local-strong` | none | hybrid `local-fast` -> `local-strong` |
+| `LLM_MODEL=local` | none | `local` on every pair, hybrid off |
+| `LLM_MODEL=anthropic/claude-haiku-4-5 LLM_CLASSIFY_MODEL=anthropic/claude-opus-4-7` | none | hybrid Haiku -> Opus, both from the environment |
+| `LLM_MODEL=local` | `--filter-model local-fast` | hybrid `local-fast` -> `local` |
+| `LLM_MODEL=local` | `--model claude-opus-4-7` | `claude-opus-4-7` on every pair; the flag wins |
+
+The values go through the same code as the flags, so the [prefixing rule](#self-hosted-or-openai-compatible-router) and the [pricing-unknown guard](#pricing-unknown-guard) apply unchanged. The startup log names each model and where it came from, so you can confirm a variable took effect before any spend:
+
+```
+[classify-edges] models: filter=local-fast (LLM_FILTER_MODEL) classify=local-strong (LLM_CLASSIFY_MODEL)
+```
+
+One thing to watch in a shared env block: an `LLM_MODEL` exported for the wiki recipes now applies here too. To keep the wiki recipes on one model and typed edges on the Haiku -> Opus hybrid, name the two legs with `LLM_FILTER_MODEL` and `LLM_CLASSIFY_MODEL` (or pass the flags); they take precedence over `LLM_MODEL`.
 
 ## Self-hosted or OpenAI-compatible router
 
@@ -115,6 +152,9 @@ export LLM_BASE_URL="http://localhost:4000/v1"          # OpenAI-compatible; the
 export LLM_API_KEY="..."                                # bearer token for that endpoint; falls back to OPENROUTER_API_KEY
 
 # Optional
+export LLM_FILTER_MODEL="local-fast"                    # your router's alias for the filter leg (default for --filter-model)
+export LLM_CLASSIFY_MODEL="local-strong"                # and for the classify leg (default for --classify-model)
+# export LLM_MODEL="local"                              # instead of the two above: one model end-to-end, like --model
 export LLM_PROVIDER="openrouter"                        # force the generic path ("anthropic" forces the direct path)
 export ANTHROPIC_BASE_URL="https://api.anthropic.com"   # base for the direct path, if you proxy it; POSTs to ${ANTHROPIC_BASE_URL}/v1/messages
 ```
@@ -125,11 +165,15 @@ export ANTHROPIC_BASE_URL="https://api.anthropic.com"   # base for the direct pa
 | `LLM_API_KEY` | falls back to `OPENROUTER_API_KEY` | Bearer token sent as `Authorization: Bearer ...`. Setting it selects the generic path. |
 | `ANTHROPIC_BASE_URL` | `https://api.anthropic.com` | Base for the direct Anthropic Messages path (`ANTHROPIC_API_KEY`). |
 | `LLM_PROVIDER` | auto-detected | `openrouter` = generic OpenAI-compatible path (the name is historical), `anthropic` = direct path. Anything else is rejected at startup. |
+| `LLM_FILTER_MODEL` | `claude-haiku-4-5-20251001` | Default for `--filter-model`. |
+| `LLM_CLASSIFY_MODEL` | `claude-opus-4-7` | Default for `--classify-model`. |
+| `LLM_MODEL` | unset | Default for `--model` when no stage model is named (hybrid off); otherwise fills the unnamed leg. See [Model selection from the environment](#model-selection-from-the-environment). |
 
 **Provider selection.** An explicit `LLM_PROVIDER` always wins. Otherwise, setting any of `LLM_BASE_URL`, `LLM_API_KEY` or `OPENROUTER_API_KEY` selects the generic path (so OpenRouter still beats a direct key when both legacy keys are set), and `ANTHROPIC_API_KEY` alone selects the direct path. The startup log prints the resolved provider and endpoint:
 
 ```
 [classify-edges] llm provider=openrouter endpoint=http://localhost:4000/v1/chat/completions
+[classify-edges] models: filter=local-fast (LLM_FILTER_MODEL) classify=local-strong (LLM_CLASSIFY_MODEL)
 ```
 
 **Prefixing rule.** Bare Anthropic model names are prefixed with `anthropic/` **only** when the `LLM_BASE_URL` host is `openrouter.ai`. Every other host — including a router that happens to proxy Anthropic models — receives the model string exactly as given, because a self-hosted router defines its own aliases.
@@ -139,9 +183,14 @@ export ANTHROPIC_BASE_URL="https://api.anthropic.com"   # base for the direct pa
 ```bash
 node classify-edges.mjs --limit 10 --dry-run \
   --filter-model local-fast --classify-model local-strong
+
+# or, so that a wiki-compiler run picks them up too
+export LLM_FILTER_MODEL="local-fast"
+export LLM_CLASSIFY_MODEL="local-strong"
+node classify-edges.mjs --limit 10 --dry-run
 ```
 
-The defaults (`claude-haiku-4-5-20251001` for the filter, `claude-opus-4-7` for classification) are sent untouched too, so either pass the flags above or teach your router those two aliases. `wiki-compiler` does not forward model flags, so a pipeline run through it relies on the router aliasing the default names.
+The defaults (`claude-haiku-4-5-20251001` for the filter, `claude-opus-4-7` for classification) are sent untouched too, so either pass the flags, export the matching variables, or teach your router those two aliases. `wiki-compiler` forwards no model flags but does pass its environment through, so for a pipeline run set `LLM_FILTER_MODEL` / `LLM_CLASSIFY_MODEL` (or `LLM_MODEL`) in the same env block; see [Model selection from the environment](#model-selection-from-the-environment).
 
 **Cost estimation on a custom host.** Router aliases cannot appear in the hand-maintained `PRICING` map. When the active endpoint is a host other than `openrouter.ai` or `api.anthropic.com`, an unknown model does **not** trigger the pricing-unknown refusal: the classifier prints one notice line, estimates that model at $0, and `--max-cost-usd` keeps applying to any model the table does know. If your endpoint bills per token, add rows to `PRICING` so the cap stays meaningful. On the two public hosts the guard is unchanged.
 
@@ -151,7 +200,7 @@ The defaults (`claude-haiku-4-5-20251001` for the filter, `claude-opus-4-7` for 
 
 **Routers without authentication.** `LLM_API_KEY` is still required (matching the sibling recipes). For a router that ignores auth, set it to any placeholder; the bearer header is sent and ignored.
 
-**Tests.** The recipe ships a dependency-free `node:test` suite that stands up a local http server and checks the URL, auth header and payload reached for every provider / base-URL combination, plus the prefixing and pricing rules:
+**Tests.** The recipe ships a dependency-free `node:test` suite that stands up a local http server and checks the URL, auth header and payload reached for every provider / base-URL combination, plus the prefixing and pricing rules and the flag / variable precedence for model selection:
 
 ```bash
 node --test recipes/typed-edge-classifier/test/*.test.mjs
@@ -225,6 +274,8 @@ After a full non-dry run:
                          (pointing at the older one) when a supersedes edge
                          is classified. OFF by default.
 ```
+
+The three model flags fall back to `LLM_FILTER_MODEL`, `LLM_CLASSIFY_MODEL` and `LLM_MODEL` when those are set (see [Model selection from the environment](#model-selection-from-the-environment)). `node classify-edges.mjs --help` lists every flag and variable.
 
 ## Design Tensions (unresolved)
 
@@ -314,7 +365,7 @@ Solution: Export `OPEN_BRAIN_URL` + `OPEN_BRAIN_SERVICE_KEY` plus one LLM creden
 Solution: `LLM_BASE_URL` (or `LLM_API_KEY`, or an explicit `LLM_PROVIDER=openrouter`) selects the generic OpenAI-compatible path, which needs its own bearer token. Either export `LLM_API_KEY`, or unset the `LLM_*` variables (or set `LLM_PROVIDER=anthropic`) to use the direct Anthropic path.
 
 **Issue: `LLM localhost:4000 my-alias: 404 ...` or `... 400 ... model not found`**
-Solution: The router at `LLM_BASE_URL` does not know that model name. Model strings are sent untouched to non-OpenRouter hosts, so check the alias in your router's model list, and pass it via `--filter-model` / `--classify-model` / `--model` (the defaults `claude-haiku-4-5-20251001` and `claude-opus-4-7` are sent as-is too). A 404 on every call usually means `LLM_BASE_URL` is missing its version segment — the script appends `/chat/completions`, so for most routers the base ends in `/v1`.
+Solution: The router at `LLM_BASE_URL` does not know that model name. Model strings are sent untouched to non-OpenRouter hosts, so check the alias in your router's model list, and pass it via `--filter-model` / `--classify-model` / `--model`, or export `LLM_FILTER_MODEL` / `LLM_CLASSIFY_MODEL` / `LLM_MODEL` so a `wiki-compiler` run picks it up as well (the defaults `claude-haiku-4-5-20251001` and `claude-opus-4-7` are sent as-is too). The `[classify-edges] models:` startup line shows which name is in use and where it came from. A 404 on every call usually means `LLM_BASE_URL` is missing its version segment — the script appends `/chat/completions`, so for most routers the base ends in `/v1`.
 
 **Issue: `Candidate sampling requires thought_entities (from schemas/entity-extraction/)`**
 Solution: Either apply the `entity-extraction` schema (so this recipe has a pool to sample from), or skip sampling entirely by passing `--pair UUID_A,UUID_B` for each pair you want classified.
