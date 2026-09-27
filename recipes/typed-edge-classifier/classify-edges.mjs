@@ -645,6 +645,11 @@ function sbClient(env) {
  * If `thought_entities` is not installed (i.e. the caller hasn't set up
  * entity-extraction), fall back to nothing — force them to use --pair.
  */
+// Upper bound on candidate pairs collected before ranking. Bounds the O(n^2)
+// scan over the 5000-row thought_entities window; the old bound was limit*4,
+// too few to see past a classified backlog.
+const MAX_CANDIDATE_PAIRS = 5000;
+
 async function sampleCandidatePairs(sb, minSupport, limit) {
   // Pull recent thought_entities rows, build a thought -> [entity_ids]
   // map in JS, then find pairs with overlap >= minSupport. We cap the
@@ -689,14 +694,83 @@ async function sampleCandidatePairs(sb, minSupport, limit) {
           support: overlap,
         });
       }
-      if (pairs.length >= limit * 4) break;
+      if (pairs.length >= MAX_CANDIDATE_PAIRS) break;
     }
-    if (pairs.length >= limit * 4) break;
+    if (pairs.length >= MAX_CANDIDATE_PAIRS) break;
   }
 
-  // Sort by support desc, then trim to limit
+  // Sort by support desc, then take the first `limit` pairs that are NOT
+  // already classified. The check used to run after trimming, so a scheduled
+  // run kept re-sampling the same top-ranked pairs and never reached the rest
+  // of a backlog once those were classified.
   pairs.sort((a, b) => b.support - a.support);
-  return pairs.slice(0, limit);
+  return selectUnclassifiedPairs(sb, pairs, limit);
+}
+
+/** Canonical key for an unordered pair of thought ids. */
+function pairKey(a, b) {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
+}
+
+/**
+ * Walk ranked candidate pairs and return the first `limit` that have no typed
+ * edge yet, checking thought_edges a batch of pairs at a time so a long
+ * backlog costs a handful of requests rather than one per pair. Selected
+ * pairs are marked alreadyChecked so processPair does not query again.
+ */
+async function selectUnclassifiedPairs(sb, rankedPairs, limit, batchSize = 100) {
+  const selected = [];
+  let checked = 0;
+  let skipped = 0;
+  for (let i = 0; i < rankedPairs.length && selected.length < limit; i += batchSize) {
+    const batch = rankedPairs.slice(i, i + batchSize);
+    const classified = await fetchClassifiedPairKeys(sb, batch);
+    for (const p of batch) {
+      checked++;
+      if (classified.has(pairKey(p.from_thought_id, p.to_thought_id))) {
+        skipped++;
+        continue;
+      }
+      selected.push({ ...p, alreadyChecked: true });
+      if (selected.length >= limit) break;
+    }
+  }
+  console.log(
+    `[classify-edges] sampling: ${rankedPairs.length} candidate pairs ranked, ` +
+      `${checked} checked, ${skipped} already classified, ${selected.length} selected (limit ${limit})`,
+  );
+  return selected;
+}
+
+/**
+ * Keys of every pair among `pairs` that already has an edge other than
+ * related_to, in either direction. One request per chunk of thought ids;
+ * an edge touching a chunk's id is returned whichever side it is on.
+ */
+async function fetchClassifiedPairKeys(sb, pairs, chunkSize = 60) {
+  const ids = [...new Set(pairs.flatMap((p) => [p.from_thought_id, p.to_thought_id]))];
+  const keys = new Set();
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const list = ids.slice(i, i + chunkSize).join(",");
+    let rows;
+    try {
+      rows = await sb.get(
+        `thought_edges?select=from_thought_id,to_thought_id` +
+          `&relation=neq.related_to` +
+          `&or=(from_thought_id.in.(${list}),to_thought_id.in.(${list}))`,
+      );
+    } catch (e) {
+      if (String(e.message).includes("404") || String(e.message).includes("42P01")) {
+        throw new Error(
+          "Candidate selection requires thought_edges (from schemas/typed-reasoning-edges/). " +
+            "Apply that schema first.",
+        );
+      }
+      throw e;
+    }
+    for (const r of rows) keys.add(pairKey(r.from_thought_id, r.to_thought_id));
+  }
+  return keys;
 }
 
 async function fetchPairAlreadyClassified(sb, a, b) {
@@ -1055,8 +1129,10 @@ async function processPair(env, sb, args, pair, costState) {
 
   const { from_thought_id: a, to_thought_id: b } = pair;
 
-  const already = await fetchPairAlreadyClassified(sb, a, b);
-  if (already) return { ...pair, status: "skip_already_classified" };
+  if (!pair.alreadyChecked) {
+    const already = await fetchPairAlreadyClassified(sb, a, b);
+    if (already) return { ...pair, status: "skip_already_classified" };
+  }
 
   // PostgREST `id=in.(A,B)` does NOT guarantee result order. Build a
   // Map<id, row> and look up by ID so A/B cannot silently swap — a
@@ -1344,4 +1420,8 @@ export {
   resolveModel,
   resolveModelSelection,
   worstCasePerPair,
+  fetchClassifiedPairKeys,
+  pairKey,
+  sampleCandidatePairs,
+  selectUnclassifiedPairs,
 };

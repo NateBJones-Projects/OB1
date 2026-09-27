@@ -214,7 +214,7 @@ The classifier is safe to run on a schedule, for example nightly from `wiki-comp
 - Pairs the filter rejected, and pairs classified below `--min-confidence`, leave no row, so they are looked at again on the next run. A later run can therefore insert an edge for a pair an earlier run declined.
 - Rows carry `classifier_version`. After a vocabulary bump, delete the old rows (see Troubleshooting) and the next run reclassifies those pairs.
 
-One limit to know about: sampling ranks candidate pairs by shared-entity support and trims to `--limit` (`wiki-compiler` passes its own edge limit, 50 by default) **before** the already-classified check runs. Once the top-ranked pairs are all classified, a run reports them as skipped and does not reach further down the ranking until the ranking changes (new thoughts and entity links) or `--limit` is raised. For a backlog larger than `--limit`, raise the limit rather than relying on repeated runs.
+Sampling ranks candidate pairs by shared-entity support, then walks down the ranking checking `thought_edges` a batch at a time until `--limit` unclassified pairs are found or the candidates run out (`wiki-compiler` passes its own edge limit, 50 by default). A backlog larger than `--limit` is therefore worked through over successive runs. The `sampling:` log line reports how many candidates were ranked, checked, already classified and selected.
 
 Observed on a nightly schedule: a pair inserted by hand during the day came back as `skip_already_classified` that night, and only a new pair was classified.
 
@@ -263,7 +263,7 @@ After a full non-dry run:
 - Each row has `classifier_version = 'typed-edge-classifier-1.0.0'` so future vocabulary changes are distinguishable from older runs.
 - `metadata.rationale` on each row explains why the classifier picked the label — useful for spot-checking.
 - `confidence` is in [0, 1]; only rows `>= --min-confidence` (default 0.75) were inserted.
-- Pairs with existing non-`related_to` edges in either direction were skipped (`skip_already_classified`).
+- Pairs with existing non-`related_to` edges in either direction were excluded at sampling time (the `sampling:` log line counts them). `skip_already_classified` in the status counts now only appears for an explicit `--pair` that is already classified.
 - Self-loops and missing-thought pairs were silently skipped.
 
 ## CLI flags
