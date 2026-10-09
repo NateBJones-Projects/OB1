@@ -1,0 +1,21 @@
+{
+  "name": "Hybrid Search",
+  "description": "Adds a hybrid_match_thoughts function that fuses vector similarity and Postgres full-text search with reciprocal rank fusion, so exact terms like names, IDs, and error strings surface alongside semantic matches.",
+  "category": "recipes",
+  "author": {
+    "name": "sbartley1911",
+    "github": "sbartley1911"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": []
+  },
+  "requires_skills": [],
+  "tags": ["search", "hybrid-search", "full-text", "rrf", "retrieval"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-10-09",
+  "updated": "2026-10-09"
+}
