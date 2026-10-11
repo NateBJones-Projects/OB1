@@ -56,7 +56,9 @@ app.all("*", async (c) => {
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
-  const key = c.req.query("key") || c.req.header("x-access-key");
+  // Accept x-brain-key (the core Open Brain server's header) as well as the
+  // original x-access-key, so one header works across Open Brain MCP servers.
+  const key = c.req.query("key") || c.req.header("x-brain-key") || c.req.header("x-access-key");
   const expected = Deno.env.get("MCP_ACCESS_KEY");
   if (!key || key !== expected) {
     return c.json({ error: "Unauthorized" }, 401);
