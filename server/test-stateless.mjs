@@ -42,7 +42,11 @@ app.options("*", (c) => c.text("ok", 200, corsHeaders));
 app.all("*", async (c) => {
   const provided = c.req.header("x-brain-key");
   if (!provided || provided !== MCP_ACCESS_KEY) {
-    return c.json({ error: "Invalid or missing access key" }, 401, corsHeaders);
+    // Mirrors server/index.ts: 401 + WWW-Authenticate, never HTTP 200 (see auth_test.ts).
+    return c.json({ error: "unauthorized", message: "Invalid or missing x-brain-key" }, 401, {
+      ...corsHeaders,
+      "WWW-Authenticate": 'Bearer realm="open-brain", error="invalid_token"',
+    });
   }
 
   const server = buildServer(); // per-request: fresh instance every time
@@ -121,6 +125,7 @@ console.log("\n[2] Auth rejection — wrong key");
     body: INIT,
   });
   assert(r.status === 401, "wrong key → 401");
+  assert(r.headers.get("www-authenticate")?.startsWith("Bearer "), "WWW-Authenticate on 401");
   assert(r.headers.get("access-control-allow-origin") === "*", "CORS on 401");
 }
 

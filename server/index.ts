@@ -516,84 +516,61 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
 };
 
-// JSON-RPC error code for unauthorized requests.
-// Per the JSON-RPC 2.0 spec, the range -32099 to -32000 is reserved for
-// implementation-defined server errors. -32001 is the conventional
-// "Unauthorized" code used by MCP clients/servers in the wild.
-//
-// Why a JSON-RPC envelope (HTTP 200) instead of a bare HTTP 401?
-// Strict MCP hosts (Codex CLI, Claude Code) treat bare HTTP 4xx responses
-// as transport-level failures and tear the connection down rather than
-// surfacing the failure to the application layer. Wrapping the auth
-// rejection in a JSON-RPC error keeps the connection alive and lets
-// clients recover (e.g. prompt the user for a new key, refetch a stale
-// cache) instead of dying.
-const JSON_RPC_UNAUTHORIZED_CODE = -32001;
-const UNAUTHORIZED_MESSAGE = "Unauthorized: missing or invalid authentication.";
+// Auth failures return HTTP 401 with a WWW-Authenticate challenge, as the MCP
+// authorization spec requires (2025-11-25, basic/authorization: "Error
+// Handling" and "Protected Resource Metadata Discovery Requirements").
+// MCP clients treat 401 as a non-retryable auth error and stop. An HTTP 200
+// carrying a JSON-RPC error is treated as a transient failure instead, and
+// clients reconnect indefinitely (see the linked issue for invocation numbers).
+const UNAUTHORIZED_MESSAGE = "Invalid or missing x-brain-key";
+
+const textEncoder = new TextEncoder();
 
 /**
- * Read the request body as text without consuming the original request's
- * body stream for downstream handlers. Returns null on bodyless methods
- * or read failure.
+ * Constant-time string comparison. Both inputs are hashed with SHA-256 so the
+ * compared buffers always have equal length (no length oracle), then compared
+ * with an XOR accumulator that never short-circuits.
  */
-async function readBodyText(req: Request): Promise<string | null> {
-  if (req.method === "GET" || req.method === "HEAD" || req.method === "DELETE") {
-    return null;
-  }
-  try {
-    return await req.text();
-  } catch {
-    return null;
-  }
+async function timingSafeEqualString(a: string, b: string): Promise<boolean> {
+  const [da, db] = await Promise.all([
+    crypto.subtle.digest("SHA-256", textEncoder.encode(a)),
+    crypto.subtle.digest("SHA-256", textEncoder.encode(b)),
+  ]);
+  const va = new Uint8Array(da);
+  const vb = new Uint8Array(db);
+  let diff = 0;
+  for (let i = 0; i < va.length; i++) diff |= va[i] ^ vb[i];
+  return diff === 0;
 }
 
-/**
- * Best-effort extraction of the JSON-RPC `id` from a raw request body.
- * Returns null when the body is missing, not JSON, or not a JSON-RPC
- * shape with an id. Per the JSON-RPC 2.0 spec, id may be a string,
- * number, or null — we preserve any of those; anything else becomes null.
- */
-function extractJsonRpcId(bodyText: string | null): string | number | null {
-  if (!bodyText) return null;
-  try {
-    const parsed = JSON.parse(bodyText);
-    if (parsed && typeof parsed === "object" && "id" in parsed) {
-      const id = (parsed as { id: unknown }).id;
-      if (typeof id === "string" || typeof id === "number" || id === null) {
-        return id;
-      }
-    }
-  } catch {
-    // fall through — malformed body
-  }
-  return null;
+async function isAuthorized(req: Request): Promise<boolean> {
+  if (!MCP_ACCESS_KEY) return false;
+  const headerKey = req.headers.get("x-brain-key");
+  const queryKey = new URL(req.url).searchParams.get("key");
+  // Evaluate both candidates so timing does not reveal which path was used.
+  const [headerOk, queryOk] = await Promise.all([
+    headerKey ? timingSafeEqualString(headerKey, MCP_ACCESS_KEY) : Promise.resolve(false),
+    queryKey ? timingSafeEqualString(queryKey, MCP_ACCESS_KEY) : Promise.resolve(false),
+  ]);
+  return headerOk || queryOk;
 }
 
-/**
- * Build a JSON-RPC 2.0 error envelope response for auth failures.
- * Returns HTTP 200 — the JSON-RPC layer expresses the error so that
- * strict MCP clients keep the connection alive instead of treating
- * the failure as a transport-level fault.
- */
-function unauthorizedResponse(id: string | number | null): Response {
-  const body = {
-    jsonrpc: "2.0",
-    error: {
-      code: JSON_RPC_UNAUTHORIZED_CODE,
-      message: UNAUTHORIZED_MESSAGE,
+function unauthorizedResponse(): Response {
+  return new Response(
+    JSON.stringify({ error: "unauthorized", message: UNAUTHORIZED_MESSAGE }),
+    {
+      status: 401,
+      headers: {
+        "Content-Type": "application/json",
+        "WWW-Authenticate":
+          `Bearer realm="open-brain", error="invalid_token", error_description="${UNAUTHORIZED_MESSAGE}"`,
+        ...corsHeaders,
+      },
     },
-    id,
-  };
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      ...corsHeaders,
-    },
-  });
+  );
 }
 
-const app = new Hono();
+export const app = new Hono();
 
 // CORS preflight — required for browser/Electron-based clients (Claude Desktop, claude.ai)
 app.options("*", (c) => {
@@ -601,17 +578,10 @@ app.options("*", (c) => {
 });
 
 app.all("*", async (c) => {
-  // Accept access key via header OR URL query parameter
-  const provided = c.req.header("x-brain-key") || new URL(c.req.url).searchParams.get("key");
-  if (!provided || provided !== MCP_ACCESS_KEY) {
-    // Return a JSON-RPC 2.0 error envelope (HTTP 200) instead of a bare
-    // HTTP 401 so strict MCP hosts treat this as an application-level
-    // error rather than a transport fault and keep the connection alive.
-    // Best-effort echo of the inbound request id keeps the response
-    // correlated; malformed/missing bodies fall back to id: null.
-    const bodyText = await readBodyText(c.req.raw);
-    const id = extractJsonRpcId(bodyText);
-    return unauthorizedResponse(id);
+  // Accept access key via header OR URL query parameter. Reject with HTTP 401
+  // before any MCP server or transport is created.
+  if (!(await isAuthorized(c.req.raw))) {
+    return unauthorizedResponse();
   }
 
   // Fix: Claude Desktop connectors don't send the Accept header that
@@ -640,4 +610,6 @@ app.all("*", async (c) => {
   return response;
 });
 
-Deno.serve(app.fetch);
+if (import.meta.main) {
+  Deno.serve(app.fetch);
+}
