@@ -109,6 +109,8 @@ Follow the [Remote MCP Connection](../../primitives/remote-mcp/) guide to connec
 | Connector name | `OB-Graph` |
 | URL | Your **MCP Connection URL** from the credential tracker |
 
+If your client sends custom headers, you can keep the key out of the URL: use the URL without `?key=` and send `x-brain-key: <your MCP Access Key>`, the same header the core Open Brain server uses (`x-access-key` also works).
+
 Done when: Your AI client can connect to the OB-Graph MCP server without authentication errors and the tools appear in its MCP tool list.
 
 ---
@@ -212,6 +214,10 @@ After setup, your AI can:
 5. Link graph nodes back to existing thoughts for full context
 
 ## Troubleshooting
+
+### 401 Unauthorized when passing the key as a header
+
+The server reads the key from `?key=`, the `x-brain-key` header, or the `x-access-key` header. Check the header name is exactly one of those, the value is your MCP Access Key with no quotes or spaces, and that you redeployed after updating `index.ts`. Versions before 1.0.2 read only `x-access-key`.
 
 ### "relation 'graph_nodes' does not exist"
 

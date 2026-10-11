@@ -6,7 +6,7 @@
     "name": "Nate Jones",
     "github": "NateBJones-Projects"
   },
-  "version": "1.0.1",
+  "version": "1.0.2",
   "requires": {
     "open_brain": true,
     "services": ["Supabase"],
@@ -26,5 +26,5 @@
   "difficulty": "intermediate",
   "estimated_time": "30 minutes",
   "created": "2026-04-05",
-  "updated": "2026-04-18"
+  "updated": "2026-10-11"
 }
