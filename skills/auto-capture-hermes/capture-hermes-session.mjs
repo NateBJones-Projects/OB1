@@ -67,18 +67,28 @@ const DEBOUNCE_MS = Number(process.env.OB_CAPTURE_DEBOUNCE_MS ?? 120000);
 // on_session_finalize fires once at teardown, but the final turn may still be
 // flushing to state.db. Wait briefly before reading.
 const FINALIZE_DELAY_MS = Number(process.env.OB_CAPTURE_FINALIZE_DELAY_MS ?? 5000);
-const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 10000);
-const HARD_TIMEOUT_MS = Number(process.env.OB_CAPTURE_HARD_TIMEOUT_MS || 25000);
+const argv = process.argv.slice(2);
+// The hook process itself must answer Hermes within its 30s hook timeout, so
+// it never does network work: it schedules a detached worker and exits. The
+// worker (--deferred) is outside that limit; it sleeps for the debounce or
+// finalize delay first, so its budgets must be sized from that delay. A
+// 24k-char payload is embedded and classified server-side and can take well
+// over 10s, hence the longer fetch window for the worker.
+const IS_DEFERRED = argv[0] === "--deferred";
+const DEFERRED_DELAY_MS = IS_DEFERRED ? Number(argv[3] || 0) : 0;
+const FETCH_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || (IS_DEFERRED ? 45000 : 10000));
+const HARD_TIMEOUT_MS = Number(
+  process.env.OB_CAPTURE_HARD_TIMEOUT_MS || (IS_DEFERRED ? DEFERRED_DELAY_MS + 90000 : 25000),
+);
 const RETRY_MAX_ATTEMPTS = 5;
 const RETRY_BATCH_SIZE = 3;
 
-const argv = process.argv.slice(2);
 const DRY_RUN = argv.includes("--dry-run") || process.env.OB_CAPTURE_DRY_RUN === "1";
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  if (argv[0] === "--deferred") {
+  if (IS_DEFERRED) {
     await runDeferred(argv[1], argv[2], Number(argv[3] || 0));
     return;
   }

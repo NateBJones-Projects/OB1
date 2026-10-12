@@ -156,8 +156,14 @@ subagent) is automatically ingested into Open Brain shortly after it ends or
 goes idle. You should see:
 
 - `disposition=captured:...` lines in `logs/ambient-capture-hermes.log`
-- New thoughts in Open Brain whose text starts with `Hermes Agent Session Transcript`
-  and carries `source_label: hermes:<project>`
+- New content in Open Brain carrying `source_label: hermes:<project>`. What that
+  looks like depends on your `open-brain-rest` `/ingest`: the Smart Ingest
+  pipeline (the common production setup) extracts atomic facts from the
+  transcript, dedups them against existing thoughts, and records the run in
+  `ingestion_jobs` / `ingestion_items` (the log's `captured:<n>` is that job id;
+  expect roughly 30–45 s per capture because each fact is embedded and
+  classified). The simpler gateway stores the whole transcript as one thought
+  whose text starts with `Hermes Agent Session Transcript` and logs its id.
 - Failed captures queued in `data/capture-retry-queue/` and retried on later runs
 - Short and subagent sessions silently skipped
 
@@ -172,6 +178,8 @@ goes idle. You should see:
 | `OB_CAPTURE_DEBOUNCE_MS` | `120000` | Idle delay after `on_session_end` |
 | `OB_CAPTURE_FINALIZE_DELAY_MS` | `5000` | Delay after `on_session_finalize` |
 | `OB_CAPTURE_MAX_CHARS` | `24000` | Payload size cap (embedding token limit) |
+| `FETCH_TIMEOUT_MS` | `45000` in the detached worker, `10000` for a synchronous run | Ingest request timeout. The worker runs outside Hermes's 30 s hook limit and Smart Ingest can take 30–45 s |
+| `OB_CAPTURE_HARD_TIMEOUT_MS` | delay + `90000` in the worker, `25000` otherwise | Absolute process lifetime guard |
 | `OB_CAPTURE_SYNC` | unset | Set to `1` to capture synchronously (testing) |
 | `OB_CAPTURE_DRY_RUN` | unset | Set to `1` to print the payload instead of sending |
 
