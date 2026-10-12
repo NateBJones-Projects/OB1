@@ -40,6 +40,12 @@ skills chained together. For a single step, call that one skill directly.
 - A working Open Brain setup (optional search/capture during the run).
 - The five canonical skills installed (see `requires_skills` in `metadata.json`).
 
+## Install
+
+1. Copy `skills/research-to-decision-workflow` into your AI client's skills directory (for Claude Code: `~/.claude/skills/`).
+2. Install the canonical skills it orchestrates (see Prerequisites).
+3. Start a new session so the client reloads its skills, then describe the decision you need to make.
+
 ## Expected Outcome
 
 A populated `docs/research-to-decision/` workspace with ordered handoff files and
