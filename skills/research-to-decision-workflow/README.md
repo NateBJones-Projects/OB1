@@ -40,6 +40,8 @@ skills chained together. For a single step, call that one skill directly.
 - A working Open Brain setup (optional search/capture during the run).
 - The five canonical skills installed (see `requires_skills` in `metadata.json`).
 
+Canonical skills this workflow orchestrates (install each before use): [research-synthesis](../../skills/research-synthesis/), [competitive-analysis](../../skills/competitive-analysis/), [meeting-synthesis](../../skills/meeting-synthesis/), [financial-model-review](../../skills/financial-model-review/), [deal-memo-drafting](../../skills/deal-memo-drafting/).
+
 ## Install
 
 1. Copy `skills/research-to-decision-workflow` into your AI client's skills directory (for Claude Code: `~/.claude/skills/`).
