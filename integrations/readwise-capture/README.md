@@ -8,6 +8,8 @@
 
 Receives Readwise highlight webhooks and stores each highlight as a thought in your Open Brain — automatically embedded, classified as a reference, and tagged with book title, author, and location. Works for highlights made anywhere Readwise aggregates from: Kindle, Apple Books, Reader, Instapaper, Hypothesis, Airr/Snipd podcasts, and physical books via the Readwise OCR app.
 
+> If this integration exposes MCP tools, it adds to your AI's context weight. See the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on managing your tool count as your Open Brain grows.
+
 ## Prerequisites
 
 - A working Open Brain setup (follow the [Getting Started guide](../../docs/01-getting-started.md) through Step 7 — you need the Supabase database, OpenRouter API key, and Supabase CLI installed)

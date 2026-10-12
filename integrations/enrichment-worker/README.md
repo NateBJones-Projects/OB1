@@ -69,6 +69,8 @@ WHERE (
   AND COALESCE(metadata->>'enrichment_status', '') <> 'exempt';
 ```
 
+> If this integration exposes MCP tools, it adds to your AI's context weight. See the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on managing your tool count as your Open Brain grows.
+
 ## Prerequisites
 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
