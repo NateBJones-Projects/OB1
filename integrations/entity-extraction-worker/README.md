@@ -24,6 +24,7 @@ The knowledge graph enables queries like "what projects does Sarah work on?" or 
 - Working Open Brain setup ([guide](../../docs/01-getting-started.md))
 - **Enhanced thoughts schema** applied — install `schemas/enhanced-thoughts`
 - **Knowledge graph schema** applied — install `schemas/knowledge-graph` to create the `entities`, `edges`, `thought_entities`, and `entity_extraction_queue` tables
+- **`resolve_entity` RPC** applied — run [`sql/001_resolve_entity.sql`](sql/001_resolve_entity.sql) (`supabase db query --linked -f /ABS/PATH/sql/001_resolve_entity.sql`). The worker resolves entities through this function, which dedupes on `normalized_name` alone so one entity never splits into several rows when the LLM varies its type. The file replaces the schema's composite `UNIQUE (entity_type, normalized_name)` with `UNIQUE (normalized_name)`; it is idempotent, and it stops with instructions if your `entities` table already holds the same name under two types (merge those first with the `merge_entities` tool or `recipes/entity-near-dupe-review`)
 - At least one LLM API key: OpenRouter (recommended), OpenAI, or Anthropic
 - Supabase CLI installed for deployment
 
