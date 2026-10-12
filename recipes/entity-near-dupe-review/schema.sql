@@ -72,22 +72,18 @@ BEGIN
   END IF;
 
   -- thought_entities: drop rows that would collide on the survivor, repoint rest
-  DELETE FROM public.thought_entities te USING public.thought_entities k
-  WHERE te.entity_id = p_loser AND k.entity_id = p_survivor
-    AND k.thought_id = te.thought_id AND k.mention_role = te.mention_role;
+  DELETE FROM public.thought_entities te USING public.thought_entities k WHERE te.entity_id = p_loser
+    AND k.entity_id = p_survivor AND k.thought_id = te.thought_id AND k.mention_role = te.mention_role;
   UPDATE public.thought_entities SET entity_id = p_survivor WHERE entity_id = p_loser;
   GET DIAGNOSTICS v_mentions = ROW_COUNT;
 
   -- edges: drop future self-loops, drop (from,to,relation) collisions, repoint rest
-  DELETE FROM public.edges
-   WHERE (from_entity_id = p_loser AND to_entity_id = p_survivor)
+  DELETE FROM public.edges WHERE (from_entity_id = p_loser AND to_entity_id = p_survivor)
       OR (from_entity_id = p_survivor AND to_entity_id = p_loser);
-  DELETE FROM public.edges e USING public.edges k
-  WHERE e.from_entity_id = p_loser AND k.from_entity_id = p_survivor
-    AND k.to_entity_id = e.to_entity_id AND k.relation = e.relation;
-  DELETE FROM public.edges e USING public.edges k
-  WHERE e.to_entity_id = p_loser AND k.to_entity_id = p_survivor
-    AND k.from_entity_id = e.from_entity_id AND k.relation = e.relation;
+  DELETE FROM public.edges e USING public.edges k WHERE e.from_entity_id = p_loser
+    AND k.from_entity_id = p_survivor AND k.to_entity_id = e.to_entity_id AND k.relation = e.relation;
+  DELETE FROM public.edges e USING public.edges k WHERE e.to_entity_id = p_loser
+    AND k.to_entity_id = p_survivor AND k.from_entity_id = e.from_entity_id AND k.relation = e.relation;
   UPDATE public.edges SET from_entity_id = p_survivor WHERE from_entity_id = p_loser;
   UPDATE public.edges SET to_entity_id   = p_survivor WHERE to_entity_id   = p_loser;
   GET DIAGNOSTICS v_edges = ROW_COUNT;
