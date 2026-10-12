@@ -122,6 +122,15 @@ Use this default structure:
      important follow-up items.
    - Include provenance: week ending date, topic scope, and major entities
      covered.
+   - Structured provenance when the provenance-chains capability is available (a
+     `capture_derived_thought` tool, or `derived_from`/`derivation_layer`
+     columns): capture the digest as a derived artifact —
+     `derivation_layer='derived'`, `derivation_method='synthesis'`,
+     `derived_from` = the UUIDs of the prior Open Brain digests and thoughts you
+     pulled and re-ranked against in step 1, and `supersedes` = the prior week's
+     digest ID when this run regenerates it. This makes each week's diff
+     traceable to the memory it was built from. No-op when that capability
+     isn't present.
 
 ## Output
 
