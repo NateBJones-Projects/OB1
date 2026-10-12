@@ -31,6 +31,11 @@ For AI clients, install the paired **[`merging-entities`](../../skills/merging-e
 
 ## Steps
 
+1. Apply `schema.sql` in the Supabase SQL Editor (Step 1).
+2. Review the candidate pairs in `ops_entity_near_dupes` (Step 2).
+3. Merge only the pairs you have confirmed, survivor first (Step 3).
+4. Verify integrity after each session (Step 4).
+
 ### Step 1: Apply the schema
 
 Run `schema.sql` in the Supabase SQL Editor. It creates the `pg_trgm` extension, a trigram index on `entities.normalized_name`, the review view, and the merge function. Safe to re-run.
@@ -83,4 +88,4 @@ SELECT details, created_at FROM consolidation_log
 
 - **[merging-entities skill](../../skills/merging-entities/)** — the behavioral safety protocol every AI client should follow when running this review.
 - **`schemas/entity-extraction`** — provides the graph tables and the `consolidation_log` this recipe writes to.
-- **[editorial-policy hygiene block](../editorial-policy/)** / **[brain-health-monitor](../brain-health-monitor/)** — both surface `entity_dup_groups` and `entities_zero_edges`; this recipe is how you act on those signals.
+- **[editorial-policy hygiene block](../editorial-policy/)** / **brain-health-monitor** (recipe proposed in #441) — both surface `entity_dup_groups` and `entities_zero_edges`; this recipe is how you act on those signals.
