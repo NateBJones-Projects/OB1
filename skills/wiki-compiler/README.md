@@ -85,6 +85,10 @@ node recipes/wiki-compiler/sync-wiki-to-brain.mjs  # -> wiki_entity / wiki_topic
 Then browse them at the Open Brain Dashboard Pro `/wiki` route. Content lives only in the
 database (behind login); nothing personal is committed to git.
 
+## Expected Outcome
+
+After a full run the `entity_extraction_queue` is drained (`processed_at` set on every row), `entities` and `thought_edges` reflect the whole brain rather than the last batch, and `compiled-wiki/` holds one Markdown page per entity plus the topic pages, each with a `compile-manifest.json` entry. Re-running on an unchanged brain is a no-op; the dashboard's wiki viewer (if installed) shows the new pages immediately because it reads from the database.
+
 ## Design Rule
 
 SQL is authoritative; `compiled-wiki/` is a regenerable artifact and stays
