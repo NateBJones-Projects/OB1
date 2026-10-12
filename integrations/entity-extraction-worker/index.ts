@@ -117,8 +117,18 @@ function isAuthorized(req: Request): boolean {
 
 function stripCodeFences(text: string): string {
   const trimmed = text.trim();
-  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
-  return match ? match[1].trim() : trimmed;
+  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```\s*$/);
+  if (match) return match[1].trim();
+  // Fence with trailing prose after the close, or unterminated fence: strip
+  // the opening fence and cut at the next closing fence if one exists. The
+  // fully-anchored regex above misses both cases and previously caused
+  // poison-pill queue items ("...```json\n{..." is not valid JSON).
+  if (trimmed.startsWith("```")) {
+    const body = trimmed.replace(/^```(?:json)?\s*\n?/, "");
+    const close = body.indexOf("```");
+    return (close >= 0 ? body.slice(0, close) : body).trim();
+  }
+  return trimmed;
 }
 
 function readAnthropicText(payload: unknown): string {
@@ -384,26 +394,23 @@ function normalizeName(name: string): string {
 
 async function upsertEntity(name: string, entityType: string): Promise<number | null> {
   const normalized = normalizeName(name);
-  const { data, error } = await supabase
-    .from("entities")
-    .upsert(
-      {
-        entity_type: entityType,
-        canonical_name: name,
-        normalized_name: normalized,
-        last_seen_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "entity_type,normalized_name" },
-    )
-    .select("id")
-    .single();
+  // Resolve via RPC that dedupes on normalized_name ALONE (not
+  // entity_type+normalized_name). This prevents the same entity being split
+  // into multiple rows when the LLM assigns an inconsistent type across
+  // mentions. On conflict the RPC keeps the first-seen type (no churn) and
+  // only bumps timestamps. We pass our own normalized string so it stays
+  // byte-identical to existing normalized_name values.
+  const { data, error } = await supabase.rpc("resolve_entity", {
+    p_name: name,
+    p_normalized: normalized,
+    p_type: entityType,
+  });
 
   if (error) {
-    console.error(`Failed to upsert entity "${name}" (${entityType}):`, error);
+    console.error(`Failed to resolve entity "${name}" (${entityType}):`, error);
     return null;
   }
-  return data?.id ?? null;
+  return (data as number | null) ?? null;
 }
 
 async function linkThoughtEntity(
