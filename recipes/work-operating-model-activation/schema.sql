@@ -476,8 +476,7 @@ BEGIN
         updated_at = now()
   RETURNING id INTO v_checkpoint_id;
 
-  DELETE FROM operating_model_entries
-  WHERE session_id = v_session.id
+  DELETE FROM operating_model_entries WHERE session_id = v_session.id
     AND layer = p_layer;
 
   INSERT INTO operating_model_entries (
