@@ -50,13 +50,13 @@ FROM YOUR OPEN BRAIN SETUP
   Project URL:               ____________
   Project ref (xxx.supabase.co):  ____________
   Service role key:          ____________
+  MCP access key:            ____________
+    (your brain-wide MCP_ACCESS_KEY secret)
   OpenRouter API key:        ____________
   Slack bot token:           ____________
   Slack capture channel ID:  ____________
 
 GENERATED DURING SETUP
-  Auditor access key
-    (random 32-char string):  ____________
   Optional digest channel ID
     (defaults to capture):    ____________
 
@@ -114,7 +114,7 @@ Run the contents of `schema.sql` in your Supabase SQL Editor. This adds the `get
 In the Supabase dashboard: **Settings → Edge Functions → Secrets**. Set:
 
 ```
-AUDITOR_ACCESS_KEY = <a random string you generate, e.g. with `openssl rand -hex 16`>
+MCP_ACCESS_KEY = <your existing brain-wide MCP access key — already set if you ran the base Open Brain setup; the auditor authenticates on it via the x-brain-key header>
 SLACK_DIGEST_CHANNEL = <optional; defaults to SLACK_CAPTURE_CHANNEL>
 POLICY_VERSION = 1.3   # or whatever your editorial-policy.md says
 ```
@@ -131,7 +131,7 @@ supabase functions deploy auditor
 
 ### Step 6: Schedule the weekly run
 
-Open `schedule.sql`, replace `<YOUR-PROJECT-REF>` and `<YOUR-AUDITOR-KEY>` with your actual values, then run it in the SQL Editor. This adds a pg_cron job that fires every Sunday at 09:00 UTC.
+Open `schedule.sql`, replace `<YOUR-PROJECT-REF>` and `<YOUR-MCP-ACCESS-KEY>` with your actual values, then run it in the SQL Editor. The key travels in the `x-brain-key` header, not the URL. This adds a pg_cron job that fires every Sunday at 09:00 UTC.
 
 ### Step 7: Smoke test
 
@@ -139,8 +139,8 @@ From the SQL Editor, fire a one-off dry run (no Slack post, no audit_report stor
 
 ```sql
 SELECT net.http_post(
-  url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auditor?key=<YOUR-AUDITOR-KEY>',
-  headers := jsonb_build_object('Content-Type', 'application/json'),
+  url := 'https://<YOUR-PROJECT-REF>.supabase.co/functions/v1/auditor',
+  headers := jsonb_build_object('Content-Type', 'application/json', 'x-brain-key', '<YOUR-MCP-ACCESS-KEY>'),
   body := jsonb_build_object('days', 30, 'post_to_slack', false, 'dry_run', true)
 );
 ```
@@ -166,7 +166,7 @@ A typical critical finding looks like:
 
 **Issue: Auditor returns 401 Unauthorized**
 
-Solution: the `AUDITOR_ACCESS_KEY` secret isn't set, or the value in your `schedule.sql` doesn't match. Check **Settings → Edge Functions → Secrets** and the `?key=…` param in the cron URL.
+Solution: the `MCP_ACCESS_KEY` secret isn't set, or the value in your `schedule.sql` doesn't match. Check **Settings → Edge Functions → Secrets** and the `x-brain-key` header in the cron command.
 
 **Issue: Auditor runs but finds nothing useful**
 

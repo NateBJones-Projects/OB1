@@ -61,6 +61,14 @@ READWISE
 
 ---
 
+## Steps at a glance
+
+1. Install the Python dependencies (Step 1).
+2. Check the size of your library so you know what the import will cost (Step 2).
+3. Export the Readwise and Supabase environment variables (Step 3).
+4. Dry-run the import and review the sample output (Step 4).
+5. Run the full import; re-runs are incremental (Step 5).
+
 ## Step 1: Install Python Dependencies
 
 From this folder:

@@ -387,26 +387,26 @@ function getLlmCallCap(): number {
  */
 export async function extractMetadata(
   text: string,
-): Promise<ThoughtMetadata & { _enrichment_status: "complete" | "fallback" }> {
+): Promise<ThoughtMetadata & { _enrichment_status: "complete" | "fallback"; _enrichment_error?: string }> {
   const fallback = fallbackMetadata(text);
   const configuredProviders = getConfiguredMetadataProviders();
   const primary = configuredProviders[0];
 
   if (!primary) {
     console.warn("No metadata provider configured, returning fallback");
-    return { ...fallback, _enrichment_status: "fallback" };
+    return { ...fallback, _enrichment_status: "fallback", _enrichment_error: "no_provider_configured" };
   }
 
   // Global call-budget guardrail: once exhausted, stop classifying.
   const cap = getLlmCallCap();
   if (cap === 0) {
-    return { ...fallback, _enrichment_status: "fallback" };
+    return { ...fallback, _enrichment_status: "fallback", _enrichment_error: "classifier_disabled" };
   }
   if (_llmCallCount >= cap) {
     console.warn(
       `Enhanced MCP LLM call budget exhausted (${_llmCallCount} / ${cap}); returning fallback metadata.`,
     );
-    return { ...fallback, _enrichment_status: "fallback" };
+    return { ...fallback, _enrichment_status: "fallback", _enrichment_error: "call_budget_exhausted" };
   }
 
   const fetchProvider = (p: MetadataProvider) => {
@@ -443,7 +443,7 @@ export async function extractMetadata(
       primary,
       lastError,
     );
-    return { ...fallback, _enrichment_status: "fallback" };
+    return { ...fallback, _enrichment_status: "fallback", _enrichment_error: `fatal_provider_error: ${String(lastError).slice(0, 200)}` };
   }
 
   // Attempt 2: retry primary after delay for transient failures only
@@ -456,7 +456,7 @@ export async function extractMetadata(
       console.warn("Primary metadata classification failed (attempt 2)", primary, err);
       lastError = err;
       if (isFatalProviderError(err)) {
-        return { ...fallback, _enrichment_status: "fallback" };
+        return { ...fallback, _enrichment_status: "fallback", _enrichment_error: `transient_failures_exhausted: ${String(err).slice(0, 200)}` };
       }
     }
   }
@@ -480,7 +480,7 @@ export async function extractMetadata(
     break;
   }
 
-  return { ...fallback, _enrichment_status: "fallback" };
+  return { ...fallback, _enrichment_status: "fallback", _enrichment_error: "all_providers_failed" };
 }
 
 // ── Fallback & sanitization ────────────────────────────────────────────────
