@@ -1,0 +1,20 @@
+{
+  "name": "Entity Near-Dupe Review",
+  "description": "Surfaces fuzzy entity duplicates the normalized_name dedup can't catch (spacing/case/hyphen/acronym/username variants) as review candidates, plus a safe human-confirmed merge function that repoints edges and mentions, aliases the loser, and logs to consolidation_log. Pairs with the merging-entities skill.",
+  "category": "recipes",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase (pg_trgm)"],
+    "tools": []
+  },
+  "tags": ["entity-resolution", "deduplication", "knowledge-graph", "trgm", "review", "data-quality"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-07-12",
+  "updated": "2026-07-12"
+}
