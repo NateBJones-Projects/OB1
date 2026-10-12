@@ -8,7 +8,7 @@
   },
   "version": "1.0.0",
   "requires": {
-    "open_brain": false,
+    "open_brain": true,
     "services": ["OpenRouter (optional, for LLM description enrichment)"],
     "tools": ["Node.js 20+"]
   },

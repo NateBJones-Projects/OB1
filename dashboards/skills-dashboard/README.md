@@ -17,14 +17,25 @@ Skills are matched across harnesses by their frontmatter `name` (directory name 
 
 Claude Code / Codex **plugin-provided** skills (~250 rows) are hidden by default — enable the "plugin skills" toggle to include them. The toggle works at the install level: a skill installed both personally and via plugin keeps its × either way, sourced accordingly.
 
+## Prerequisites
+
+- Node.js 20+
+- At least one harness with skills installed locally (Claude Code, Codex, Grok, Hermes or Claude Desktop); the dashboard scans the paths in the table above
+- Optional: an OpenRouter API key, only for the LLM enrichment pass described below
+
 ## Run
 
-```bash
-npm install
-npm run dev        # Express scanner on :8788 + Vite client on :5173
-```
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Start the scanner and the client together:
+   ```bash
+   npm run dev        # Express scanner on :8788 + Vite client on :5173
+   ```
+3. Open http://localhost:5173.
 
-Open http://localhost:5173. The table rescans on every request; the client refetches every 60 s and has a Refresh button.
+Expected outcome: a table with one row per skill and one column per harness, an `×` in each cell where that skill is installed, grouped into collapsible categories. The table rescans on every request; the client refetches every 60 s and has a Refresh button.
 
 Click a **skill name** to open the file browser popup (one tab per install, resizable, Esc/× to close). Click the **+** next to a name for inline install details (source, path, date, per-harness state).
 
