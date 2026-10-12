@@ -1,0 +1,20 @@
+{
+  "name": "Open Brain Capture-Hook Authoring",
+  "description": "Authoring and debugging guide for session-end auto-capture hooks that ship an AI CLI transcript to Open Brain, covering each agent's real transcript format and the ingest limits that make hooks fail silently.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Claude Code", "Codex", "Grok", "Node.js 18+"]
+  },
+  "requires_skills": ["auto-capture", "auto-capture-claude-code"],
+  "tags": ["skill", "capture", "hooks", "session-end", "debugging", "claude-code", "codex", "grok", "ingest"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-07-05"
+}
