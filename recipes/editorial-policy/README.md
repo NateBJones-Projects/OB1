@@ -30,6 +30,7 @@ Three failure modes the policy + auditor pair catches that scattered prompt-tuni
 - **`schema.sql`** — adds one helper RPC (`get_recent_audit_reports`) and one partial index on the `thoughts` table. No new tables.
 - **`auditor/index.ts`** + **`deno.json`** — Supabase Edge Function that runs weekly, scans recent thoughts, returns structured JSON findings, stores them as `type=audit_report` thoughts, and posts to Slack on critical findings only.
 - **`schedule.sql`** — pg_cron entry to fire the auditor weekly.
+- **`hygiene.sql`** *(optional, recommended)* — read-only lint views + a `lint_hygiene_summary()` function. When installed, the auditor computes mechanical hygiene counts (orphans, exact duplicates, missing fingerprints, low-signal noise, over-tagging, and — with the entity-extraction schema — isolated high-importance thoughts and zero-edge entities) **before** the LLM pass and stores them in `metadata.hygiene` on every audit_report, plus a human-readable section in the report content. Hygiene never posts to Slack. Without this file the auditor runs LLM-only, exactly as before.
 
 ## Prerequisites
 
@@ -128,6 +129,16 @@ cp <recipe>/auditor/index.ts  supabase/functions/auditor/index.ts
 cp <recipe>/auditor/deno.json supabase/functions/auditor/deno.json
 supabase functions deploy auditor
 ```
+
+### Step 5b (optional): Install the mechanical hygiene layer
+
+Run `hygiene.sql` in the SQL Editor. Everything in it is guarded — on installs missing the enhanced-thoughts schema, content-fingerprint dedup, or the entity-extraction schema, the corresponding views are skipped with a `NOTICE` and the summary reports what it can. Verify with:
+
+```sql
+SELECT lint_hygiene_summary();
+```
+
+Two design decisions worth knowing: hygiene is computed **before** the LLM call, and the LLM pass is wrapped so a provider failure stores a hygiene-only report with `metadata.llm_error` set instead of discarding the run — the free SQL pass is never gated behind the flaky paid one. And hygiene counts live in a separate `metadata.hygiene` block, never mixed into `findings`, so they stay independently queryable and can't inflate finding counts.
 
 ### Step 6: Schedule the weekly run
 
