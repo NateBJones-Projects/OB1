@@ -1,0 +1,85 @@
+# Skills Dashboard
+
+A localhost dashboard showing which AI skills are installed in which harness on this machine. One row per skill, one column per harness, an `×` where installed — grouped into collapsible categories, searchable, with a per-skill file browser and a static-export path for Vercel.
+
+## Harnesses scanned
+
+| Harness | Where skills are found |
+|---|---|
+| Claude Code | `~/.claude/skills/` (personal) + enabled plugins resolved via `~/.claude/plugins/installed_plugins.json` |
+| Codex | `~/.codex/skills/` + built-in `.system/` skills + plugin cache |
+| Grok Build | `~/.grok/skills/` |
+| Hermes | `$HERMES_HOME` or `~/.hermes` — pre-wired; the column populates automatically once Hermes is installed |
+| Claude Desktop | `~/Library/Application Support/Claude/local-agent-mode-sessions/skills-plugin/**` joined with its `manifest.json` |
+| ChatGPT Desktop | no local skill store — the column renders with a note |
+
+Skills are matched across harnesses by their frontmatter `name` (directory name as fallback, with lenient recovery for malformed YAML). The Updated column is the newest `SKILL.md` mtime across harnesses; per-install dates are in the row detail and cell tooltips. Dates within the last 7 days render in signal orange.
+
+Claude Code / Codex **plugin-provided** skills (~250 rows) are hidden by default — enable the "plugin skills" toggle to include them. The toggle works at the install level: a skill installed both personally and via plugin keeps its × either way, sourced accordingly.
+
+## Prerequisites
+
+- Node.js 20+
+- At least one harness with skills installed locally (Claude Code, Codex, Grok, Hermes or Claude Desktop); the dashboard scans the paths in the table above
+- Optional: an OpenRouter API key, only for the LLM enrichment pass described below
+
+## Run
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Start the scanner and the client together:
+
+   ```bash
+   npm run dev        # Express scanner on :8788 + Vite client on :5173
+   ```
+
+3. Open http://localhost:5173.
+
+Expected outcome: a table with one row per skill and one column per harness, an `×` in each cell where that skill is installed, grouped into collapsible categories. The table rescans on every request; the client refetches every 60 s and has a Refresh button.
+
+Click a **skill name** to open the file browser popup (one tab per install, resizable, Esc/× to close). Click the **+** next to a name for inline install details (source, path, date, per-harness state).
+
+## Descriptions & LLM enrichment (optional)
+
+Descriptions come from SKILL.md frontmatter (or Claude Desktop's manifest). Skills without one get a heuristic (first paragraph of the body). To improve those and re-categorize rows stuck in "Other" with an LLM:
+
+```bash
+cp .env.example .env    # set OPENROUTER_API_KEY
+npm run enrich          # or use the Enrich button in the toolbar
+```
+
+Results are cached in `server/.describe-cache.json` keyed by file content hash, so each skill is only ever summarized once. The polled `/api/skills` route never calls the LLM.
+
+Categories are assigned by an editable keyword rubric in `server/categories.ts` (manual overrides map at the top).
+
+## Duplicate detection & OpenRouter dedup
+
+Any skill with more than one install inside a single harness is flagged: rows get a `dup` chip and the toolbar shows an orange **duplicates (N)** button that opens the review panel.
+
+- **Byte-identical copies** (e.g. several plugins shipping the same skill) are confirmed mechanically by content hash — no LLM call.
+- **Groups whose content differs** can be judged with the **Dedup with OpenRouter** button (needs `OPENROUTER_API_KEY`): the LLM classifies each group as `same` (redundant copies — with advice on which to keep), `variants` (deliberate platform-specific implementations — keep all), or `different` (unrelated skills sharing a name), with one-sentence reasoning and a recommendation.
+
+Verdicts are cached in `server/.dedup-cache.json` keyed by the group's content hashes, so a group is only judged once until one of its files changes.
+
+Each install in the panel has a **Delete** button (live mode only) with an inline confirm step. Deleting moves the skill directory to the macOS **Trash** (falling back to `~/.skills-dashboard-trash` if Trash access is denied) — never a hard delete, so it's recoverable. The endpoint only accepts paths that are part of a *current* duplicate group, so a skill's last remaining copy can never be removed this way. Note that copies inside a plugin's cache may reappear when that plugin updates.
+
+## Deploy to Vercel (static snapshot)
+
+A hosted deployment cannot scan this machine's disk — it serves a baked snapshot:
+
+```bash
+npm run export     # writes a sanitized public/skills.json (no absolute paths)
+npm run build      # bundles it into dist/
+```
+
+Deploy `dist/` as a static site (`vercel deploy dist`). The client detects that `/api` is absent, falls back to the baked `skills.json`, and shows a "snapshot from <date>" badge; the file-browser popup is disabled. Re-run export + build to refresh the snapshot.
+
+## Notes
+
+- Port 8788 (repo-learning-coach uses 8787). Override with `SKILLS_DASH_PORT`.
+- The file-browser endpoints only serve paths that `realpath`-resolve inside the scanned skill roots; symlinks are rejected.
+- `npm run serve` after a build serves the client and API together on :8788 (production mode).

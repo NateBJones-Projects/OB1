@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+server/.describe-cache.json
+server/.dedup-cache.json
+public/skills.json
+*.tsbuildinfo
