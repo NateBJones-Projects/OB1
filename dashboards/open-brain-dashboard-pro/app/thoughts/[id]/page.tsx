@@ -24,8 +24,9 @@ export default async function ThoughtDetailPage({
   const session = await getSession();
   const excludeRestricted = !session.restrictedUnlocked;
   const { id } = await params;
-  const thoughtId = parseInt(id, 10);
-  if (isNaN(thoughtId)) notFound();
+  // Thought ids are UUIDs (public.thoughts.id uuid default gen_random_uuid()).
+  if (!/^[0-9a-fA-F-]{36}$/.test(id)) notFound();
+  const thoughtId = id;
 
   let thought;
   try {
