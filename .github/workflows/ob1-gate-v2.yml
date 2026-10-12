@@ -273,7 +273,10 @@ jobs:
             case "$category" in
               recipes)
                 has_artifact=$(echo "$dir_files" | grep -E '\.(sql|ts|js|py)$' || true)
-                readme_has_steps=$(grep -c -iE '^\s*[0-9]+\.' "$dir/README.md" 2>/dev/null || echo "0")
+                # grep -c prints the count even when it is 0 (and then exits 1), so
+                # "|| echo 0" produced "0\n0" and broke the integer test below.
+                readme_has_steps=$(grep -c -iE '^\s*[0-9]+\.' "$dir/README.md" 2>/dev/null || true)
+                readme_has_steps=${readme_has_steps:-0}
                 if [ -z "$has_artifact" ] && [ "$readme_has_steps" -lt 3 ]; then
                   rule6_detail="${rule6_detail}  - \`$dir\`: recipes need code files (.sql/.ts/.js/.py) or detailed step-by-step instructions in README\n"
                   rule6_pass=false
