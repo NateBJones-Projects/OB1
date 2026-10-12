@@ -61,11 +61,13 @@ Gather or confirm before running:
    proceed until the decision is explicitly defined.** Use the bundled
    `workflow-template.md` for the brief and file structure.
 2. **Scaffold the workspace.**
+
    ```bash
    mkdir -p docs/research-to-decision/sources \
             docs/research-to-decision/meetings \
             docs/research-to-decision/models
    ```
+
 3. **Optionally search Open Brain** for prior related context and note anything
    that changes the brief.
 4. **Select the path** from the brief:
