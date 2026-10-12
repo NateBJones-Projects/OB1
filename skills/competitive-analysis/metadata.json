@@ -6,7 +6,7 @@
     "name": "Nate B. Jones",
     "github": "NateBJones"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "requires": {
     "open_brain": true,
     "services": [],
@@ -16,5 +16,5 @@
   "difficulty": "intermediate",
   "estimated_time": "10 minutes",
   "created": "2026-03-31",
-  "updated": "2026-03-31"
+  "updated": "2026-07-05"
 }

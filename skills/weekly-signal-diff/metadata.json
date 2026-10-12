@@ -6,7 +6,7 @@
     "name": "Jonathan Edwards",
     "github": "justfinethanku"
   },
-  "version": "1.0.0",
+  "version": "1.0.1",
   "requires": {
     "open_brain": true,
     "services": ["Optional: OpenRouter (Perplexity Sonar family) for live search"],
@@ -23,5 +23,5 @@
   "difficulty": "intermediate",
   "estimated_time": "15 minutes",
   "created": "2026-04-13",
-  "updated": "2026-04-13"
+  "updated": "2026-07-05"
 }
