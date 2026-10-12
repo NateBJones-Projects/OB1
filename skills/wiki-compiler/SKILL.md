@@ -62,17 +62,21 @@ zero output is a failure — verify, don't assume.
      `LLM_MODEL=anthropic/claude-haiku-4-5`
 
 2. **Schema preflight (Supabase CLI).** Confirm the graph tables exist:
+
    ```bash
    supabase db query --linked "select table_name from information_schema.tables
      where table_schema='public'
        and table_name in ('thoughts','entities','edges','thought_entities','thought_edges');"
    ```
+
    `entity-extraction` ships `entities/edges/thought_entities`. If `thought_edges`
    is missing, install the typed-edges schema. **Pass an absolute path** — the CLI
    resolves `-f` relative to the Supabase workdir (the OB1 *parent* dir), not cwd:
+
    ```bash
    supabase db query --linked -f "$(pwd)/schemas/typed-reasoning-edges/schema.sql"
    ```
+
    The schema is idempotent and additive (no destructive statements).
 
 3. **Dry run.** `node recipes/wiki-compiler/compile-wiki.mjs --dry-run`. This
@@ -84,10 +88,12 @@ zero output is a failure — verify, don't assume.
 
 5. **Verify each phase actually did work** (the manifest says `ok` even when a
    phase produced nothing):
+
    ```bash
    supabase db query --linked "select relation, count(*) from public.thought_edges group by relation;"
    ls compiled-wiki/entities/ compiled-wiki/topics/
    ```
+
    If `thought_edges` is still empty, apply the edge-phase fix in the next section.
 
 6. **Publish to the brain (for dashboard viewing).** After a successful compile,
@@ -102,6 +108,7 @@ zero output is a failure — verify, don't assume.
    processes only `--extract-limit` items (default 25). To fold every thought
    into the graph, loop extraction-only passes until pending hits zero, then do
    one final compile so the wiki reflects every entity:
+
    ```bash
    # pending: select count(*) from entity_extraction_queue where processed_at is null;
    while [ "$(pending)" != "0" ]; do
@@ -109,6 +116,7 @@ zero output is a failure — verify, don't assume.
        --skip-edges --skip-entity-wiki --skip-topic-wiki --extract-limit 50
    done
    ```
+
    A large `--extract-limit` can 502 (edge-function timeout); the worker still
    makes progress, so the loop absorbs it — keep looping until pending is 0.
 
@@ -120,10 +128,12 @@ zero output is a failure — verify, don't assume.
   Fix: if your tree has the `resolveModel` date-stripping fix, defaults work.
   Otherwise run the edge phase standalone with an undated slug (the wrapper does
   not expose `--filter-model`), then `--skip-edges` for the rest:
+
   ```bash
   node recipes/typed-edge-classifier/classify-edges.mjs \
     --filter-model claude-haiku-4-5 --classify-model claude-opus-4-7
   ```
+
 - **502 on extraction.** Edge-function timeout on a large batch. Lower
   `--extract-limit` and keep looping.
 - **`supabase db query -f` "file not found".** The path is resolved from the
