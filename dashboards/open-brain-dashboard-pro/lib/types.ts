@@ -1,5 +1,5 @@
 export interface Thought {
-  id: number;
+  id: string;
   uuid?: string;
   content: string;
   type: string;
@@ -40,8 +40,8 @@ export interface StatsResponse {
 }
 
 export interface DuplicatePair {
-  thought_id_a: number;
-  thought_id_b: number;
+  thought_id_a: string;
+  thought_id_b: string;
   similarity: number;
   content_a: string;
   content_b: string;
@@ -76,9 +76,9 @@ export interface IngestionItem {
   action: string; // add, skip, create_revision, append_evidence
   reason: string | null;
   status: string;
-  matched_thought_id: number | null;
+  matched_thought_id: string | null;
   similarity_score: number | null;
-  result_thought_id: number | null;
+  result_thought_id: string | null;
   /** Parsed metadata — type, importance, tags, source_snippet */
   meta: IngestionItemMeta;
 }
@@ -92,7 +92,7 @@ export type AddToBrainMode = "auto" | "single" | "extract";
 
 export interface AddToBrainResult {
   path: "single" | "extract";
-  thought_id?: number;
+  thought_id?: string;
   job_id?: number;
   type?: string;
   status?: string;
