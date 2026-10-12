@@ -26,13 +26,17 @@ Claude Code / Codex **plugin-provided** skills (~250 rows) are hidden by default
 ## Run
 
 1. Install dependencies:
+
    ```bash
    npm install
    ```
+
 2. Start the scanner and the client together:
+
    ```bash
    npm run dev        # Express scanner on :8788 + Vite client on :5173
    ```
+
 3. Open http://localhost:5173.
 
 Expected outcome: a table with one row per skill and one column per harness, an `×` in each cell where that skill is installed, grouped into collapsible categories. The table rescans on every request; the client refetches every 60 s and has a Refresh button.
