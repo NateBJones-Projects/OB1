@@ -12,6 +12,8 @@ implementations: those are install recipes, this is the authoring/debugging
 layer that explains *why* they are shaped the way they are and *what fails
 silently* when they aren't.
 
+Depends on the base protocol in [auto-capture](../../skills/auto-capture/) and the reference implementation in [auto-capture-claude-code](../../skills/auto-capture-claude-code/); the [auto-capture-codex](../../skills/auto-capture-codex/) and [auto-capture-grok](../../skills/auto-capture-grok/) adapters in this same contribution follow the pattern this guide describes.
+
 ## Supported Clients
 
 - Claude Code (JSONL transcripts)
