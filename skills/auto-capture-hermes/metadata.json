@@ -1,0 +1,20 @@
+{
+  "name": "Auto-Capture Hermes Adapter",
+  "description": "Hermes Agent adapter for the auto-capture skill. Captures Hermes sessions to Open Brain at session end via Hermes shell hooks (on_session_finalize and a debounced on_session_end), reading the transcript from Hermes's SQLite state.db.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Hermes Agent", "Node.js 18+ (Node 22.5+ recommended for built-in SQLite)"]
+  },
+  "requires_skills": ["auto-capture"],
+  "tags": ["skill", "capture", "hermes", "hooks", "session-end", "ambient", "sqlite"],
+  "difficulty": "beginner",
+  "estimated_time": "10 minutes",
+  "created": "2026-10-11"
+}
