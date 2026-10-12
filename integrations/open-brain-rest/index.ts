@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
@@ -626,15 +627,87 @@ app.post("/thought/:id/reflection", async (c) => {
   return c.json(data, 200, corsHeaders);
 });
 
-app.get("/ingestion-jobs", (c) => c.json({ jobs: [], count: 0 }, 200, corsHeaders));
-app.get("/ingestion-jobs/:id", (c) => c.json({ job: null, items: [] }, 200, corsHeaders));
-app.post("/ingestion-jobs/:id/execute", (c) => c.json({ job_id: c.req.param("id"), status: "not_configured" }, 200, corsHeaders));
+// ── Smart Ingest wiring ─────────────────────────────────────────────────────
+// These routes proxy the dashboard's "Add to Brain" extract path to the
+// deployed `smart-ingest` Edge Function and expose the ingestion_jobs /
+// ingestion_items pipeline tables. The gateway calls smart-ingest
+// server-to-server with the shared MCP access key (smart-ingest runs
+// verify_jwt=false and authenticates via x-brain-key).
+
+const SMART_INGEST_URL = `${SUPABASE_URL}/functions/v1/smart-ingest`;
+
+async function callSmartIngest(path: string, payload: unknown) {
+  const res = await fetch(`${SMART_INGEST_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-brain-key": MCP_ACCESS_KEY },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({ error: "smart-ingest returned non-JSON" }));
+  return { status: res.status, data };
+}
+
+app.get("/ingestion-jobs", async (c) => {
+  const limit = intParam(new URL(c.req.url).searchParams.get("limit"), 50, 1, 200);
+  const { data, error } = await supabase
+    .from("ingestion_jobs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) return c.json({ error: error.message }, 500, corsHeaders);
+  return c.json({ jobs: data ?? [], count: (data ?? []).length }, 200, corsHeaders);
+});
+
+app.get("/ingestion-jobs/:id", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: "Invalid id" }, 400, corsHeaders);
+  const { data: job, error: jobErr } = await supabase
+    .from("ingestion_jobs")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (jobErr) return c.json({ error: jobErr.message }, 500, corsHeaders);
+  if (!job) return c.json({ error: "Job not found" }, 404, corsHeaders);
+  const { data: items, error: itemsErr } = await supabase
+    .from("ingestion_items")
+    .select("*")
+    .eq("job_id", id)
+    .order("id", { ascending: true });
+  if (itemsErr) return c.json({ error: itemsErr.message }, 500, corsHeaders);
+  return c.json({ job, items: items ?? [] }, 200, corsHeaders);
+});
+
+app.post("/ingestion-jobs/:id/execute", async (c) => {
+  const id = Number(c.req.param("id"));
+  if (!Number.isInteger(id) || id <= 0) return c.json({ error: "Invalid id" }, 400, corsHeaders);
+  const body = await c.req.json().catch(() => ({}));
+  try {
+    const { status, data } = await callSmartIngest("/execute", {
+      job_id: id,
+      skip_classification: body.skip_classification,
+    });
+    return c.json(data, status as ContentfulStatusCode, corsHeaders);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : "Execute failed" }, 502, corsHeaders);
+  }
+});
+
 app.post("/ingest", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const text = String(body.text || "").trim();
   if (!text) return c.json({ error: "text is required" }, 400, corsHeaders);
-  const result = await createThought({ content: text, source_type: "dashboard_ingest" });
-  return c.json({ job_id: 0, status: "complete", extracted_count: 1, thought_id: result.thought_id }, 200, corsHeaders);
+  try {
+    const { status, data } = await callSmartIngest("", {
+      text,
+      dry_run: body.dry_run,
+      skip_classification: body.skip_classification,
+      source_label: body.source_label ?? "dashboard",
+      source_type: body.source_type ?? "dashboard_ingest",
+      source_metadata: { source_client: "dashboard", capture_mode: "add_to_brain" },
+    });
+    return c.json(data, status as ContentfulStatusCode, corsHeaders);
+  } catch (error) {
+    return c.json({ error: error instanceof Error ? error.message : "Ingest failed" }, 502, corsHeaders);
+  }
 });
 
 Deno.serve((req) => {

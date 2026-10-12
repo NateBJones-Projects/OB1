@@ -12,6 +12,14 @@
 
 Agent Memory stays in `integrations/agent-memory-api`. This gateway only handles the base `thoughts` operational surface.
 
+## Prerequisites
+
+- Working Open Brain setup ([guide](../../docs/01-getting-started.md)) with the `thoughts` table
+- Supabase CLI for deployment; Node.js 20+ for the smoke harness
+- The dashboard (`dashboards/open-brain-dashboard-pro`) if you want a consumer for the gateway
+
+> If this integration exposes MCP tools, it adds to your AI's context weight. See the [MCP Tool Audit & Optimization Guide](../../docs/05-tool-audit.md) for strategies on managing your tool count as your Open Brain grows. (This gateway is REST only and registers no MCP tools.)
+
 ## Required Secrets
 
 Set these as Supabase function secrets:
@@ -50,7 +58,13 @@ The function expects `thoughts.id` to be a UUID. The dashboard now treats though
 
 ## Deploy
 
-From a Supabase workdir, copy or symlink this folder to `supabase/functions/open-brain-rest`, then deploy:
+1. Set the required secrets (above) on the project.
+2. From a Supabase workdir, copy or symlink this folder to `supabase/functions/open-brain-rest`.
+3. Deploy the function.
+4. Point the dashboard's `NEXT_PUBLIC_API_URL` at the deployed URL.
+5. Run the smoke test (next section).
+
+Deploy command:
 
 ```bash
 supabase functions deploy open-brain-rest --no-verify-jwt --use-api --project-ref YOUR_PROJECT_REF
@@ -72,7 +86,7 @@ OB1_REST_KEY="YOUR_MCP_ACCESS_KEY" \
 node integrations/open-brain-rest/smoke/live-smoke.mjs
 ```
 
-The smoke creates three temporary rows, verifies health, capture, browse, stats, text search, workflow update, duplicate scan, and audit filtering, then deletes the rows. Pass `--keep` only when you intentionally want to inspect the created rows.
+The smoke creates three temporary rows, verifies health, capture, browse, stats, text search, workflow update, duplicate scan, and audit filtering, then deletes the rows. Expected outcome: every check reports `ok` and the three temporary rows are gone. Pass `--keep` only when you intentionally want to inspect the created rows.
 
 ## Dashboard Demo Seed
 

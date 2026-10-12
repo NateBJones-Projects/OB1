@@ -98,7 +98,7 @@ This Edge Function depends on these database functions:
 |-----|--------|---------|
 | `upsert_thought(text, jsonb)` | Core OB1 schema (Step 2.6) | Creates or updates a thought with content and payload |
 | `match_thoughts(vector, float, int)` | Core OB1 schema | Semantic similarity search for deduplication |
-| `append_thought_evidence(bigint, jsonb)` | `schemas/smart-ingest-tables` | Appends corroborating evidence to an existing thought's metadata |
+| `append_thought_evidence(uuid, jsonb)` | `schemas/smart-ingest-tables` | Appends corroborating evidence to an existing thought's metadata |
 
 ## Credential Tracker
 

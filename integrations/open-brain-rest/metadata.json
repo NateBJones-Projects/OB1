@@ -1,6 +1,18 @@
 {
-  "name": "open-brain-rest",
+  "name": "Open Brain REST Gateway",
   "description": "Supabase Edge Function REST gateway for the OB1 dashboard thoughts, workflow, search, audit, and duplicate-review surfaces.",
-  "type": "integration",
-  "status": "experimental"
+  "category": "integrations",
+  "author": {
+    "name": "Alan Shurafa",
+    "github": "alanshurafa"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["Supabase"],
+    "tools": ["Supabase CLI", "Node.js 20+"]
+  },
+  "tags": ["rest", "gateway", "edge-function", "dashboard", "thoughts"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes"
 }
