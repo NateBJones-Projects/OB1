@@ -31,13 +31,20 @@ Without it, a capable model still gets the mechanics wrong — it will nest `der
 
 ## Installation
 
-Copy the skill into your AI client's skills directory (or point your client's rule loader at it):
+1. Apply the [provenance-chains schema](../../schemas/provenance-chains/) if you have not already (see Prerequisites).
+2. Copy the skill into your AI client's skills directory (or point your client's rule loader at it):
 
-```bash
-cp -r skills/provenance-chains ~/.claude/skills/provenance-chains
-```
+   ```bash
+   cp -r skills/provenance-chains ~/.claude/skills/provenance-chains
+   ```
+
+3. Start a new session so the client reloads its skills.
 
 The skill fires on its own from the `description` triggers — no manual invocation needed once installed. It activates when you capture a synthesized artifact or when a user asks an origin/impact question ("why do I believe X", "what uses this thought").
+
+## Expected Outcome
+
+Synthesized artifacts you capture (digests, briefs, summaries) land with `derivation_layer = 'derived'`, `derivation_method = 'synthesis'` and `derived_from` set to the UUIDs of the thoughts they were built from, so `trace_provenance` answers "why do I believe this?" and `find_derivatives` answers "what uses this?" for them. Captures made without the schema installed still succeed as plain thoughts; nothing breaks, they just carry no provenance.
 
 ## How It Fits the Provenance Chains Set
 
