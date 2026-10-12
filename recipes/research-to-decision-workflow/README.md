@@ -2,6 +2,9 @@
 
 > Composition recipe for chaining canonical OB1 skills into operator and investor decision workflows.
 
+To run this as a triggerable workflow instead of a manual checklist, use the
+[Research-to-Decision Workflow skill](../../skills/research-to-decision-workflow/).
+
 ## What It Does
 
 This recipe shows how to use five reusable skill packs together without duplicating their prompt logic. The skills handle the canonical behavior; this recipe defines the install order, workspace structure, handoffs, skip rules, and two recommended paths from raw inputs to a reusable decision artifact.
@@ -46,6 +49,14 @@ GENERATED DURING SETUP
 ```
 
 ## Steps
+
+1. Install the canonical skill dependencies.
+2. Create a working folder for the workflow.
+3. Start with the decision brief.
+4. Choose the path (operator or investor).
+5. Respect the handoffs between skills.
+6. Skip steps when the workflow is lighter.
+7. Capture only the durable outputs to Open Brain.
 
 ### 1. Install the canonical skill dependencies
 

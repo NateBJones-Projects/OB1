@@ -1,0 +1,27 @@
+{
+  "name": "Research-to-Decision Workflow",
+  "description": "Orchestrator skill that runs the research-to-decision pipeline: scaffolds the workspace, picks the operator or investor path, chains competitive-analysis, financial-model-review, research-synthesis, meeting-synthesis, and deal-memo-drafting with enforced handoffs, and captures durable outputs to Open Brain.",
+  "category": "skills",
+  "author": {
+    "name": "Ezana Azene",
+    "github": "eazene"
+  },
+  "version": "1.0.0",
+  "requires": {
+    "open_brain": true,
+    "services": [],
+    "tools": ["Claude Code or similar AI coding tool with reusable skills/system prompts"]
+  },
+  "requires_skills": [
+    "competitive-analysis",
+    "financial-model-review",
+    "deal-memo-drafting",
+    "research-synthesis",
+    "meeting-synthesis"
+  ],
+  "tags": ["workflow", "decision-support", "orchestration", "skill-composition", "diligence", "memo"],
+  "difficulty": "intermediate",
+  "estimated_time": "20 minutes",
+  "created": "2026-07-06",
+  "updated": "2026-07-06"
+}
