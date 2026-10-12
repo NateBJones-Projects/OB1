@@ -91,11 +91,15 @@ export function scanAll(): ScanResult {
       for (const details of Object.values(byHarness)) details.sort((a, b) => b.mtimeMs - a.mtimeMs)
 
       // LLM cache lookup is keyed by content hash of a representative SKILL.md.
+      // Always consult it: enrichment re-categorizes rows that have a real
+      // description but landed in "Other", and resolveDescription() already
+      // ranks frontmatter/manifest text above the cached description, so the
+      // cache can only ever change the category of such rows.
       const representative = [...installs].sort((a, b) => b.mtimeMs - a.mtimeMs)[0]
       const hasRealDescription = installs.some(
         (i) => i.descriptionSource === 'frontmatter' || i.descriptionSource === 'manifest',
       )
-      const cached = hasRealDescription ? undefined : cache[sha256File(representative.sourcePath) ?? '']
+      const cached = cache[sha256File(representative.sourcePath) ?? '']
 
       const { description, source } = resolveDescription(installs, cached?.description)
       const category = cached?.category ?? categorize(key, description)
