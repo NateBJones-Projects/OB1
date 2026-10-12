@@ -34,7 +34,7 @@ Each client loads persistent instructions from a different place. Use the one(s)
 - **Claude Code** — add one line to your auto-memory index and a small memory file. Append to `~/.claude/projects/<project-slug>/memory/MEMORY.md`:
 
   ```markdown
-  - [Search OB1 before asking](search-ob1-before-asking.md) — query Open Brain before asking any factual/status question; ask only if the brain comes up empty
+  - Search OB1 before asking (`search-ob1-before-asking.md`) — query Open Brain before asking any factual/status question; ask only if the brain comes up empty
   ```
 
   and drop the rule text (above) into `~/.claude/projects/<project-slug>/memory/search-ob1-before-asking.md` as a `feedback`-type memory. It loads into context at session start.
