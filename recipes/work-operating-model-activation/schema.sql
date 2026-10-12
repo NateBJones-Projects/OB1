@@ -14,7 +14,7 @@ BEGIN
   NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 
 CREATE TABLE IF NOT EXISTS operating_model_profiles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -255,7 +255,7 @@ BEGIN
 
   RETURN 'review';
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 
 CREATE OR REPLACE FUNCTION operating_model_start_session(
   p_user_id UUID,
@@ -387,7 +387,7 @@ BEGIN
     'latest_checkpoints', v_latest_checkpoints
   );
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 
 CREATE OR REPLACE FUNCTION operating_model_save_layer(
   p_session_id UUID,
@@ -476,8 +476,7 @@ BEGIN
         updated_at = now()
   RETURNING id INTO v_checkpoint_id;
 
-  DELETE FROM operating_model_entries
-  WHERE session_id = v_session.id
+  DELETE FROM operating_model_entries WHERE session_id = v_session.id
     AND layer = p_layer;
 
   INSERT INTO operating_model_entries (
@@ -610,7 +609,7 @@ BEGIN
     'entries', v_saved_entries
   );
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = public, pg_temp;
 
 GRANT EXECUTE ON FUNCTION public.operating_model_next_layer(TEXT[]) TO service_role;
 GRANT EXECUTE ON FUNCTION public.operating_model_start_session(UUID, TEXT) TO service_role;
