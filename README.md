@@ -23,32 +23,32 @@ Never built an Open Brain? Start here:
 
 ## Recent Contributions
 
-The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-05-22.
+The 20 most recent merged PRs. This list is generated from GitHub and refreshes daily. Last updated: 2026-08-30.
 
 <!-- recent-contributions:start -->
 
 | Contribution | What changed | Creator |
 | ------------ | ------------ | ------- |
-| [Provenance chains — derivation tracking](recipes/provenance-chains/) | Provenance chains — derivation tracking. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Open Brain Dashboard Pro — Next.js 16 + iron-session](dashboards/open-brain-dashboard-pro/) | Open Brain Dashboard Pro — Next.js 16 + iron-session. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Atomizer — generic + Gmail re-atomization toolkit](recipes/atomizer/) | Atomizer — generic + Gmail re-atomization toolkit. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Brain smoke test — install verification harness](recipes/brain-smoke-test/) | Brain smoke test — install verification harness. | [@alanshurafa](https://github.com/alanshurafa) |
-| [CRM improvements: crm_ prefix, FTS search, meeting prep, stale detection](extensions/professional-crm/) | CRM improvements: crm_ prefix, FTS search, meeting prep, stale detection. | [@pintomatic](https://github.com/pintomatic) |
-| [Edge function cost optimization — 73% invocation reduction](recipes/edge-function-cost-optimization/) | Edge function cost optimization — 73% invocation reduction. | [@JustinTSmith](https://github.com/JustinTSmith) |
-| [Obsidian-vault-import: --source-label to override metadata.source](recipes/obsidian-vault-import/) | Obsidian-vault-import: --source-label to override metadata.source. | [@dhanjit](https://github.com/dhanjit) |
-| [Preserve full frontmatter in obsidian-vault-import metadata](recipes/obsidian-vault-import/) | Preserves full frontmatter in obsidian-vault-import metadata. | [@dhanjit](https://github.com/dhanjit) |
-| [Load .env into wiki-compiler child processes](recipes/wiki-compiler/) | Loads .env into wiki-compiler child processes. | [@mlava](https://github.com/mlava) |
-| [Enable standalone output for Docker builds](dashboards/open-brain-dashboard-next/) | Enables standalone output for Docker builds. | [@Mavrick-F](https://github.com/Mavrick-F) |
-| [Fix outdated primitives section in README](README.md) | Fixes outdated primitives section in README. | [@jjshanks](https://github.com/jjshanks) |
-| [Document Edge Function redeploy step in OpenRouter rotation FAQ](docs/03-faq.md) | Documents Edge Function redeploy step in OpenRouter rotation FAQ. | [@Silverhawk-bit](https://github.com/Silverhawk-bit) |
-| [Return JSON-RPC error envelopes on auth failure](server/index.ts) | Returns JSON-RPC error envelopes on auth failure. | [@txcfi-scott](https://github.com/txcfi-scott) |
-| [Markdownlint sweep for existing recipe/schema docs](schemas/workflow-status/) | Markdownlint sweep for existing recipe/schema docs. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Improve ChatGPT MCP compatibility](primitives/remote-mcp/) | Improves ChatGPT MCP compatibility. | [@justfinethanku](https://github.com/justfinethanku) |
-| [Add wiki compiler orchestration recipe](recipes/wiki-compiler/) | Adds wiki compiler orchestration recipe. | [@justfinethanku](https://github.com/justfinethanku) |
-| [Wiki synthesis + autobiography pipeline](recipes/wiki-synthesis/) | Wiki synthesis + autobiography pipeline. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Entity wiki pages from knowledge graph](recipes/entity-wiki/) | Entity wiki pages from knowledge graph. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Typed reasoning edges + Opus/Haiku classifier](schemas/typed-reasoning-edges/) | Typed reasoning edges + Opus/Haiku classifier. | [@alanshurafa](https://github.com/alanshurafa) |
-| [Entity extraction worker](integrations/entity-extraction-worker/) | Entity extraction worker. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Refresh README recent contributions](README.md) | Refresh README recent contributions. | [@github-actions[bot]](https://github.com/github-actions[bot]) |
+| [Add deploy-pages workflow for openbrain.fyi](.github/workflows/deploy-pages.yml) | Adds deploy-pages workflow for openbrain.fyi. | [@snapsynapse](https://github.com/snapsynapse) |
+| [Google Activity import: include Gemini answers from safeHtmlItem](recipes/google-activity-import/) | Google Activity import: include Gemini answers from safeHtmlItem. | [@araece](https://github.com/araece) |
+| [Repo-learning-coach: load .env via dotenv + fix research frontmatter](recipes/repo-learning-coach/) | Repo-learning-coach: load .env via dotenv + fix research frontmatter. | [@eazene](https://github.com/eazene) |
+| [Provenance-chains: fix eval.mjs default model (dated id 404s on OpenRouter)](recipes/provenance-chains/) | Provenance-chains: fix eval.mjs default model (dated id 404s on OpenRouter). | [@eazene](https://github.com/eazene) |
+| [Fix editorial-policy auditor JSON parse under claude-haiku-4-5](recipes/editorial-policy/) | Fixes editorial-policy auditor JSON parse under claude-haiku-4-5. | [@eazene](https://github.com/eazene) |
+| [Fix add_household_item storing details as an escaped JSON string](extensions/household-knowledge/) | Fixes add_household_item storing details as an escaped JSON string. | [@hannahgwilson](https://github.com/hannahgwilson) |
+| [Thought work claims for parallel workers](schemas/thought-work-claims/) | Thought work claims for parallel workers. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Authorship edges — speaker attribution + self author edges](recipes/authorship-edges/) | Authorship edges — speaker attribution + self author edges. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Add capture_derived_thought MCP tool to provenance-chains](recipes/provenance-chains/) | Adds capture_derived_thought MCP tool to provenance-chains. | [@eazene](https://github.com/eazene) |
+| [Add updating-thoughts and deleting-thoughts skill packs](skills/deleting-thoughts/) | Adds updating-thoughts and deleting-thoughts skill packs. | [@eazene](https://github.com/eazene) |
+| [Report the real cause when all LLM providers fail](integrations/entity-extraction-worker/) | Report the real cause when all LLM providers fail. | [@sjgold](https://github.com/sjgold) |
+| [Content-fingerprint-dedup: add write-time fingerprint trigger](recipes/content-fingerprint-dedup/) | Content-fingerprint-dedup: add write-time fingerprint trigger. | [@eazene](https://github.com/eazene) |
+| [Fix readwise-import against content_fingerprint unique index](recipes/readwise-import/) | Fixes readwise-import against content_fingerprint unique index. | [@eazene](https://github.com/eazene) |
+| [Persistent wiki pages](schemas/wiki-pages/) | Persistent wiki pages. | [@alanshurafa](https://github.com/alanshurafa) |
+| [Fix update-thought-mcp deploy-blocking bugs](integrations/update-thought-mcp/) | Fixes update-thought-mcp deploy-blocking bugs. | [@eazene](https://github.com/eazene) |
+| [Reject non-POST MCP requests with 405 to prevent GET handshake hang](integrations/kubernetes-deployment/) | Reject non-POST MCP requests with 405 to prevent GET handshake hang. | [@jcpoyser](https://github.com/jcpoyser) |
+| [Fix ob-graph MCP GET route causing SSE reconnect storm](recipes/ob-graph/) | Fixes ob-graph MCP GET route causing SSE reconnect storm. | [@eazene](https://github.com/eazene) |
+| [Fix UUID id pagination in thought-enrichment backfills](recipes/thought-enrichment/) | Fixes UUID id pagination in thought-enrichment backfills. | [@themacmarketer](https://github.com/themacmarketer) |
+| [Fix double-encoded metadata writes in thought-enrichment](recipes/thought-enrichment/) | Fixes double-encoded metadata writes in thought-enrichment. | [@jebontheside](https://github.com/jebontheside) |
 
 <!-- recent-contributions:end -->
 

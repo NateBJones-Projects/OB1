@@ -34,7 +34,7 @@
  *   --ids a,b,c                        grade specific thought IDs only
  *   --force                            re-grade thoughts already scored
  *   --dry-run                          skip PATCH back to DB
- *   --model NAME                       openrouter model (default: anthropic/claude-3.5-haiku)
+ *   --model NAME                       openrouter model (default: anthropic/claude-haiku-4-5)
  *   --concurrency N                    openrouter grader concurrency (default 3)
  *   --out FILE                         queue mode prompts output path
  *   --apply-scores FILE                write scores from a queue-mode JSONL back to DB
@@ -52,7 +52,7 @@ function parseArgs(argv) {
     ids: null,
     force: false,
     dryRun: false,
-    model: "anthropic/claude-3.5-haiku",
+    model: "anthropic/claude-haiku-4-5",
     concurrency: 3,
     out: null,
     applyScores: null,

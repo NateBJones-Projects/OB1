@@ -61,6 +61,10 @@ node scripts/new-contribution.mjs --category recipes --slug demo-recipe --name "
 
 The generator creates the README, metadata, and category-specific starter artifacts without overwriting an existing folder. Dashboard scaffolds start with `index.html`, integrations with `index.ts`, and extensions with both `schema.sql` and `index.ts`, so the generated folder meets the category artifact gate before you customize it. The category `_template/` folders remain the source of truth. See [scripts/README.md](scripts/README.md) for interactive usage and all flags.
 
+### Import Recipe Metadata
+
+If your contribution imports external data into `public.thoughts`, follow the [Ingestion Metadata Contract](docs/ingestion-metadata-contract.md). New importers should preserve source provenance, importer version, hashes, sensitivity tier, and enough source context for users to verify or clean up the import later. Do not store raw archives, secrets, signed URLs, local absolute paths, or large transcript blobs in metadata.
+
 ## README Standards
 
 Your contribution's README must include these sections:

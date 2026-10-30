@@ -1,3 +1,5 @@
+import 'dotenv/config'
+
 import { syncContentToSupabase } from './db.js'
 
 const run = async () => {

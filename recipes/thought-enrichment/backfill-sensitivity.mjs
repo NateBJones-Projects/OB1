@@ -102,7 +102,7 @@ console.log();
 
 const BATCH_SIZE = 500;
 const PROGRESS_EVERY = 5000;
-let afterId = 0;
+let afterId = "00000000-0000-0000-0000-000000000000";
 let scanned = 0;
 let scannedAtLastProgress = 0;
 let upgradedPersonal = 0;

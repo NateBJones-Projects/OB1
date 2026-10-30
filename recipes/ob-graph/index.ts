@@ -19,7 +19,7 @@
  *   - list_edge_types   — List all relationship types in use
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { z } from "zod";
@@ -27,7 +27,20 @@ import { createClient } from "@supabase/supabase-js";
 
 const app = new Hono();
 
-app.post("*", async (c) => {
+// Health probe on a dedicated path. It MUST NOT live on the "*" wildcard:
+// MCP's Streamable HTTP transport opens a long-lived GET SSE stream, and a
+// wildcard GET that returns plain JSON instead of a stream makes clients
+// reconnect in a tight ~1/sec loop (a real free-tier-burning incident).
+// Supabase routes the request to the function with the "/<function-name>"
+// prefix intact, so match both the prefixed and bare forms.
+const health = (c: Context) =>
+  c.json({ status: "ok", service: "OB-Graph MCP", version: "1.0.1" });
+app.get("/health", health);
+app.get("/:fn/health", health);
+
+// Route ALL methods (GET included) to the MCP transport so the GET opens a
+// real SSE stream. Do not split GET onto a non-streaming handler.
+app.all("*", async (c) => {
   // Fix: Claude Desktop connectors don't send the Accept header that
   // StreamableHTTPTransport requires. Build a patched request if missing.
   if (!c.req.header("accept")?.includes("text/event-stream")) {
@@ -533,7 +546,5 @@ app.post("*", async (c) => {
   await server.connect(transport);
   return transport.handleRequest(c);
 });
-
-app.get("*", (c) => c.json({ status: "ok", service: "OB-Graph MCP", version: "1.0.1" }));
 
 Deno.serve(app.fetch);

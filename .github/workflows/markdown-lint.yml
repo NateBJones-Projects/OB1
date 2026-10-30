@@ -2,10 +2,8 @@ name: Markdown Lint
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     branches: [main]
-    paths:
-      - '**/*.md'
 
 permissions:
   contents: read
@@ -14,11 +12,12 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PR head safely
+      # Required checks must run for every PR, including code-only changes.
+      - name: Checkout PR merge commit
         uses: actions/checkout@v4
         with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/head
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Setup Node
         uses: actions/setup-node@v4

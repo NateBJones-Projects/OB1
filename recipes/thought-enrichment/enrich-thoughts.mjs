@@ -587,10 +587,11 @@ async function fetchByIds(config, ids) {
 
 async function patchThought(id, patch, config, retries = 4) {
   const url = `${config.supabaseUrl}/rest/v1/thoughts?id=eq.${id}`;
+  // Send metadata as a plain object: the request body is JSON.stringify'd
+  // below, so pre-stringifying metadata double-encodes it and PostgREST
+  // stores the jsonb column as a JSON *string* instead of an object,
+  // breaking every metadata->'topics' / @> query downstream.
   const body = { ...patch };
-  if (body.metadata) {
-    body.metadata = JSON.stringify(body.metadata);
-  }
   const opts = {
     method: "PATCH",
     headers: {

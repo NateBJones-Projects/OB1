@@ -166,11 +166,12 @@ async function main() {
   console.log(`Batch size: ${BATCH_SIZE}`);
   console.log("");
 
-  // Cursor replaces offset. afterId starts at 0 (all thought ids are
-  // positive) and advances to the last id seen in each page, so a
-  // PATCH that removes rows from the `type=eq.reference` filter cannot
-  // cause the cursor to skip un-processed rows.
-  let afterId = 0;
+  // Cursor replaces offset. afterId starts at the zero UUID (thoughts.id
+  // is a UUID on stock Open Brain installs) and advances to the last id
+  // seen in each page, so a PATCH that removes rows from the
+  // `type=eq.reference` filter cannot cause the cursor to skip
+  // un-processed rows.
+  let afterId = "00000000-0000-0000-0000-000000000000";
   let processedRows = 0;
   let total = null;
   let firstCountDone = false;

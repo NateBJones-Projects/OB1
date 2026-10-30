@@ -1,7 +1,7 @@
 ---
 slug: recipe-overview
 title: What Repo Learning Coach Builds
-summary: The product boundary for the recipe: a local learning app backed by Supabase tables inside an existing Open Brain project.
+summary: "The product boundary for the recipe: a local learning app backed by Supabase tables inside an existing Open Brain project."
 category: orientation
 ---
 
