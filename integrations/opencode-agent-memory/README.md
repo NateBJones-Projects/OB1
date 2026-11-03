@@ -16,6 +16,10 @@ sequenceDiagram
         Plugin->>Model: Extract compact structured findings
         Plugin->>API: Generated evidence, review required
         API-->>Plugin: Durable receipt
+        opt Operator enables autoReview
+            Plugin->>Model: Separate reviewer checks findings against source excerpt
+            Plugin->>API: Mark supported routine findings evidence-only
+        end
     end
 ```
 
@@ -25,6 +29,8 @@ Connects OpenCode's native V2 lifecycle to **Nate B. Jones OB1 Agent Memory**.
 Relevant project memories arrive before primary model requests, without asking the
 model to discover and call a memory tool. Optional checkpoints preserve compact
 findings after successful session completion and before conversation compaction.
+An independently selected reviewer can optionally make supported routine findings
+eligible for recall as generated evidence, while leaving uncertain items for a human.
 
 OpenCode still manages session history, model context and compaction. OB1 remains
 the single shared memory backend. This contribution adds no database schema and
@@ -126,6 +132,36 @@ otherwise the model may repeat the lookup already supplied by the context hook.
    is automatically promoted to a trusted instruction. Check the API's inspector
    or your existing OB1 review tools for the receipt, not just a model's claim.
 
+6. **Optionally authorize automatic evidence review.** Configure the reviewer model
+   through OpenCode's normal provider authentication, then add these plugin options:
+
+   ```json
+   {
+     "autoReview": true,
+     "reviewModel": { "providerID": "your-provider", "id": "your-reviewer-model" },
+     "reviewTimeoutMs": 120000
+   }
+   ```
+
+   This is a separate consent boundary from capture. The selected reviewer receives
+   a bounded visible conversation excerpt and the newly captured findings. A cloud
+   reviewer sends that material to its provider and uses that provider's allowance
+   or billing. There is no automatic model or API-key fallback in this plugin.
+   For ChatGPT subscription access, use OpenCode's supported sign-in integration,
+   verify the active credential and model, and follow
+   [OpenAI's plan-use guidance](https://learn.chatgpt.com/docs/sign-in-with-chatgpt).
+
+   The reviewer holds sensitive, conflicting, unsupported and consequential claims.
+   Only supported routine findings with an exact source quote may receive
+   `evidence_only`. Generated provenance is preserved; the adapter never calls
+   `confirm`, labels an AI verdict human-confirmed, deletes memories, or edits their
+   contents. Existing pending memories are not swept automatically. Approval still
+   reflects model judgment, not independent proof of a factual claim.
+
+   **Done when:** the OB1 review history names the automated reviewer, the memory
+   has `review_status=evidence_only`, and `can_use_as_instruction` remains false.
+   Held findings stay pending for explicit human review.
+
 ## Expected Outcome
 
 - Primary requests receive up to three scoped, policy-eligible memories. The
@@ -162,6 +198,9 @@ otherwise the model may repeat the lookup already supplied by the context hook.
 | `maxContextBytes` | `6000` | Hard injected context byte limit, 512–16000. |
 | `timeoutMs` | `5000` | Each HTTP request deadline, 100–30000 ms. |
 | `captureTimeoutMs` | `30000` | Extraction/write deadline, 100–120000 ms. |
+| `autoReview` | `false` | Authorize review of this adapter's captured findings as evidence only. |
+| `reviewModel` | none | Required explicit `{providerID, id, variant?}` when review is enabled. |
+| `reviewTimeoutMs` | `120000` | Separate review deadline, 100–300000 ms. |
 | `allowInsecureHttp` | `false` | Explicit exception for a trusted LAN; loopback HTTP is allowed. |
 
 Setting session metadata `ob1Memory` to `false` excludes that session from both
@@ -181,6 +220,7 @@ npm run smoke:native
 needed), a temporary project, and local fake model/OB1 endpoints. It exercises
 native plugin loading, context injection, completion checkpoint delivery and compaction without
 external writes or paid model calls. It creates and removes a synthetic OpenCode session.
+It also verifies review delivery and the evidence-only action through the native host.
 `smoke:live` separately checks the real remote OB1 contract with no write-back.
 See [DESIGN.md](DESIGN.md) for the implementation boundaries.
 
@@ -210,6 +250,16 @@ the warning rather than assuming a write occurred. Completion checkpoints run in
 the background and need the OpenCode server to remain alive. A standalone CLI
 process that exits immediately, a crash or a forced shutdown can interrupt them;
 use a persistent server for reliable completion-event handling.
+
+### Findings remain pending after automatic review
+
+The reviewer may have held the finding, lacked an exact supporting quote, failed to
+return valid JSON, exceeded its deadline, or lost provider access. No fallback model
+is selected. Errors leave the memory pending and keep the capture receipt. The same
+excerpt can retry failed review without repeating write-back; after the session moves
+on, unresolved findings may require manual review. Human edits and review state are
+rechecked before mutation. The existing API has no conditional-update parameter, so
+avoid reviewing the same item manually while its automatic review is in flight.
 
 ### Self-hosted LAN endpoint is refused
 

@@ -2,6 +2,7 @@ import type { Context, Plugin } from "@opencode/plugin/promise/plugin";
 import type { SessionInfo } from "@opencode/client";
 import { MemoryClient, options } from "./client.js";
 import { clip, tail, digest, extractionPrompt, parseCheckpoint, record, renderRecall, unsafe } from "./memory.js";
+import { reviewCaptured } from "./review.js";
 
 /** The plugin exports the native V2 shape; SDK imports are type-only. */
 export default { id: "ob1.agent-memory", setup } satisfies Plugin;
@@ -94,7 +95,23 @@ export async function setup(ctx: Context) {
       const inputHash = digest(excerpt);
       const storageKey = `checkpoint/${scopeKey}`;
       const receipt = record(await ctx.storage.get(storageKey));
-      if (receipt.inputHash === inputHash) return;
+      const review = async (ids: string[]) => {
+        if (!config.autoReview || !ids.length) return;
+        const reviewSignal = AbortSignal.any([controller.signal, AbortSignal.timeout(config.reviewTimeoutMs)]);
+        await reviewCaptured({ ctx, client, config, ids, project: project(session), session: session.id,
+          excerpt, signal: reviewSignal, stillAllowed: async () => {
+            const current = await scope(session.id);
+            return !!current && project(current) === project(session);
+          } });
+        cache.delete(session.id);
+        await ctx.storage.set(storageKey, { inputHash, memoryIds: ids, reviewed: true });
+      };
+      if (receipt.inputHash === inputHash) {
+        if (receipt.reviewed !== true && Array.isArray(receipt.memoryIds)) {
+          await review(receipt.memoryIds.filter((id): id is string => typeof id === "string"));
+        }
+        return;
+      }
       const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(config.captureTimeoutMs)]);
       const generated = await ctx.experimental.generate.text({
         model: session.model,
@@ -103,6 +120,7 @@ export async function setup(ctx: Context) {
       const payload = parseCheckpoint(generated.text);
       const current = await scope(session.id);
       if (!current || project(current) !== project(session) || controller.signal.aborted) return;
+      let memoryIds: string[] = [];
       if (Object.values(payload).some(items => items.length)) {
         const value = await client.post("/writeback", {
           schema_version: "openbrain.agent_memory.writeback.v1", ...identity(session),
@@ -115,9 +133,12 @@ export async function setup(ctx: Context) {
         }, signal);
         const memories = record(value).memories;
         if (!Array.isArray(memories) || !memories.length || record(value).blocked === true) throw new Error("Writeback not accepted");
+        memoryIds = memories.map(m => record(m).memory_id).filter((id): id is string => typeof id === "string");
       }
       // Only successful writes (or a valid empty extraction) advance the watermark.
-      await ctx.storage.set(storageKey, { inputHash });
+      await ctx.storage.set(storageKey, { inputHash, memoryIds, reviewed: false });
+      // Keep the successful write receipt even if model review fails; retry review without recapturing.
+      await review(memoryIds).catch(() => warn("review"));
     })().catch(() => warn("checkpoint")).finally(() => capturing.delete(session.id));
     capturing.set(session.id, run);
     return run;

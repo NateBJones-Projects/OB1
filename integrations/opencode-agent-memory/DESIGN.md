@@ -13,6 +13,11 @@
 5. Verify budget enforcement, project isolation, policy filtering, duplicate
    events, failed requests, and disabled capture offline. Run live read-only
    validation against an existing OB1 instance and a native OpenCode smoke test.
+6. Make model-assisted review independently opt-in, with an explicit reviewer model.
+   Check only captured IDs from the same session against the visible source excerpt.
+   Supported routine findings become evidence-only; never promote to user-confirmed
+   instructions. Preserve successful capture receipts across review failures and
+   recheck scope, edits and human review state before any review mutation.
 
 The contribution is a client plugin for a remote Supabase Edge Function, not an
 additional MCP server. Existing MCP tools can coexist for explicit memory review.

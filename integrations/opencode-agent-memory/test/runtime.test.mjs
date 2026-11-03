@@ -42,9 +42,14 @@ async function withHarness(extra, run) {
   const h = harness(extra), original = globalThis.fetch;
   process.env.OB1_TEST_KEY = "test-only-key";
   globalThis.fetch = async (url, init) => {
-    h.calls.push({ url, body: JSON.parse(init.body) });
+    h.calls.push({ url, method: init.method, body: init.body ? JSON.parse(init.body) : undefined });
     if (h.failure) throw new Error("private network failure");
     if (url.endsWith("/writeback") && h.rejectWrite) return Response.json({ blocked: true }, { status: 422 });
+    if (url.endsWith("/memories/saved")) return Response.json({ memory: h.saved });
+    if (url.endsWith("/memories/saved/review")) {
+      h.saved = { ...h.saved, review_status: "evidence_only", requires_user_confirmation: false };
+      return Response.json({ memory: h.saved });
+    }
     return Response.json(url.endsWith("/recall") ? recalled : { memories: [{ memory_id: "saved" }] });
   };
   const cleanup = await setup(h.ctx);
@@ -136,4 +141,26 @@ test("failed sessions and credential-like user input are not captured or recalle
 });
 test("disabled plugin requires neither configuration nor credentials", async () => {
   assert.equal(await setup({ options: { enabled: false } }), undefined);
+});
+test("review failure retries from receipt without writing duplicate memories", async () => {
+  await withHarness({ autoCapture: true, autoReview: true, reviewModel: { providerID: "subscription", id: "reviewer" } }, async h => {
+    h.saved = { id: "saved", workspace_id: "test", project_id: "opencode:project-a", task_id: "ses_a",
+      runtime_name: "opencode", provenance_status: "generated", review_status: "pending", lifecycle_status: "active",
+      requires_user_confirmation: true, can_use_as_instruction: false, content: "Use unsigned timers." };
+    const generate = h.ctx.experimental.generate.text;
+    let fail = true;
+    h.ctx.experimental.generate.text = async input => {
+      if (input.model.id !== "reviewer") return generate(input);
+      if (fail) throw new Error("Reviewer unavailable");
+      return { text: JSON.stringify({ reviews: [{ memory_id: "saved", decision: "approve_evidence",
+        source_quote: "Use unsigned timers.", reason: "Explicit project decision." }] }) };
+    };
+    await h.hooks.compaction(h.request("Use unsigned timers."));
+    assert.equal([...h.storage.values()][0].reviewed, false);
+    fail = false;
+    await h.hooks.compaction(h.request("Use unsigned timers."));
+    assert.equal(h.calls.filter(c => c.url?.endsWith("/writeback")).length, 1);
+    assert.equal(h.calls.filter(c => c.method === "PATCH").length, 1);
+    assert.equal([...h.storage.values()][0].reviewed, true);
+  });
 });

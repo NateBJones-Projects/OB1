@@ -1,7 +1,7 @@
 // Real OpenCode host + local fake OB1/model endpoints. No external writes or model calls.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ import { randomBytes } from "node:crypto";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const directory = await mkdtemp(join(tmpdir(), "ob1-opencode-native-"));
 const calls = [], observed = [];
+let saved;
 const server = createServer(async (req, res) => {
   try {
     let raw = "";
@@ -38,13 +39,29 @@ const server = createServer(async (req, res) => {
     }
     if (req.url === "/ob1/writeback") {
       calls.push({ kind: "writeback", body });
+      saved = { id: "native-checkpoint", workspace_id: "smoke", project_id: "opencode-native-smoke",
+        task_id: body.task_id, runtime_name: "opencode", provenance_status: "generated", review_status: "pending",
+        lifecycle_status: "active", requires_user_confirmation: true, can_use_as_instruction: false,
+        content: "Use unsigned timers for the smoke fixture." };
       res.setHeader("content-type", "application/json");
       res.end(JSON.stringify({ memories: [{ memory_id: "native-checkpoint" }] })); return;
+    }
+    if (req.url === "/ob1/memories/native-checkpoint") {
+      res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ memory: saved })); return;
+    }
+    if (req.url === "/ob1/memories/native-checkpoint/review") {
+      assert.equal(body.action, "evidence_only");
+      calls.push({ kind: "review", body });
+      saved = { ...saved, review_status: "evidence_only", requires_user_confirmation: false };
+      res.setHeader("content-type", "application/json"); res.end(JSON.stringify({ memory: saved })); return;
     }
     if (req.url?.endsWith("/chat/completions")) {
       const input = JSON.stringify(body.messages);
       observed.push(input);
-      const text = input.includes("Extract only durable project")
+      const text = input.includes("Review generated OB1 memory candidates")
+        ? JSON.stringify({ reviews: [{ memory_id: "native-checkpoint", decision: "approve_evidence",
+          source_quote: "For this synthetic memory integration test, use unsigned timers.", reason: "Explicit routine test decision." }] })
+        : input.includes("Extract only durable project")
         ? '{"decisions":["Use unsigned timers for the smoke fixture."]}' : "OB1_SMOKE_OK";
       res.setHeader("content-type", body.stream ? "text/event-stream" : "application/json");
       if (body.stream) {
@@ -66,23 +83,27 @@ const base = `http://127.0.0.1:${server.address().port}`;
 let host;
 let cleanupSession;
 try {
+  await mkdir(join(directory, "config"));
   await writeFile(join(directory, "opencode.json"), JSON.stringify({
     model: "ollama/ob1-smoke-check",
+    policies: [
+      { action: "provider.use", resource: "*", effect: "deny" },
+      { action: "provider.use", resource: "ollama", effect: "allow" },
+      { action: "mcp.use", resource: "*", effect: "deny" },
+    ],
     agents: { compaction: { model: "ollama/ob1-smoke-check" } },
     providers: { "ollama": { package: "@opencode/ai/providers/openai-compatible",
       settings: { baseURL: base + "/v1", apiKey: "local-smoke-only" },
       models: { "ob1-smoke-check": { modelID: "ob1-smoke-check", capabilities: { tools: false, input: ["text"], output: ["text"] },
         limit: { context: 16000, output: 1000 } } } } },
     plugins: [{ package: root, options: { endpoint: base + "/ob1", workspaceId: "smoke",
-      projectId: "opencode-native-smoke", keyEnv: "OB1_NATIVE_SMOKE_KEY", autoCapture: true } }],
+      projectId: "opencode-native-smoke", keyEnv: "OB1_NATIVE_SMOKE_KEY", autoCapture: true,
+      autoReview: true, reviewModel: { providerID: "ollama", id: "ob1-smoke-check" } } }],
     mcp: { servers: { openbrain: { type: "local", command: ["unused"], disabled: true } } },
   }, null, 2));
-  if (process.env.OB1_SMOKE_DEBUG) {
-    const { stdout } = await promisify(execFile)(process.env.OPENCODE_BIN || "opencode", ["debug", "config", "--standalone"], { cwd: directory });
-    console.log(JSON.stringify(JSON.parse(stdout).map(x => ({ path: x.path, providers: Object.keys(x.info?.providers ?? {}), plugins: x.info?.plugins }))));
-  }
   const password = randomBytes(24).toString("hex");
   const childEnv = { ...process.env, PWD: directory, INIT_CWD: directory, OB1_NATIVE_SMOKE_KEY: "local-smoke-only",
+    XDG_CONFIG_HOME: join(directory, "config"), OPENCODE_CONFIG_DIR: join(directory, "config"),
     OPENCODE_PASSWORD: password, OPENCODE_SERVER_PASSWORD: password };
   host = spawn(process.env.OPENCODE_BIN || "opencode", ["serve", "--stdio", "--port", "0"], {
     cwd: directory, env: childEnv, stdio: ["pipe", "pipe", "pipe"],
@@ -103,6 +124,16 @@ try {
       catch { clearTimeout(timer); reject(new Error("Invalid OpenCode startup response")); }
     });
   });
+  // Refuse to run prompts if any unrelated non-builtin plugin was inherited.
+  for (let i = 0; i < 20; i++) {
+    const { stdout } = await promisify(execFile)(process.env.OPENCODE_BIN || "opencode",
+      ["api", "get", "/api/plugin", "--server", serverUrl], { cwd: directory, env: childEnv });
+    const plugins = JSON.parse(stdout).data.filter(p => p.source.type !== "builtin");
+    assert.ok(plugins.every(p => p.source.path === root), "Unexpected inherited plugin in smoke test");
+    if (plugins.some(p => p.id === "ob1.agent-memory" && p.state.status === "active")) break;
+    if (i === 19) throw new Error("Smoke plugin failed to activate");
+    await new Promise(r => setTimeout(r, 50));
+  }
   const child = spawn(process.env.OPENCODE_BIN || "opencode", ["run", "--server", serverUrl, "--auto", "--format", "json",
     "--model", "ollama/ob1-smoke-check", "For this synthetic memory integration test, use unsigned timers. Reply briefly."], {
     cwd: directory, env: childEnv, stdio: ["ignore", "pipe", "pipe"],
@@ -127,6 +158,8 @@ try {
   assert.ok(write, "Native idle checkpoint did not reach the fixture backend");
   assert.equal(write.body.provenance.requires_review, true);
   assert.equal(write.body.runtime.name, "opencode");
+  for (let i = 0; i < 100 && !calls.some(c => c.kind === "review"); i++) await new Promise(r => setTimeout(r, 50));
+  assert.ok(calls.some(c => c.kind === "review"), "Native evidence-only review did not complete");
   await promisify(execFile)(process.env.OPENCODE_BIN || "opencode",
     ["api", "post", `/api/session/${sessionID}/compact`, "--data", "{}", "--server", serverUrl], { cwd: directory, env: childEnv });
   let compacted = false;
@@ -139,7 +172,7 @@ try {
   }
   assert.ok(compacted, "Native compaction did not complete with the plugin enabled");
   console.log(JSON.stringify({ ok: true, native_recall: true, model_context_injection: true, native_completion_checkpoint: true,
-    native_compaction: true,
+    native_compaction: true, native_evidence_review: true,
     actual_external_writes: 0 }));
 } finally {
   if (cleanupSession) await cleanupSession().catch(() => {});
