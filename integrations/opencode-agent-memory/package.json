@@ -1,0 +1,18 @@
+{
+  "name": "ob1-opencode-agent-memory",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenCode V2 lifecycle integration for Nate B. Jones OB1 Agent Memory",
+  "type": "module",
+  "exports": { ".": "./dist/index.js" },
+  "files": ["dist", "README.md"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "smoke:live": "npm run build && node smoke/live.mjs",
+    "smoke:native": "npm run build && node smoke/native.mjs"
+  },
+  "devDependencies": { "@opencode/plugin": "2.2.5", "@types/node": "^22.0.0", "typescript": "~5.9.3" }
+}

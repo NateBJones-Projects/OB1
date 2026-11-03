@@ -1,0 +1,17 @@
+{
+  "name": "OpenCode Agent Memory (OB1)",
+  "description": "OpenCode V2 automatic scoped recall and opt-in session/compaction checkpoints through the existing OB1 Agent Memory API.",
+  "category": "integrations",
+  "author": { "name": "Diego Koga", "github": "dikoga" },
+  "version": "0.1.0",
+  "requires": {
+    "open_brain": true,
+    "services": ["OB1 Agent Memory API", "OpenCode 2.2.5"],
+    "tools": ["Node.js 22+", "npm"]
+  },
+  "tags": ["opencode", "agent-memory", "plugin", "context", "governance"],
+  "difficulty": "intermediate",
+  "estimated_time": "15 minutes",
+  "created": "2026-11-02",
+  "updated": "2026-11-02"
+}
