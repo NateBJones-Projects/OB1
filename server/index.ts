@@ -1,4 +1,4 @@
-// Open Brain MCP Server — v1.2.0
+// Open Brain MCP Server — v1.2.1 (fix: build a fresh MCP server per request)
 // Tools: search_thoughts, list_thoughts, thought_stats, capture_thought, update_thought, delete_thought
 // stonemonk2/OB1 fork — core 2nd Brain functions only (no wiki layer)
 
@@ -75,7 +75,11 @@ Return only valid JSON, no markdown.`,
 
 // ── MCP Server ───────────────────────────────────────────────────────────────
 
-const server = new McpServer({ name: "open-brain", version: "1.2.0" });
+// A fresh McpServer is built for every request. One shared instance can only be
+// attached to a single connection at a time, so reusing it made every request after
+// the first on a warm instance fail with "Already connected to a transport".
+function createServer(): McpServer {
+const server = new McpServer({ name: "open-brain", version: "1.2.1" });
 
 // search_thoughts
 server.tool(
@@ -295,6 +299,9 @@ server.tool(
   }
 );
 
+return server;
+}
+
 // ── Hono app + auth middleware ────────────────────────────────────────────────
 
 const app = new Hono();
@@ -308,6 +315,9 @@ app.use("*", async (c, next) => {
 });
 
 app.all("*", async (c) => {
+  // Fresh server + transport per request (stateless), so repeated or concurrent
+  // requests on a warm instance never collide.
+  const server = createServer();
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);
