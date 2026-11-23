@@ -791,7 +791,7 @@ function buildConfig(args, env) {
     resetState: !!args.resetState,
     // Anthropic direct
     anthropicApiKey: env.ANTHROPIC_API_KEY || "",
-    anthropicModel: args.model || env.ANTHROPIC_CLASSIFIER_MODEL || "claude-3-5-haiku-20241022",
+    anthropicModel: args.model || env.ANTHROPIC_CLASSIFIER_MODEL || "claude-haiku-5-5",
     // OpenRouter
     openRouterApiKey: env.OPENROUTER_API_KEY || "",
     openRouterModel: args.model || env.OPENROUTER_CLASSIFIER_MODEL || "openai/gpt-4o-mini",
