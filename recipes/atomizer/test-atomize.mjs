@@ -45,14 +45,14 @@ const effectiveProvider = provider || "openrouter";
 if (effectiveProvider === "anthropic") {
   atomizeOpts.anthropicApiKey = env.ANTHROPIC_API_KEY;
   if (!atomizeOpts.anthropicApiKey) {
-    console.error("--provider=anthropic requires ANTHROPIC_API_KEY in .env.local or process env");
-    process.exit(1);
+    console.log("skipped: no API key for anthropic (set ANTHROPIC_API_KEY in .env.local or process env)");
+    process.exit(0);
   }
 } else if (effectiveProvider === "openrouter") {
   atomizeOpts.openrouterApiKey = env.OPENROUTER_API_KEY;
   if (!atomizeOpts.openrouterApiKey) {
-    console.error("--provider=openrouter requires OPENROUTER_API_KEY in .env.local or process env");
-    process.exit(1);
+    console.log("skipped: no API key for openrouter (set OPENROUTER_API_KEY in .env.local or process env)");
+    process.exit(0);
   }
 }
 
