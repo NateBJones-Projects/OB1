@@ -64,10 +64,11 @@ export function createSupabaseThoughtStore(
       return { data: { count, rows: data as StatsRow[] } };
     },
     async upsertThought(content: string, metadata: Record<string, unknown>): Promise<StoreResult<{ id: string }>> {
-      const { data } = await supabase.rpc("upsert_thought", {
+      const { data, error } = await supabase.rpc("upsert_thought", {
         p_content: content,
         p_payload: { metadata },
       });
+      if (error) return { error: error.message };
       return { data: { id: data?.id } };
     },
     setEmbedding: notImplemented,

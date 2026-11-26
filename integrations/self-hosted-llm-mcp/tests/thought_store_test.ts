@@ -220,3 +220,15 @@ Deno.test("U83 upsertThought calls RPC upsert_thought with p_content and p_paylo
     p_payload: { metadata: { type: "idea", source: "mcp" } },
   });
 });
+
+Deno.test("U84 upsertThought returns { id } from the reply, or { error } for an RPC error", async () => {
+  const { ff, store } = setup();
+  ff.on(
+    "POST",
+    `${REST}/rpc/upsert_thought`,
+    { body: { id: "t-9", fingerprint: "f" } },
+    { status: 400, body: { code: "P0001", details: null, hint: null, message: "upsert refused" } },
+  );
+  assertEquals(await store.upsertThought("c", {}), { data: { id: "t-9" } });
+  assertEquals(await store.upsertThought("c", {}), { error: "upsert refused" });
+});
