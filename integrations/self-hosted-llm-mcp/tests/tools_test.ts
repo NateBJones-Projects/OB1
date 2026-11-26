@@ -633,6 +633,20 @@ Deno.test("U140 setEmbedding failing on a merged duplicate returns the already-i
   assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall"), []);
 });
 
+Deno.test("U206 setEmbedding failing on a merged duplicate whose existing row has no embedding returns the already-in-your-brain text and makes no delete call", async () => {
+  const { client, store } = await rig();
+  store.seed({ id: "old-1", content: "An idea", embedding: null, metadata: { type: "idea" } });
+  store.fail.setEmbedding = EMB_FAIL;
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(
+    textOf(result),
+    `Embedding could not be saved: ${EMB_FAIL}. This text was already in your brain; its metadata was updated but its embedding was not. Capture it again to repair.`,
+  );
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall"), []);
+});
+
 const MAY = `Embedding could not be saved: ${EMB_FAIL}. The thought may be saved without its embedding; capture it again to repair.`;
 
 Deno.test("U141 setEmbedding failing with readBack failing returns the may-be-saved text with no delete call", async () => {
