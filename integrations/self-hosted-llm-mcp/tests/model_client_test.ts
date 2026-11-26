@@ -5,14 +5,36 @@ import type { OkConfig } from "../lib/types.ts";
 import { axisVector, chatReply, embeddingReply, FakeFetch, modelsReply } from "./helpers/fake_fetch.ts";
 
 const EMB = "http://model.test/v1";
-const CHAT = "http://model.test/v1";
+const CHAT = "http://chat.test/v1";
+
+/** Bounded poll: resolves when cond() holds, throws after ms. */
+async function waitFor(cond: () => boolean, label: string, ms = 2000): Promise<void> {
+  const end = Date.now() + ms;
+  while (!cond()) {
+    if (Date.now() > end) throw new Error(`waitFor timed out: ${label}`);
+    await new Promise((r) => setTimeout(r, 2));
+  }
+}
+
+/** Bounded wait: the promise must settle within ms, or the test fails (never hangs). */
+async function within<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limit = new Promise<never>((_, rej) => {
+    timer = setTimeout(() => rej(new Error(`${label}: not settled within ${ms} ms`)), ms);
+  });
+  try {
+    return await Promise.race([p, limit]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function cfg(over: { embKey?: string; chatKey?: string; chatBase?: string; timeoutMs?: number } = {}): OkConfig {
   return {
     ok: true,
     embedding: { role: "embedding", base: EMB, model: "qwen3-embedding:4b", ...(over.embKey ? { key: over.embKey } : {}) },
     chat: { role: "chat", base: over.chatBase ?? CHAT, model: "qwen3:4b", ...(over.chatKey ? { key: over.chatKey } : {}) },
-    timeoutMs: over.timeoutMs ?? 50,
+    timeoutMs: over.timeoutMs ?? 5000,
     chatInherits: ["base"],
   };
 }
@@ -65,9 +87,9 @@ Deno.test("U37 listModels sends one GET /models on the role's base", async () =>
   assertEquals(ff.requests.length, 1);
   assertEquals(ff.requests[0].method, "GET");
   assertEquals(ff.requests[0].url, `${EMB}/models`);
-  const ff2 = new FakeFetch().on("GET", "http://chat.test/v1/models", modelsReply(["a"]));
-  await createModelClient(cfg({ chatBase: "http://chat.test/v1" }), ff2.fetch).listModels("chat");
-  assertEquals(ff2.requests.map((r) => r.url), ["http://chat.test/v1/models"]);
+  const ff2 = new FakeFetch().on("GET", `${CHAT}/models`, modelsReply(["a"]));
+  await createModelClient(cfg(), ff2.fetch).listModels("chat");
+  assertEquals(ff2.requests.map((r) => r.url), [`${CHAT}/models`]);
 });
 
 Deno.test("U38 a role with a key sends Bearer on embed, chat and listModels", async () => {
@@ -100,12 +122,14 @@ Deno.test("U40 each role sends its own key when the two keys differ", async () =
   const ff = new FakeFetch()
     .on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0)))
     .on("POST", `${CHAT}/chat/completions`, chatReply("{}"))
-    .on("GET", `${EMB}/models`, modelsReply([]));
+    .on("GET", `${EMB}/models`, modelsReply([]))
+    .on("GET", `${CHAT}/models`, modelsReply([]));
   const c = createModelClient(cfg({ embKey: "sk-emb", chatKey: "sk-chat" }), ff.fetch);
   await c.embed("a");
   await c.chat("a");
   await c.listModels("embedding");
   await c.listModels("chat");
+  assertEquals(ff.unmatched.length, 0);
   assertEquals(ff.requests.map((r) => r.headers["authorization"]), [
     "Bearer sk-emb",
     "Bearer sk-chat",
@@ -115,7 +139,7 @@ Deno.test("U40 each role sends its own key when the two keys differ", async () =
 });
 
 Deno.test("U41 every request goes to one of the two configured bases", async () => {
-  const chatBase = "http://chat.test/v1";
+  const chatBase = CHAT;
   const ff = new FakeFetch()
     .on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0)))
     .on("POST", `${chatBase}/chat/completions`, chatReply("{}"))
@@ -152,23 +176,25 @@ Deno.test("U42 a rejected fetch gives unreachable naming role, base and 'could n
     assert(!r.ok);
     assertEquals(r.kind, "unreachable");
     assertStringIncludes(r.message, role);
-    assertStringIncludes(r.message, "http://model.test/v1");
+    assertStringIncludes(r.message, role === "embedding" ? EMB : CHAT);
+    assert(!r.message.includes(role === "embedding" ? CHAT : EMB), "names the other role's base");
     assertStringIncludes(r.message, "could not be reached");
   }
 });
 
 Deno.test("U43 a reply arriving inside timeoutMs is ok", async () => {
-  const slow = async () => {
-    await new Promise((r) => setTimeout(r, 10));
-    return embeddingReply(axisVector(1));
-  };
-  const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, slow).on("POST", `${CHAT}/chat/completions`, async () => {
-    await new Promise((r) => setTimeout(r, 10));
-    return chatReply("{}");
-  });
-  const c = createModelClient(cfg({ timeoutMs: 1000 }), ff.fetch);
-  assert((await c.embed("a")).ok);
-  assert((await c.chat("a")).ok);
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, { hold: embeddingReply(axisVector(1)) })
+    .on("POST", `${CHAT}/chat/completions`, { hold: chatReply("{}") });
+  const c = createModelClient(cfg(), ff.fetch);
+  const emb = c.embed("a");
+  await waitFor(() => ff.heldCount === 1, "embedding reply held");
+  ff.release();
+  assert((await within(emb, 2000, "embed")).ok);
+  const chat = c.chat("a");
+  await waitFor(() => ff.heldCount === 1, "chat reply held");
+  ff.release();
+  assert((await within(chat, 2000, "chat")).ok);
 });
 
 Deno.test("U44 a hanging fetch gives timeout for either role naming role, base, ms and FETCH_TIMEOUT_MS", async () => {
@@ -176,11 +202,17 @@ Deno.test("U44 a hanging fetch gives timeout for either role naming role, base, 
     .on("POST", `${EMB}/embeddings`, { hang: true })
     .on("POST", `${CHAT}/chat/completions`, { hang: true });
   const c = createModelClient(cfg({ timeoutMs: 20 }), ff.fetch);
-  for (const [role, r] of [["embedding", await c.embed("a")], ["chat", await c.chat("a")]] as const) {
+  // each call must give up within a bound far above 20 ms; a timeout that is not enforced fails here instead of hanging
+  const results = [
+    ["embedding", await within(c.embed("a"), 1000, "embed timeout")],
+    ["chat", await within(c.chat("a"), 1000, "chat timeout")],
+  ] as const;
+  for (const [role, r] of results) {
     assert(!r.ok);
     assertEquals(r.kind, "timeout");
     assertStringIncludes(r.message, role);
-    assertStringIncludes(r.message, "http://model.test/v1");
+    assertStringIncludes(r.message, role === "embedding" ? EMB : CHAT);
+    assert(!r.message.includes(role === "embedding" ? CHAT : EMB), "names the other role's base");
     assertStringIncludes(r.message, "20");
     assertStringIncludes(r.message, "FETCH_TIMEOUT_MS");
   }
@@ -196,7 +228,8 @@ Deno.test("U45 HTTP 401 and 403 each give auth_rejected naming role, base and 'a
       assert(!r.ok);
       assertEquals(r.kind, "auth_rejected");
       assertStringIncludes(r.message, role);
-      assertStringIncludes(r.message, "http://model.test/v1");
+      assertStringIncludes(r.message, role === "embedding" ? EMB : CHAT);
+      assert(!r.message.includes(role === "embedding" ? CHAT : EMB), "names the other role's base");
       assertStringIncludes(r.message, "access key rejected");
     }
   }
@@ -234,6 +267,22 @@ Deno.test("U47 a 400 or 422 body naming the model as unknown gives model_not_fou
       assertEquals(ff.requests.length, 1);
     }
   }
+  const chatBodies = [
+    `model "qwen3:4b" not found, try pulling it first`,
+    `Unknown model: qwen3:4b`,
+    `The model qwen3:4b DOES NOT EXIST`,
+  ];
+  for (const status of [400, 422]) {
+    for (const body of chatBodies) {
+      const ff = new FakeFetch().on("POST", `${CHAT}/chat/completions`, { status, body: { error: body } });
+      const r = await createModelClient(cfg(), ff.fetch).chat("a");
+      assert(!r.ok);
+      assertEquals(r.kind, "model_not_found", `chat ${status} ${body}`);
+      assertStringIncludes(r.message, "chat");
+      assertStringIncludes(r.message, "qwen3:4b");
+      assertEquals(ff.requests.length, 1);
+    }
+  }
 });
 
 Deno.test("U48 HTTP 500 gives http_error naming role, status and server text", async () => {
@@ -248,6 +297,7 @@ Deno.test("U48 HTTP 500 gives http_error naming role, status and server text", a
     assert(!r.ok);
     assertEquals(r.kind, "http_error");
     assertStringIncludes(r.message, role);
+    assertStringIncludes(r.message, role === "embedding" ? EMB : CHAT);
     assertStringIncludes(r.message, "500");
     assertStringIncludes(r.message, text);
   }
@@ -425,20 +475,23 @@ Deno.test("U59 a retry returning a 768-length vector gives wrong_dimension", asy
 });
 
 Deno.test("U60 the retry gets its own timeoutMs, and a hanging retry gives timeout", async () => {
-  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  // each reply is held 30 ms against a 50 ms limit: the pair outlasts one limit but each request is inside its own
+  const limit = 400;
+  // each reply is held about half the limit: the pair outlasts one limit but each request is inside its own
   const slow = new FakeFetch().on(
     "POST",
     `${EMB}/embeddings`,
     { hold: { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } } },
     { hold: embeddingReply(axisVector(0)) },
   );
-  const pending = createModelClient(cfg({ timeoutMs: 50 }), slow.fetch).embed("a");
-  await wait(30);
+  const started = Date.now();
+  const pending = createModelClient(cfg({ timeoutMs: limit }), slow.fetch).embed("a");
+  await waitFor(() => slow.heldCount === 1, "first reply held");
+  await waitFor(() => Date.now() - started >= limit / 2, "half the limit elapsed");
   slow.release();
-  await wait(30);
+  await waitFor(() => slow.heldCount === 1, "retry reply held");
+  await waitFor(() => Date.now() - started > limit + 50, "total time past one limit");
   slow.release();
-  const ok = await pending;
+  const ok = await within(pending, 2000, "slow embed");
   assert(ok.ok);
   assertEquals(slow.requests.length, 2);
 
@@ -448,7 +501,7 @@ Deno.test("U60 the retry gets its own timeoutMs, and a hanging retry gives timeo
     { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } },
     { hang: true },
   );
-  const r = await createModelClient(cfg({ timeoutMs: 20 }), hang.fetch).embed("a");
+  const r = await within(createModelClient(cfg({ timeoutMs: 20 }), hang.fetch).embed("a"), 1000, "hanging retry");
   assertEquals(hang.requests.length, 2);
   assert(!r.ok);
   assertEquals(r.kind, "timeout");
@@ -507,6 +560,26 @@ Deno.test("U64 server text of 200 chars is kept whole, 201 is cut to 200, and re
   assert(cut.endsWith("a".repeat(200)));
   assert(!cut.includes("a".repeat(201)));
   // a key whose value would straddle the 200-char cut: no part of it may survive
+  const straddle = await run("a".repeat(195) + key);
+  assert(!straddle.includes("sk-emb"));
+  assertStringIncludes(straddle, "a".repeat(195) + "[reda");
+  assert(!straddle.includes("a".repeat(196)));
+});
+
+Deno.test("U64 an unreachable error text of 200 chars is kept whole, 201 is cut to 200, redaction first", async () => {
+  const key = "sk-emb-1234567";
+  const run = async (networkError: string) => {
+    const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, { networkError });
+    const r = await createModelClient(cfg({ embKey: key }), ff.fetch).embed("a");
+    assert(!r.ok);
+    assertEquals(r.kind, "unreachable");
+    return r.message;
+  };
+  const whole = await run("a".repeat(200));
+  assert(whole.endsWith("could not be reached: " + "a".repeat(200)));
+  const cut = await run("a".repeat(201));
+  assert(cut.endsWith("could not be reached: " + "a".repeat(200)));
+  assert(!cut.includes("a".repeat(201)));
   const straddle = await run("a".repeat(195) + key);
   assert(!straddle.includes("sk-emb"));
   assertStringIncludes(straddle, "a".repeat(195) + "[reda");
