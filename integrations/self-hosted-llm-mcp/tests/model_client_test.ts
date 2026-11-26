@@ -375,3 +375,15 @@ Deno.test("U57 a 404, and a 500 whose body mentions dimension, are not retried",
     assertEquals(r.kind, status === 404 ? "model_not_found" : "http_error");
   }
 });
+
+Deno.test("U58 a retry that again fails with a dimension 400 sends no third request and gives http_error", async () => {
+  const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, {
+    status: 400,
+    body: { error: "dimensions are not supported" },
+  });
+  const r = await createModelClient(cfg(), ff.fetch).embed("a");
+  assertEquals(ff.requests.length, 2);
+  assert(!r.ok);
+  assertEquals(r.kind, "http_error");
+  assertStringIncludes(r.message, "400");
+});
