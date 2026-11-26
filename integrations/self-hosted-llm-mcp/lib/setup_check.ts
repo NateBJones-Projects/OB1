@@ -13,7 +13,10 @@ function configBlock(c: OkConfig): SetupConfigBlock {
 export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
   const config = resolveConfig(deps.getEnv);
   if (!config.ok) {
-    const reason = `Missing required settings: ${config.missing.join(", ")}.`;
+    const parts: string[] = [];
+    if (config.missing.length > 0) parts.push(`Missing required settings: ${config.missing.join(", ")}.`);
+    for (const i of config.invalid) parts.push(`${i.setting} is invalid: ${i.reason}.`);
+    const reason = parts.join(" ");
     return { ok: false, checks: [{ id: "config", ok: false, reason }], warnings: [], thoughts: { other_model: null }, config: null };
   }
   const client = createModelClient(config, deps.modelFetch);

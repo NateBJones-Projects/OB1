@@ -83,3 +83,13 @@ Deno.test("U150 a missing setting fails config with a reason naming each missing
   assertEquals(c.ok, false);
   for (const name of ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"]) assertStringIncludes(c.reason ?? "", name);
 });
+
+Deno.test("U151 an invalid setting fails config naming it with its reason", async () => {
+  const { deps } = setup({ ...BASE_ENV, EMBEDDING_API_BASE: "ollama:11434/v1", FETCH_TIMEOUT_MS: "60s" });
+  const c = check((await runSetupCheck(deps)).checks, "config");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "EMBEDDING_API_BASE");
+  assertStringIncludes(c.reason ?? "", "must start with http:// or https://");
+  assertStringIncludes(c.reason ?? "", "FETCH_TIMEOUT_MS");
+  assertStringIncludes(c.reason ?? "", "positive whole number");
+});
