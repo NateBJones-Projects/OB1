@@ -153,3 +153,12 @@ Deno.test("U17 FETCH_TIMEOUT_MS \"90000\" gives 90000 and \"1\" gives 1", () => 
   assertEquals(ok({ ...MIN, FETCH_TIMEOUT_MS: "90000" }).timeoutMs, 90000);
   assertEquals(ok({ ...MIN, FETCH_TIMEOUT_MS: "1" }).timeoutMs, 1);
 });
+
+Deno.test("U18 FETCH_TIMEOUT_MS \"0\", \"-5\", \"60s\", \"1.5\", \"abc\" are invalid, never defaulted", () => {
+  for (const bad of ["0", "-5", "60s", "1.5", "abc"]) {
+    const r = resolveConfig(envOf({ ...MIN, FETCH_TIMEOUT_MS: bad }));
+    assert(!r.ok, `${bad} should be invalid`);
+    assertEquals(r.invalid.map((i) => i.setting), ["FETCH_TIMEOUT_MS"], bad);
+    assertEquals(r.missing, []);
+  }
+});

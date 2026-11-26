@@ -23,6 +23,9 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   if (rawChatBase !== undefined && !/^https?:\/\//.test(rawChatBase)) {
     invalid.push({ setting: "CHAT_API_BASE", reason: BASE_REASON });
   }
+  if (rawTimeout !== undefined && !(/^[0-9]+$/.test(rawTimeout) && Number(rawTimeout) >= 1)) {
+    invalid.push({ setting: "FETCH_TIMEOUT_MS", reason: "must be a positive whole number of milliseconds" });
+  }
   if (invalid.length > 0) return { ok: false, missing: [], invalid };
   const embedding: EndpointConfig = {
     role: "embedding",
