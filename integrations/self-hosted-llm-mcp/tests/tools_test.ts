@@ -230,3 +230,11 @@ Deno.test("U109 search_thoughts embeds the query and matches with that vector, t
   assertEquals(match.length, 1);
   assertEquals(match[0].args, [axisVector(3), 0.5, 10]);
 });
+
+Deno.test("U110 search_thoughts forwards an explicit limit and threshold", async () => {
+  const { client, store } = await rig();
+  await client.callTool({ name: "search_thoughts", arguments: { query: "q", limit: 3, threshold: 0.8 } });
+  const match = store.calls.filter((c) => c.method === "matchThoughts");
+  assertEquals(match.length, 1);
+  assertEquals(match[0].args, [axisVector(0), 0.8, 3]);
+});

@@ -72,7 +72,7 @@ export function buildServer(deps: Deps): McpServer {
     try {
       const embedded = await models().embed(query);
       if (!embedded.ok) throw new Error(embedded.message);
-      const res = await store.matchThoughts(embedded.value, 0.5, 10);
+      const res = await store.matchThoughts(embedded.value, threshold, limit);
       if ("error" in res) return text(`Search error: ${res.error}`, true);
       return text("");
     } catch (err) {
