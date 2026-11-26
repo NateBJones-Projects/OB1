@@ -105,8 +105,9 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       });
       if (!("status" in sent)) return sent;
       if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
-      const json = JSON.parse(sent.text);
-      return { ok: true, value: json.choices[0].message.content };
+      const content = parseJson(sent.text)?.choices?.[0]?.message?.content;
+      if (typeof content !== "string") return badResponse(ep, "choices[0].message.content");
+      return { ok: true, value: content };
     },
     async listModels(role: Role): Promise<ModelResult<string[] | null>> {
       const ep = config[role];

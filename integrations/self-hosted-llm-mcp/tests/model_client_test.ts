@@ -268,3 +268,21 @@ Deno.test("U50 a 2xx embeddings reply that is malformed gives bad_response", asy
     assertStringIncludes(r.message, "embedding");
   }
 });
+
+Deno.test("U51 a 2xx chat reply lacking choices[0].message.content or non-JSON gives bad_response", async () => {
+  const bodies: unknown[] = [
+    {},
+    { choices: [] },
+    { choices: [{}] },
+    { choices: [{ message: {} }] },
+    { choices: [{ message: { content: 42 } }] },
+    "this is not json",
+  ];
+  for (const body of bodies) {
+    const ff = new FakeFetch().on("POST", `${CHAT}/chat/completions`, { status: 200, body });
+    const r = await createModelClient(cfg(), ff.fetch).chat("a");
+    assert(!r.ok, JSON.stringify(body)?.slice(0, 60));
+    assertEquals(r.kind, "bad_response", JSON.stringify(body)?.slice(0, 60));
+    assertStringIncludes(r.message, "chat");
+  }
+});
