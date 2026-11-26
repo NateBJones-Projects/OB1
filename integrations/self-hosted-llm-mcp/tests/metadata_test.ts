@@ -53,3 +53,18 @@ Deno.test("U30 buildCaptureMetadata(null, m) gives the fallback metadata", () =>
     enrichment_status: "fallback",
   });
 });
+
+Deno.test("U31 buildCaptureMetadata(extracted, m) keeps extracted fields and adds the real ones, no defaults", () => {
+  const extracted = { people: ["Ann"], dates_mentioned: [] };
+  const out = buildCaptureMetadata(extracted, "embed-model");
+  assertEquals(out, {
+    people: ["Ann"],
+    dates_mentioned: [],
+    source: "mcp",
+    embedding_model: "embed-model",
+    enrichment_status: "complete",
+  });
+  assert(!("topics" in out) && !("type" in out));
+  assertEquals(buildCaptureMetadata({}, "m").enrichment_status, "complete");
+  assertEquals(extracted, { people: ["Ann"], dates_mentioned: [] });
+});

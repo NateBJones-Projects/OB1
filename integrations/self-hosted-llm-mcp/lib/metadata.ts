@@ -20,9 +20,12 @@ export function parseUsableMetadata(text: string): Record<string, unknown> | nul
 }
 
 export function buildCaptureMetadata(
-  _extracted: Record<string, unknown> | null,
+  extracted: Record<string, unknown> | null,
   embeddingModel: string,
 ): Record<string, unknown> {
+  if (extracted !== null) {
+    return { ...extracted, source: "mcp", embedding_model: embeddingModel, enrichment_status: "complete" };
+  }
   return {
     topics: ["uncategorized"],
     type: "observation",
