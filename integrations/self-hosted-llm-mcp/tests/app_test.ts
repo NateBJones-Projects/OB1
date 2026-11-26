@@ -43,3 +43,20 @@ Deno.test("U181 a POST with no key answers HTTP 200 with the JSON-RPC -32001 una
   assertEquals(m.jsonrpc, "2.0");
   assertEquals(m.error, { code: -32001, message: UNAUTHORIZED });
 });
+
+function post(body: string | null): Request {
+  return new Request(FUNCTION_URL, { method: "POST", headers: { "content-type": "application/json" }, body });
+}
+
+Deno.test("U182 the envelope echoes a string or number id, and gives null for a null, missing, non-scalar or unparseable id", async () => {
+  const app = createApp(makeDeps());
+  const idOf = async (body: string | null) => (await (await app.fetch(post(body))).json()).id;
+  assertEquals(await idOf('{"jsonrpc":"2.0","id":"abc","method":"x"}'), "abc");
+  assertEquals(await idOf('{"jsonrpc":"2.0","id":42,"method":"x"}'), 42);
+  assertEquals(await idOf('{"jsonrpc":"2.0","id":null,"method":"x"}'), null);
+  assertEquals(await idOf('{"jsonrpc":"2.0","method":"x"}'), null);
+  assertEquals(await idOf('{"jsonrpc":"2.0","id":{"a":1},"method":"x"}'), null);
+  assertEquals(await idOf('{"jsonrpc":"2.0","id":[1],"method":"x"}'), null);
+  assertEquals(await idOf("not json"), null);
+  assertEquals(await idOf(null), null);
+});
