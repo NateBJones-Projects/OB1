@@ -8,6 +8,11 @@
     "@std/assert": "jsr:@std/assert@^1"
   },
   "lock": false,
+  "lint": {
+    "rules": {
+      "exclude": ["no-import-prefix"]
+    }
+  },
   "tasks": {
     "test": "deno test --node-modules-dir=none --no-prompt --allow-env --allow-read tests/"
   }
