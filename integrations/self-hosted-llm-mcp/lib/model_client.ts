@@ -2,6 +2,7 @@ import { EXTRACTION_PROMPT } from "./metadata.ts";
 import type { EndpointConfig, ModelClient, ModelResult, OkConfig, OutcomeKind, Role } from "./types.ts";
 
 const EXPECTED_DIMENSIONS = 1536;
+const MAX_SERVER_TEXT = 200;
 
 type Failure = { ok: false; kind: OutcomeKind; message: string };
 type Sent = { status: number; text: string } | Failure;
@@ -40,7 +41,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       return {
         ok: false,
         kind: "unreachable",
-        message: `The ${ep.role} model server at ${ep.base} could not be reached: ${redact(err instanceof Error ? err.message : String(err))}`,
+        message: `The ${ep.role} model server at ${ep.base} could not be reached: ${serverText(err instanceof Error ? err.message : String(err))}`,
       };
     }
   }
@@ -51,6 +52,11 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       .filter((k): k is string => !!k)
       .sort((a, b) => b.length - a.length);
     return keys.reduce((out, key) => out.split(key).join("[redacted]"), text);
+  }
+
+  /** Redacts key values first, then trims to 200 chars, so a key cut by the limit cannot leak. */
+  function serverText(text: string): string {
+    return redact(text).slice(0, MAX_SERVER_TEXT);
   }
 
   function httpFailure(ep: EndpointConfig, status: number, text: string): Failure {
@@ -66,7 +72,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     return {
       ok: false,
       kind: "http_error",
-      message: `The ${ep.role} model server at ${ep.base} answered HTTP ${status}: ${redact(text)}`,
+      message: `The ${ep.role} model server at ${ep.base} answered HTTP ${status}: ${serverText(text)}`,
     };
   }
 

@@ -469,3 +469,24 @@ Deno.test("U63 a key value inside a thrown fetch error appears as [redacted] in 
     assert(!r.message.includes(keys.chatKey));
   }
 });
+
+Deno.test("U64 server text of 200 chars is kept whole, 201 is cut to 200, and redaction comes before the cut", async () => {
+  const key = "sk-emb-1234567";
+  const run = async (body: string, over = {}) => {
+    const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, { status: 500, body });
+    const r = await createModelClient(cfg({ embKey: key, ...over }), ff.fetch).embed("a");
+    assert(!r.ok);
+    return r.message;
+  };
+  const whole = await run("a".repeat(200));
+  assertStringIncludes(whole, "a".repeat(200));
+  assert(whole.endsWith("a".repeat(200)));
+  const cut = await run("a".repeat(201));
+  assert(cut.endsWith("a".repeat(200)));
+  assert(!cut.includes("a".repeat(201)));
+  // a key whose value would straddle the 200-char cut: no part of it may survive
+  const straddle = await run("a".repeat(195) + key);
+  assert(!straddle.includes("sk-emb"));
+  assertStringIncludes(straddle, "a".repeat(195) + "[reda");
+  assert(!straddle.includes("a".repeat(196)));
+});
