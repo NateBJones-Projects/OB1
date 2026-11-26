@@ -1,5 +1,7 @@
 import type { EndpointConfig, GetEnv, OkConfig, ResolvedConfig, Warning } from "./types.ts";
 
+const BASE_REASON = "must start with http:// or https://";
+
 function stripSlash(base: string): string {
   return base.replace(/\/+$/, "");
 }
@@ -12,6 +14,11 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   };
   const missing = ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"].filter((n) => getEnv(n) === undefined);
   if (missing.length > 0) return { ok: false, missing, invalid: [] };
+  const invalid: { setting: string; reason: string }[] = [];
+  if (!/^https?:\/\//.test(getEnv("EMBEDDING_API_BASE")!)) {
+    invalid.push({ setting: "EMBEDDING_API_BASE", reason: BASE_REASON });
+  }
+  if (invalid.length > 0) return { ok: false, missing: [], invalid };
   const embedding: EndpointConfig = {
     role: "embedding",
     base: stripSlash(getEnv("EMBEDDING_API_BASE")!),

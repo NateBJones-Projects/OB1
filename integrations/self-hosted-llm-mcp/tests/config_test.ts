@@ -120,3 +120,12 @@ Deno.test("U12 http:// and https:// bases are both accepted", () => {
     assertEquals(r.chat.base, base);
   }
 });
+
+Deno.test("U13 a base without a scheme is invalid, names its setting, and is not missing", () => {
+  const r = resolveConfig(envOf({ ...MIN, EMBEDDING_API_BASE: "ollama:11434/v1" }));
+  assert(!r.ok);
+  assertEquals(r.missing, []);
+  assertEquals(r.invalid.length, 1);
+  assertEquals(r.invalid[0].setting, "EMBEDDING_API_BASE");
+  assert(r.invalid[0].reason.includes("http://") && r.invalid[0].reason.includes("https://"));
+});
