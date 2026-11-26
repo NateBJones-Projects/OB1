@@ -86,6 +86,8 @@ Your Open Brain database stores 1536-dimension vectors. The function asks the mo
 
 Smaller models do not work for this: `qwen3-embedding:0.6b` is native 1024 and cannot produce 1536. A model that natively returns 1536 dimensions also works.
 
+**The `dimensions` retry.** Every embedding request asks for `dimensions: 1536`. If the server answers HTTP 400 or 422 with a body that mentions "dimension" or "matryoshka" (for example Ollama's `dimensions ... exceeds embedding length`, or vLLM's "does not support Matryoshka embeddings"), the function retries once without the field. Whatever comes back must still be exactly 1536 numbers, or the capture is refused and the message names both sizes. In practice, vLLM owners must start the server with `--hf-overrides '{"is_matryoshka": true}'` for a Matryoshka model such as Qwen3-Embedding, so the field is accepted. Otherwise the retry returns the native size and the capture is refused. llama.cpp ignores the field, so it always returns its native size.
+
 These findings come from server documentation and source code, not from a live run. See the table below for what has been checked on real hardware.
 
 ### Tested with (known good, not a minimum)
@@ -255,6 +257,21 @@ Other fields:
 
 **Issue: A tool or the setup check says "Model endpoint not configured: missing ..."**
 Solution: Set each setting the message names (see [Configure](#configure)). The same message appears for a base URL without `http://` or `https://` and for a `FETCH_TIMEOUT_MS` that is not a positive integer. On Supabase Cloud, new secrets apply after the next request. On a self-hosted stack, restart the `functions` service.
+
+**Reference: exact message shapes**
+Missing settings:
+
+```text
+Model endpoint not configured: missing EMBEDDING_API_BASE, EMBEDDING_MODEL. Set these as function secrets (see README → Configure).
+```
+
+Invalid settings (the setting name, then the reason in parentheses):
+
+```text
+Model endpoint not configured: invalid EMBEDDING_API_BASE (must start with http:// or https://), invalid FETCH_TIMEOUT_MS (must be a positive whole number of milliseconds). Set these as function secrets (see README → Configure).
+```
+
+When both kinds are present, the two parts are joined with a semicolon and a space, missing first: `missing A; invalid B (reason)`. A tool whose embedding call fails returns the word Error, a colon and a space, then the cause, the same prefix core Open Brain uses.
 
 **Issue: The server could not be reached (`embedding_reachable` or `chat_reachable` fails, or a capture names the base URL as unreachable)**
 Solution: Check from where the function runs, not from your laptop. On Supabase Cloud, the model server must be public over HTTPS behind a key; see [Supabase Cloud reachability](#supabase-cloud-reachability). On a self-hosted stack, use an address the `functions` container can resolve, such as a Compose service name. Nothing is stored when the embedding server is unreachable.
