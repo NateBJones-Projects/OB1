@@ -1,5 +1,6 @@
 import { StreamableHTTPTransport } from "npm:@hono/mcp@0.1.1";
 import { Hono } from "npm:hono@4.9.2";
+import { runSetupCheck } from "./setup_check.ts";
 import { createSupabaseThoughtStore } from "./thought_store.ts";
 import { buildServer } from "./tools.ts";
 import type { Deps, FetchApp } from "./types.ts";
@@ -69,6 +70,18 @@ async function serveMcp(deps: Deps, request: Request): Promise<Response> {
   return response;
 }
 
+/** A GET whose last path segment is `setup-check`, ignoring one trailing slash. */
+function isSetupCheck(request: Request): boolean {
+  if (request.method !== "GET") return false;
+  const path = new URL(request.url).pathname;
+  const trimmed = path.endsWith("/") ? path.slice(0, -1) : path;
+  return trimmed.split("/").pop() === "setup-check";
+}
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...corsHeaders } });
+}
+
 export function createApp(deps: Deps): FetchApp {
   return {
     async fetch(request: Request): Promise<Response> {
@@ -77,6 +90,10 @@ export function createApp(deps: Deps): FetchApp {
       const accessKey = deps.getEnv("MCP_ACCESS_KEY");
       if (!provided || !accessKey || provided !== accessKey) {
         return unauthorizedResponse(extractJsonRpcId(await readBodyText(request)));
+      }
+      if (isSetupCheck(request)) {
+        const report = await runSetupCheck(deps);
+        return jsonResponse(report.ok ? 200 : 503, report);
       }
       return await serveMcp(deps, request);
     },

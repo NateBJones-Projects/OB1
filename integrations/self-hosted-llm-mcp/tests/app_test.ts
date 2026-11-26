@@ -1,7 +1,8 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@^1";
 import { createApp, productionDeps } from "../lib/app.ts";
+import { runSetupCheck } from "../lib/setup_check.ts";
 import type { Deps } from "../lib/types.ts";
-import { FakeFetch } from "./helpers/fake_fetch.ts";
+import { axisVector, chatReply, embeddingReply, FakeFetch, modelsReply } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
 import { FUNCTION_URL, mcpCall, parseMessage } from "./helpers/mcp.ts";
 
@@ -220,4 +221,37 @@ Deno.test("U194 index.ts holds one statement serving createApp(productionDeps())
   const rest = code.filter((l) => !l.startsWith("import ")).join(" ");
   assertEquals(imports, ['import { createApp, productionDeps } from "./lib/app.ts";']);
   assertEquals(rest, "Deno.serve(createApp(productionDeps()).fetch);");
+});
+
+const BASE = "http://model.test/v1";
+const MODEL_ENV = { MCP_ACCESS_KEY: KEY, EMBEDDING_API_BASE: BASE, EMBEDDING_MODEL: "embed-1536", CHAT_MODEL: "chat-small" };
+const GOOD_META = '{"type":"idea","topics":[],"people":[],"action_items":[],"dates_mentioned":[]}';
+
+function healthyFake(): FakeFetch {
+  return new FakeFetch()
+    .on("POST", `${BASE}/embeddings`, () => embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META))
+    .on("GET", `${BASE}/models`, modelsReply(["embed-1536", "chat-small"]));
+}
+
+const checkRequest = (path = "/setup-check", headers: Record<string, string> = { "x-brain-key": KEY }) =>
+  new Request(FUNCTION_URL + path, { headers });
+
+Deno.test("U196 GET setup-check with the key answers 200 for an ok report and 503 otherwise, with the same JSON body, content type and CORS", async () => {
+  const okDeps = makeDeps(MODEL_ENV, healthyFake());
+  const ok = await createApp(okDeps).fetch(checkRequest());
+  assertEquals(ok.status, 200);
+  assertEquals(ok.headers.get("content-type"), "application/json");
+  assertCors(ok);
+  const okReport = await runSetupCheck(makeDeps(MODEL_ENV, healthyFake()));
+  assertEquals(okReport.ok, true);
+  assertEquals(await ok.json(), okReport);
+
+  const bad = await createApp(makeDeps({ MCP_ACCESS_KEY: KEY })).fetch(checkRequest());
+  assertEquals(bad.status, 503);
+  assertEquals(bad.headers.get("content-type"), "application/json");
+  assertCors(bad);
+  const badReport = await runSetupCheck(makeDeps({ MCP_ACCESS_KEY: KEY }));
+  assertEquals(badReport.ok, false);
+  assertEquals(await bad.json(), badReport);
 });
