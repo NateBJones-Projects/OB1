@@ -103,3 +103,24 @@ Deno.test("U186 a correct x-brain-key, and a correct ?key= alone, each reach the
     assert(toolNames(r.message).includes("capture_thought"));
   }
 });
+
+function toolsList(url: string, headers: Record<string, string> = {}): Request {
+  return new Request(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...headers },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }),
+  });
+}
+
+async function isRefused(res: Response): Promise<boolean> {
+  const m = await res.json().catch(() => null);
+  return res.status === 200 && m?.error?.code === -32001;
+}
+
+Deno.test("U187 a non-empty header wins over the query; an empty header falls through to the query", async () => {
+  const app = createApp(makeDeps());
+  const q = (k: string) => `${FUNCTION_URL}?key=${k}`;
+  assert(await isRefused(await app.fetch(toolsList(q(KEY), { "x-brain-key": "wrong" }))), "wrong header + right query");
+  assert(!(await isRefused(await app.fetch(toolsList(q("wrong"), { "x-brain-key": KEY })))), "right header + wrong query");
+  assert(!(await isRefused(await app.fetch(toolsList(q(KEY), { "x-brain-key": "" })))), "empty header falls through");
+});
