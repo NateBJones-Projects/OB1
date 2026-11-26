@@ -1,6 +1,7 @@
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.24.3/server/mcp.js";
 import { z } from "npm:zod@4.1.13";
 import { resolveConfig } from "./config.ts";
+import { buildCaptureMetadata, parseUsableMetadata } from "./metadata.ts";
 import { createModelClient } from "./model_client.ts";
 import type { Deps, ModelClient } from "./types.ts";
 
@@ -197,6 +198,30 @@ export function buildServer(deps: Deps): McpServer {
         "The thought to capture — a clear, standalone statement that will make sense when retrieved later by any AI",
       ),
     },
-  }, notYet);
+  }, async ({ content }) => {
+    try {
+      const client = models();
+      const embedded = await client.embed(content);
+      const chatted = await client.chat(content);
+      if (!embedded.ok) throw new Error(embedded.message);
+      const config = resolveConfig(deps.getEnv);
+      const extracted = chatted.ok ? parseUsableMetadata(chatted.value) : null;
+      const metadata = buildCaptureMetadata(extracted, config.ok ? config.embedding.model : "");
+      const upserted = await store.upsertThought(content, metadata);
+      if ("error" in upserted) return text(`Failed to capture: ${upserted.error}`, true);
+      const saved = await store.setEmbedding(upserted.data.id, embedded.value);
+      if ("error" in saved) return text(`Failed to save embedding: ${saved.error}`, true);
+      const meta = metadata as Record<string, unknown>;
+      let confirmation = `Captured as ${meta.type || "thought"}`;
+      if (Array.isArray(meta.topics) && meta.topics.length) confirmation += ` — ${(meta.topics as string[]).join(", ")}`;
+      if (Array.isArray(meta.people) && meta.people.length) confirmation += ` | People: ${(meta.people as string[]).join(", ")}`;
+      if (Array.isArray(meta.action_items) && meta.action_items.length) {
+        confirmation += ` | Actions: ${(meta.action_items as string[]).join("; ")}`;
+      }
+      return text(confirmation);
+    } catch (err) {
+      return errorText(err);
+    }
+  });
   return server;
 }

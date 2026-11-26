@@ -277,3 +277,12 @@ Deno.test("U113 search with a store error returns core's Search error text", asy
   assertEquals(result.isError, true);
   assertEquals(textOf(result), "Search error: rpc exploded");
 });
+
+Deno.test("U114 a successful capture replies with core's Captured as confirmation", async () => {
+  const { client } = await rig(GOOD_ENV, {
+    chat: chatReply('{"topics":["alpha","beta"],"type":"task","people":["Ada"],"action_items":["call","write"]}'),
+  });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "Call Ada about the draft" } });
+  assert(!result.isError);
+  assertEquals(textOf(result), "Captured as task — alpha, beta | People: Ada | Actions: call; write");
+});
