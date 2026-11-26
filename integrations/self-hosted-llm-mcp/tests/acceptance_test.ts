@@ -341,7 +341,7 @@ Deno.test("A18 with CHAT_MODEL unset all six tools fail naming CHAT_MODEL and se
   assertEquals(store.calls.length, 0);
 });
 
-todo("A19 an unkeyed http base passes the setup check with no warning", async () => {
+Deno.test("A19 an unkeyed http base passes the setup check with no warning", async () => {
   const base = "http://ollama:11434/v1";
   const app = createApp(makeDeps(baseEnv({ EMBEDDING_API_BASE: base }), healthy(new FakeFetch(), base)));
   const { status, body } = await setupCheck(app);
