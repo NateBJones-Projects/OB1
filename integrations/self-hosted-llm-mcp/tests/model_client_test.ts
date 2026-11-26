@@ -205,3 +205,21 @@ Deno.test("U46 HTTP 404 gives model_not_found naming role and model", async () =
     assertStringIncludes(r.message, model);
   }
 });
+
+Deno.test("U47 a 400 or 422 body naming the model as unknown gives model_not_found", async () => {
+  const bodies = [
+    `model "qwen3-embedding:4b" not found, try pulling it first`,
+    `Unknown model: qwen3-embedding:4b`,
+    `The model qwen3-embedding:4b DOES NOT EXIST`,
+  ];
+  for (const status of [400, 422]) {
+    for (const body of bodies) {
+      const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, { status, body: { error: body } });
+      const r = await createModelClient(cfg(), ff.fetch).embed("a");
+      assert(!r.ok);
+      assertEquals(r.kind, "model_not_found", `${status} ${body}`);
+      assertStringIncludes(r.message, "qwen3-embedding:4b");
+      assertEquals(ff.requests.length, 1);
+    }
+  }
+});

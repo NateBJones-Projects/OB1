@@ -34,7 +34,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     }
   }
 
-  function httpFailure(ep: EndpointConfig, status: number): Failure {
+  function httpFailure(ep: EndpointConfig, status: number, text: string): Failure {
     if (status === 401 || status === 403) {
       return {
         ok: false,
@@ -43,7 +43,13 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       };
     }
     if (status === 404) return modelNotFound(ep);
+    if ((status === 400 || status === 422) && namesModelAsUnknown(ep, text)) return modelNotFound(ep);
     throw new Error("not implemented");
+  }
+
+  function namesModelAsUnknown(ep: EndpointConfig, text: string): boolean {
+    const body = text.toLowerCase();
+    return body.includes(ep.model.toLowerCase()) && /not found|unknown|does not exist/.test(body);
   }
 
   function modelNotFound(ep: EndpointConfig): Failure {
@@ -59,7 +65,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       const ep = config.embedding;
       const sent = await send(ep, "POST", "/embeddings", { model: ep.model, input: text, dimensions: 1536 });
       if (!("status" in sent)) return sent;
-      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status);
+      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
       const json = JSON.parse(sent.text);
       return { ok: true, value: json.data[0].embedding };
     },
@@ -74,7 +80,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
         ],
       });
       if (!("status" in sent)) return sent;
-      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status);
+      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
       const json = JSON.parse(sent.text);
       return { ok: true, value: json.choices[0].message.content };
     },
@@ -82,7 +88,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       const ep = config[role];
       const sent = await send(ep, "GET", "/models");
       if (!("status" in sent)) return sent;
-      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status);
+      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
       return { ok: true, value: null };
     },
   };
