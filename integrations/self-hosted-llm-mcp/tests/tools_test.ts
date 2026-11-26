@@ -482,3 +482,20 @@ Deno.test("U129 capture whose embedding fails while chat succeeds stores nothing
   assertEquals(store.calls, []);
   assertEquals(store.rows, []);
 });
+
+const FALLBACK_META = {
+  topics: ["uncategorized"],
+  type: "observation",
+  source: "mcp",
+  embedding_model: "embed-1",
+  enrichment_status: "fallback",
+};
+
+Deno.test("U130 capture with chat unreachable stores the row with its embedding and the fallback metadata", async () => {
+  const { client, store } = await rig(GOOD_ENV, { chat: { networkError: "connection refused" } });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assert(!result.isError);
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.rows[0].embedding, axisVector(0));
+  assertEquals(store.rows[0].metadata, FALLBACK_META);
+});
