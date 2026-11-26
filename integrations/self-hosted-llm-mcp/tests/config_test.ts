@@ -227,3 +227,11 @@ Deno.test("U23 an unkeyed http:// role and a keyed https:// role give no warning
   });
   assertEquals(keyOverHttpWarnings(https), []);
 });
+
+Deno.test("U24 a chat role inheriting a keyed http:// embedding base gives two warnings, one per role", () => {
+  const cfg = ok({ ...MIN, EMBEDDING_API_KEY: "ek" });
+  assertEquals(cfg.chatInherits, ["base", "key"]);
+  const w = keyOverHttpWarnings(cfg);
+  assertEquals(w.map((x) => [x.id, x.role]), [["key_over_http", "embedding"], ["key_over_http", "chat"]]);
+  assert(w[1].message.includes("chat endpoint"));
+});
