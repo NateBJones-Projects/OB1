@@ -10,7 +10,6 @@ import { axisVector, chatReply, embeddingReply, FakeFetch, modelsReply } from ".
 import type { RecordedRequest } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
 import { FUNCTION_URL, mcpCall } from "./helpers/mcp.ts";
-import { todo } from "./helpers/todo.ts";
 
 const KEY = "test-key";
 const BASE = "http://model.test/v1";
@@ -63,7 +62,7 @@ async function setupCheck(app: { fetch: (r: Request) => Response | Promise<Respo
   return { status: res.status, res, body: await res.json() };
 }
 
-todo("A1 capture_thought stores one row with a 1536-length embedding and extracted metadata", async () => {
+Deno.test("A1 capture_thought stores one row with a 1536-length embedding and extracted metadata", async () => {
   const fake = healthy();
   const store = new FakeStore();
   const app = createApp(makeDeps(baseEnv(), fake, store));
@@ -77,7 +76,7 @@ todo("A1 capture_thought stores one row with a 1536-length embedding and extract
   assertEquals(store.rows[0].metadata.source, "mcp");
 });
 
-todo("A2 search_thoughts with the exact text returns that thought first", async () => {
+Deno.test("A2 search_thoughts with the exact text returns that thought first", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, perTextEmbeddings())
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
@@ -91,7 +90,7 @@ todo("A2 search_thoughts with the exact text returns that thought first", async 
   assertStringIncludes(r.text, "--- Result 1 ");
 });
 
-todo("A3 search_thoughts with a paraphrase near the original returns that thought", async () => {
+Deno.test("A3 search_thoughts with a paraphrase near the original returns that thought", async () => {
   const original = "The quarterly review moved to Thursday";
   const paraphrase = "When is the review meeting now";
   const mix = axisVector(0).map((v, i) => (i === 0 ? 0.8 : i === 1 ? 0.6 : v));
@@ -110,7 +109,7 @@ todo("A3 search_thoughts with a paraphrase near the original returns that though
   assertStringIncludes(r.text, original);
 });
 
-todo("A4 list_thoughts and thought_stats return core's output text for the same rows", async () => {
+Deno.test("A4 list_thoughts and thought_stats return core's output text for the same rows", async () => {
   const store = new FakeStore();
   store.seed({ content: "first stored note", metadata: { type: "task", topics: ["ops"], people: ["Ana"] } });
   store.seed({ content: "second stored note", metadata: { type: "idea", topics: ["ops", "design"] } });
@@ -132,7 +131,7 @@ todo("A4 list_thoughts and thought_stats return core's output text for the same 
   assertStringIncludes(stats.text, "  Ana: 1");
 });
 
-todo("A5 capture, search, list and stats succeed with every model request on the configured base", async () => {
+Deno.test("A5 capture, search, list and stats succeed with every model request on the configured base", async () => {
   const fake = healthy();
   const app = createApp(makeDeps(baseEnv(), fake));
   for (
@@ -151,7 +150,7 @@ todo("A5 capture, search, list and stats succeed with every model request on the
   assertEquals(fake.unmatched.length, 0);
 });
 
-todo("A6 capture_thought with the embedding base unreachable names the base and stores nothing", async () => {
+Deno.test("A6 capture_thought with the embedding base unreachable names the base and stores nothing", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, { networkError: "connection refused" })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
@@ -164,7 +163,7 @@ todo("A6 capture_thought with the embedding base unreachable names the base and 
   assertEquals(store.rows.length, 0);
 });
 
-todo("A7 capture_thought with an unknown embedding model names the model and stores nothing", async () => {
+Deno.test("A7 capture_thought with an unknown embedding model names the model and stores nothing", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, { status: 404, body: { error: { message: `model "${EMB_MODEL}" not found` } } })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
@@ -176,7 +175,7 @@ todo("A7 capture_thought with an unknown embedding model names the model and sto
   assertEquals(store.rows.length, 0);
 });
 
-todo("A8 capture_thought with 768-dimension embeddings names 768 and 1536 and stores nothing", async () => {
+Deno.test("A8 capture_thought with 768-dimension embeddings names 768 and 1536 and stores nothing", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
@@ -191,7 +190,7 @@ todo("A8 capture_thought with 768-dimension embeddings names 768 and 1536 and st
   assertEquals(store.rows.length, 0);
 });
 
-todo("A9 setup-check with 768-dimension embeddings answers 503 with embedding_dimension failed", async () => {
+Deno.test("A9 setup-check with 768-dimension embeddings answers 503 with embedding_dimension failed", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META))
@@ -207,7 +206,7 @@ todo("A9 setup-check with 768-dimension embeddings answers 503 with embedding_di
   assertStringIncludes(check?.reason ?? "", "1536");
 });
 
-todo("A10 unusable chat output saves the thought with default metadata and says extraction was skipped", async () => {
+Deno.test("A10 unusable chat output saves the thought with default metadata and says extraction was skipped", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
     .on("POST", `${BASE}/chat/completions`, chatReply("this is not json at all"));
@@ -223,7 +222,7 @@ todo("A10 unusable chat output saves the thought with default metadata and says 
   assertEquals(store.rows[0].metadata.type, "observation");
 });
 
-todo("A11 capture_thought with EMBEDDING_API_BASE unset names it and sends no request", async () => {
+Deno.test("A11 capture_thought with EMBEDDING_API_BASE unset names it and sends no request", async () => {
   const env = baseEnv();
   delete env.EMBEDDING_API_BASE;
   const fake = healthy();
@@ -236,7 +235,7 @@ todo("A11 capture_thought with EMBEDDING_API_BASE unset names it and sends no re
   assertEquals(store.rows.length, 0);
 });
 
-todo("A12 setup-check on a correctly configured server answers 200 with every check passed", async () => {
+Deno.test("A12 setup-check on a correctly configured server answers 200 with every check passed", async () => {
   const app = createApp(makeDeps(baseEnv(), healthy()));
   const { status, res, body } = await setupCheck(app);
   assertEquals(status, 200);
@@ -255,7 +254,7 @@ todo("A12 setup-check on a correctly configured server answers 200 with every ch
   for (const c of report.checks) assertEquals(c.ok, true, `check ${c.id}`);
 });
 
-todo("A13 setup-check without the key answers 401", async () => {
+Deno.test("A13 setup-check without the key answers 401", async () => {
   const fake = healthy();
   const app = createApp(makeDeps(baseEnv(), fake));
   const { status, body } = await setupCheck(app, null);
@@ -264,7 +263,7 @@ todo("A13 setup-check without the key answers 401", async () => {
   assertEquals(fake.requests.length, 0);
 });
 
-todo("A14 setup-check counts 3 thoughts without embedding_model and both captured rows name the model", async () => {
+Deno.test("A14 setup-check counts 3 thoughts without embedding_model and both captured rows name the model", async () => {
   const store = new FakeStore();
   for (const c of ["old one", "old two", "old three"]) store.seed({ content: c });
   const fake = new FakeFetch()
@@ -281,7 +280,7 @@ todo("A14 setup-check counts 3 thoughts without embedding_model and both capture
   for (const r of fresh) assertEquals(r.metadata.embedding_model, EMB_MODEL);
 });
 
-todo("A15 a model server that never answers fails capture with a timeout naming FETCH_TIMEOUT_MS", async () => {
+Deno.test("A15 a model server that never answers fails capture with a timeout naming FETCH_TIMEOUT_MS", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, { hang: true })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
@@ -293,7 +292,7 @@ todo("A15 a model server that never answers fails capture with a timeout naming 
   assertEquals(store.rows.length, 0);
 });
 
-todo("A16 a FETCH_TIMEOUT_MS larger than the server delay lets the capture succeed", async () => {
+Deno.test("A16 a FETCH_TIMEOUT_MS larger than the server delay lets the capture succeed", async () => {
   const slow = async () => {
     await new Promise((r) => setTimeout(r, 30));
     return embeddingReply(axisVector(0));
@@ -308,7 +307,7 @@ todo("A16 a FETCH_TIMEOUT_MS larger than the server delay lets the capture succe
   assertEquals(store.rows.length, 1);
 });
 
-todo("A17 with no chat settings besides CHAT_MODEL the chat request goes to the embedding base", async () => {
+Deno.test("A17 with no chat settings besides CHAT_MODEL the chat request goes to the embedding base", async () => {
   const fake = healthy();
   const app = createApp(makeDeps(baseEnv(), fake));
   const r = await callTool(app, "capture_thought", { content: "inherit the base" });
@@ -318,7 +317,7 @@ todo("A17 with no chat settings besides CHAT_MODEL the chat request goes to the 
   assertEquals(chat[0].url, `${BASE}/chat/completions`);
 });
 
-todo("A18 with CHAT_MODEL unset all six tools fail naming CHAT_MODEL and send no request", async () => {
+Deno.test("A18 with CHAT_MODEL unset all six tools fail naming CHAT_MODEL and send no request", async () => {
   const env = baseEnv();
   delete env.CHAT_MODEL;
   const fake = healthy();
@@ -341,7 +340,7 @@ todo("A18 with CHAT_MODEL unset all six tools fail naming CHAT_MODEL and send no
   assertEquals(store.calls.length, 0);
 });
 
-todo("A19 an unkeyed http base passes the setup check with no warning", async () => {
+Deno.test("A19 an unkeyed http base passes the setup check with no warning", async () => {
   const base = "http://ollama:11434/v1";
   const app = createApp(makeDeps(baseEnv({ EMBEDDING_API_BASE: base }), healthy(new FakeFetch(), base)));
   const { status, body } = await setupCheck(app);
@@ -350,7 +349,7 @@ todo("A19 an unkeyed http base passes the setup check with no warning", async ()
   assertEquals((body as SetupReport).warnings, []);
 });
 
-todo("A20 an http base with EMBEDDING_API_KEY passes with a key_over_http warning for the embedding role", async () => {
+Deno.test("A20 an http base with EMBEDDING_API_KEY passes with a key_over_http warning for the embedding role", async () => {
   const base = "http://ollama:11434/v1";
   const env = baseEnv({ EMBEDDING_API_BASE: base, EMBEDDING_API_KEY: "secret-embed-key" });
   const app = createApp(makeDeps(env, healthy(new FakeFetch(), base)));
@@ -364,7 +363,7 @@ todo("A20 an http base with EMBEDDING_API_KEY passes with a key_over_http warnin
   assert(res.status === 200);
 });
 
-todo("A21 an MCP client using only ?key= lists exactly the six tools", async () => {
+Deno.test("A21 an MCP client using only ?key= lists exactly the six tools", async () => {
   const app = createApp(makeDeps(baseEnv(), healthy()));
   const { status, message } = await mcpCall(app.fetch, "tools/list", {}, { key: KEY, via: "query" });
   assertEquals(status, 200);
@@ -372,7 +371,7 @@ todo("A21 an MCP client using only ?key= lists exactly the six tools", async () 
   assertEquals(tools, ["capture_thought", "fetch", "list_thoughts", "search", "search_thoughts", "thought_stats"]);
 });
 
-todo("A22 an MCP request with a wrong key gets the JSON-RPC unauthorized error", async () => {
+Deno.test("A22 an MCP request with a wrong key gets the JSON-RPC unauthorized error", async () => {
   const app = createApp(makeDeps(baseEnv(), healthy()));
   const { status, message } = await mcpCall(app.fetch, "tools/list", {}, { key: "wrong-key", id: 7 });
   assertEquals(status, 200);
@@ -380,7 +379,7 @@ todo("A22 an MCP request with a wrong key gets the JSON-RPC unauthorized error",
   assertEquals(message?.error, { code: -32001, message: "Unauthorized: missing or invalid authentication." });
 });
 
-todo("A23 with both roles on a cloud-style https base capture and search succeed on that base only", async () => {
+Deno.test("A23 with both roles on a cloud-style https base capture and search succeed on that base only", async () => {
   const cloud = "https://api.cloud.test/v1";
   const fake = new FakeFetch()
     .on("POST", `${cloud}/embeddings`, perTextEmbeddings())
@@ -401,7 +400,7 @@ todo("A23 with both roles on a cloud-style https base capture and search succeed
   assertEquals(fake.unmatched.length, 0);
 });
 
-todo("A24 enrichment_status goes complete, fallback, then complete again on the same row", async () => {
+Deno.test("A24 enrichment_status goes complete, fallback, then complete again on the same row", async () => {
   let chatWorks = true;
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, perTextEmbeddings())
