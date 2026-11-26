@@ -82,3 +82,13 @@ Deno.test("U8 blank required settings are missing; a non-blank value is not", ()
   const r = resolveConfig(envOf({ EMBEDDING_API_BASE: "http://e/v1", EMBEDDING_MODEL: "x", CHAT_MODEL: "x" }));
   assert(r.ok);
 });
+
+Deno.test("U9 blank CHAT_API_BASE or CHAT_API_KEY falls back as if unset", () => {
+  const r = ok({ ...MIN, EMBEDDING_API_KEY: "ek", CHAT_API_BASE: "  ", CHAT_API_KEY: "" });
+  assertEquals(r.chat.base, "http://embed:11434/v1");
+  assertEquals(r.chat.key, "ek");
+  assertEquals(r.chatInherits, ["base", "key"]);
+  const own = ok({ ...MIN, EMBEDDING_API_KEY: "ek", CHAT_API_BASE: "http://c/v1", CHAT_API_KEY: " " });
+  assertEquals(own.chat.key, undefined);
+  assertEquals(own.chatInherits, []);
+});
