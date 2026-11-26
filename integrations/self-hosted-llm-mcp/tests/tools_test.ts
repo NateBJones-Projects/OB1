@@ -644,3 +644,13 @@ Deno.test("U141 setEmbedding failing with readBack failing returns the may-be-sa
   assertEquals(textOf(result), MAY);
   assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall"), []);
 });
+
+Deno.test("U142 setEmbedding failing with the delete erroring returns the may-be-saved text", async () => {
+  const { client, store } = await rig();
+  store.fail.setEmbedding = EMB_FAIL;
+  store.fail.deleteIfInsertedByCall = "delete exploded";
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), MAY);
+  assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall").length, 1);
+});
