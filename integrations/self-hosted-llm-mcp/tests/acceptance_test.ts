@@ -10,7 +10,6 @@ import { axisVector, chatReply, embeddingReply, FakeFetch, modelsReply } from ".
 import type { RecordedRequest } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
 import { FUNCTION_URL, mcpCall } from "./helpers/mcp.ts";
-import { todo } from "./helpers/todo.ts";
 
 const KEY = "test-key";
 const BASE = "http://model.test/v1";
