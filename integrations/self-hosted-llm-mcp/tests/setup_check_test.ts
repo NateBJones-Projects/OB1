@@ -333,3 +333,22 @@ Deno.test("U169 chat_metadata carries the chat call's outcome when the call fail
   assertStringIncludes(c.reason ?? "", "HTTP 500");
   assertStringIncludes(c.reason ?? "", "template error");
 });
+
+Deno.test("U170 when chat inherits the embedding base, both roles are reported separately and chat requests go to the embedding base", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, { status: 404, body: "no such model" });
+  const report = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  assertEquals(report.config?.chat.inherits, ["base"]);
+  assertEquals(report.checks.length, 7);
+  assertEquals(check(report.checks, "embedding_model").ok, true);
+  const chatModel = check(report.checks, "chat_model");
+  assertEquals(chatModel.ok, false);
+  assertStringIncludes(chatModel.reason ?? "", '"chat-m"');
+  assertEquals(check(report.checks, "chat_reachable").ok, true);
+  assertEquals(check(report.checks, "chat_metadata").ok, false);
+  assertEquals(fake.unmatched.length, 0);
+  assert(fake.requests.every((r) => r.url.startsWith(`${BASE}/`)));
+  assert(fake.requests.some((r) => r.url === `${BASE}/chat/completions`));
+});
