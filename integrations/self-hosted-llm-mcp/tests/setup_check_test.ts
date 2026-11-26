@@ -440,3 +440,11 @@ Deno.test("U176 5 thoughts, 2 matching EMBEDDING_MODEL, give other_model 3", asy
   assertEquals(report.thoughts, { other_model: 3 });
   assertEquals(store.calls.find((c) => c.method === "countWithModel")?.args, ["emb-m"]);
 });
+
+Deno.test("U177 all thoughts matching, and an empty brain, each give other_model 0", async () => {
+  const all = new FakeStore();
+  all.seed({ content: "a", metadata: { embedding_model: "emb-m" } });
+  all.seed({ content: "b", metadata: { embedding_model: "emb-m" } });
+  assertEquals((await runSetupCheck(setup(BASE_ENV, healthyFake(), all).deps)).thoughts, { other_model: 0 });
+  assertEquals((await runSetupCheck(setup(BASE_ENV, healthyFake(), new FakeStore()).deps)).thoughts, { other_model: 0 });
+});
