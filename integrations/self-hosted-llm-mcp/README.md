@@ -96,14 +96,14 @@ This table records the environment where one embedding and chat setup was checke
 
 | Item | Value |
 |------|-------|
-| Self-hosted Supabase version | pending verification |
-| Supabase CLI version (Cloud deploys) | pending verification |
-| Model server and version | pending verification |
-| Embedding model and digest | pending verification |
-| Chat model and tag | pending verification |
-| Length of one embedding response with `dimensions: 1536` | pending verification |
-| Machine RAM | pending verification |
-| Machine GPU | pending verification |
+| Self-hosted Supabase version | Official Docker Compose stack from `supabase/supabase` commit `a522111` (2026-11-26): `supabase/postgres:17.6.1.136`, `postgrest/postgrest:v14.18`, `supabase/edge-runtime:v1.79.2`, `envoyproxy/envoy:v1.39.6` gateway |
+| Supabase CLI version (Cloud deploys) | pending verification (the Cloud deploy has not been run yet) |
+| Model server and version | Ollama 0.40.18, on the same machine as the stack |
+| Embedding model and digest | `qwen3-embedding:4b` (id `df5bd2e3c74c`, Q4_K_M, native size 2560) |
+| Chat model and tag | `llama3.1:8b` (id `46e0c10c039e`) |
+| Length of one embedding response with `dimensions: 1536` | 1536 (unit length); 2560 without `dimensions` |
+| Machine RAM | 48 GB |
+| Machine GPU | Apple M4 Max (integrated) |
 
 ## Steps
 
@@ -151,9 +151,14 @@ From the root of your Open Brain project, with the Supabase CLI logged in and li
 This applies to the official Supabase Docker Compose stack. The stack itself is not part of this integration.
 
 1. Copy this folder to `docker/volumes/functions/self-hosted-llm-mcp/` in your Supabase stack.
-2. Add the settings from the [Configure](#configure) table to the environment of the `functions` service in `docker-compose.yml` (or an override file). The router passes the container environment to every function, so there is no per-function setting. Then restart the service: `docker compose restart functions`.
-3. Make sure `FUNCTIONS_VERIFY_JWT=false` in the stack's `.env`. That is the default. MCP clients send only the access key.
-4. Your function URL is `http://<host>:8000/functions/v1/self-hosted-llm-mcp`.
+2. Add the settings from the [Configure](#configure) table to the environment of the `functions` service. The stack pins `COMPOSE_FILE` in its `.env`, so a plain `docker-compose.override.yml` is ignored. Put the settings in a file such as `docker-compose.ob1-llm.yml` with a `services: functions: environment:` block, then register it with `sh run.sh config add ob1-llm`. The router passes the container environment to every function, so there is no per-function setting.
+3. Recreate the functions container so it picks up the new environment: `docker compose up -d --force-recreate functions`. A plain `docker compose restart functions` keeps the old environment.
+4. Make sure `FUNCTIONS_VERIFY_JWT=false` in the stack's `.env`. That is the default. MCP clients send only the access key.
+5. Your function URL is `http://<host>:8000/functions/v1/self-hosted-llm-mcp`.
+
+If the model server runs on the same machine as the stack (for example Ollama on a laptop), the containers cannot reach it at `localhost`. On Docker Desktop use `EMBEDDING_API_BASE=http://host.docker.internal:11434/v1`. On Linux, add `extra_hosts: ["host.docker.internal:host-gateway"]` to the `functions` service.
+
+The stack's API gateway is Envoy by default (Kong is an optional overlay). Neither requires an `apikey` on `/functions/v1/`, so the access key alone reaches the function.
 
 Warning: JWT checking on the Compose stack is one setting for all functions. With `FUNCTIONS_VERIFY_JWT=false`, every function in that stack is reachable without a Supabase JWT, so each one must check its own credentials. The functions container also hands `SUPABASE_SERVICE_ROLE_KEY` to every function. If you need `FUNCTIONS_VERIFY_JWT=true` for other functions, the only option is a local edit to `volumes/functions/main/index.ts` that exempts this function by name. Supabase does not document that, and you must redo the edit after each stack update. This README gives no patch.
 
@@ -161,7 +166,8 @@ These files change often, so each link is pinned to a commit:
 
 - [`docker-compose.yml`](https://github.com/supabase/supabase/blob/160f233b4e/docker/docker-compose.yml) (the `VERIFY_JWT` variable and its TODO)
 - [`volumes/functions/main/index.ts`](https://github.com/supabase/supabase/blob/3580c144a4/docker/volumes/functions/main/index.ts) (the single `VERIFY_JWT` switch and the shared import map)
-- [`volumes/api/kong.yml`](https://github.com/supabase/supabase/blob/1b5d89f78a/docker/volumes/api/kong.yml) (the `functions-v1` route, with no key requirement)
+- [`volumes/api/envoy/lds.template.yaml`](https://github.com/supabase/supabase/blob/a522111/docker/volumes/api/envoy/lds.template.yaml) (the default gateway's `functions-v1-all` route: RBAC `allow_all`, no key requirement)
+- [`volumes/api/kong.yml`](https://github.com/supabase/supabase/blob/1b5d89f78a/docker/volumes/api/kong.yml) (the optional Kong gateway's `functions-v1` route, also with no key requirement)
 
 ### Supabase Cloud reachability
 
