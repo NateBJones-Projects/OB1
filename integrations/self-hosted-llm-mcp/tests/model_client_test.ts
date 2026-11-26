@@ -359,7 +359,7 @@ Deno.test("U55 the retry is otherwise identical and its 1536-length reply is ok"
   assertEquals(ff.requests[1].headers["authorization"], "Bearer sk-emb");
 });
 
-Deno.test("U56 a 422 dimension, a vLLM Matryoshka 400 and an upper-case DIMENSIONS body are each retried once", async () => {
+Deno.test("U56 a 422 or 400 body containing the word dimension in any case (including vLLM's Matryoshka dimensions message) is retried once", async () => {
   const cases: [number, string][] = [
     [422, "dimension must be unset for this model"],
     [400, "Model 'x' does not support Matryoshka embeddings; dimensions must be unset"],
@@ -373,7 +373,7 @@ Deno.test("U56 a 422 dimension, a vLLM Matryoshka 400 and an upper-case DIMENSIO
   }
 });
 
-Deno.test("U56 a Matryoshka 400 without the word dimension is retried once without the dimensions key", async () => {
+Deno.test("U56 a Matryoshka-only 400 (no word dimension in the body) is retried once without the dimensions key", async () => {
   const ff = new FakeFetch().on(
     "POST",
     `${EMB}/embeddings`,
