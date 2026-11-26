@@ -499,3 +499,10 @@ Deno.test("U65 listModels returns the data[].id list for a 2xx listing", async (
   const empty = new FakeFetch().on("GET", `${EMB}/models`, modelsReply([]));
   assertEquals(await createModelClient(cfg(), empty.fetch).listModels("embedding"), { ok: true, value: [] });
 });
+
+Deno.test("U66 listModels returns ok null for a 2xx non-JSON body or one without data[]", async () => {
+  for (const body of ["<html>welcome</html>", {}, { data: "nope" }, { models: [{ id: "a" }] }]) {
+    const ff = new FakeFetch().on("GET", `${EMB}/models`, { status: 200, body });
+    assertEquals(await createModelClient(cfg(), ff.fetch).listModels("embedding"), { ok: true, value: null });
+  }
+});
