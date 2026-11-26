@@ -453,3 +453,19 @@ Deno.test("U62 a key value of either role inside a server error body appears as 
     assert(!r.message.includes(keys.chatKey));
   }
 });
+
+Deno.test("U63 a key value inside a thrown fetch error appears as [redacted] in the unreachable message", async () => {
+  const keys = { embKey: "sk-emb-1234567", chatKey: "sk-chat-7654321" };
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, { networkError: `connect failed for ${keys.embKey} / ${keys.chatKey}` })
+    .on("POST", `${CHAT}/chat/completions`, { networkError: `connect failed for ${keys.chatKey}` });
+  const c = createModelClient(cfg(keys), ff.fetch);
+  for (const r of [await c.embed("a"), await c.chat("a")]) {
+    assert(!r.ok);
+    assertEquals(r.kind, "unreachable");
+    assertStringIncludes(r.message, "[redacted]");
+    assertStringIncludes(r.message, "could not be reached");
+    assert(!r.message.includes(keys.embKey));
+    assert(!r.message.includes(keys.chatKey));
+  }
+});

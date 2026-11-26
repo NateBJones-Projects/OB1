@@ -28,7 +28,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       return { status: response.status, text: await response.text() };
-    } catch (_err) {
+    } catch (err) {
       if (signal.aborted) {
         return {
           ok: false,
@@ -40,7 +40,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       return {
         ok: false,
         kind: "unreachable",
-        message: `The ${ep.role} model server at ${ep.base} could not be reached.`,
+        message: `The ${ep.role} model server at ${ep.base} could not be reached: ${redact(err instanceof Error ? err.message : String(err))}`,
       };
     }
   }
