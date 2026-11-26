@@ -118,3 +118,12 @@ Deno.test("U153 with config failed, no model request is sent", async () => {
   assertEquals(fake.requests.length, 0);
   assertEquals(fake.unmatched.length, 0);
 });
+
+Deno.test("U154 with config failed, ok is false and other_model is null with no store call", async () => {
+  const { deps, store } = setup({});
+  const report = await runSetupCheck(deps);
+  assertEquals(report.ok, false);
+  assertEquals(report.thoughts, { other_model: null });
+  assertEquals(report.config, null);
+  assertEquals(store.calls.length, 0);
+});
