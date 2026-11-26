@@ -60,3 +60,10 @@ Deno.test("U182 the envelope echoes a string or number id, and gives null for a 
   assertEquals(await idOf("not json"), null);
   assertEquals(await idOf(null), null);
 });
+
+Deno.test("U183 a GET with a wrong key gets the envelope with id null", async () => {
+  const app = createApp(makeDeps());
+  const res = await app.fetch(new Request(FUNCTION_URL, { headers: { "x-brain-key": "wrong" } }));
+  assertEquals(res.status, 200);
+  assertEquals(await res.json(), { jsonrpc: "2.0", error: { code: -32001, message: UNAUTHORIZED }, id: null });
+});
