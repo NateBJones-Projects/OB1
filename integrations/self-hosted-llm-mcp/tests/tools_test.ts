@@ -543,3 +543,17 @@ Deno.test("U133 capture with chat content that is not a JSON object stores the f
     assertStringIncludes(t, "JSON object");
   }
 });
+
+Deno.test("U134 capture with chat content in one fenced JSON block stores enrichment_status complete", async () => {
+  const { client, store } = await rig(GOOD_ENV, { chat: chatReply('```json\n{"topics":["fenced"],"type":"reference"}\n```') });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assert(!result.isError);
+  assertEquals(textOf(result), "Captured as reference — fenced");
+  assertEquals(store.rows[0].metadata, {
+    topics: ["fenced"],
+    type: "reference",
+    source: "mcp",
+    embedding_model: "embed-1",
+    enrichment_status: "complete",
+  });
+});
