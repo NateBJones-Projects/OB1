@@ -112,3 +112,11 @@ Deno.test("U11 a trailing slash is removed from a base; a base without one is un
   assertEquals(b.embedding.base, "http://e:1/v1");
   assertEquals(b.chat.base, "http://e:1/v1");
 });
+
+Deno.test("U12 http:// and https:// bases are both accepted", () => {
+  for (const base of ["http://host:11434/v1", "https://host.example/v1"]) {
+    const r = ok({ ...MIN, EMBEDDING_API_BASE: base, CHAT_API_BASE: base });
+    assertEquals(r.embedding.base, base);
+    assertEquals(r.chat.base, base);
+  }
+});
