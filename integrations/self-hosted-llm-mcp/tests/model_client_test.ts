@@ -130,3 +130,17 @@ Deno.test("U41 every request goes to one of the two configured bases", async () 
   assertEquals(ff.unmatched.length, 0);
   for (const r of ff.requests) assert(r.url.startsWith(EMB + "/") || r.url.startsWith(chatBase + "/"), r.url);
 });
+
+Deno.test("U42 a rejected fetch gives unreachable naming role, base and 'could not be reached'", async () => {
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, { networkError: "connection refused" })
+    .on("POST", `${CHAT}/chat/completions`, { networkError: "dns failure" });
+  const c = createModelClient(cfg(), ff.fetch);
+  for (const [role, r] of [["embedding", await c.embed("a")], ["chat", await c.chat("a")]] as const) {
+    assert(!r.ok);
+    assertEquals(r.kind, "unreachable");
+    assertStringIncludes(r.message, role);
+    assertStringIncludes(r.message, "http://model.test/v1");
+    assertStringIncludes(r.message, "could not be reached");
+  }
+});
