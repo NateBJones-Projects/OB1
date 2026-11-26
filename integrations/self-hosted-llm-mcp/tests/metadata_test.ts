@@ -43,3 +43,13 @@ Deno.test("U29 parseUsableMetadata is unusable for non-JSON, empty, fenced non-J
   ];
   for (const reply of replies) assertEquals(parseUsableMetadata(reply), null, JSON.stringify(reply));
 });
+
+Deno.test("U30 buildCaptureMetadata(null, m) gives the fallback metadata", () => {
+  assertEquals(buildCaptureMetadata(null, "embed-model"), {
+    topics: ["uncategorized"],
+    type: "observation",
+    source: "mcp",
+    embedding_model: "embed-model",
+    enrichment_status: "fallback",
+  });
+});

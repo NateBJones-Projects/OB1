@@ -21,7 +21,13 @@ export function parseUsableMetadata(text: string): Record<string, unknown> | nul
 
 export function buildCaptureMetadata(
   _extracted: Record<string, unknown> | null,
-  _embeddingModel: string,
+  embeddingModel: string,
 ): Record<string, unknown> {
-  throw new Error("not implemented");
+  return {
+    topics: ["uncategorized"],
+    type: "observation",
+    source: "mcp",
+    embedding_model: embeddingModel,
+    enrichment_status: "fallback",
+  };
 }
