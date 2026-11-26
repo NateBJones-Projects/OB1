@@ -375,3 +375,14 @@ Deno.test("U96 countWithModel(m) adds metadata->>embedding_model=eq.m to the sam
     ["select", "*"],
   ]);
 });
+
+Deno.test("U97 model names reach the request intact (qwen3-embedding:4b, openai/text-embedding-3-small, v1.5, a,b)", async () => {
+  const { ff, store } = setup();
+  ff.on("HEAD", `${REST}/thoughts`, { headers: { "content-range": "*/1" } });
+  const names = ["qwen3-embedding:4b", "openai/text-embedding-3-small", "v1.5", "a,b"];
+  for (const name of names) await store.countWithModel(name);
+  assertEquals(ff.requests.length, names.length);
+  names.forEach((name, i) => {
+    assertEquals(params(ff.requests[i]).getAll("metadata->>embedding_model"), [`eq.${name}`]);
+  });
+});
