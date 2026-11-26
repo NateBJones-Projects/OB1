@@ -246,22 +246,38 @@ const checkRequest = (path = "/setup-check", headers: Record<string, string> = {
   new Request(FUNCTION_URL + path, { headers });
 
 Deno.test("U196 GET setup-check with the key answers 200 for an ok report and 503 otherwise, with the same JSON body, content type and CORS", async () => {
-  const okDeps = makeDeps(MODEL_ENV, healthyFake());
+  const okStore = new FakeStore();
+  okStore.seed({ content: "old one" });
+  okStore.seed({ content: "old two" });
+  okStore.seed({ content: "new one", metadata: { embedding_model: "embed-1536" } });
+  const okDeps = { ...makeDeps(MODEL_ENV, healthyFake()), store: okStore };
   const ok = await createApp(okDeps).fetch(checkRequest());
   assertEquals(ok.status, 200);
   assertEquals(ok.headers.get("content-type"), "application/json");
   assertCors(ok);
-  const okReport = await runSetupCheck(makeDeps(MODEL_ENV, healthyFake()));
-  assertEquals(okReport.ok, true);
-  assertEquals(await ok.json(), okReport);
+  const okBody = await ok.json();
+  assertEquals(okBody.ok, true);
+  assertEquals(
+    okBody.checks.map((c: { id: string }) => c.id),
+    ["config", "embedding_reachable", "embedding_model", "embedding_dimension", "chat_reachable", "chat_model", "chat_metadata"],
+  );
+  assertEquals(okBody.checks.map((c: { ok: boolean }) => c.ok), [true, true, true, true, true, true, true]);
+  assertEquals(okBody.thoughts, { other_model: 2 });
+  assertEquals(okBody.config.embedding, { base: BASE, model: "embed-1536", key_set: false });
+  assertEquals(okBody.config.timeout_ms, 60000);
 
   const bad = await createApp(makeDeps({ MCP_ACCESS_KEY: KEY })).fetch(checkRequest());
   assertEquals(bad.status, 503);
   assertEquals(bad.headers.get("content-type"), "application/json");
   assertCors(bad);
-  const badReport = await runSetupCheck(makeDeps({ MCP_ACCESS_KEY: KEY }));
-  assertEquals(badReport.ok, false);
-  assertEquals(await bad.json(), badReport);
+  const badBody = await bad.json();
+  assertEquals(badBody.ok, false);
+  assertEquals(badBody.checks.length, 7);
+  assertEquals(badBody.checks[0].id, "config");
+  assertEquals(badBody.checks[0].ok, false);
+  assertStringIncludes(badBody.checks[0].reason, "EMBEDDING_API_BASE");
+  assertEquals(badBody.thoughts, { other_model: null });
+  assertEquals(badBody.config, null);
 });
 
 const SETUP_UNAUTHORIZED = '{"error":"Unauthorized: missing or invalid authentication."}';
