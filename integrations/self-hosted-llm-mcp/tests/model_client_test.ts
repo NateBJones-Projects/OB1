@@ -52,3 +52,9 @@ Deno.test("U35 chat sends one POST /chat/completions with model, json_object for
   });
   assertEquals(r.headers["content-type"], "application/json");
 });
+
+Deno.test("U36 chat returns ok with choices[0].message.content for a 2xx reply", async () => {
+  const ff = new FakeFetch().on("POST", `${CHAT}/chat/completions`, chatReply('{"type":"idea"}'));
+  const r = await createModelClient(cfg(), ff.fetch).chat("x");
+  assertEquals(r, { ok: true, value: '{"type":"idea"}' });
+});

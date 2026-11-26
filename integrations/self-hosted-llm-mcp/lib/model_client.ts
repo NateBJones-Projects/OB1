@@ -15,7 +15,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     },
     async chat(text: string): Promise<ModelResult<string>> {
       const ep = config.chat;
-      await doFetch(`${ep.base}/chat/completions`, {
+      const res = await doFetch(`${ep.base}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -27,7 +27,8 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
           ],
         }),
       });
-      return { ok: false, kind: "bad_response", message: "not implemented" };
+      const json = await res.json();
+      return { ok: true, value: json.choices[0].message.content };
     },
     listModels(): Promise<ModelResult<string[] | null>> {
       throw new Error("not implemented");
