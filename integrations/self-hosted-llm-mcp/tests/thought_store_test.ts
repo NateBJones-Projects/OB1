@@ -396,3 +396,10 @@ Deno.test("U98 both counts return { error } for a database error", async () => {
   assert("error" in withModel, "countWithModel must report the failure");
   assertEquals(typeof (withModel as { error: string }).error, "string");
 });
+
+Deno.test("U99 both counts return 0 for an empty table", async () => {
+  const { ff, store } = setup();
+  ff.on("HEAD", `${REST}/thoughts`, { headers: { "content-range": "*/0" } });
+  assertEquals(await store.countAll(), { data: 0 });
+  assertEquals(await store.countWithModel("m"), { data: 0 });
+});
