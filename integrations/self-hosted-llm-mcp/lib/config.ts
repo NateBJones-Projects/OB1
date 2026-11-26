@@ -18,6 +18,7 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   if (!/^https?:\/\//.test(getEnv("EMBEDDING_API_BASE")!)) {
     invalid.push({ setting: "EMBEDDING_API_BASE", reason: BASE_REASON });
   }
+  const rawTimeout = getEnv("FETCH_TIMEOUT_MS");
   const rawChatBase = getEnv("CHAT_API_BASE");
   if (rawChatBase !== undefined && !/^https?:\/\//.test(rawChatBase)) {
     invalid.push({ setting: "CHAT_API_BASE", reason: BASE_REASON });
@@ -40,7 +41,7 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
     key: getEnv("CHAT_API_KEY") ?? (chatBase === undefined ? embedding.key : undefined),
     model: getEnv("CHAT_MODEL")!,
   };
-  return { ok: true, embedding, chat, timeoutMs: 60000, chatInherits };
+  return { ok: true, embedding, chat, timeoutMs: rawTimeout === undefined ? 60000 : Number(rawTimeout), chatInherits };
 }
 
 export function keyOverHttpWarnings(_config: OkConfig): Warning[] {

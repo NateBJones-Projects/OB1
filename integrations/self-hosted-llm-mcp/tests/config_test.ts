@@ -148,3 +148,8 @@ Deno.test("U15 an invalid chat base is reported under CHAT_API_BASE; an inherite
 Deno.test("U16 FETCH_TIMEOUT_MS unset gives 60000", () => {
   assertEquals(ok(MIN).timeoutMs, 60000);
 });
+
+Deno.test("U17 FETCH_TIMEOUT_MS \"90000\" gives 90000 and \"1\" gives 1", () => {
+  assertEquals(ok({ ...MIN, FETCH_TIMEOUT_MS: "90000" }).timeoutMs, 90000);
+  assertEquals(ok({ ...MIN, FETCH_TIMEOUT_MS: "1" }).timeoutMs, 1);
+});
