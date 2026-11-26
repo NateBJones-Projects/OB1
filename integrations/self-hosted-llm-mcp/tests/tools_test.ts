@@ -115,14 +115,17 @@ const CORE_TOOLS: Record<string, { title: string; description: string; annotatio
 Deno.test("U101 each tool's title, description, input schema and annotations equal core's", async () => {
   const { client } = await rig();
   const { tools } = await client.listTools();
-  for (const t of tools) {
-    const want = CORE_TOOLS[t.name];
-    assert(want, `unexpected tool ${t.name}`);
-    assertEquals(t.title, want.title, t.name);
-    assertEquals(t.description, want.description, t.name);
-    assertEquals(t.annotations, want.annotations, t.name);
-    assertEquals(t.inputSchema.properties, want.properties, t.name);
-    assertEquals([...(t.inputSchema.required ?? [])].sort(), [...want.required].sort(), t.name);
+  const names = Object.keys(CORE_TOOLS);
+  assertEquals(tools.length, names.length);
+  for (const name of names) {
+    const t = tools.find((x: { name: string }) => x.name === name)!;
+    assert(t, `missing tool ${name}`);
+    const want = CORE_TOOLS[name];
+    assertEquals(t.title, want.title, name);
+    assertEquals(t.description, want.description, name);
+    assertEquals(t.annotations, want.annotations, name);
+    assertEquals(t.inputSchema.properties, want.properties, name);
+    assertEquals([...(t.inputSchema.required ?? [])].sort(), [...want.required].sort(), name);
   }
 });
 
@@ -312,17 +315,22 @@ Deno.test("U117 both the embedding and chat requests are in flight before either
     chat: { hold: chatReply('{"topics":["a"],"type":"idea"}') },
   });
   const pending = client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
-  for (let i = 0; i < 50 && fake.heldCount < 2; i++) await new Promise((r) => setTimeout(r, 10));
-  const held = fake.heldCount;
-  let settled = false;
-  pending.finally(() => (settled = true)).catch(() => {});
-  while (!settled) {
-    fake.release();
-    await new Promise((r) => setTimeout(r, 5));
+  // Bounded wait (about 2 s) for both requests to be held; never unbounded.
+  for (let i = 0; i < 200 && fake.heldCount < 2; i++) await new Promise((r) => setTimeout(r, 10));
+  assertEquals(fake.heldCount, 2);
+  fake.release();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      pending,
+      new Promise<never>((_, rej) => {
+        timer = setTimeout(() => rej(new Error("capture did not settle after release")), 5000);
+      }),
+    ]);
+    assert(!result.isError);
+  } finally {
+    clearTimeout(timer);
   }
-  const result = await pending;
-  assertEquals(held, 2);
-  assert(!result.isError);
 });
 
 Deno.test("U118 every model request in a capture and a search goes to a configured base", async () => {
@@ -630,6 +638,20 @@ Deno.test("U140 setEmbedding failing on a merged duplicate returns the already-i
   );
   assertEquals(store.rows.length, 1);
   assertEquals(store.rows[0].embedding, axisVector(5));
+  assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall"), []);
+});
+
+Deno.test("U206 setEmbedding failing on a merged duplicate whose existing row has no embedding returns the already-in-your-brain text and makes no delete call", async () => {
+  const { client, store } = await rig();
+  store.seed({ id: "old-1", content: "An idea", embedding: null, metadata: { type: "idea" } });
+  store.fail.setEmbedding = EMB_FAIL;
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(
+    textOf(result),
+    `Embedding could not be saved: ${EMB_FAIL}. This text was already in your brain; its metadata was updated but its embedding was not. Capture it again to repair.`,
+  );
+  assertEquals(store.rows.length, 1);
   assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall"), []);
 });
 
