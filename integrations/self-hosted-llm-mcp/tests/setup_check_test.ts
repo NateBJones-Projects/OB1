@@ -111,3 +111,10 @@ Deno.test("U152 with config failed, every other check reads skipped: configurati
     assertEquals(c.reason, "skipped: configuration incomplete");
   }
 });
+
+Deno.test("U153 with config failed, no model request is sent", async () => {
+  const { deps, fake } = setup({ CHAT_MODEL: "chat-m" });
+  await runSetupCheck(deps);
+  assertEquals(fake.requests.length, 0);
+  assertEquals(fake.unmatched.length, 0);
+});
