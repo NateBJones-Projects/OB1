@@ -42,6 +42,11 @@ export function createSupabaseThoughtStore(
       if (filters.type) q = q.contains("metadata", { type: filters.type });
       if (filters.topic) q = q.contains("metadata", { topics: [filters.topic] });
       if (filters.person) q = q.contains("metadata", { people: [filters.person] });
+      if (filters.days) {
+        const since = new Date();
+        since.setDate(since.getDate() - filters.days);
+        q = q.gte("created_at", since.toISOString());
+      }
       const { data } = await q;
       return { data: data as ListRow[] };
     },

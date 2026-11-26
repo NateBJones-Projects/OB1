@@ -132,3 +132,20 @@ Deno.test("U77 listThoughts adds a metadata contains {people: [person]} filter o
   assertEquals(params(ff.requests[0]).getAll("metadata"), ['cs.{"people":["Ada"]}']);
   assertEquals(params(ff.requests[1]).has("metadata"), false);
 });
+
+Deno.test("U78 listThoughts adds created_at=gte.<now - days> (within a tolerance window) only when days is given", async () => {
+  const { ff, store } = setup();
+  ff.on("GET", `${REST}/thoughts`, { body: [] });
+  const before = Date.now();
+  await store.listThoughts({ limit: 5, days: 7 });
+  const after = Date.now();
+  await store.listThoughts({ limit: 5 });
+  const gte = params(ff.requests[0]).getAll("created_at");
+  assertEquals(gte.length, 1);
+  assertMatch(gte[0], /^gte\./);
+  const since = new Date(gte[0].slice(4)).getTime();
+  const day = 24 * 3600 * 1000;
+  const slack = 2 * 3600 * 1000; // the core's setDate arithmetic may differ by an hour across a DST change
+  assert(since >= before - 7 * day - slack && since <= after - 7 * day + slack, `unexpected cutoff ${gte[0]}`);
+  assertEquals(params(ff.requests[1]).has("created_at"), false);
+});
