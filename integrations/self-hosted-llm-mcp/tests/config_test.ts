@@ -53,3 +53,10 @@ Deno.test("U4 CHAT_API_BASE set without CHAT_API_KEY: chat has no key", () => {
   assertEquals(r.chat.base, "http://chat:8080/v1");
   assertEquals(r.chatInherits, []);
 });
+
+Deno.test("U5 CHAT_API_BASE and CHAT_API_KEY set: chat uses its own values", () => {
+  const r = ok({ ...MIN, EMBEDDING_API_KEY: "ek", CHAT_API_BASE: "http://chat:8080/v1", CHAT_API_KEY: "ck" });
+  assertEquals(r.chat.base, "http://chat:8080/v1");
+  assertEquals(r.chat.key, "ck");
+  assertEquals(r.chatInherits, []);
+});
