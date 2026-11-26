@@ -72,3 +72,13 @@ Deno.test("U7 CHAT_MODEL unset with EMBEDDING_MODEL set: only CHAT_MODEL is miss
   assert(!r.ok);
   assertEquals(r.missing, ["CHAT_MODEL"]);
 });
+
+Deno.test("U8 blank required settings are missing; a non-blank value is not", () => {
+  for (const blank of ["", "   ", "\t \n"]) {
+    const r = resolveConfig(envOf({ EMBEDDING_API_BASE: blank, EMBEDDING_MODEL: blank, CHAT_MODEL: blank }));
+    assert(!r.ok);
+    assertEquals(r.missing, ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"]);
+  }
+  const r = resolveConfig(envOf({ EMBEDDING_API_BASE: "http://e/v1", EMBEDDING_MODEL: "x", CHAT_MODEL: "x" }));
+  assert(r.ok);
+});

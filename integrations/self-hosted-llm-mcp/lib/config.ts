@@ -1,6 +1,11 @@
 import type { EndpointConfig, GetEnv, OkConfig, ResolvedConfig, Warning } from "./types.ts";
 
-export function resolveConfig(getEnv: GetEnv): ResolvedConfig {
+export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
+  // A blank value (empty or whitespace only) counts as unset.
+  const getEnv: GetEnv = (name) => {
+    const v = rawGetEnv(name);
+    return v === undefined || v.trim() === "" ? undefined : v;
+  };
   const missing = ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"].filter((n) => getEnv(n) === undefined);
   if (missing.length > 0) return { ok: false, missing, invalid: [] };
   const embedding: EndpointConfig = {
