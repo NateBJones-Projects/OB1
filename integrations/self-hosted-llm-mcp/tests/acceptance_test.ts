@@ -110,7 +110,7 @@ Deno.test("A3 search_thoughts with a paraphrase near the original returns that t
   assertStringIncludes(r.text, original);
 });
 
-todo("A4 list_thoughts and thought_stats return core's output text for the same rows", async () => {
+Deno.test("A4 list_thoughts and thought_stats return core's output text for the same rows", async () => {
   const store = new FakeStore();
   store.seed({ content: "first stored note", metadata: { type: "task", topics: ["ops"], people: ["Ana"] } });
   store.seed({ content: "second stored note", metadata: { type: "idea", topics: ["ops", "design"] } });
