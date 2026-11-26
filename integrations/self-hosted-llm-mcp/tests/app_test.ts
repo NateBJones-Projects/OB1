@@ -124,3 +124,20 @@ Deno.test("U187 a non-empty header wins over the query; an empty header falls th
   assert(!(await isRefused(await app.fetch(toolsList(q("wrong"), { "x-brain-key": KEY })))), "right header + wrong query");
   assert(!(await isRefused(await app.fetch(toolsList(q(KEY), { "x-brain-key": "" })))), "empty header falls through");
 });
+
+Deno.test("U188 with MCP_ACCESS_KEY unset or empty, every request is refused whatever key it presents", async () => {
+  for (const env of [{} as Record<string, string>, { MCP_ACCESS_KEY: "" }]) {
+    const app = createApp(makeDeps(env));
+    for (const key of ["", "anything", "undefined"]) {
+      assert(await isRefused(await app.fetch(toolsList(`${FUNCTION_URL}?key=${key}`, { "x-brain-key": key }))), `key "${key}"`);
+    }
+    assert(await isRefused(await app.fetch(toolsList(FUNCTION_URL))), "no key");
+  }
+});
+
+Deno.test("U189 Supabase Authorization Bearer or apikey headers without the access key are refused", async () => {
+  const app = createApp(makeDeps());
+  assert(await isRefused(await app.fetch(toolsList(FUNCTION_URL, { authorization: `Bearer ${KEY}` }))));
+  assert(await isRefused(await app.fetch(toolsList(FUNCTION_URL, { apikey: KEY }))));
+  assert(await isRefused(await app.fetch(toolsList(FUNCTION_URL, { authorization: `Bearer ${KEY}`, apikey: KEY }))));
+});
