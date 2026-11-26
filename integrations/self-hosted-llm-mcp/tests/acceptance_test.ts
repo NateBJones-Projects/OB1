@@ -364,7 +364,7 @@ todo("A20 an http base with EMBEDDING_API_KEY passes with a key_over_http warnin
   assert(res.status === 200);
 });
 
-todo("A21 an MCP client using only ?key= lists exactly the six tools", async () => {
+Deno.test("A21 an MCP client using only ?key= lists exactly the six tools", async () => {
   const app = createApp(makeDeps(baseEnv(), healthy()));
   const { status, message } = await mcpCall(app.fetch, "tools/list", {}, { key: KEY, via: "query" });
   assertEquals(status, 200);
