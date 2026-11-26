@@ -264,7 +264,7 @@ Deno.test("A13 setup-check without the key answers 401", async () => {
   assertEquals(fake.requests.length, 0);
 });
 
-todo("A14 setup-check counts 3 thoughts without embedding_model and both captured rows name the model", async () => {
+Deno.test("A14 setup-check counts 3 thoughts without embedding_model and both captured rows name the model", async () => {
   const store = new FakeStore();
   for (const c of ["old one", "old two", "old three"]) store.seed({ content: c });
   const fake = new FakeFetch()
