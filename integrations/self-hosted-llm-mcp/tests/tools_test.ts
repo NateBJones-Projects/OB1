@@ -115,14 +115,17 @@ const CORE_TOOLS: Record<string, { title: string; description: string; annotatio
 Deno.test("U101 each tool's title, description, input schema and annotations equal core's", async () => {
   const { client } = await rig();
   const { tools } = await client.listTools();
-  for (const t of tools) {
-    const want = CORE_TOOLS[t.name];
-    assert(want, `unexpected tool ${t.name}`);
-    assertEquals(t.title, want.title, t.name);
-    assertEquals(t.description, want.description, t.name);
-    assertEquals(t.annotations, want.annotations, t.name);
-    assertEquals(t.inputSchema.properties, want.properties, t.name);
-    assertEquals([...(t.inputSchema.required ?? [])].sort(), [...want.required].sort(), t.name);
+  const names = Object.keys(CORE_TOOLS);
+  assertEquals(tools.length, names.length);
+  for (const name of names) {
+    const t = tools.find((x: { name: string }) => x.name === name)!;
+    assert(t, `missing tool ${name}`);
+    const want = CORE_TOOLS[name];
+    assertEquals(t.title, want.title, name);
+    assertEquals(t.description, want.description, name);
+    assertEquals(t.annotations, want.annotations, name);
+    assertEquals(t.inputSchema.properties, want.properties, name);
+    assertEquals([...(t.inputSchema.required ?? [])].sort(), [...want.required].sort(), name);
   }
 });
 
