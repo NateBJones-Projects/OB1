@@ -32,3 +32,14 @@ Deno.test("U180 OPTIONS on any path, with no key, answers 200 ok with core's COR
     assertCors(res);
   }
 });
+
+const UNAUTHORIZED = "Unauthorized: missing or invalid authentication.";
+
+Deno.test("U181 a POST with no key answers HTTP 200 with the JSON-RPC -32001 unauthorized envelope", async () => {
+  const app = createApp(makeDeps());
+  const { status, message } = await mcpCall(app.fetch, "tools/list");
+  assertEquals(status, 200);
+  const m = message as { jsonrpc: string; error: { code: number; message: string } };
+  assertEquals(m.jsonrpc, "2.0");
+  assertEquals(m.error, { code: -32001, message: UNAUTHORIZED });
+});

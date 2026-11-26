@@ -7,11 +7,21 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS, DELETE",
 };
 
+const UNAUTHORIZED_MESSAGE = "Unauthorized: missing or invalid authentication.";
+
+function unauthorizedResponse(): Response {
+  const body = { jsonrpc: "2.0", error: { code: -32001, message: UNAUTHORIZED_MESSAGE }, id: null };
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
+
 export function createApp(_deps: Deps): FetchApp {
   return {
     fetch(request: Request): Response {
       if (request.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
-      throw new Error("not implemented");
+      return unauthorizedResponse();
     },
   };
 }
