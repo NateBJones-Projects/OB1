@@ -173,3 +173,13 @@ Deno.test("U19 missing and invalid settings are reported together", () => {
   assertEquals(r.missing, ["EMBEDDING_MODEL", "CHAT_MODEL"]);
   assertEquals(r.invalid.map((i) => i.setting), ["EMBEDDING_API_BASE", "CHAT_API_BASE", "FETCH_TIMEOUT_MS"]);
 });
+
+Deno.test("U20 two calls with different environments each return their own values", () => {
+  const a = ok({ ...MIN, EMBEDDING_API_BASE: "http://a/v1", EMBEDDING_MODEL: "ma", FETCH_TIMEOUT_MS: "10" });
+  const b = ok({ ...MIN, EMBEDDING_API_BASE: "http://b/v1", EMBEDDING_MODEL: "mb", FETCH_TIMEOUT_MS: "20" });
+  assertEquals([a.embedding.base, a.embedding.model, a.timeoutMs], ["http://a/v1", "ma", 10]);
+  assertEquals([b.embedding.base, b.embedding.model, b.timeoutMs], ["http://b/v1", "mb", 20]);
+  const bad = resolveConfig(envOf({}));
+  assert(!bad.ok);
+  assert(ok(MIN).ok);
+});
