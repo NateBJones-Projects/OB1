@@ -400,3 +400,15 @@ Deno.test("U123 config gate: an invalid setting is named with the missing ones",
   assertEquals(fake.requests, []);
   assertEquals(store.calls, []);
 });
+
+Deno.test("U124 config gate: setting a missing variable between two calls lets the second call run", async () => {
+  const { CHAT_MODEL: _drop, ...env } = GOOD_ENV;
+  const { client, env: live, fake } = await rig(env);
+  const first = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(first.isError, true);
+  assertEquals(fake.requests, []);
+  live.CHAT_MODEL = "chat-1";
+  const second = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assert(!second.isError);
+  assertEquals(textOf(second), "Captured as idea — alpha");
+});
