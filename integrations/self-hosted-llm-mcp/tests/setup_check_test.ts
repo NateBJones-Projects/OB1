@@ -400,3 +400,17 @@ Deno.test("U173 an unkeyed http base and a keyed https base produce no warning",
   assertEquals(keyed.ok, true);
   assertEquals(keyed.warnings, []);
 });
+
+Deno.test("U174 every model request starts before any reply is released", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, { hold: modelsReply(["emb-m", "chat-m"]) })
+    .on("POST", `${BASE}/embeddings`, { hold: embeddingReply(axisVector(0)) })
+    .on("POST", `${BASE}/chat/completions`, { hold: chatReply("{}") });
+  const running = runSetupCheck(setup({ ...BASE_ENV, FETCH_TIMEOUT_MS: "5000" }, fake).deps);
+  for (let i = 0; i < 100 && fake.heldCount < 4; i++) await new Promise((r) => setTimeout(r, 5));
+  const heldBeforeRelease = fake.heldCount;
+  fake.release();
+  const report = await running;
+  assertEquals(heldBeforeRelease, 4);
+  assertEquals(report.ok, true);
+});
