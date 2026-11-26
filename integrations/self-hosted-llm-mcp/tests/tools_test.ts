@@ -664,3 +664,15 @@ Deno.test("U143 setEmbedding failing with the delete reporting deleted: false re
   assertEquals(textOf(result), MAY);
   assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall").length, 1);
 });
+
+Deno.test("U144 the compensating delete uses the read-back id and timestamp", async () => {
+  const { client, store } = await rig();
+  const T = "2031-02-03T04:05:06.789012+00:00";
+  store.fail.setEmbedding = EMB_FAIL;
+  store.override.readBack = () => Promise.resolve({ data: { createdAt: T, updatedAt: T, embeddingIsNull: true } });
+  await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  const id = store.rows[0].id;
+  const reads = store.calls.filter((c) => c.method === "readBack");
+  assertEquals(reads.map((c) => c.args), [[id]]);
+  assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall").map((c) => c.args), [[id, T]]);
+});
