@@ -401,7 +401,7 @@ Deno.test("A23 with both roles on a cloud-style https base capture and search su
   assertEquals(fake.unmatched.length, 0);
 });
 
-todo("A24 enrichment_status goes complete, fallback, then complete again on the same row", async () => {
+Deno.test("A24 enrichment_status goes complete, fallback, then complete again on the same row", async () => {
   let chatWorks = true;
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, perTextEmbeddings())
