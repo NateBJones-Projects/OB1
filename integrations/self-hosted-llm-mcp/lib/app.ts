@@ -88,7 +88,11 @@ export function createApp(deps: Deps): FetchApp {
       if (request.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
       const provided = request.headers.get("x-brain-key") || new URL(request.url).searchParams.get("key");
       const accessKey = deps.getEnv("MCP_ACCESS_KEY");
-      if (!provided || !accessKey || provided !== accessKey) {
+      const authorized = !!provided && !!accessKey && provided === accessKey;
+      if (!authorized && isSetupCheck(request)) {
+        return jsonResponse(401, { error: "Unauthorized: missing or invalid authentication." });
+      }
+      if (!authorized) {
         return unauthorizedResponse(extractJsonRpcId(await readBodyText(request)));
       }
       if (isSetupCheck(request)) {

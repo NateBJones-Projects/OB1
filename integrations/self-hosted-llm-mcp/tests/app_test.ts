@@ -255,3 +255,20 @@ Deno.test("U196 GET setup-check with the key answers 200 for an ok report and 50
   assertEquals(badReport.ok, false);
   assertEquals(await bad.json(), badReport);
 });
+
+const SETUP_UNAUTHORIZED = '{"error":"Unauthorized: missing or invalid authentication."}';
+
+Deno.test("U197 GET setup-check with no or a wrong key (header or query) answers 401 with the exact error body and CORS", async () => {
+  const app = createApp(makeDeps(MODEL_ENV, healthyFake()));
+  const requests = [
+    checkRequest("/setup-check", {}),
+    checkRequest("/setup-check", { "x-brain-key": "wrong" }),
+    checkRequest("/setup-check?key=wrong", {}),
+  ];
+  for (const req of requests) {
+    const res = await app.fetch(req);
+    assertEquals(res.status, 401, req.url);
+    assertEquals(await res.text(), SETUP_UNAUTHORIZED);
+    assertCors(res);
+  }
+});
