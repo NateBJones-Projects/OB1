@@ -7,13 +7,16 @@ export function resolveConfig(getEnv: GetEnv): ResolvedConfig {
     key: getEnv("EMBEDDING_API_KEY"),
     model: getEnv("EMBEDDING_MODEL")!,
   };
+  const chatBase = getEnv("CHAT_API_BASE");
+  const chatInherits: ("base" | "key")[] = [];
+  if (chatBase === undefined) chatInherits.push("base");
   const chat: EndpointConfig = {
     role: "chat",
-    base: getEnv("CHAT_API_BASE")!,
+    base: chatBase ?? embedding.base,
     key: getEnv("CHAT_API_KEY"),
     model: getEnv("CHAT_MODEL")!,
   };
-  return { ok: true, embedding, chat, timeoutMs: 60000, chatInherits: [] };
+  return { ok: true, embedding, chat, timeoutMs: 60000, chatInherits };
 }
 
 export function keyOverHttpWarnings(_config: OkConfig): Warning[] {

@@ -31,3 +31,12 @@ Deno.test("U1 all six settings set validly resolve as given with no inheritance"
   assertEquals(r.chat, { role: "chat", base: "https://c.example/v1", key: "ck", model: "cm" });
   assertEquals(r.chatInherits, []);
 });
+
+Deno.test("U2 only the three required settings: chat inherits the base, no keys", () => {
+  const r = ok(MIN);
+  assertEquals(r.embedding.base, "http://embed:11434/v1");
+  assertEquals(r.chat.base, "http://embed:11434/v1");
+  assertEquals(r.embedding.key, undefined);
+  assertEquals(r.chat.key, undefined);
+  assertEquals(r.chatInherits, ["base"]);
+});
