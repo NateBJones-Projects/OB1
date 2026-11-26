@@ -255,7 +255,7 @@ Deno.test("A12 setup-check on a correctly configured server answers 200 with eve
   for (const c of report.checks) assertEquals(c.ok, true, `check ${c.id}`);
 });
 
-todo("A13 setup-check without the key answers 401", async () => {
+Deno.test("A13 setup-check without the key answers 401", async () => {
   const fake = healthy();
   const app = createApp(makeDeps(baseEnv(), fake));
   const { status, body } = await setupCheck(app, null);
