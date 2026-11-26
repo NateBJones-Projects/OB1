@@ -157,3 +157,27 @@ Deno.test("U156 role reachable passes on a 200 and on a 404 from /models", async
     assertEquals(check(checks, "chat_reachable").ok, true, `status ${status}`);
   }
 });
+
+const CHAT_BASE = "http://chat.test/v1";
+const SPLIT_ENV = { ...BASE_ENV, CHAT_API_BASE: CHAT_BASE };
+
+/** Embedding and chat on separate bases, both healthy; pass overrides to register a failing route first. */
+function splitFake(over: { embModels?: Parameters<FakeFetch["on"]>[2]; chatModels?: Parameters<FakeFetch["on"]>[2] } = {}) {
+  return new FakeFetch()
+    .on("GET", `${BASE}/models`, over.embModels ?? modelsReply(["emb-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("GET", `${CHAT_BASE}/models`, over.chatModels ?? modelsReply(["chat-m"]))
+    .on("POST", `${CHAT_BASE}/chat/completions`, chatReply("{}"));
+}
+
+Deno.test("U157 role reachable fails with auth_rejected on a 401 or 403", async () => {
+  for (const status of [401, 403]) {
+    const fake = splitFake({ embModels: { status, body: "denied" } });
+    const { checks } = await runSetupCheck(setup(SPLIT_ENV, fake).deps);
+    const c = check(checks, "embedding_reachable");
+    assertEquals(c.ok, false, `status ${status}`);
+    assertStringIncludes(c.reason ?? "", `HTTP ${status}`);
+    assertStringIncludes(c.reason ?? "", "rejected");
+    assertEquals(check(checks, "chat_reachable").ok, true);
+  }
+});
