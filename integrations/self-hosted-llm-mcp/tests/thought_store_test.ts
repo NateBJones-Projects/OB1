@@ -253,3 +253,16 @@ Deno.test("U86 setEmbedding returns { error } for a database error", async () =>
   });
   assertEquals(await store.setEmbedding("t-9", [1]), { error: "update failed" });
 });
+
+Deno.test("U87 readBack requests created_at, updated_at and whether embedding is null for one id", async () => {
+  const { ff, store } = setup();
+  ff.on("GET", `${REST}/thoughts`, { body: { created_at: "T", updated_at: "T", embedding: null } });
+  await store.readBack("t-9");
+  assertEquals(ff.requests.length, 1);
+  const req = ff.requests[0];
+  assertEquals(req.method, "GET");
+  assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
+  assertEquals(params(req).get("id"), "eq.t-9");
+  assertEquals(params(req).get("select")?.split(",").sort(), ["created_at", "embedding", "updated_at"]);
+  assertMatch(req.headers["accept"], /application\/vnd\.pgrst\.object\+json/);
+});
