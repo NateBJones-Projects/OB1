@@ -86,7 +86,12 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
   return {
     async embed(text: string): Promise<ModelResult<number[]>> {
       const ep = config.embedding;
-      const sent = await send(ep, "POST", "/embeddings", { model: ep.model, input: text, dimensions: EXPECTED_DIMENSIONS });
+      const request = { model: ep.model, input: text, dimensions: EXPECTED_DIMENSIONS };
+      let sent = await send(ep, "POST", "/embeddings", request);
+      if ("status" in sent && (sent.status === 400 || sent.status === 422) && /dimension|matryoshka/i.test(sent.text)) {
+        const { dimensions: _dropped, ...withoutDimensions } = request;
+        sent = await send(ep, "POST", "/embeddings", withoutDimensions);
+      }
       if (!("status" in sent)) return sent;
       if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
       const vector = parseJson(sent.text)?.data?.[0]?.embedding;

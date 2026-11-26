@@ -307,3 +307,17 @@ Deno.test("U53 wrong_dimension message is the contract text and no vector is ret
   );
   assert(!("value" in r));
 });
+
+Deno.test("U54 an Ollama dimensions 400 is retried once to the same URL without the dimensions key", async () => {
+  const ff = new FakeFetch().on(
+    "POST",
+    `${EMB}/embeddings`,
+    { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } },
+    embeddingReply(axisVector(0)),
+  );
+  await createModelClient(cfg(), ff.fetch).embed("hello");
+  assertEquals(ff.requests.length, 2);
+  assertEquals(ff.requests[1].url, ff.requests[0].url);
+  assert("dimensions" in (ff.requests[0].body as object));
+  assert(!("dimensions" in (ff.requests[1].body as object)));
+});
