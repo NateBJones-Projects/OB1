@@ -414,3 +414,17 @@ Deno.test("U174 every model request starts before any reply is released", async 
   assertEquals(heldBeforeRelease, 4);
   assertEquals(report.ok, true);
 });
+
+Deno.test("U175 with every model route hanging, the run finishes in about one timeoutMs", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, { hang: true })
+    .on("POST", `${BASE}/embeddings`, { hang: true })
+    .on("POST", `${BASE}/chat/completions`, { hang: true });
+  const started = performance.now();
+  const report = await runSetupCheck(setup({ ...BASE_ENV, FETCH_TIMEOUT_MS: "300" }, fake).deps);
+  const elapsed = performance.now() - started;
+  assert(elapsed >= 250, `finished too early: ${elapsed} ms`);
+  assert(elapsed < 850, `took ${elapsed} ms, more than about one timeout`);
+  assertEquals(report.ok, false);
+  assertEquals(report.checks.filter((c) => !c.ok).length, 6);
+});
