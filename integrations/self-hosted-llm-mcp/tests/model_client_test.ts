@@ -387,3 +387,17 @@ Deno.test("U58 a retry that again fails with a dimension 400 sends no third requ
   assertEquals(r.kind, "http_error");
   assertStringIncludes(r.message, "400");
 });
+
+Deno.test("U59 a retry returning a 768-length vector gives wrong_dimension", async () => {
+  const ff = new FakeFetch().on(
+    "POST",
+    `${EMB}/embeddings`,
+    { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } },
+    embeddingReply(axisVector(0, 768)),
+  );
+  const r = await createModelClient(cfg(), ff.fetch).embed("a");
+  assertEquals(ff.requests.length, 2);
+  assert(!r.ok);
+  assertEquals(r.kind, "wrong_dimension");
+  assertStringIncludes(r.message, "768");
+});
