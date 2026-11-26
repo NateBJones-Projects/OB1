@@ -1,8 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { ListFilters, ListRow, StatsRow, ReadBack, StoreResult, ThoughtMatch, ThoughtRecord, ThoughtStore } from "./types.ts";
 
-const notImplemented = () => Promise.reject(new Error("not implemented"));
-
 export function createSupabaseThoughtStore(
   url: string,
   serviceRoleKey: string,
