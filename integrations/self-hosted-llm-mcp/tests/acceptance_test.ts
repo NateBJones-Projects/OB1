@@ -76,18 +76,35 @@ Deno.test("A1 capture_thought stores one row with a 1536-length embedding and ex
   assertEquals(store.rows[0].metadata.source, "mcp");
 });
 
+/** A2 fixture: the other thought clears the 0.5 search threshold but is less similar to the query than the exact one. */
+const EXACT_SIMILARITY = 1.0;
+const NEAR_SIMILARITY = 0.7;
+
 Deno.test("A2 search_thoughts with the exact text returns that thought first", async () => {
+  const exact = "alpha thought about gardens";
+  const other = "beta thought about engines";
+  const nearVector = axisVector(0).map((v, i) => (i === 0 ? NEAR_SIMILARITY : i === 1 ? Math.sqrt(1 - NEAR_SIMILARITY ** 2) : v));
   const fake = new FakeFetch()
-    .on("POST", `${BASE}/embeddings`, perTextEmbeddings())
+    .on("POST", `${BASE}/embeddings`, (req) => {
+      const input = String((req.body as { input: string }).input);
+      return embeddingReply(input === other ? nearVector : axisVector(0));
+    })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
   const app = createApp(makeDeps(baseEnv(), fake));
-  await callTool(app, "capture_thought", { content: "alpha thought about gardens" });
-  await callTool(app, "capture_thought", { content: "beta thought about engines" });
-  const r = await callTool(app, "search_thoughts", { query: "alpha thought about gardens" });
+  await callTool(app, "capture_thought", { content: other });
+  await callTool(app, "capture_thought", { content: exact });
+  const r = await callTool(app, "search_thoughts", { query: exact });
   assertEquals(r.isError, false);
-  assertStringIncludes(r.text, "alpha thought about gardens");
-  assert(!r.text.includes("beta thought about engines"));
-  assertStringIncludes(r.text, "--- Result 1 ");
+  const first = r.text.indexOf("--- Result 1 ");
+  const second = r.text.indexOf("--- Result 2 ");
+  assert(first >= 0 && second > first, "both thoughts are returned, as Result 1 then Result 2");
+  const firstBlock = r.text.slice(first, second);
+  const secondBlock = r.text.slice(second);
+  assertStringIncludes(firstBlock, exact);
+  assert(!firstBlock.includes(other));
+  assertStringIncludes(firstBlock, `${(EXACT_SIMILARITY * 100).toFixed(1)}% match`);
+  assertStringIncludes(secondBlock, other);
+  assertStringIncludes(secondBlock, `${(NEAR_SIMILARITY * 100).toFixed(1)}% match`);
 });
 
 Deno.test("A3 search_thoughts with a paraphrase near the original returns that thought", async () => {
@@ -165,13 +182,13 @@ Deno.test("A6 capture_thought with the embedding base unreachable names the base
 
 Deno.test("A7 capture_thought with an unknown embedding model names the model and stores nothing", async () => {
   const fake = new FakeFetch()
-    .on("POST", `${BASE}/embeddings`, { status: 404, body: { error: { message: `model "${EMB_MODEL}" not found` } } })
+    .on("POST", `${BASE}/embeddings`, { status: 404, body: { error: { message: "not found" } } })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
   const store = new FakeStore();
   const app = createApp(makeDeps(baseEnv(), fake, store));
   const r = await callTool(app, "capture_thought", { content: "will not be stored" });
   assertEquals(r.isError, true);
-  assertStringIncludes(r.text, EMB_MODEL);
+  assertStringIncludes(r.text, `The embedding model "${EMB_MODEL}" was not found on the model server at ${BASE}.`);
   assertEquals(store.rows.length, 0);
 });
 

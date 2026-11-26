@@ -122,8 +122,16 @@ Deno.test("U187 a non-empty header wins over the query; an empty header falls th
   const app = createApp(makeDeps());
   const q = (k: string) => `${FUNCTION_URL}?key=${k}`;
   assert(await isRefused(await app.fetch(toolsList(q(KEY), { "x-brain-key": "wrong" }))), "wrong header + right query");
-  assert(!(await isRefused(await app.fetch(toolsList(q("wrong"), { "x-brain-key": KEY })))), "right header + wrong query");
-  assert(!(await isRefused(await app.fetch(toolsList(q(KEY), { "x-brain-key": "" })))), "empty header falls through");
+  const CORE_TOOLS = ["search", "fetch", "search_thoughts", "list_thoughts", "thought_stats", "capture_thought"];
+  for (const [label, req] of [
+    ["right header + wrong query", toolsList(q("wrong"), { "x-brain-key": KEY })],
+    ["empty header falls through", toolsList(q(KEY), { "x-brain-key": "" })],
+  ] as const) {
+    const res = await app.fetch(req);
+    assertEquals(res.status, 200, label);
+    const message = await parseMessage(res);
+    assertEquals(toolNames(message).slice().sort(), CORE_TOOLS.slice().sort(), label);
+  }
 });
 
 Deno.test("U188 with MCP_ACCESS_KEY unset or empty, every request is refused whatever key it presents", async () => {
@@ -283,9 +291,11 @@ Deno.test("U198 GET setup-check accepts a correct ?key= and applies the same hea
 });
 
 Deno.test("U199 with MCP_ACCESS_KEY unset, GET setup-check answers 401", async () => {
-  for (const env of [{} as Record<string, string>, { MCP_ACCESS_KEY: "" }]) {
-    const app = createApp(makeDeps({ ...MODEL_ENV, ...env }, healthyFake()));
-    for (const key of ["", "anything"]) {
+  const { MCP_ACCESS_KEY: _unset, ...unsetEnv } = MODEL_ENV;
+  assert(!("MCP_ACCESS_KEY" in unsetEnv));
+  for (const env of [unsetEnv, { ...MODEL_ENV, MCP_ACCESS_KEY: "" }]) {
+    const app = createApp(makeDeps(env, healthyFake()));
+    for (const key of ["", "anything", "undefined"]) {
       const res = await app.fetch(checkRequest(`/setup-check?key=${key}`, { "x-brain-key": key }));
       assertEquals(res.status, 401);
     }
