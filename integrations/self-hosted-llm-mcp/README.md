@@ -97,7 +97,7 @@ This table records the environment where one embedding and chat setup was checke
 | Item | Value |
 |------|-------|
 | Self-hosted Supabase version | Official Docker Compose stack from `supabase/supabase` commit `a522111` (2026-11-26): `supabase/postgres:17.6.1.136`, `postgrest/postgrest:v14.18`, `supabase/edge-runtime:v1.79.2`, `envoyproxy/envoy:v1.39.6` gateway |
-| Supabase CLI version (Cloud deploys) | pending verification (the Cloud deploy has not been run yet) |
+| Supabase CLI version (Cloud deploys) | Supabase CLI 3.4.0, deploying to a Supabase Cloud project (us-east-2) that reached the model server through the tunnel variant below (Caddy 2.11.9 + Tailscale Funnel) |
 | Model server and version | Ollama 0.40.18, on the same machine as the stack |
 | Embedding model and digest | `qwen3-embedding:4b` (id `df5bd2e3c74c`, Q4_K_M, native size 2560) |
 | Chat model and tag | `llama3.1:8b` (id `46e0c10c039e`) |
@@ -200,7 +200,7 @@ Example with [Caddy](https://caddyserver.com/), Ollama on the same machine, and 
    curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer your-model-key" https://models.example.com/v1/models
    ```
 
-   The first prints `401`. The second prints `200`.
+   The first prints `401`. The second prints `200`. If the first also prints `200`, the request is not reaching your site block: Caddy answers a host it has no site for with an empty `200`. Check that the second command returns a model list, not an empty body.
 5. Set the secrets so the function sends the same key:
 
    ```bash
@@ -211,6 +211,25 @@ Example with [Caddy](https://caddyserver.com/), Ollama on the same machine, and 
 
    If chat uses the same server, leave `CHAT_API_BASE` and `CHAT_API_KEY` unset so they inherit these values. If chat is on a different server, set `CHAT_API_BASE` and `CHAT_API_KEY` for it.
 6. Run the setup check. The reachability checks should now pass.
+
+**Variant without a public IP (tested): a tunnel.** If the model server is behind NAT (a home network, a hotel), a tunnel such as [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) can provide the public HTTPS address instead of DNS and open ports. Run Caddy on the loopback interface only, and let the tunnel forward to it. A tunnel forwards its own public hostname in the `Host` header, so the site must accept any host:
+
+```text
+http://:8443 {
+    bind 127.0.0.1
+    @authorized header Authorization "Bearer your-model-key"
+    handle @authorized {
+        reverse_proxy localhost:11434 {
+            header_up Host localhost:11434
+        }
+    }
+    handle {
+        respond "Unauthorized" 401
+    }
+}
+```
+
+Then run `tailscale funnel --bg 8443`, test the printed `https://<machine>.<tailnet>.ts.net` address as in step 4, and use it as `EMBEDDING_API_BASE` (with `/v1`) in step 5. Turn the tunnel off when you no longer need it: `tailscale funnel --https=443 off`.
 
 The setup check cannot tell whether an unkeyed `http://` endpoint is exposed to the internet. Keeping the endpoint behind HTTPS and a key is your responsibility.
 
@@ -261,8 +280,11 @@ Other fields:
 
 ## Troubleshooting
 
+**Issue: On Supabase Cloud, the setup check times out against a `10.x`, `192.168.x` or `172.16–31.x` address**
+Solution: The model server is on a private network that Supabase Cloud cannot route to. The request is dropped silently, so the check reports a timeout after `FETCH_TIMEOUT_MS` instead of a quick "could not be reached". Follow [Supabase Cloud reachability](#supabase-cloud-reachability).
+
 **Issue: A tool or the setup check says "Model endpoint not configured: missing ..."**
-Solution: Set each setting the message names (see [Configure](#configure)). The same message appears for a base URL without `http://` or `https://` and for a `FETCH_TIMEOUT_MS` that is not a positive integer. On Supabase Cloud, new secrets apply after the next request. On a self-hosted stack, restart the `functions` service.
+Solution: Set each setting the message names (see [Configure](#configure)). The same message appears for a base URL without `http://` or `https://` and for a `FETCH_TIMEOUT_MS` that is not a positive integer. On Supabase Cloud, new secrets apply after the next request. On a self-hosted stack, recreate the functions container (`docker compose up -d --force-recreate functions`); a plain restart keeps the old environment.
 
 **Reference: exact message shapes**
 Missing settings:
