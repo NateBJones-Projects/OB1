@@ -236,3 +236,27 @@ Deno.test("U162 role model fails with model_not_found naming the model when unli
     assertStringIncludes(c.reason ?? "", "not found");
   }
 });
+
+Deno.test("U163 with a non-JSON /models body, role model follows the real call's outcome", async () => {
+  const good = new FakeFetch()
+    .on("GET", `${BASE}/models`, { status: 200, body: "<html>not a model list</html>" })
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const r1 = await runSetupCheck(setup(BASE_ENV, good).deps);
+  assertEquals(check(r1.checks, "embedding_model").ok, true);
+  assertEquals(check(r1.checks, "chat_model").ok, true);
+  assertEquals(check(r1.checks, "embedding_reachable").ok, true);
+
+  const bad = new FakeFetch()
+    .on("GET", `${BASE}/models`, { status: 200, body: "<html>not a model list</html>" })
+    .on("POST", `${BASE}/embeddings`, { status: 404, body: "no" })
+    .on("POST", `${BASE}/chat/completions`, { status: 500, body: "boom" });
+  const r2 = await runSetupCheck(setup(BASE_ENV, bad).deps);
+  const e = check(r2.checks, "embedding_model");
+  assertEquals(e.ok, false);
+  assertStringIncludes(e.reason ?? "", '"emb-m"');
+  assertStringIncludes(e.reason ?? "", "not found");
+  const c = check(r2.checks, "chat_model");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "HTTP 500");
+});
