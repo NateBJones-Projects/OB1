@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@^1";
 import { runSetupCheck } from "../lib/setup_check.ts";
 import type { CheckResult, Deps } from "../lib/types.ts";
-import { axisVector, chatReply, embeddingReply, FakeFetch, modelsReply } from "./helpers/fake_fetch.ts";
+import { axisVector, chatReply, embeddingReply, FakeFetch, type Handler, modelsReply } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
 
 const BASE = "http://model.test/v1";
@@ -128,22 +128,83 @@ Deno.test("U154 with config failed, ok is false and other_model is null with no 
   assertEquals(store.calls.length, 0);
 });
 
-Deno.test("U155 any single failed check makes ok false", async () => {
-  const badEmbedding = new FakeFetch()
-    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
-    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
-    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
-  const r1 = await runSetupCheck(setup(BASE_ENV, badEmbedding).deps);
-  assertEquals(r1.checks.filter((c) => !c.ok).map((c) => c.id), ["embedding_dimension"]);
-  assertEquals(r1.ok, false);
+const CHAT_BASE = "http://chat.test/v1";
+const SPLIT_ENV = { ...BASE_ENV, CHAT_API_BASE: CHAT_BASE };
 
-  const badChat = new FakeFetch()
-    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
-    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
-    .on("POST", `${BASE}/chat/completions`, chatReply("not json at all"));
-  const r2 = await runSetupCheck(setup(BASE_ENV, badChat).deps);
-  assertEquals(r2.checks.filter((c) => !c.ok).map((c) => c.id), ["chat_metadata"]);
-  assertEquals(r2.ok, false);
+const UNLISTED_MODELS = modelsReply(["something-else"]);
+const ALL_SEVEN = [
+  "config",
+  "embedding_reachable",
+  "embedding_model",
+  "embedding_dimension",
+  "chat_reachable",
+  "chat_model",
+  "chat_metadata",
+];
+
+/** Embedding and chat on separate bases; each route is healthy unless overridden. */
+function failingFake(over: {
+  embModels?: Handler;
+  embeddings?: Handler;
+  chatModels?: Handler;
+  chat?: Handler;
+}): FakeFetch {
+  return new FakeFetch()
+    .on("GET", `${BASE}/models`, over.embModels ?? modelsReply(["emb-m"]))
+    .on("POST", `${BASE}/embeddings`, over.embeddings ?? embeddingReply(axisVector(0)))
+    .on("GET", `${CHAT_BASE}/models`, over.chatModels ?? modelsReply(["chat-m"]))
+    .on("POST", `${CHAT_BASE}/chat/completions`, over.chat ?? chatReply("{}"));
+}
+
+// Each case breaks one thing. `failed` is the exact set of checks that then fail. A model check cannot fail
+// alone: it fails only when the model is unlisted AND the real call failed, and that same failed call also
+// fails embedding_dimension / chat_metadata. config cannot fail alone either: every other check is skipped.
+const SINGLE_FAILURES: { name: string; env: Record<string, string>; fake: FakeFetch; failed: string[] }[] = [
+  { name: "config", env: { CHAT_MODEL: "chat-m" }, fake: failingFake({}), failed: ALL_SEVEN },
+  {
+    name: "embedding_reachable",
+    env: SPLIT_ENV,
+    fake: failingFake({ embModels: { networkError: "connection refused" } }),
+    failed: ["embedding_reachable"],
+  },
+  {
+    name: "embedding_model",
+    env: SPLIT_ENV,
+    fake: failingFake({ embModels: UNLISTED_MODELS, embeddings: { status: 404, body: "no such model" } }),
+    failed: ["embedding_model", "embedding_dimension"],
+  },
+  {
+    name: "embedding_dimension",
+    env: SPLIT_ENV,
+    fake: failingFake({ embeddings: embeddingReply(axisVector(0, 768)) }),
+    failed: ["embedding_dimension"],
+  },
+  {
+    name: "chat_reachable",
+    env: SPLIT_ENV,
+    fake: failingFake({ chatModels: { networkError: "connection refused" } }),
+    failed: ["chat_reachable"],
+  },
+  {
+    name: "chat_model",
+    env: SPLIT_ENV,
+    fake: failingFake({ chatModels: UNLISTED_MODELS, chat: { status: 404, body: "no such model" } }),
+    failed: ["chat_model", "chat_metadata"],
+  },
+  {
+    name: "chat_metadata",
+    env: SPLIT_ENV,
+    fake: failingFake({ chat: chatReply("not json at all") }),
+    failed: ["chat_metadata"],
+  },
+];
+
+Deno.test("U155 any single failed check makes ok false, for each of the seven checks", async () => {
+  for (const c of SINGLE_FAILURES) {
+    const report = await runSetupCheck(setup(c.env, c.fake).deps);
+    assertEquals(report.checks.filter((x) => !x.ok).map((x) => x.id), c.failed, `${c.name}: failed checks`);
+    assertEquals(report.ok, false, `${c.name}: ok`);
+  }
 });
 
 Deno.test("U156 role reachable passes on a 200 and on a 404 from /models", async () => {
@@ -157,9 +218,6 @@ Deno.test("U156 role reachable passes on a 200 and on a 404 from /models", async
     assertEquals(check(checks, "chat_reachable").ok, true, `status ${status}`);
   }
 });
-
-const CHAT_BASE = "http://chat.test/v1";
-const SPLIT_ENV = { ...BASE_ENV, CHAT_API_BASE: CHAT_BASE };
 
 /** Embedding and chat on separate bases, both healthy; pass overrides to register a failing route first. */
 function splitFake(over: { embModels?: Parameters<FakeFetch["on"]>[2]; chatModels?: Parameters<FakeFetch["on"]>[2] } = {}) {
@@ -423,13 +481,17 @@ Deno.test("U175 with every model route hanging, the run finishes in about one ti
     .on("GET", `${BASE}/models`, { hang: true })
     .on("POST", `${BASE}/embeddings`, { hang: true })
     .on("POST", `${BASE}/chat/completions`, { hang: true });
+  const TIMEOUT = 300;
+  const MIN_ELAPSED = TIMEOUT * 0.8; // waited for the timeout rather than failing at once
+  const MAX_ELAPSED = TIMEOUT * 2.5; // four sequential timeouts would be 4x; "about one" stays under 2.5x
+  const EVERY_CHECK_BUT_CONFIG = 6;
   const started = performance.now();
-  const report = await runSetupCheck(setup({ ...BASE_ENV, FETCH_TIMEOUT_MS: "300" }, fake).deps);
+  const report = await runSetupCheck(setup({ ...BASE_ENV, FETCH_TIMEOUT_MS: String(TIMEOUT) }, fake).deps);
   const elapsed = performance.now() - started;
-  assert(elapsed >= 250, `finished too early: ${elapsed} ms`);
-  assert(elapsed < 850, `took ${elapsed} ms, more than about one timeout`);
+  assert(elapsed >= MIN_ELAPSED, `finished too early: ${elapsed} ms`);
+  assert(elapsed < MAX_ELAPSED, `took ${elapsed} ms, more than about one timeout`);
   assertEquals(report.ok, false);
-  assertEquals(report.checks.filter((c) => !c.ok).length, 6);
+  assertEquals(report.checks.filter((c) => !c.ok).length, EVERY_CHECK_BUT_CONFIG);
 });
 
 Deno.test("U176 5 thoughts, 2 matching EMBEDDING_MODEL, give other_model 3", async () => {
