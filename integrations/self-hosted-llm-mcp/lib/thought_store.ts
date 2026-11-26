@@ -99,7 +99,10 @@ export function createSupabaseThoughtStore(
       if (error) return { error: error.message };
       return { data: { deleted: (data?.length ?? 0) > 0 } };
     },
-    countAll: notImplemented,
+    async countAll(): Promise<StoreResult<number>> {
+      const { count } = await supabase.from("thoughts").select("*", { count: "exact", head: true });
+      return { data: count as number };
+    },
     countWithModel: notImplemented,
   };
 }

@@ -348,3 +348,15 @@ Deno.test("U94 deleteIfInsertedByCall returns { error } for a database error", a
   });
   assertEquals(await store.deleteIfInsertedByCall("t-9", T), { error: "delete failed" });
 });
+
+Deno.test("U95 countAll requests an exact head count of thoughts and returns the total", async () => {
+  const { ff, store } = setup();
+  ff.on("HEAD", `${REST}/thoughts`, { headers: { "content-range": "*/42" } });
+  assertEquals(await store.countAll(), { data: 42 });
+  assertEquals(ff.requests.length, 1);
+  const req = ff.requests[0];
+  assertEquals(req.method, "HEAD");
+  assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
+  assertEquals(listParams(req), [["select", "*"]]);
+  assertMatch(req.headers["prefer"], /count=exact/);
+});
