@@ -286,3 +286,12 @@ Deno.test("U51 a 2xx chat reply lacking choices[0].message.content or non-JSON g
     assertStringIncludes(r.message, "chat");
   }
 });
+
+Deno.test("U52 a 1536-length vector is ok; 1535 and 1537 each give wrong_dimension", async () => {
+  for (const [len, ok] of [[1536, true], [1535, false], [1537, false]] as const) {
+    const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0, len)));
+    const r = await createModelClient(cfg(), ff.fetch).embed("a");
+    assertEquals(r.ok, ok, `length ${len}`);
+    if (!r.ok) assertEquals(r.kind, "wrong_dimension", `length ${len}`);
+  }
+});

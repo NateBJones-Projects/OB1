@@ -1,6 +1,8 @@
 import { EXTRACTION_PROMPT } from "./metadata.ts";
 import type { EndpointConfig, ModelClient, ModelResult, OkConfig, OutcomeKind, Role } from "./types.ts";
 
+const EXPECTED_DIMENSIONS = 1536;
+
 type Failure = { ok: false; kind: OutcomeKind; message: string };
 type Sent = { status: number; text: string } | Failure;
 
@@ -84,12 +86,20 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
   return {
     async embed(text: string): Promise<ModelResult<number[]>> {
       const ep = config.embedding;
-      const sent = await send(ep, "POST", "/embeddings", { model: ep.model, input: text, dimensions: 1536 });
+      const sent = await send(ep, "POST", "/embeddings", { model: ep.model, input: text, dimensions: EXPECTED_DIMENSIONS });
       if (!("status" in sent)) return sent;
       if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
       const vector = parseJson(sent.text)?.data?.[0]?.embedding;
       if (!Array.isArray(vector) || !vector.every((n) => typeof n === "number")) {
         return badResponse(ep, "data[0].embedding (an array of numbers)");
+      }
+      if (vector.length !== EXPECTED_DIMENSIONS) {
+        return {
+          ok: false,
+          kind: "wrong_dimension",
+          message: `Embedding model "${ep.model}" returned ${vector.length}-dimension vectors; ` +
+            `this brain stores ${EXPECTED_DIMENSIONS}. Choose a model that can output ${EXPECTED_DIMENSIONS} dimensions (see README).`,
+        };
       }
       return { ok: true, value: vector };
     },
