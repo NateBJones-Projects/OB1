@@ -79,3 +79,13 @@ Deno.test("U184 the unauthorized response's status, body, Content-Type and CORS 
   assertEquals(res.headers.get("content-type"), "application/json");
   assertCors(res);
 });
+
+Deno.test("U185 a wrong x-brain-key and a wrong ?key= are each refused", async () => {
+  const app = createApp(makeDeps());
+  const viaHeader = await mcpCall(app.fetch, "tools/list", {}, { key: "wrong" });
+  const viaQuery = await mcpCall(app.fetch, "tools/list", {}, { key: "wrong", via: "query" });
+  for (const r of [viaHeader, viaQuery]) {
+    assertEquals(r.status, 200);
+    assertEquals((r.message as { error: { code: number } }).error.code, -32001);
+  }
+});
