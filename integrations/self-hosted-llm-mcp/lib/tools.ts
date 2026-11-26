@@ -35,12 +35,6 @@ export function buildServer(deps: Deps): McpServer {
     }
     return await run(args, { config, client: createModelClient(config, deps.modelFetch) });
   };
-  /** Resolves the configuration for this call and builds the model client. */
-  const models = (): ModelClient => {
-    const config = resolveConfig(deps.getEnv);
-    if (!config.ok) throw new Error("configuration incomplete");
-    return createModelClient(config, deps.modelFetch);
-  };
   const thoughtUrl = (id: string): string =>
     `${(deps.getEnv("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts").replace(/\/$/, "")}/${id}`;
 
@@ -51,9 +45,9 @@ export function buildServer(deps: Deps): McpServer {
       "Search Open Brain memories by meaning. Use this read-only compatibility tool when ChatGPT needs search/fetch-style access to stored thoughts.",
     annotations: { readOnlyHint: true },
     inputSchema: { query: z.string().describe("The search query to run against Open Brain thoughts") },
-  }, async ({ query }) => {
+  }, gate(async ({ query }: { query: string }, { client }) => {
     try {
-      const embedded = await models().embed(query);
+      const embedded = await client.embed(query);
       if (!embedded.ok) throw new Error(embedded.message);
       const res = await store.matchThoughts(embedded.value, 0.5, 10);
       if ("error" in res) return text(`Search error: ${res.error}`, true);
@@ -66,14 +60,14 @@ export function buildServer(deps: Deps): McpServer {
     } catch (err) {
       return errorText(err);
     }
-  });
+  }));
   server.registerTool("fetch", {
     title: "Fetch Open Brain Thought",
     description:
       "Fetch one Open Brain thought by ID after using search. Use this read-only compatibility tool to retrieve the full text and metadata for citation.",
     annotations: { readOnlyHint: true },
     inputSchema: { id: z.string().describe("The Open Brain thought ID returned by the search tool") },
-  }, async ({ id }) => {
+  }, gate(async ({ id }: { id: string }) => {
     try {
       const res = await store.fetchThought(id);
       if ("error" in res) return text(`Fetch error: ${res.error}`, true);
@@ -88,7 +82,7 @@ export function buildServer(deps: Deps): McpServer {
     } catch (err) {
       return errorText(err);
     }
-  });
+  }));
   server.registerTool("search_thoughts", {
     title: "Search Thoughts",
     description:
@@ -99,9 +93,9 @@ export function buildServer(deps: Deps): McpServer {
       limit: z.number().optional().default(10),
       threshold: z.number().optional().default(0.5),
     },
-  }, async ({ query, limit, threshold }) => {
+  }, gate(async ({ query, limit, threshold }: { query: string; limit: number; threshold: number }, { client }) => {
     try {
-      const embedded = await models().embed(query);
+      const embedded = await client.embed(query);
       if (!embedded.ok) throw new Error(embedded.message);
       const res = await store.matchThoughts(embedded.value, threshold, limit);
       if ("error" in res) return text(`Search error: ${res.error}`, true);
@@ -125,7 +119,7 @@ export function buildServer(deps: Deps): McpServer {
     } catch (err) {
       return errorText(err);
     }
-  });
+  }));
   server.registerTool("list_thoughts", {
     title: "List Recent Thoughts",
     description: "List recently captured thoughts with optional filters by type, topic, person, or time range.",
@@ -137,7 +131,7 @@ export function buildServer(deps: Deps): McpServer {
       person: z.string().optional().describe("Filter by person mentioned"),
       days: z.number().optional().describe("Only thoughts from the last N days"),
     },
-  }, async ({ limit, type, topic, person, days }) => {
+  }, gate(async ({ limit, type, topic, person, days }: { limit: number; type?: string; topic?: string; person?: string; days?: number }) => {
     try {
       const res = await store.listThoughts({
         limit,
@@ -157,13 +151,13 @@ export function buildServer(deps: Deps): McpServer {
     } catch (err) {
       return errorText(err);
     }
-  });
+  }));
   server.registerTool("thought_stats", {
     title: "Thought Statistics",
     description: "Get a summary of all captured thoughts: totals, types, top topics, and people.",
     annotations: { readOnlyHint: true },
     inputSchema: {},
-  }, async () => {
+  }, gate(async (_args: Record<string, never>, _ctx) => {
     try {
       const res = await store.stats();
       const { count, rows: data } = "data" in res ? res.data : { count: null, rows: [] };
@@ -202,7 +196,7 @@ export function buildServer(deps: Deps): McpServer {
     } catch (err) {
       return errorText(err);
     }
-  });
+  }));
   server.registerTool("capture_thought", {
     title: "Capture Thought",
     description:

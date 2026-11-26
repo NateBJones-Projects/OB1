@@ -346,3 +346,22 @@ Deno.test("U119 config gate: with EMBEDDING_API_BASE unset, capture returns the 
   assertEquals(result.isError, true);
   assertEquals(textOf(result), `Model endpoint not configured: missing EMBEDDING_API_BASE. ${GATE_TAIL}`);
 });
+
+const SIX_CALLS: [string, Record<string, unknown>][] = [
+  ["search", { query: "q" }],
+  ["fetch", { id: "x" }],
+  ["search_thoughts", { query: "q" }],
+  ["list_thoughts", {}],
+  ["thought_stats", {}],
+  ["capture_thought", { content: "c" }],
+];
+
+Deno.test("U120 config gate: with CHAT_MODEL unset, each of the six tools returns isError naming CHAT_MODEL", async () => {
+  const { CHAT_MODEL: _drop, ...env } = GOOD_ENV;
+  const { client } = await rig(env);
+  for (const [name, args] of SIX_CALLS) {
+    const result = await client.callTool({ name, arguments: args });
+    assertEquals(result.isError, true, name);
+    assertEquals(textOf(result), `Model endpoint not configured: missing CHAT_MODEL. ${GATE_TAIL}`, name);
+  }
+});
