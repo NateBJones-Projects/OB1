@@ -293,7 +293,7 @@ Deno.test("A15 a model server that never answers fails capture with a timeout na
   assertEquals(store.rows.length, 0);
 });
 
-todo("A16 a FETCH_TIMEOUT_MS larger than the server delay lets the capture succeed", async () => {
+Deno.test("A16 a FETCH_TIMEOUT_MS larger than the server delay lets the capture succeed", async () => {
   const slow = async () => {
     await new Promise((r) => setTimeout(r, 30));
     return embeddingReply(axisVector(0));
