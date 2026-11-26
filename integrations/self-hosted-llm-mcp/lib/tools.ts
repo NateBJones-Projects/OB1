@@ -76,6 +76,7 @@ export function buildServer(deps: Deps): McpServer {
     try {
       const res = await store.listThoughts({ limit });
       if ("error" in res) return text(`Error: ${res.error}`, true);
+      if (!res.data.length) return text("No thoughts found.");
       const results = res.data.map((t, i) => {
         const m = t.metadata || {};
         const tags = Array.isArray(m.topics) ? (m.topics as string[]).join(", ") : "";

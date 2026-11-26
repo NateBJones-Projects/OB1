@@ -167,3 +167,10 @@ Deno.test("U104 list_thoughts returns core's listing text for rows", async () =>
       `2. [${new Date(a.created_at).toLocaleDateString()}] (idea - x, y)\n   First thought`,
   );
 });
+
+Deno.test("U105 list_thoughts with no rows returns core's empty text", async () => {
+  const { client } = await rig();
+  const result = await client.callTool({ name: "list_thoughts", arguments: {} });
+  assert(!result.isError);
+  assertEquals(textOf(result), "No thoughts found.");
+});
