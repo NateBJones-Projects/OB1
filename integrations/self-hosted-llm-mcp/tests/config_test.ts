@@ -40,3 +40,9 @@ Deno.test("U2 only the three required settings: chat inherits the base, no keys"
   assertEquals(r.chat.key, undefined);
   assertEquals(r.chatInherits, ["base"]);
 });
+
+Deno.test("U3 chat inherits base and key when CHAT_API_BASE and CHAT_API_KEY are unset", () => {
+  const r = ok({ ...MIN, EMBEDDING_API_KEY: "ek" });
+  assertEquals(r.chat.key, "ek");
+  assertEquals(r.chatInherits, ["base", "key"]);
+});

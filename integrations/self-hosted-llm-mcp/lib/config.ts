@@ -10,10 +10,12 @@ export function resolveConfig(getEnv: GetEnv): ResolvedConfig {
   const chatBase = getEnv("CHAT_API_BASE");
   const chatInherits: ("base" | "key")[] = [];
   if (chatBase === undefined) chatInherits.push("base");
+  const chatKey = getEnv("CHAT_API_KEY");
+  if (chatKey === undefined && chatBase === undefined && embedding.key !== undefined) chatInherits.push("key");
   const chat: EndpointConfig = {
     role: "chat",
     base: chatBase ?? embedding.base,
-    key: getEnv("CHAT_API_KEY"),
+    key: getEnv("CHAT_API_KEY") ?? (chatBase === undefined ? embedding.key : undefined),
     model: getEnv("CHAT_MODEL")!,
   };
   return { ok: true, embedding, chat, timeoutMs: 60000, chatInherits };
