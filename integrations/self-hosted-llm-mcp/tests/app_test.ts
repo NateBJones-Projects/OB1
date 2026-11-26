@@ -302,3 +302,13 @@ Deno.test("U200 an unauthorized setup-check request runs no check and sends no m
   assertEquals(fake.requests.length, 0);
   assertEquals(store.calls.length, 0);
 });
+
+Deno.test("U201 /fn/setup-check, /setup-check, /other/setup-check, /fn/setup-check/ and /fn/setup-check?x=1 all reach the setup check", async () => {
+  for (const path of ["/fn/setup-check", "/setup-check", "/other/setup-check", "/fn/setup-check/", "/fn/setup-check?x=1"]) {
+    // Unauthorized first: a path that misses the route answers the 200 envelope instead of 401, and fails fast.
+    assertEquals((await createApp(makeDeps(MODEL_ENV)).fetch(checkRequest(path, {}))).status, 401, path);
+    const res = await createApp(makeDeps(MODEL_ENV, healthyFake())).fetch(checkRequest(path));
+    assertEquals(res.status, 200, path);
+    assertEquals(Array.isArray((await res.json()).checks), true, path);
+  }
+});
