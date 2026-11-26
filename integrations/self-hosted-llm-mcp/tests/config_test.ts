@@ -135,3 +135,12 @@ Deno.test("U14 an ftp:// base is invalid and names its setting", () => {
   assert(!r.ok);
   assertEquals(r.invalid.map((i) => i.setting), ["EMBEDDING_API_BASE"]);
 });
+
+Deno.test("U15 an invalid chat base is reported under CHAT_API_BASE; an inherited invalid base once under EMBEDDING_API_BASE", () => {
+  const own = resolveConfig(envOf({ ...MIN, CHAT_API_BASE: "chat:8080" }));
+  assert(!own.ok);
+  assertEquals(own.invalid.map((i) => i.setting), ["CHAT_API_BASE"]);
+  const inherited = resolveConfig(envOf({ ...MIN, EMBEDDING_API_BASE: "embed:11434" }));
+  assert(!inherited.ok);
+  assertEquals(inherited.invalid.map((i) => i.setting), ["EMBEDDING_API_BASE"]);
+});

@@ -18,6 +18,10 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   if (!/^https?:\/\//.test(getEnv("EMBEDDING_API_BASE")!)) {
     invalid.push({ setting: "EMBEDDING_API_BASE", reason: BASE_REASON });
   }
+  const rawChatBase = getEnv("CHAT_API_BASE");
+  if (rawChatBase !== undefined && !/^https?:\/\//.test(rawChatBase)) {
+    invalid.push({ setting: "CHAT_API_BASE", reason: BASE_REASON });
+  }
   if (invalid.length > 0) return { ok: false, missing: [], invalid };
   const embedding: EndpointConfig = {
     role: "embedding",
