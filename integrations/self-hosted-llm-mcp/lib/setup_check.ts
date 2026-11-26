@@ -1,4 +1,5 @@
 import { resolveConfig } from "./config.ts";
+import { parseUsableMetadata } from "./metadata.ts";
 import { createModelClient } from "./model_client.ts";
 import type { CheckResult, Deps, OkConfig, Role, SetupConfigBlock, SetupReport } from "./types.ts";
 
@@ -42,7 +43,7 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     { id: "embedding_dimension", role: "embedding", ok: embedding.ok },
     { id: "chat_reachable", role: "chat", ok: true },
     { id: "chat_model", role: "chat", ok: true },
-    { id: "chat_metadata", role: "chat", ok: chat.ok },
+    { id: "chat_metadata", role: "chat", ok: chat.ok && parseUsableMetadata(chat.value) !== null },
   ];
   return { ok: checks.every((c) => c.ok), checks, warnings: [], thoughts: { other_model: null }, config: configBlock(config) };
 }

@@ -127,3 +127,21 @@ Deno.test("U154 with config failed, ok is false and other_model is null with no 
   assertEquals(report.config, null);
   assertEquals(store.calls.length, 0);
 });
+
+Deno.test("U155 any single failed check makes ok false", async () => {
+  const badEmbedding = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const r1 = await runSetupCheck(setup(BASE_ENV, badEmbedding).deps);
+  assertEquals(r1.checks.filter((c) => !c.ok).map((c) => c.id), ["embedding_dimension"]);
+  assertEquals(r1.ok, false);
+
+  const badChat = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("not json at all"));
+  const r2 = await runSetupCheck(setup(BASE_ENV, badChat).deps);
+  assertEquals(r2.checks.filter((c) => !c.ok).map((c) => c.id), ["chat_metadata"]);
+  assertEquals(r2.ok, false);
+});
