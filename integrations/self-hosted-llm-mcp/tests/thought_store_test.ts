@@ -35,3 +35,9 @@ Deno.test("U68 fetchThought requests core's columns for id=eq.<id> as a single o
   assertEquals(params(req).get("id"), "eq.t-1");
   assertMatch(req.headers["accept"], /application\/vnd\.pgrst\.object\+json/);
 });
+
+Deno.test("U69 fetchThought returns the row for a 200", async () => {
+  const { ff, store } = setup();
+  ff.on("GET", `${REST}/thoughts`, { body: ROW });
+  assertEquals(await store.fetchThought("t-1"), { data: ROW });
+});
