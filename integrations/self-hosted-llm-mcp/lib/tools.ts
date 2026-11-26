@@ -17,7 +17,6 @@ function thoughtTitle(content: string, createdAt?: string): string {
   return firstLine ? `${datePrefix} - ${firstLine}` : `${datePrefix} thought`;
 }
 
-const notYet = (): Promise<ToolReply> => Promise.resolve({ content: [{ type: "text", text: "not implemented" }] });
 
 export function buildServer(deps: Deps): McpServer {
   const { store } = deps;
