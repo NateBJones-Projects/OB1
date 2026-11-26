@@ -207,7 +207,7 @@ todo("A9 setup-check with 768-dimension embeddings answers 503 with embedding_di
   assertStringIncludes(check?.reason ?? "", "1536");
 });
 
-todo("A10 unusable chat output saves the thought with default metadata and says extraction was skipped", async () => {
+Deno.test("A10 unusable chat output saves the thought with default metadata and says extraction was skipped", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
     .on("POST", `${BASE}/chat/completions`, chatReply("this is not json at all"));
