@@ -45,3 +45,81 @@ Deno.test("U100 tools/list returns exactly the six tools named as core", async (
     ["capture_thought", "fetch", "list_thoughts", "search", "search_thoughts", "thought_stats"],
   );
 });
+
+const CORE_TOOLS: Record<string, { title: string; description: string; annotations: Record<string, boolean>; properties: Record<string, Record<string, unknown>>; required: string[] }> = {
+  search: {
+    title: "Search Open Brain",
+    description:
+      "Search Open Brain memories by meaning. Use this read-only compatibility tool when ChatGPT needs search/fetch-style access to stored thoughts.",
+    annotations: { readOnlyHint: true },
+    properties: { query: { type: "string", description: "The search query to run against Open Brain thoughts" } },
+    required: ["query"],
+  },
+  fetch: {
+    title: "Fetch Open Brain Thought",
+    description:
+      "Fetch one Open Brain thought by ID after using search. Use this read-only compatibility tool to retrieve the full text and metadata for citation.",
+    annotations: { readOnlyHint: true },
+    properties: { id: { type: "string", description: "The Open Brain thought ID returned by the search tool" } },
+    required: ["id"],
+  },
+  search_thoughts: {
+    title: "Search Thoughts",
+    description:
+      "Search captured thoughts by meaning. Use this when the user asks about a topic, person, or idea they've previously captured.",
+    annotations: { readOnlyHint: true },
+    properties: {
+      query: { type: "string", description: "What to search for" },
+      limit: { type: "number", default: 10 },
+      threshold: { type: "number", default: 0.5 },
+    },
+    required: ["query"],
+  },
+  list_thoughts: {
+    title: "List Recent Thoughts",
+    description: "List recently captured thoughts with optional filters by type, topic, person, or time range.",
+    annotations: { readOnlyHint: true },
+    properties: {
+      limit: { type: "number", default: 10 },
+      type: { type: "string", description: "Filter by type: observation, task, idea, reference, person_note" },
+      topic: { type: "string", description: "Filter by topic tag" },
+      person: { type: "string", description: "Filter by person mentioned" },
+      days: { type: "number", description: "Only thoughts from the last N days" },
+    },
+    required: [],
+  },
+  thought_stats: {
+    title: "Thought Statistics",
+    description: "Get a summary of all captured thoughts: totals, types, top topics, and people.",
+    annotations: { readOnlyHint: true },
+    properties: {},
+    required: [],
+  },
+  capture_thought: {
+    title: "Capture Thought",
+    description:
+      "Save a new thought to the Open Brain. Generates an embedding and extracts metadata automatically. Use this when the user wants to save something to their brain directly from any AI client — notes, insights, decisions, or migrated content from other systems.",
+    annotations: { readOnlyHint: false, openWorldHint: false, destructiveHint: false, idempotentHint: false },
+    properties: {
+      content: {
+        type: "string",
+        description: "The thought to capture — a clear, standalone statement that will make sense when retrieved later by any AI",
+      },
+    },
+    required: ["content"],
+  },
+};
+
+Deno.test("U101 each tool's title, description, input schema and annotations equal core's", async () => {
+  const { client } = await rig();
+  const { tools } = await client.listTools();
+  for (const t of tools) {
+    const want = CORE_TOOLS[t.name];
+    assert(want, `unexpected tool ${t.name}`);
+    assertEquals(t.title, want.title, t.name);
+    assertEquals(t.description, want.description, t.name);
+    assertEquals(t.annotations, want.annotations, t.name);
+    assertEquals(t.inputSchema.properties, want.properties, t.name);
+    assertEquals([...(t.inputSchema.required ?? [])].sort(), [...want.required].sort(), t.name);
+  }
+});
