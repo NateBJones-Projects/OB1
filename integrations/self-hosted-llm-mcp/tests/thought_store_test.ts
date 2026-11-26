@@ -123,3 +123,12 @@ Deno.test("U76 listThoughts adds a metadata contains {topics: [topic]} filter on
   assertEquals(params(ff.requests[0]).getAll("metadata"), ['cs.{"topics":["work"]}']);
   assertEquals(params(ff.requests[1]).has("metadata"), false);
 });
+
+Deno.test("U77 listThoughts adds a metadata contains {people: [person]} filter only when person is given", async () => {
+  const { ff, store } = setup();
+  ff.on("GET", `${REST}/thoughts`, { body: [] });
+  await store.listThoughts({ limit: 5, person: "Ada" });
+  await store.listThoughts({ limit: 5 });
+  assertEquals(params(ff.requests[0]).getAll("metadata"), ['cs.{"people":["Ada"]}']);
+  assertEquals(params(ff.requests[1]).has("metadata"), false);
+});

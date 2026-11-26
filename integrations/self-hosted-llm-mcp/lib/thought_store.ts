@@ -41,6 +41,7 @@ export function createSupabaseThoughtStore(
         .limit(filters.limit);
       if (filters.type) q = q.contains("metadata", { type: filters.type });
       if (filters.topic) q = q.contains("metadata", { topics: [filters.topic] });
+      if (filters.person) q = q.contains("metadata", { people: [filters.person] });
       const { data } = await q;
       return { data: data as ListRow[] };
     },
