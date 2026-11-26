@@ -291,3 +291,13 @@ Deno.test("U166 embedding_dimension carries the embedding call's outcome when th
   assertStringIncludes(c.reason ?? "", "HTTP 500");
   assertStringIncludes(c.reason ?? "", "model crashed");
 });
+
+Deno.test("U167 chat_metadata passes for a JSON-object reply", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply('{"type":"task","topics":["a"]}'));
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "chat_metadata");
+  assertEquals(c.ok, true);
+  assertEquals(c.reason, undefined);
+});
