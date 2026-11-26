@@ -155,3 +155,18 @@ Deno.test("U190 an authorized tools/list succeeds with no Accept header, with ap
     assert(toolNames(message).includes("search_thoughts"), `accept ${accept}`);
   }
 });
+
+Deno.test("U191 an authorized response has no mcp-session-id header and carries the CORS headers", async () => {
+  const app = createApp(makeDeps());
+  const init = await mcpCall(app.fetch, "initialize", {
+    protocolVersion: "2025-03-26",
+    capabilities: {},
+    clientInfo: { name: "t", version: "1" },
+  }, { key: KEY });
+  const list = await mcpCall(app.fetch, "tools/list", {}, { key: KEY });
+  for (const r of [init, list]) {
+    assertEquals(r.status, 200);
+    assertEquals(r.response.headers.get("mcp-session-id"), null);
+    assertCors(r.response);
+  }
+});
