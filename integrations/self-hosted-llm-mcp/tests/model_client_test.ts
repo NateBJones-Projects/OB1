@@ -189,3 +189,19 @@ Deno.test("U45 HTTP 401 and 403 each give auth_rejected naming role, base and 'a
     }
   }
 });
+
+Deno.test("U46 HTTP 404 gives model_not_found naming role and model", async () => {
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, { status: 404, body: { error: "gone" } })
+    .on("POST", `${CHAT}/chat/completions`, { status: 404, body: { error: "gone" } });
+  const c = createModelClient(cfg(), ff.fetch);
+  for (const [role, model, r] of [
+    ["embedding", "qwen3-embedding:4b", await c.embed("a")],
+    ["chat", "qwen3:4b", await c.chat("a")],
+  ] as const) {
+    assert(!r.ok);
+    assertEquals(r.kind, "model_not_found");
+    assertStringIncludes(r.message, role);
+    assertStringIncludes(r.message, model);
+  }
+});

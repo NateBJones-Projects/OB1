@@ -42,7 +42,16 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
         message: `The ${ep.role} model server at ${ep.base} access key rejected (HTTP ${status}).`,
       };
     }
+    if (status === 404) return modelNotFound(ep);
     throw new Error("not implemented");
+  }
+
+  function modelNotFound(ep: EndpointConfig): Failure {
+    return {
+      ok: false,
+      kind: "model_not_found",
+      message: `The ${ep.role} model "${ep.model}" was not found on the model server at ${ep.base}.`,
+    };
   }
 
   return {
