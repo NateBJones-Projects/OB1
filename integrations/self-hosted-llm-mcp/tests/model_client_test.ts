@@ -240,3 +240,12 @@ Deno.test("U48 HTTP 500 gives http_error naming role, status and server text", a
     assertStringIncludes(r.message, text);
   }
 });
+
+Deno.test("U49 a 400 mentioning neither dimensions nor the model gives http_error after one request", async () => {
+  const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, { status: 400, body: { error: "input must be a string" } });
+  const r = await createModelClient(cfg(), ff.fetch).embed("a");
+  assert(!r.ok);
+  assertEquals(r.kind, "http_error");
+  assertStringIncludes(r.message, "400");
+  assertEquals(ff.requests.length, 1);
+});
