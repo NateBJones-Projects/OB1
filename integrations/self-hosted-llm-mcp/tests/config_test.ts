@@ -201,3 +201,17 @@ Deno.test("U21 no missing, invalid or reason text contains a key value", () => {
     assert(!text.includes(EK) && !text.includes(CK), text);
   }
 });
+
+Deno.test("U22 a keyed http:// embedding role gives exactly one key_over_http warning", () => {
+  const cfg = ok({
+    ...MIN,
+    EMBEDDING_API_KEY: "ek",
+    CHAT_API_BASE: "https://c/v1",
+    CHAT_API_KEY: "ck",
+  });
+  assertEquals(keyOverHttpWarnings(cfg), [{
+    id: "key_over_http",
+    role: "embedding",
+    message: "An access key is configured for the embedding endpoint, but it uses http://; the key travels unencrypted.",
+  }]);
+});

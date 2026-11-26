@@ -61,6 +61,12 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   return { ok: true, embedding, chat, timeoutMs: rawTimeout === undefined ? 60000 : Number(rawTimeout), chatInherits };
 }
 
-export function keyOverHttpWarnings(_config: OkConfig): Warning[] {
-  throw new Error("not implemented");
+export function keyOverHttpWarnings(config: OkConfig): Warning[] {
+  return [config.embedding, config.chat]
+    .filter((e) => e.key !== undefined && e.base.startsWith("http://"))
+    .map((e) => ({
+      id: "key_over_http",
+      role: e.role,
+      message: `An access key is configured for the ${e.role} endpoint, but it uses http://; the key travels unencrypted.`,
+    }));
 }
