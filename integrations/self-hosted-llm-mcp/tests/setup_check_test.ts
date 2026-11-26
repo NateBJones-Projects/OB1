@@ -527,6 +527,19 @@ Deno.test("U178 a failing count gives other_model null with a thoughts_count war
   }
 });
 
+Deno.test("U207 a failing count with an empty database message still names a cause", async () => {
+  for (const method of ["countAll", "countWithModel"] as const) {
+    const store = new FakeStore();
+    store.seed({ content: "a" });
+    store.fail[method] = "";
+    const report = await runSetupCheck(setup(BASE_ENV, healthyFake(), store).deps);
+    assertEquals(report.thoughts.other_model, null, method);
+    const warning = report.warnings.find((w) => w.id === "thoughts_count");
+    assert(warning, `${method}: no thoughts_count warning`);
+    assertEquals(warning.message, "Could not count thoughts from other embedding models: database returned no error detail", method);
+  }
+});
+
 Deno.test("U179 with a failing count, the model checks still run and decide ok", async () => {
   const store = new FakeStore();
   store.fail.countAll = "database unavailable";

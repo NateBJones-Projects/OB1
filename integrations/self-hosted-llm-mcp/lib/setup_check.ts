@@ -77,7 +77,8 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
   if ("data" in all && "data" in matching) {
     otherModel = all.data - matching.data;
   } else {
-    const failure = "error" in all ? all.error : (matching as { error: string }).error;
+    const raw = "error" in all ? all.error : (matching as { error: string }).error;
+    const failure = raw.trim() === "" ? "database returned no error detail" : raw;
     warnings.push({ id: "thoughts_count", message: `Could not count thoughts from other embedding models: ${failure}` });
   }
   const checks: CheckResult[] = [
