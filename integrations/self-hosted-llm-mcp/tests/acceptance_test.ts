@@ -176,7 +176,7 @@ Deno.test("A7 capture_thought with an unknown embedding model names the model an
   assertEquals(store.rows.length, 0);
 });
 
-todo("A8 capture_thought with 768-dimension embeddings names 768 and 1536 and stores nothing", async () => {
+Deno.test("A8 capture_thought with 768-dimension embeddings names 768 and 1536 and stores nothing", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
