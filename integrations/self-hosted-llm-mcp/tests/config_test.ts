@@ -92,3 +92,14 @@ Deno.test("U9 blank CHAT_API_BASE or CHAT_API_KEY falls back as if unset", () =>
   assertEquals(own.chat.key, undefined);
   assertEquals(own.chatInherits, []);
 });
+
+Deno.test("U10 OPENROUTER_API_KEY never substitutes for a missing embedding base", () => {
+  const r = resolveConfig(envOf({
+    OPENROUTER_API_KEY: "or-key",
+    EMBEDDING_MODEL: "em",
+    CHAT_MODEL: "cm",
+  }));
+  assert(!r.ok);
+  assertEquals(r.missing, ["EMBEDDING_API_BASE"]);
+  assert(!JSON.stringify(r).toLowerCase().includes("openrouter"));
+});
