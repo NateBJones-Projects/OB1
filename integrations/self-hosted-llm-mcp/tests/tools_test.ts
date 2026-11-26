@@ -315,17 +315,22 @@ Deno.test("U117 both the embedding and chat requests are in flight before either
     chat: { hold: chatReply('{"topics":["a"],"type":"idea"}') },
   });
   const pending = client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
-  for (let i = 0; i < 50 && fake.heldCount < 2; i++) await new Promise((r) => setTimeout(r, 10));
-  const held = fake.heldCount;
-  let settled = false;
-  pending.finally(() => (settled = true)).catch(() => {});
-  while (!settled) {
-    fake.release();
-    await new Promise((r) => setTimeout(r, 5));
+  // Bounded wait (about 2 s) for both requests to be held; never unbounded.
+  for (let i = 0; i < 200 && fake.heldCount < 2; i++) await new Promise((r) => setTimeout(r, 10));
+  assertEquals(fake.heldCount, 2);
+  fake.release();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      pending,
+      new Promise<never>((_, rej) => {
+        timer = setTimeout(() => rej(new Error("capture did not settle after release")), 5000);
+      }),
+    ]);
+    assert(!result.isError);
+  } finally {
+    clearTimeout(timer);
   }
-  const result = await pending;
-  assertEquals(held, 2);
-  assert(!result.isError);
 });
 
 Deno.test("U118 every model request in a capture and a search goes to a configured base", async () => {
