@@ -41,3 +41,15 @@ Deno.test("U69 fetchThought returns the row for a 200", async () => {
   ff.on("GET", `${REST}/thoughts`, { body: ROW });
   assertEquals(await store.fetchThought("t-1"), { data: ROW });
 });
+
+Deno.test("U70 fetchThought returns { error } with PostgREST's message for a missing row or a database error", async () => {
+  const { ff, store } = setup();
+  ff.on(
+    "GET",
+    `${REST}/thoughts`,
+    { status: 406, body: { code: "PGRST116", details: "The result contains 0 rows", hint: null, message: "JSON object requested, multiple (or no) rows returned" } },
+    { status: 500, body: { code: "XX000", details: null, hint: null, message: "database exploded" } },
+  );
+  assertEquals(await store.fetchThought("nope"), { error: "JSON object requested, multiple (or no) rows returned" });
+  assertEquals(await store.fetchThought("t-1"), { error: "database exploded" });
+});
