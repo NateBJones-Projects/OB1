@@ -443,3 +443,21 @@ Deno.test("U126 capture with the embedding unreachable or timing out returns isE
     assertEquals(store.rows, [], label);
   }
 });
+
+Deno.test("U127 capture with an auth_rejected, model_not_found, bad_response or http_error embedding returns isError naming it, with no upsertThought call", async () => {
+  const cases: [string, Handler, string][] = [
+    ["auth_rejected", { status: 401, body: "nope" }, "access key rejected (HTTP 401)"],
+    ["model_not_found", { status: 404, body: "gone" }, 'model "embed-1" was not found'],
+    ["bad_response", { status: 200, body: { data: [] } }, "reply lacks"],
+    ["http_error", { status: 500, body: "boom" }, "HTTP 500"],
+  ];
+  for (const [label, embedding, expected] of cases) {
+    const { client, store } = await rig(GOOD_ENV, { embedding });
+    const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+    assertEquals(result.isError, true, label);
+    assertStringIncludes(textOf(result), "embedding", label);
+    assertStringIncludes(textOf(result), BASE, label);
+    assertStringIncludes(textOf(result), expected, label);
+    assertEquals(store.calls.filter((c) => c.method === "upsertThought"), [], label);
+  }
+});
