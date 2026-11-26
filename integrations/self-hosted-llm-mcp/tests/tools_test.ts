@@ -129,24 +129,32 @@ Deno.test("U101 each tool's title, description, input schema and annotations equ
   }
 });
 
-/** Core's thoughtTitle, restated for expected values. */
-function title(content: string, createdAt?: string): string {
-  const firstLine = content.replace(/\s+/g, " ").trim().slice(0, 80);
-  const datePrefix = createdAt ? new Date(createdAt).toLocaleDateString() : "Open Brain";
-  return firstLine ? `${datePrefix} - ${firstLine}` : `${datePrefix} thought`;
+/**
+ * The date part of a title comes from toLocaleDateString(), which varies by locale and time zone, so it is matched as
+ * digits and separators only; the content part after " - " is asserted literally (the test computes nothing).
+ */
+function assertTitle(actual: unknown, contentPart: string) {
+  const escaped = contentPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert(new RegExp(`^[\\d/.\\- ,]*\\d - ${escaped}$`).test(String(actual)), `title ${JSON.stringify(actual)} lacks the literal tail ${JSON.stringify(contentPart)}`);
 }
+
+const FIXED_AT = "2031-02-03T12:00:00.000Z";
+// 100 characters with a doubled space; the title keeps the first 80 after whitespace collapse.
+const LONG_CONTENT = "Remember to buy milk,  eggs, bread and butter from the corner shop before the weekend rush begins ok";
+const LONG_TITLE_TAIL = "Remember to buy milk, eggs, bread and butter from the corner shop before the wee";
 
 Deno.test("U102 fetch of an existing id returns core's document text", async () => {
   const { client, store } = await rig();
-  const row = store.seed({ id: "abc-1", content: "Remember the milk", metadata: { type: "task", topics: ["home"] } });
+  store.seed({ id: "abc-1", content: LONG_CONTENT, created_at: FIXED_AT, metadata: { type: "task", topics: ["home"] } });
   const result = await client.callTool({ name: "fetch", arguments: { id: "abc-1" } });
   assert(!result.isError);
-  assertEquals(JSON.parse(textOf(result)), {
+  const { title, ...rest } = JSON.parse(textOf(result));
+  assertTitle(title, LONG_TITLE_TAIL);
+  assertEquals(rest, {
     id: "abc-1",
-    title: title(row.content, row.created_at),
-    text: "Remember the milk",
+    text: LONG_CONTENT,
     url: "https://openbrain.local/thoughts/abc-1",
-    metadata: { type: "task", topics: ["home"], created_at: row.created_at, updated_at: row.updated_at },
+    metadata: { type: "task", topics: ["home"], created_at: FIXED_AT, updated_at: FIXED_AT },
   });
   assertEquals(store.calls.map((c) => c.method), ["fetchThought"]);
 });
@@ -265,12 +273,13 @@ Deno.test("U111 search_thoughts returns core's results text, and core's no-match
 
 Deno.test("U112 search returns core's results JSON using threshold 0.5 and count 10", async () => {
   const { client, store } = await rig();
-  const row = store.seed({ id: "r-1", content: "Milk is in the fridge", embedding: axisVector(0), metadata: {} });
+  store.seed({ id: "r-1", content: LONG_CONTENT, created_at: FIXED_AT, embedding: axisVector(0), metadata: {} });
   const result = await client.callTool({ name: "search", arguments: { query: "milk" } });
   assert(!result.isError);
-  assertEquals(JSON.parse(textOf(result)), {
-    results: [{ id: "r-1", title: title(row.content, row.created_at), url: "https://openbrain.local/thoughts/r-1" }],
-  });
+  const { results } = JSON.parse(textOf(result));
+  assertEquals(results.length, 1);
+  assertTitle(results[0].title, LONG_TITLE_TAIL);
+  assertEquals({ ...results[0], title: undefined }, { id: "r-1", title: undefined, url: "https://openbrain.local/thoughts/r-1" });
   assertEquals(store.calls.find((c) => c.method === "matchThoughts")?.args, [axisVector(0), 0.5, 10]);
 });
 
@@ -400,11 +409,12 @@ Deno.test("U123 config gate: an invalid setting is named with the missing ones",
   for (const [name, args] of SIX_CALLS) {
     const result = await client.callTool({ name, arguments: args });
     assertEquals(result.isError, true, name);
-    const t = textOf(result);
-    assert(t.startsWith("Model endpoint not configured: missing CHAT_MODEL"), t);
-    assertStringIncludes(t, "EMBEDDING_API_BASE (must start with http:// or https://)");
-    assertStringIncludes(t, "FETCH_TIMEOUT_MS (must be a positive whole number of milliseconds)");
-    assert(t.endsWith(GATE_TAIL), t);
+    assertEquals(
+      textOf(result),
+      "Model endpoint not configured: missing CHAT_MODEL; invalid EMBEDDING_API_BASE (must start with http:// or https://), " +
+        `FETCH_TIMEOUT_MS (must be a positive whole number of milliseconds). ${GATE_TAIL}`,
+      name,
+    );
   }
   assertEquals(fake.requests, []);
   assertEquals(store.calls, []);
@@ -428,26 +438,25 @@ Deno.test("U125 search_thoughts and search with a failing embedding return isErr
   for (const name of ["search_thoughts", "search"]) {
     const result = await client.callTool({ name, arguments: { query: "milk" } });
     assertEquals(result.isError, true, name);
-    const t = textOf(result);
-    assert(t.startsWith("Error: "), t);
-    assertStringIncludes(t, "embedding");
-    assertStringIncludes(t, BASE);
-    assertStringIncludes(t, "could not be reached");
-    assert(!t.includes("Milk"), t);
+    assertEquals(textOf(result), `Error: The embedding model server at ${BASE} could not be reached: connection refused`, name);
   }
   assertEquals(store.calls.filter((c) => c.method === "matchThoughts"), []);
 });
 
 Deno.test("U126 capture with the embedding unreachable or timing out returns isError naming the cause, with no upsertThought call", async () => {
-  const cases: [string, Handler, string[]][] = [
-    ["unreachable", { networkError: "connection refused" }, ["embedding", BASE, "could not be reached"]],
-    ["timeout", { hang: true }, ["embedding", BASE, "FETCH_TIMEOUT_MS", "30 ms"]],
+  const cases: [string, Handler, string][] = [
+    ["unreachable", { networkError: "connection refused" }, `Error: The embedding model server at ${BASE} could not be reached: connection refused`],
+    [
+      "timeout",
+      { hang: true },
+      `Error: The embedding model server at ${BASE} gave no complete response within 30 ms. Raise FETCH_TIMEOUT_MS if the server is slow.`,
+    ],
   ];
   for (const [label, embedding, expected] of cases) {
     const { client, store } = await rig({ ...GOOD_ENV, FETCH_TIMEOUT_MS: "30" }, { embedding });
     const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
     assertEquals(result.isError, true, label);
-    for (const part of expected) assertStringIncludes(textOf(result), part, label);
+    assertEquals(textOf(result), expected, label);
     assertEquals(store.calls.filter((c) => c.method === "upsertThought"), [], label);
     assertEquals(store.rows, [], label);
   }
@@ -455,18 +464,20 @@ Deno.test("U126 capture with the embedding unreachable or timing out returns isE
 
 Deno.test("U127 capture with an auth_rejected, model_not_found, bad_response or http_error embedding returns isError naming it, with no upsertThought call", async () => {
   const cases: [string, Handler, string][] = [
-    ["auth_rejected", { status: 401, body: "nope" }, "access key rejected (HTTP 401)"],
-    ["model_not_found", { status: 404, body: "gone" }, 'model "embed-1" was not found'],
-    ["bad_response", { status: 200, body: { data: [] } }, "reply lacks"],
-    ["http_error", { status: 500, body: "boom" }, "HTTP 500"],
+    ["auth_rejected", { status: 401, body: "nope" }, `Error: The embedding model server at ${BASE} access key rejected (HTTP 401).`],
+    ["model_not_found", { status: 404, body: "gone" }, `Error: The embedding model "embed-1" was not found on the model server at ${BASE}.`],
+    [
+      "bad_response",
+      { status: 200, body: { data: [] } },
+      `Error: The embedding model server at ${BASE} answered, but the reply lacks data[0].embedding (an array of numbers).`,
+    ],
+    ["http_error", { status: 500, body: "boom" }, `Error: The embedding model server at ${BASE} answered HTTP 500: boom`],
   ];
   for (const [label, embedding, expected] of cases) {
     const { client, store } = await rig(GOOD_ENV, { embedding });
     const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
     assertEquals(result.isError, true, label);
-    assertStringIncludes(textOf(result), "embedding", label);
-    assertStringIncludes(textOf(result), BASE, label);
-    assertStringIncludes(textOf(result), expected, label);
+    assertEquals(textOf(result), expected, label);
     assertEquals(store.calls.filter((c) => c.method === "upsertThought"), [], label);
   }
 });
@@ -525,18 +536,15 @@ Deno.test("U131 capture with chat timing out stores the fallback row and ends th
 
 Deno.test("U132 capture with a chat 5xx or missing choices stores the fallback row with the skip line naming the reason", async () => {
   const cases: [Handler, string][] = [
-    [{ status: 503, body: "overloaded" }, "HTTP 503"],
-    [{ status: 200, body: { object: "chat.completion" } }, "reply lacks"],
+    [{ status: 503, body: "overloaded" }, `The chat model server at ${BASE} answered HTTP 503: overloaded`],
+    [{ status: 200, body: { object: "chat.completion" } }, `The chat model server at ${BASE} answered, but the reply lacks choices[0].message.content`],
   ];
   for (const [chat, reason] of cases) {
     const { client, store } = await rig(GOOD_ENV, { chat });
     const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
     assert(!result.isError, reason);
     assertEquals(store.rows[0].metadata, FALLBACK_META, reason);
-    const t = textOf(result);
-    assert(t.startsWith("Captured as observation — uncategorized\nMetadata extraction skipped: "), t);
-    assertStringIncludes(t, reason);
-    assert(t.endsWith(". Saved with default metadata."), t);
+    assertEquals(textOf(result), `Captured as observation — uncategorized\nMetadata extraction skipped: ${reason}. Saved with default metadata.`, reason);
   }
 });
 
@@ -546,10 +554,11 @@ Deno.test("U133 capture with chat content that is not a JSON object stores the f
     const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
     assert(!result.isError, content);
     assertEquals(store.rows[0].metadata, FALLBACK_META, content);
-    const t = textOf(result);
-    assert(t.startsWith("Captured as observation — uncategorized\nMetadata extraction skipped: "), t);
-    assert(t.endsWith(". Saved with default metadata."), t);
-    assertStringIncludes(t, "JSON object");
+    assertEquals(
+      textOf(result),
+      "Captured as observation — uncategorized\nMetadata extraction skipped: the chat model's reply was not a JSON object. Saved with default metadata.",
+      content,
+    );
   }
 });
 
@@ -704,24 +713,56 @@ Deno.test("U145 no tool reply contains any of the four secrets, even when the fa
   const env = { ...GOOD_ENV, EMBEDDING_API_KEY: EK, CHAT_API_KEY: CK, MCP_ACCESS_KEY: MK, SUPABASE_SERVICE_ROLE_KEY: SK };
   const echo = `rejected ${EK} / ${CK} / ${MK} / ${SK}`;
   const secrets = [EK, CK, MK, SK];
-  const paths: { label: string; opts?: { embedding?: Handler; chat?: Handler }; fail?: Record<string, string>; call: [string, Record<string, unknown>] }[] = [
-    { label: "fetch store error", fail: { fetchThought: echo }, call: ["fetch", { id: "x" }] },
-    { label: "list store error", fail: { listThoughts: echo }, call: ["list_thoughts", {}] },
-    { label: "search store error", fail: { matchThoughts: echo }, call: ["search", { query: "q" }] },
-    { label: "search_thoughts store error", fail: { matchThoughts: echo }, call: ["search_thoughts", { query: "q" }] },
-    { label: "search embedding echo", opts: { embedding: { status: 500, body: echo } }, call: ["search", { query: "q" }] },
-    { label: "capture embedding echo", opts: { embedding: { status: 500, body: echo } }, call: ["capture_thought", { content: "c" }] },
-    { label: "capture chat echo", opts: { chat: { status: 500, body: echo } }, call: ["capture_thought", { content: "c" }] },
-    { label: "capture upsert error", fail: { upsertThought: echo }, call: ["capture_thought", { content: "c" }] },
-    { label: "capture setEmbedding error", fail: { setEmbedding: echo }, call: ["capture_thought", { content: "c" }] },
-    { label: "capture readBack error", fail: { setEmbedding: echo, readBack: echo }, call: ["capture_thought", { content: "c" }] },
+  const R = "rejected [redacted] / [redacted] / [redacted] / [redacted]";
+  const MODEL_500 = `The embedding model server at ${BASE} answered HTTP 500: ${R}`;
+  // Every path's reply carries the echoed server text, so each expects its exact reply with the four secrets redacted:
+  // that is the positive control proving the echo reached the reply (a vacuous pass would not contain "[redacted]").
+  const paths: {
+    label: string;
+    opts?: { embedding?: Handler; chat?: Handler };
+    fail?: Record<string, string>;
+    call: [string, Record<string, unknown>];
+    expected: string;
+  }[] = [
+    { label: "fetch store error", fail: { fetchThought: echo }, call: ["fetch", { id: "x" }], expected: `Fetch error: ${R}` },
+    { label: "list store error", fail: { listThoughts: echo }, call: ["list_thoughts", {}], expected: `Error: ${R}` },
+    { label: "search store error", fail: { matchThoughts: echo }, call: ["search", { query: "q" }], expected: `Search error: ${R}` },
+    { label: "search_thoughts store error", fail: { matchThoughts: echo }, call: ["search_thoughts", { query: "q" }], expected: `Search error: ${R}` },
+    { label: "search embedding echo", opts: { embedding: { status: 500, body: echo } }, call: ["search", { query: "q" }], expected: `Error: ${MODEL_500}` },
+    {
+      label: "capture embedding echo",
+      opts: { embedding: { status: 500, body: echo } },
+      call: ["capture_thought", { content: "c" }],
+      expected: `Error: ${MODEL_500}`,
+    },
+    {
+      label: "capture chat echo",
+      opts: { chat: { status: 500, body: echo } },
+      call: ["capture_thought", { content: "c" }],
+      expected:
+        `Captured as observation — uncategorized\nMetadata extraction skipped: The chat model server at ${BASE} answered HTTP 500: ${R}. Saved with default metadata.`,
+    },
+    { label: "capture upsert error", fail: { upsertThought: echo }, call: ["capture_thought", { content: "c" }], expected: `Failed to capture: ${R}` },
+    {
+      label: "capture setEmbedding error",
+      fail: { setEmbedding: echo },
+      call: ["capture_thought", { content: "c" }],
+      expected: `Embedding could not be saved: ${R}. The thought was not kept; capture it again.`,
+    },
+    {
+      label: "capture readBack error",
+      fail: { setEmbedding: echo, readBack: echo },
+      call: ["capture_thought", { content: "c" }],
+      expected: `Embedding could not be saved: ${R}. The thought may be saved without its embedding; capture it again to repair.`,
+    },
   ];
   for (const p of paths) {
     const { client, store } = await rig(env, p.opts);
     Object.assign(store.fail, p.fail ?? {});
     const result = await client.callTool({ name: p.call[0], arguments: p.call[1] });
     const t = textOf(result);
-    assert(t.length > 0, p.label);
+    assert(t.includes("[redacted]"), `${p.label}: the echoed text never reached the reply: ${t}`);
+    assertEquals(t, p.expected, p.label);
     for (const secret of secrets) assert(!t.includes(secret), `${p.label}: reply contains a secret: ${t}`);
   }
 });
