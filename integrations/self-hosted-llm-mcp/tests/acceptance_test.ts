@@ -63,7 +63,7 @@ async function setupCheck(app: { fetch: (r: Request) => Response | Promise<Respo
   return { status: res.status, res, body: await res.json() };
 }
 
-todo("A1 capture_thought stores one row with a 1536-length embedding and extracted metadata", async () => {
+Deno.test("A1 capture_thought stores one row with a 1536-length embedding and extracted metadata", async () => {
   const fake = healthy();
   const store = new FakeStore();
   const app = createApp(makeDeps(baseEnv(), fake, store));
