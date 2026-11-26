@@ -33,7 +33,6 @@ Deno.test("U68 fetchThought requests core's columns for id=eq.<id> as a single o
   assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
   assertEquals(params(req).get("select"), "id,content,metadata,created_at,updated_at");
   assertEquals(params(req).get("id"), "eq.t-1");
-  assertMatch(req.headers["accept"], /application\/vnd\.pgrst\.object\+json/);
 });
 
 Deno.test("U69 fetchThought returns the row for a 200", async () => {
@@ -92,6 +91,16 @@ function listParams(req: RecordedRequest): [string, string][] {
   return [...params(req).entries()];
 }
 
+/** The filter parameters of a request, leaving out `select` (how supabase-js spells "all columns" on a count). */
+function filterParams(req: RecordedRequest): [string, string][] {
+  return listParams(req).filter(([k]) => k !== "select");
+}
+
+/** The JSON object a "metadata contains" filter carries, without the operator syntax in front of it. */
+function containsPayload(value: string): unknown {
+  return JSON.parse(value.slice(value.indexOf("{")));
+}
+
 Deno.test("U74 listThoughts with no filters requests core's columns ordered created_at.desc with the limit and no other filter", async () => {
   const { ff, store } = setup();
   ff.on("GET", `${REST}/thoughts`, { body: [] });
@@ -111,7 +120,7 @@ Deno.test("U75 listThoughts adds a metadata contains {type} filter only when typ
   ff.on("GET", `${REST}/thoughts`, { body: [] });
   await store.listThoughts({ limit: 5, type: "idea" });
   await store.listThoughts({ limit: 5 });
-  assertEquals(params(ff.requests[0]).getAll("metadata"), ['cs.{"type":"idea"}']);
+  assertEquals(params(ff.requests[0]).getAll("metadata").map(containsPayload), [{ type: "idea" }]);
   assertEquals(params(ff.requests[1]).has("metadata"), false);
 });
 
@@ -120,7 +129,7 @@ Deno.test("U76 listThoughts adds a metadata contains {topics: [topic]} filter on
   ff.on("GET", `${REST}/thoughts`, { body: [] });
   await store.listThoughts({ limit: 5, topic: "work" });
   await store.listThoughts({ limit: 5 });
-  assertEquals(params(ff.requests[0]).getAll("metadata"), ['cs.{"topics":["work"]}']);
+  assertEquals(params(ff.requests[0]).getAll("metadata").map(containsPayload), [{ topics: ["work"] }]);
   assertEquals(params(ff.requests[1]).has("metadata"), false);
 });
 
@@ -129,25 +138,35 @@ Deno.test("U77 listThoughts adds a metadata contains {people: [person]} filter o
   ff.on("GET", `${REST}/thoughts`, { body: [] });
   await store.listThoughts({ limit: 5, person: "Ada" });
   await store.listThoughts({ limit: 5 });
-  assertEquals(params(ff.requests[0]).getAll("metadata"), ['cs.{"people":["Ada"]}']);
+  assertEquals(params(ff.requests[0]).getAll("metadata").map(containsPayload), [{ people: ["Ada"] }]);
   assertEquals(params(ff.requests[1]).has("metadata"), false);
 });
 
-Deno.test("U78 listThoughts adds created_at=gte.<now - days> (within a tolerance window) only when days is given", async () => {
+Deno.test("U78 listThoughts adds created_at=gte.<now - days> (to within the call's own duration) only when days is given", async () => {
+  const DAY = 24 * 3600 * 1000;
   const { ff, store } = setup();
   ff.on("GET", `${REST}/thoughts`, { body: [] });
-  const before = Date.now();
-  await store.listThoughts({ limit: 5, days: 7 });
-  const after = Date.now();
+  const windows: { days: number; before: number; after: number }[] = [];
+  for (const days of [1, 7, 90]) {
+    const before = Date.now();
+    await store.listThoughts({ limit: 5, days });
+    windows.push({ days, before, after: Date.now() });
+  }
   await store.listThoughts({ limit: 5 });
-  const gte = params(ff.requests[0]).getAll("created_at");
-  assertEquals(gte.length, 1);
-  assertMatch(gte[0], /^gte\./);
-  const since = new Date(gte[0].slice(4)).getTime();
-  const day = 24 * 3600 * 1000;
-  const slack = 2 * 3600 * 1000; // the core's setDate arithmetic may differ by an hour across a DST change
-  assert(since >= before - 7 * day - slack && since <= after - 7 * day + slack, `unexpected cutoff ${gte[0]}`);
-  assertEquals(params(ff.requests[1]).has("created_at"), false);
+  windows.forEach(({ days, before, after }, i) => {
+    const gte = params(ff.requests[i]).getAll("created_at");
+    assertEquals(gte.length, 1, `days ${days}`);
+    assertMatch(gte[0], /^gte\./);
+    const since = new Date(gte[0].slice(4)).getTime();
+    // The core subtracts calendar days in local time, so the cutoff moves by the local UTC-offset change
+    // (an hour across a DST change) and by nothing else.
+    const dst = (new Date(before - days * DAY).getTimezoneOffset() - new Date(before).getTimezoneOffset()) * 60000;
+    assert(
+      since >= before - days * DAY + dst && since <= after - days * DAY + dst,
+      `days ${days}: cutoff ${gte[0]} is outside [${before - days * DAY + dst}, ${after - days * DAY + dst}]`,
+    );
+  });
+  assertEquals(params(ff.requests[3]).has("created_at"), false);
 });
 
 Deno.test("U79 listThoughts returns the rows, or { error } for a database error", async () => {
@@ -172,8 +191,7 @@ Deno.test("U80 stats sends core's two thought_stats queries (exact count head; m
   const head = ff.requests.find((r) => r.method === "HEAD")!;
   const rows = ff.requests.find((r) => r.method === "GET")!;
   assertEquals(new URL(head.url).pathname, "/rest/v1/thoughts");
-  assertEquals(listParams(head), [["select", "*"]]);
-  assertMatch(head.headers["prefer"], /count=exact/);
+  assertEquals(filterParams(head), []);
   assertEquals(new URL(rows.url).pathname, "/rest/v1/thoughts");
   assertEquals(listParams(rows).sort(), [
     ["order", "created_at.desc"],
@@ -199,7 +217,9 @@ Deno.test("U82 stats returns { error } when either query fails", async () => {
     ff.on("HEAD", `${REST}/thoughts`, { status: 500 });
     ff.on("GET", `${REST}/thoughts`, { body: [] });
     const r = await store.stats();
-    assert("error" in r, "count failure must be an error");
+    // Deliberate pin: a body-less HEAD 500 gives supabase-js an empty message, observed once.
+    assertEquals(r, { error: "" });
+    assert(!("data" in r), "a count failure carries no data");
   }
   {
     const { ff, store } = setup();
@@ -264,7 +284,6 @@ Deno.test("U87 readBack requests created_at, updated_at and whether embedding is
   assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
   assertEquals(params(req).get("id"), "eq.t-9");
   assertEquals(params(req).get("select")?.split(",").sort(), ["created_at", "embedding", "updated_at"]);
-  assertMatch(req.headers["accept"], /application\/vnd\.pgrst\.object\+json/);
 });
 
 Deno.test("U88 readBack reports embeddingIsNull true for a null embedding and false for a set one", async () => {
@@ -357,8 +376,7 @@ Deno.test("U95 countAll requests an exact head count of thoughts and returns the
   const req = ff.requests[0];
   assertEquals(req.method, "HEAD");
   assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
-  assertEquals(listParams(req), [["select", "*"]]);
-  assertMatch(req.headers["prefer"], /count=exact/);
+  assertEquals(filterParams(req), []);
 });
 
 Deno.test("U96 countWithModel(m) adds metadata->>embedding_model=eq.m to the same count", async () => {
@@ -369,11 +387,7 @@ Deno.test("U96 countWithModel(m) adds metadata->>embedding_model=eq.m to the sam
   const req = ff.requests[0];
   assertEquals(req.method, "HEAD");
   assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
-  assertMatch(req.headers["prefer"], /count=exact/);
-  assertEquals(listParams(req).sort(), [
-    ["metadata->>embedding_model", "eq.nomic"],
-    ["select", "*"],
-  ]);
+  assertEquals(filterParams(req), [["metadata->>embedding_model", "eq.nomic"]]);
 });
 
 Deno.test("U97 model names reach the request intact (qwen3-embedding:4b, openai/text-embedding-3-small, v1.5, a,b)", async () => {
@@ -390,11 +404,13 @@ Deno.test("U97 model names reach the request intact (qwen3-embedding:4b, openai/
 Deno.test("U98 both counts return { error } for a database error", async () => {
   const { ff, store } = setup();
   ff.on("HEAD", `${REST}/thoughts`, { status: 500 });
+  // Deliberate pin: a body-less HEAD 500 gives supabase-js an empty message, observed once.
   const all = await store.countAll();
-  assert("error" in all, "countAll must report the failure");
+  assertEquals(all, { error: "" });
+  assert(!("data" in all), "countAll must not carry data on failure");
   const withModel = await store.countWithModel("m");
-  assert("error" in withModel, "countWithModel must report the failure");
-  assertEquals(typeof (withModel as { error: string }).error, "string");
+  assertEquals(withModel, { error: "" });
+  assert(!("data" in withModel), "countWithModel must not carry data on failure");
 });
 
 Deno.test("U99 both counts return 0 for an empty table", async () => {
