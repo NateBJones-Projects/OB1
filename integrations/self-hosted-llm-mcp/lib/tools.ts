@@ -98,7 +98,46 @@ export function buildServer(deps: Deps): McpServer {
     description: "Get a summary of all captured thoughts: totals, types, top topics, and people.",
     annotations: { readOnlyHint: true },
     inputSchema: {},
-  }, notYet);
+  }, async () => {
+    try {
+      const res = await store.stats();
+      const { count, rows: data } = "data" in res ? res.data : { count: null, rows: [] };
+      const types: Record<string, number> = {};
+      const topics: Record<string, number> = {};
+      const people: Record<string, number> = {};
+      for (const r of data) {
+        const m = (r.metadata || {}) as Record<string, unknown>;
+        if (m.type) types[m.type as string] = (types[m.type as string] || 0) + 1;
+        if (Array.isArray(m.topics)) for (const t of m.topics) topics[t as string] = (topics[t as string] || 0) + 1;
+        if (Array.isArray(m.people)) for (const p of m.people) people[p as string] = (people[p as string] || 0) + 1;
+      }
+      const sort = (o: Record<string, number>): [string, number][] =>
+        Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, 10);
+      const lines: string[] = [
+        `Total thoughts: ${count}`,
+        `Date range: ${
+          data.length
+            ? new Date(data[data.length - 1].created_at).toLocaleDateString() + " → " +
+              new Date(data[0].created_at).toLocaleDateString()
+            : "N/A"
+        }`,
+        "",
+        "Types:",
+        ...sort(types).map(([k, v]) => `  ${k}: ${v}`),
+      ];
+      if (Object.keys(topics).length) {
+        lines.push("", "Top topics:");
+        for (const [k, v] of sort(topics)) lines.push(`  ${k}: ${v}`);
+      }
+      if (Object.keys(people).length) {
+        lines.push("", "People mentioned:");
+        for (const [k, v] of sort(people)) lines.push(`  ${k}: ${v}`);
+      }
+      return text(lines.join("\n"));
+    } catch (err) {
+      return errorText(err);
+    }
+  });
   server.registerTool("capture_thought", {
     title: "Capture Thought",
     description:

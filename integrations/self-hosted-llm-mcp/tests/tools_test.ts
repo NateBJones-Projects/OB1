@@ -191,3 +191,31 @@ Deno.test("U107 list_thoughts forwards limit, type, topic, person and days to th
   await client.callTool({ name: "list_thoughts", arguments: {} });
   assertEquals(store.calls[1].args, [{ limit: 10 }]);
 });
+
+Deno.test("U108 thought_stats returns core's stats text", async () => {
+  const { client, store } = await rig();
+  const a = store.seed({ content: "a", metadata: { type: "idea", topics: ["x", "y"], people: ["Ada"] } });
+  store.seed({ content: "b", metadata: { type: "idea", topics: ["x"] } });
+  const c = store.seed({ content: "c", metadata: { type: "task" } });
+  const d = (r: { created_at: string }) => new Date(r.created_at).toLocaleDateString();
+  const result = await client.callTool({ name: "thought_stats", arguments: {} });
+  assert(!result.isError);
+  assertEquals(
+    textOf(result),
+    [
+      "Total thoughts: 3",
+      `Date range: ${d(a)} → ${d(c)}`,
+      "",
+      "Types:",
+      "  idea: 2",
+      "  task: 1",
+      "",
+      "Top topics:",
+      "  x: 2",
+      "  y: 1",
+      "",
+      "People mentioned:",
+      "  Ada: 1",
+    ].join("\n"),
+  );
+});
