@@ -387,3 +387,16 @@ Deno.test("U172 a key_over_http warning is reported and leaves ok true", async (
     },
   ]);
 });
+
+Deno.test("U173 an unkeyed http base and a keyed https base produce no warning", async () => {
+  const unkeyed = await runSetupCheck(setup(BASE_ENV).deps);
+  assertEquals(unkeyed.warnings, []);
+
+  const secure = "https://secure.test/v1";
+  const fake = healthyFake(secure);
+  const keyed = await runSetupCheck(
+    setup({ ...BASE_ENV, EMBEDDING_API_BASE: secure, EMBEDDING_API_KEY: "sk-secret" }, fake).deps,
+  );
+  assertEquals(keyed.ok, true);
+  assertEquals(keyed.warnings, []);
+});
