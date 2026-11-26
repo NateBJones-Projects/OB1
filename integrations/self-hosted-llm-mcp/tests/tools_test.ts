@@ -428,3 +428,18 @@ Deno.test("U125 search_thoughts and search with a failing embedding return isErr
   }
   assertEquals(store.calls.filter((c) => c.method === "matchThoughts"), []);
 });
+
+Deno.test("U126 capture with the embedding unreachable or timing out returns isError naming the cause, with no upsertThought call", async () => {
+  const cases: [string, Handler, string[]][] = [
+    ["unreachable", { networkError: "connection refused" }, ["embedding", BASE, "could not be reached"]],
+    ["timeout", { hang: true }, ["embedding", BASE, "FETCH_TIMEOUT_MS", "30 ms"]],
+  ];
+  for (const [label, embedding, expected] of cases) {
+    const { client, store } = await rig({ ...GOOD_ENV, FETCH_TIMEOUT_MS: "30" }, { embedding });
+    const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+    assertEquals(result.isError, true, label);
+    for (const part of expected) assertStringIncludes(textOf(result), part, label);
+    assertEquals(store.calls.filter((c) => c.method === "upsertThought"), [], label);
+    assertEquals(store.rows, [], label);
+  }
+});
