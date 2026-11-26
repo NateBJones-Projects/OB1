@@ -597,3 +597,12 @@ Deno.test("U137 recapturing that text with chat working marks the same row compl
   assertEquals(store.rows[0].metadata.enrichment_status, "complete");
   assertEquals(store.rows[0].metadata.type, "idea");
 });
+
+Deno.test("U138 an upsertThought error returns core's Failed to capture text with no setEmbedding call", async () => {
+  const { client, store } = await rig();
+  store.fail.upsertThought = "duplicate key";
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), "Failed to capture: duplicate key");
+  assertEquals(store.calls.filter((c) => c.method === "setEmbedding"), []);
+});
