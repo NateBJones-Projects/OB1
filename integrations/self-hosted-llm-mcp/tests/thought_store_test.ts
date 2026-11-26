@@ -87,3 +87,21 @@ Deno.test("U73 matchThoughts returns { error } for an RPC error", async () => {
   });
   assertEquals(await store.matchThoughts([1, 2, 3], 0.5, 10), { error: "expected 1536 dimensions, not 3" });
 });
+
+function listParams(req: RecordedRequest): [string, string][] {
+  return [...params(req).entries()];
+}
+
+Deno.test("U74 listThoughts with no filters requests core's columns ordered created_at.desc with the limit and no other filter", async () => {
+  const { ff, store } = setup();
+  ff.on("GET", `${REST}/thoughts`, { body: [] });
+  await store.listThoughts({ limit: 15 });
+  const req = ff.requests[0];
+  assertEquals(req.method, "GET");
+  assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
+  assertEquals(listParams(req).sort(), [
+    ["limit", "15"],
+    ["order", "created_at.desc"],
+    ["select", "content,metadata,created_at"],
+  ]);
+});
