@@ -312,3 +312,16 @@ Deno.test("U201 /fn/setup-check, /setup-check, /other/setup-check, /fn/setup-che
     assertEquals(Array.isArray((await res.json()).checks), true, path);
   }
 });
+
+Deno.test("U202 /fn/setup-check/extra, /fn/setup-checker, /fn/xsetup-check and /setup-check/fn reach the MCP route", async () => {
+  const app = createApp(makeDeps(MODEL_ENV, healthyFake()));
+  for (const path of ["/fn/setup-check/extra", "/fn/setup-checker", "/fn/xsetup-check", "/setup-check/fn"]) {
+    // No key: the MCP route's 200 envelope, never the setup check's 401.
+    const refused = await app.fetch(checkRequest(path, {}));
+    assertEquals(refused.status, 200, path);
+    assertEquals((await refused.json()).error.code, -32001, path);
+    // With the key: the MCP tools list.
+    const { message } = await mcpCall(app.fetch, "tools/list", {}, { key: KEY, url: FUNCTION_URL + path });
+    assert(toolNames(message).includes("capture_thought"), path);
+  }
+});
