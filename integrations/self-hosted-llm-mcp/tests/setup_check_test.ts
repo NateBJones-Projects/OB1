@@ -428,3 +428,15 @@ Deno.test("U175 with every model route hanging, the run finishes in about one ti
   assertEquals(report.ok, false);
   assertEquals(report.checks.filter((c) => !c.ok).length, 6);
 });
+
+Deno.test("U176 5 thoughts, 2 matching EMBEDDING_MODEL, give other_model 3", async () => {
+  const store = new FakeStore();
+  store.seed({ content: "a", metadata: { embedding_model: "emb-m" } });
+  store.seed({ content: "b", metadata: { embedding_model: "emb-m" } });
+  store.seed({ content: "c", metadata: { embedding_model: "old-model" } });
+  store.seed({ content: "d", metadata: {} });
+  store.seed({ content: "e" });
+  const report = await runSetupCheck(setup(BASE_ENV, healthyFake(), store).deps);
+  assertEquals(report.thoughts, { other_model: 3 });
+  assertEquals(store.calls.find((c) => c.method === "countWithModel")?.args, ["emb-m"]);
+});

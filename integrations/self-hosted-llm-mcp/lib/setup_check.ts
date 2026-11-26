@@ -64,12 +64,15 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     return { ok: false, checks, warnings: [], thoughts: { other_model: null }, config: null };
   }
   const client = createModelClient(config, deps.modelFetch);
-  const [embedding, chat, embeddingModels, chatModels] = await Promise.all([
+  const [embedding, chat, embeddingModels, chatModels, all, matching] = await Promise.all([
     client.embed("sample"),
     client.chat("sample"),
     client.listModels("embedding"),
     client.listModels("chat"),
+    deps.store.countAll(),
+    deps.store.countWithModel(config.embedding.model),
   ]);
+  const otherModel = "data" in all && "data" in matching ? all.data - matching.data : null;
   const checks: CheckResult[] = [
     { id: "config", ok: true },
     reachable("embedding", embeddingModels),
@@ -81,5 +84,5 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     modelCheck("chat", config.chat.model, chatModels, chat),
     chatMetadata(chat),
   ];
-  return { ok: checks.every((c) => c.ok), checks, warnings: keyOverHttpWarnings(config), thoughts: { other_model: null }, config: configBlock(config) };
+  return { ok: checks.every((c) => c.ok), checks, warnings: keyOverHttpWarnings(config), thoughts: { other_model: otherModel }, config: configBlock(config) };
 }
