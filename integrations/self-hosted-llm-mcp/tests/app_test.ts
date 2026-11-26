@@ -349,3 +349,18 @@ Deno.test("U204 a wrong key on any non-setup-check path gets the 200 envelope, n
     }
   }
 });
+
+Deno.test("U205 a crashing setup check answers 500 with the fixed error body and CORS, with no stack trace or key", async () => {
+  const getEnv = (name: string) => {
+    if (name === "MCP_ACCESS_KEY") return KEY;
+    throw new Error(`boom with ${KEY} inside`);
+  };
+  const app = createApp({ ...makeDeps(), getEnv });
+  const res = await app.fetch(checkRequest());
+  assertEquals(res.status, 500);
+  const text = await res.text();
+  assertEquals(text, '{"error":"Setup check failed unexpectedly."}');
+  assertEquals(res.headers.get("content-type"), "application/json");
+  assertCors(res);
+  assertEquals(text.includes(KEY) || text.includes("boom") || text.includes("at "), false);
+});

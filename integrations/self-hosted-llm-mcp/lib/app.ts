@@ -96,8 +96,13 @@ export function createApp(deps: Deps): FetchApp {
         return unauthorizedResponse(extractJsonRpcId(await readBodyText(request)));
       }
       if (isSetupCheck(request)) {
-        const report = await runSetupCheck(deps);
-        return jsonResponse(report.ok ? 200 : 503, report);
+        try {
+          const report = await runSetupCheck(deps);
+          return jsonResponse(report.ok ? 200 : 503, report);
+        } catch {
+          // Nothing from the error (message, stack, a key) reaches the reply.
+          return jsonResponse(500, { error: "Setup check failed unexpectedly." });
+        }
       }
       return await serveMcp(deps, request);
     },
