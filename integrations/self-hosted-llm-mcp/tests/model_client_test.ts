@@ -490,3 +490,12 @@ Deno.test("U64 server text of 200 chars is kept whole, 201 is cut to 200, and re
   assertStringIncludes(straddle, "a".repeat(195) + "[reda");
   assert(!straddle.includes("a".repeat(196)));
 });
+
+Deno.test("U65 listModels returns the data[].id list for a 2xx listing", async () => {
+  const ff = new FakeFetch()
+    .on("GET", `${EMB}/models`, modelsReply(["qwen3-embedding:4b", "qwen3:4b"]));
+  const r = await createModelClient(cfg(), ff.fetch).listModels("embedding");
+  assertEquals(r, { ok: true, value: ["qwen3-embedding:4b", "qwen3:4b"] });
+  const empty = new FakeFetch().on("GET", `${EMB}/models`, modelsReply([]));
+  assertEquals(await createModelClient(cfg(), empty.fetch).listModels("embedding"), { ok: true, value: [] });
+});

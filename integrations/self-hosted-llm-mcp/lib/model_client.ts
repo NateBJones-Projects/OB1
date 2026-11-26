@@ -143,7 +143,9 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       const sent = await send(ep, "GET", "/models");
       if (!("status" in sent)) return sent;
       if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
-      return { ok: true, value: null };
+      const data = parseJson(sent.text)?.data;
+      if (!Array.isArray(data)) return { ok: true, value: null };
+      return { ok: true, value: data.map((m) => m?.id).filter((id): id is string => typeof id === "string") };
     },
   };
 }
