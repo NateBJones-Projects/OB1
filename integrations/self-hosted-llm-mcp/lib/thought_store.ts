@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import type { ListFilters, ListRow, StoreResult, ThoughtMatch, ThoughtRecord, ThoughtStore } from "./types.ts";
+import type { ListFilters, ListRow, StatsRow, StoreResult, ThoughtMatch, ThoughtRecord, ThoughtStore } from "./types.ts";
 
 const notImplemented = () => Promise.reject(new Error("not implemented"));
 
@@ -51,7 +51,16 @@ export function createSupabaseThoughtStore(
       if (error) return { error: error.message };
       return { data: data as ListRow[] };
     },
-    stats: notImplemented,
+    async stats(): Promise<StoreResult<{ count: number | null; rows: StatsRow[] }>> {
+      const { count } = await supabase
+        .from("thoughts")
+        .select("*", { count: "exact", head: true });
+      const { data } = await supabase
+        .from("thoughts")
+        .select("metadata, created_at")
+        .order("created_at", { ascending: false });
+      return { data: { count, rows: data as StatsRow[] } };
+    },
     upsertThought: notImplemented,
     setEmbedding: notImplemented,
     readBack: notImplemented,

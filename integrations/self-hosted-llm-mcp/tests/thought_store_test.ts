@@ -162,3 +162,21 @@ Deno.test("U79 listThoughts returns the rows, or { error } for a database error"
   assertEquals(await store.listThoughts({ limit: 5 }), { data: rows });
   assertEquals(await store.listThoughts({ limit: 5 }), { error: "list failed" });
 });
+
+Deno.test("U80 stats sends core's two thought_stats queries (exact count head; metadata and created_at rows)", async () => {
+  const { ff, store } = setup();
+  ff.on("HEAD", `${REST}/thoughts`, { headers: { "content-range": "*/3" } });
+  ff.on("GET", `${REST}/thoughts`, { body: [] });
+  await store.stats();
+  assertEquals(ff.requests.length, 2);
+  const head = ff.requests.find((r) => r.method === "HEAD")!;
+  const rows = ff.requests.find((r) => r.method === "GET")!;
+  assertEquals(new URL(head.url).pathname, "/rest/v1/thoughts");
+  assertEquals(listParams(head), [["select", "*"]]);
+  assertMatch(head.headers["prefer"], /count=exact/);
+  assertEquals(new URL(rows.url).pathname, "/rest/v1/thoughts");
+  assertEquals(listParams(rows).sort(), [
+    ["order", "created_at.desc"],
+    ["select", "metadata,created_at"],
+  ]);
+});
