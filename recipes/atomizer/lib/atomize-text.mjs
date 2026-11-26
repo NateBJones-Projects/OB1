@@ -25,7 +25,7 @@
  *     timeoutMs,       // default 30_000
  *     minAtoms,        // minimum # of atoms to expect; default 1
  *     anthropicApiKey, // required when provider='anthropic'
- *     anthropicModel,  // default 'claude-sonnet-4-5'
+ *     anthropicModel,  // default 'claude-sonnet-5-5'
  *     openrouterApiKey,// required when provider='openrouter'
  *     openrouterModel, // default 'anthropic/claude-sonnet-4.5'
  *   }) → Promise<string[]>
@@ -237,7 +237,7 @@ async function atomizeViaOpenRouter(text, { prompt, timeoutMs, openrouterApiKey,
  * @param {number} [opts.timeoutMs=30000]
  * @param {number} [opts.minAtoms=1]
  * @param {string} [opts.anthropicApiKey]
- * @param {string} [opts.anthropicModel="claude-sonnet-4-5"]
+ * @param {string} [opts.anthropicModel="claude-sonnet-5-5"]
  * @param {string} [opts.openrouterApiKey]
  * @param {string} [opts.openrouterModel="anthropic/claude-sonnet-4.5"]
  * @returns {Promise<string[]>}
@@ -249,7 +249,7 @@ export async function atomizeText(text, opts = {}) {
     timeoutMs = 30_000,
     minAtoms = 1,
     anthropicApiKey,
-    anthropicModel = "claude-sonnet-4-5",
+    anthropicModel = "claude-sonnet-5-5",
     openrouterApiKey,
     openrouterModel = "anthropic/claude-sonnet-4.5",
   } = opts;
