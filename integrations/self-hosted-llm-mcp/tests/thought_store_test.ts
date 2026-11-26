@@ -208,3 +208,15 @@ Deno.test("U82 stats returns { error } when either query fails", async () => {
     assertEquals(await store.stats(), { error: "rows failed" });
   }
 });
+
+Deno.test("U83 upsertThought calls RPC upsert_thought with p_content and p_payload: { metadata }", async () => {
+  const { ff, store } = setup();
+  ff.on("POST", `${REST}/rpc/upsert_thought`, { body: { id: "t-9", fingerprint: "f" } });
+  await store.upsertThought("some content", { type: "idea", source: "mcp" });
+  assertEquals(ff.requests.length, 1);
+  assertEquals(ff.requests[0].method, "POST");
+  assertEquals(ff.requests[0].body, {
+    p_content: "some content",
+    p_payload: { metadata: { type: "idea", source: "mcp" } },
+  });
+});
