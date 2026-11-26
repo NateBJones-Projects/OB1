@@ -72,7 +72,8 @@ export function createSupabaseThoughtStore(
       return { data: { id: data?.id } };
     },
     async setEmbedding(id: string, embedding: number[]): Promise<StoreResult<null>> {
-      await supabase.from("thoughts").update({ embedding }).eq("id", id);
+      const { error } = await supabase.from("thoughts").update({ embedding }).eq("id", id);
+      if (error) return { error: error.message };
       return { data: null };
     },
     readBack: notImplemented,

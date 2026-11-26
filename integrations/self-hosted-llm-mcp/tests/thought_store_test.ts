@@ -244,3 +244,12 @@ Deno.test("U85 setEmbedding updates embedding on id=eq.<id>", async () => {
   assertEquals(listParams(req), [["id", "eq.t-9"]]);
   assertEquals(req.body, { embedding: [0.5, 0.25] });
 });
+
+Deno.test("U86 setEmbedding returns { error } for a database error", async () => {
+  const { ff, store } = setup();
+  ff.on("PATCH", `${REST}/thoughts`, {
+    status: 500,
+    body: { code: "XX000", details: null, hint: null, message: "update failed" },
+  });
+  assertEquals(await store.setEmbedding("t-9", [1]), { error: "update failed" });
+});
