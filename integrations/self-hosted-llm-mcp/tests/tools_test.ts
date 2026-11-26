@@ -258,3 +258,14 @@ Deno.test("U111 search_thoughts returns core's results text, and core's no-match
   assert(!none.isError);
   assertEquals(textOf(none), 'No thoughts found matching "milk".');
 });
+
+Deno.test("U112 search returns core's results JSON using threshold 0.5 and count 10", async () => {
+  const { client, store } = await rig();
+  const row = store.seed({ id: "r-1", content: "Milk is in the fridge", embedding: axisVector(0), metadata: {} });
+  const result = await client.callTool({ name: "search", arguments: { query: "milk" } });
+  assert(!result.isError);
+  assertEquals(JSON.parse(textOf(result)), {
+    results: [{ id: "r-1", title: title(row.content, row.created_at), url: "https://openbrain.local/thoughts/r-1" }],
+  });
+  assertEquals(store.calls.find((c) => c.method === "matchThoughts")?.args, [axisVector(0), 0.5, 10]);
+});

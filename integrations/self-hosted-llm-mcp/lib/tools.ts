@@ -35,7 +35,22 @@ export function buildServer(deps: Deps): McpServer {
       "Search Open Brain memories by meaning. Use this read-only compatibility tool when ChatGPT needs search/fetch-style access to stored thoughts.",
     annotations: { readOnlyHint: true },
     inputSchema: { query: z.string().describe("The search query to run against Open Brain thoughts") },
-  }, notYet);
+  }, async ({ query }) => {
+    try {
+      const embedded = await models().embed(query);
+      if (!embedded.ok) throw new Error(embedded.message);
+      const res = await store.matchThoughts(embedded.value, 0.5, 10);
+      if ("error" in res) return text(`Search error: ${res.error}`, true);
+      const results = res.data.map((t) => ({
+        id: t.id,
+        title: thoughtTitle(t.content, t.created_at),
+        url: thoughtUrl(t.id),
+      }));
+      return text(JSON.stringify({ results }));
+    } catch (err) {
+      return errorText(err);
+    }
+  });
   server.registerTool("fetch", {
     title: "Fetch Open Brain Thought",
     description:
