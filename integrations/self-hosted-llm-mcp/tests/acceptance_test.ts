@@ -191,7 +191,7 @@ Deno.test("A8 capture_thought with 768-dimension embeddings names 768 and 1536 a
   assertEquals(store.rows.length, 0);
 });
 
-todo("A9 setup-check with 768-dimension embeddings answers 503 with embedding_dimension failed", async () => {
+Deno.test("A9 setup-check with 768-dimension embeddings answers 503 with embedding_dimension failed", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META))
