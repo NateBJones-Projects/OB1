@@ -191,3 +191,14 @@ Deno.test("U158 role reachable fails as unreachable, naming the base, on a netwo
   assertStringIncludes(c.reason ?? "", "could not be reached");
   assertEquals(check(checks, "embedding_reachable").ok, true);
 });
+
+Deno.test("U159 role reachable fails with timeout when /models hangs", async () => {
+  const fake = splitFake({ embModels: { hang: true } });
+  const env = { ...SPLIT_ENV, FETCH_TIMEOUT_MS: "50" };
+  const { checks } = await runSetupCheck(setup(env, fake).deps);
+  const c = check(checks, "embedding_reachable");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "50 ms");
+  assertStringIncludes(c.reason ?? "", "FETCH_TIMEOUT_MS");
+  assertEquals(check(checks, "chat_reachable").ok, true);
+});
