@@ -53,3 +53,17 @@ Deno.test("U70 fetchThought returns { error } with PostgREST's message for a mis
   assertEquals(await store.fetchThought("nope"), { error: "JSON object requested, multiple (or no) rows returned" });
   assertEquals(await store.fetchThought("t-1"), { error: "database exploded" });
 });
+
+Deno.test("U71 matchThoughts calls RPC match_thoughts with query_embedding, match_threshold, match_count and filter {}", async () => {
+  const { ff, store } = setup();
+  ff.on("POST", `${REST}/rpc/match_thoughts`, { body: [] });
+  await store.matchThoughts([0.1, 0.2, 0.3], 0.42, 7);
+  assertEquals(ff.requests.length, 1);
+  assertEquals(ff.requests[0].method, "POST");
+  assertEquals(ff.requests[0].body, {
+    query_embedding: [0.1, 0.2, 0.3],
+    match_threshold: 0.42,
+    match_count: 7,
+    filter: {},
+  });
+});
