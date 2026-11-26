@@ -375,3 +375,12 @@ Deno.test("U121 config gate: no model request and no store call happen under a b
   assertEquals(fake.requests, []);
   assertEquals(store.calls, []);
 });
+
+Deno.test("U122 config gate: tools/list still returns the six tools under a bad configuration", async () => {
+  const { client } = await rig({});
+  const { tools } = await client.listTools();
+  assertEquals(
+    tools.map((t: { name: string }) => t.name).sort(),
+    ["capture_thought", "fetch", "list_thoughts", "search", "search_thoughts", "thought_stats"],
+  );
+});
