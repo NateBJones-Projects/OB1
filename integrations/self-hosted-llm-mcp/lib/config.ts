@@ -1,6 +1,8 @@
 import type { EndpointConfig, GetEnv, OkConfig, ResolvedConfig, Warning } from "./types.ts";
 
 export function resolveConfig(getEnv: GetEnv): ResolvedConfig {
+  const missing = ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"].filter((n) => getEnv(n) === undefined);
+  if (missing.length > 0) return { ok: false, missing, invalid: [] };
   const embedding: EndpointConfig = {
     role: "embedding",
     base: getEnv("EMBEDDING_API_BASE")!,

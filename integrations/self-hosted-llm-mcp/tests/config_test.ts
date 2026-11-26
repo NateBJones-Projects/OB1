@@ -60,3 +60,9 @@ Deno.test("U5 CHAT_API_BASE and CHAT_API_KEY set: chat uses its own values", () 
   assertEquals(r.chat.key, "ck");
   assertEquals(r.chatInherits, []);
 });
+
+Deno.test("U6 nothing set: missing lists the three required settings in order", () => {
+  const r = resolveConfig(envOf({}));
+  assert(!r.ok);
+  assertEquals(r.missing, ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"]);
+});
