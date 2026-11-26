@@ -182,13 +182,13 @@ Deno.test("A6 capture_thought with the embedding base unreachable names the base
 
 Deno.test("A7 capture_thought with an unknown embedding model names the model and stores nothing", async () => {
   const fake = new FakeFetch()
-    .on("POST", `${BASE}/embeddings`, { status: 404, body: { error: { message: `model "${EMB_MODEL}" not found` } } })
+    .on("POST", `${BASE}/embeddings`, { status: 404, body: { error: { message: "not found" } } })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
   const store = new FakeStore();
   const app = createApp(makeDeps(baseEnv(), fake, store));
   const r = await callTool(app, "capture_thought", { content: "will not be stored" });
   assertEquals(r.isError, true);
-  assertStringIncludes(r.text, EMB_MODEL);
+  assertStringIncludes(r.text, `The embedding model "${EMB_MODEL}" was not found on the model server at ${BASE}.`);
   assertEquals(store.rows.length, 0);
 });
 
