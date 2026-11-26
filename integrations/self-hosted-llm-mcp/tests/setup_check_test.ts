@@ -59,3 +59,19 @@ Deno.test("U148 config shows each role's base, model and key_set, chat inherits,
     timeout_ms: 5000,
   });
 });
+
+Deno.test("U149 no key value appears anywhere in the report", async () => {
+  const env = {
+    ...BASE_ENV,
+    EMBEDDING_API_KEY: "sk-emb-SECRET",
+    CHAT_API_BASE: "http://chat.test/v1",
+    CHAT_API_KEY: "sk-chat-SECRET",
+  };
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, { status: 500, body: "boom sk-emb-SECRET" })
+    .on("POST", `${BASE}/embeddings`, { status: 500, body: "bad key sk-emb-SECRET and sk-chat-SECRET" })
+    .on("GET", "http://chat.test/v1/models", modelsReply(["chat-m"]))
+    .on("POST", "http://chat.test/v1/chat/completions", { status: 500, body: "bad key sk-chat-SECRET" });
+  const text = JSON.stringify(await runSetupCheck(setup(env, fake).deps));
+  assert(!text.includes("SECRET"), text);
+});
