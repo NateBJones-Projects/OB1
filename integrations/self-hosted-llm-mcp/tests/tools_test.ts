@@ -676,3 +676,30 @@ Deno.test("U144 the compensating delete uses the read-back id and timestamp", as
   assertEquals(reads.map((c) => c.args), [[id]]);
   assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall").map((c) => c.args), [[id, T]]);
 });
+
+Deno.test("U145 no tool reply contains any of the four secrets, even when the fake servers and store errors echo them", async () => {
+  const EK = "emb-secret-AAAA1111", CK = "chat-secret-BBBB2222", MK = "mcp-secret-CCCC3333", SK = "service-role-DDDD4444";
+  const env = { ...GOOD_ENV, EMBEDDING_API_KEY: EK, CHAT_API_KEY: CK, MCP_ACCESS_KEY: MK, SUPABASE_SERVICE_ROLE_KEY: SK };
+  const echo = `rejected ${EK} / ${CK} / ${MK} / ${SK}`;
+  const secrets = [EK, CK, MK, SK];
+  const paths: { label: string; opts?: { embedding?: Handler; chat?: Handler }; fail?: Record<string, string>; call: [string, Record<string, unknown>] }[] = [
+    { label: "fetch store error", fail: { fetchThought: echo }, call: ["fetch", { id: "x" }] },
+    { label: "list store error", fail: { listThoughts: echo }, call: ["list_thoughts", {}] },
+    { label: "search store error", fail: { matchThoughts: echo }, call: ["search", { query: "q" }] },
+    { label: "search_thoughts store error", fail: { matchThoughts: echo }, call: ["search_thoughts", { query: "q" }] },
+    { label: "search embedding echo", opts: { embedding: { status: 500, body: echo } }, call: ["search", { query: "q" }] },
+    { label: "capture embedding echo", opts: { embedding: { status: 500, body: echo } }, call: ["capture_thought", { content: "c" }] },
+    { label: "capture chat echo", opts: { chat: { status: 500, body: echo } }, call: ["capture_thought", { content: "c" }] },
+    { label: "capture upsert error", fail: { upsertThought: echo }, call: ["capture_thought", { content: "c" }] },
+    { label: "capture setEmbedding error", fail: { setEmbedding: echo }, call: ["capture_thought", { content: "c" }] },
+    { label: "capture readBack error", fail: { setEmbedding: echo, readBack: echo }, call: ["capture_thought", { content: "c" }] },
+  ];
+  for (const p of paths) {
+    const { client, store } = await rig(env, p.opts);
+    Object.assign(store.fail, p.fail ?? {});
+    const result = await client.callTool({ name: p.call[0], arguments: p.call[1] });
+    const t = textOf(result);
+    assert(t.length > 0, p.label);
+    for (const secret of secrets) assert(!t.includes(secret), `${p.label}: reply contains a secret: ${t}`);
+  }
+});

@@ -21,6 +21,13 @@ const notYet = (): Promise<ToolReply> => Promise.resolve({ content: [{ type: "te
 
 export function buildServer(deps: Deps): McpServer {
   const { store } = deps;
+  /** Replaces every secret value (longest first) so no reply can carry one, whatever a server or the database echoed. */
+  const redactSecrets = (input: string): string =>
+    ["EMBEDDING_API_KEY", "CHAT_API_KEY", "MCP_ACCESS_KEY", "SUPABASE_SERVICE_ROLE_KEY"]
+      .map((name) => deps.getEnv(name))
+      .filter((v): v is string => !!v && v.trim() !== "")
+      .sort((a, b) => b.length - a.length)
+      .reduce((out, secret) => out.split(secret).join("[redacted]"), input);
   /** The configuration gate: every tool resolves the configuration on each call and refuses under a bad one. */
   const gate = <A>(run: (args: A, ctx: { config: OkConfig; client: ModelClient }) => Promise<ToolReply>) =>
   async (args: A): Promise<ToolReply> => {
@@ -34,7 +41,8 @@ export function buildServer(deps: Deps): McpServer {
         true,
       );
     }
-    return await run(args, { config, client: createModelClient(config, deps.modelFetch) });
+    const reply = await run(args, { config, client: createModelClient(config, deps.modelFetch) });
+    return { ...reply, content: reply.content.map((c) => ({ ...c, text: redactSecrets(c.text) })) };
   };
   const thoughtUrl = (id: string): string =>
     `${(deps.getEnv("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts").replace(/\/$/, "")}/${id}`;
