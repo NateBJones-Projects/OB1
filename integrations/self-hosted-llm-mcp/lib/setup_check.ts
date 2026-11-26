@@ -1,4 +1,4 @@
-import { resolveConfig } from "./config.ts";
+import { keyOverHttpWarnings, resolveConfig } from "./config.ts";
 import { parseUsableMetadata } from "./metadata.ts";
 import { createModelClient } from "./model_client.ts";
 import type { CheckResult, Deps, ModelResult, OkConfig, Role, SetupConfigBlock, SetupReport } from "./types.ts";
@@ -81,5 +81,5 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     modelCheck("chat", config.chat.model, chatModels, chat),
     chatMetadata(chat),
   ];
-  return { ok: checks.every((c) => c.ok), checks, warnings: [], thoughts: { other_model: null }, config: configBlock(config) };
+  return { ok: checks.every((c) => c.ok), checks, warnings: keyOverHttpWarnings(config), thoughts: { other_model: null }, config: configBlock(config) };
 }

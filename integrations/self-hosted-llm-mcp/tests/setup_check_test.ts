@@ -370,3 +370,20 @@ Deno.test("U171 one run sends one embedding call, one chat call and one /models 
     assertEquals(fake.requests.length, 4);
   }
 });
+
+Deno.test("U172 a key_over_http warning is reported and leaves ok true", async () => {
+  const report = await runSetupCheck(setup({ ...BASE_ENV, EMBEDDING_API_KEY: "sk-secret" }).deps);
+  assertEquals(report.ok, true);
+  assertEquals(report.warnings, [
+    {
+      id: "key_over_http",
+      role: "embedding",
+      message: "An access key is configured for the embedding endpoint, but it uses http://; the key travels unencrypted.",
+    },
+    {
+      id: "key_over_http",
+      role: "chat",
+      message: "An access key is configured for the chat endpoint, but it uses http://; the key travels unencrypted.",
+    },
+  ]);
+});
