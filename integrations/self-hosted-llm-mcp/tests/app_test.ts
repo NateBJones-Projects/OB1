@@ -89,3 +89,17 @@ Deno.test("U185 a wrong x-brain-key and a wrong ?key= are each refused", async (
     assertEquals((r.message as { error: { code: number } }).error.code, -32001);
   }
 });
+
+function toolNames(message: Record<string, unknown> | null): string[] {
+  return ((message as { result: { tools: { name: string }[] } }).result.tools).map((t) => t.name);
+}
+
+Deno.test("U186 a correct x-brain-key, and a correct ?key= alone, each reach the MCP route", async () => {
+  const app = createApp(makeDeps());
+  const viaHeader = await mcpCall(app.fetch, "tools/list", {}, { key: KEY });
+  const viaQuery = await mcpCall(app.fetch, "tools/list", {}, { key: KEY, via: "query" });
+  for (const r of [viaHeader, viaQuery]) {
+    assertEquals(r.status, 200);
+    assert(toolNames(r.message).includes("capture_thought"));
+  }
+});

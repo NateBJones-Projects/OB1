@@ -1,3 +1,6 @@
+import { StreamableHTTPTransport } from "npm:@hono/mcp@0.1.1";
+import { Hono } from "npm:hono@4.9.2";
+import { buildServer } from "./tools.ts";
 import type { Deps, FetchApp } from "./types.ts";
 
 const corsHeaders = {
@@ -41,11 +44,28 @@ function unauthorizedResponse(id: string | number | null): Response {
   });
 }
 
-export function createApp(_deps: Deps): FetchApp {
+/** One fresh server and transport per request, as in core. */
+async function serveMcp(deps: Deps, request: Request): Promise<Response> {
+  const server = buildServer(deps);
+  const transport = new StreamableHTTPTransport();
+  await server.connect(transport);
+  const hono = new Hono();
+  hono.all("*", (c) => transport.handleRequest(c));
+  const response = await hono.fetch(request);
+  for (const [k, v] of Object.entries(corsHeaders)) response.headers.set(k, v);
+  return response;
+}
+
+export function createApp(deps: Deps): FetchApp {
   return {
     async fetch(request: Request): Promise<Response> {
       if (request.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
-      return unauthorizedResponse(extractJsonRpcId(await readBodyText(request)));
+      const provided = request.headers.get("x-brain-key") || new URL(request.url).searchParams.get("key");
+      const accessKey = deps.getEnv("MCP_ACCESS_KEY");
+      if (!provided || !accessKey || provided !== accessKey) {
+        return unauthorizedResponse(extractJsonRpcId(await readBodyText(request)));
+      }
+      return await serveMcp(deps, request);
     },
   };
 }
