@@ -297,3 +297,10 @@ Deno.test("U115 a successful capture stores extracted metadata plus source, embe
     { topics: ["alpha"], type: "idea", people: ["Ada"], source: "mcp", embedding_model: "embed-1", enrichment_status: "complete" },
   ]);
 });
+
+Deno.test("U116 a successful capture stores the model's vector as the row's embedding", async () => {
+  const { client, store } = await rig(GOOD_ENV, { embedding: embeddingReply(axisVector(7)) });
+  await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.rows[0].embedding, axisVector(7));
+});
