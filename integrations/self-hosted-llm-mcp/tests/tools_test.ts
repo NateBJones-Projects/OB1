@@ -473,3 +473,12 @@ Deno.test("U128 capture with a 768-length embedding returns the exact wrong_dime
   assertEquals(store.calls, []);
   assertEquals(store.rows, []);
 });
+
+Deno.test("U129 capture whose embedding fails while chat succeeds stores nothing", async () => {
+  const { client, fake, store } = await rig(GOOD_ENV, { embedding: { status: 500, body: "boom" } });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(fake.requests.filter((r) => r.url === `${BASE}/chat/completions`).length, 1);
+  assertEquals(store.calls, []);
+  assertEquals(store.rows, []);
+});
