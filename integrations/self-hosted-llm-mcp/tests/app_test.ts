@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@^1";
-import { createApp } from "../lib/app.ts";
+import { createApp, productionDeps } from "../lib/app.ts";
 import type { Deps } from "../lib/types.ts";
 import { FakeFetch } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
@@ -181,4 +181,34 @@ Deno.test("U192 the MCP route serves the tools built from the injected deps", as
   const text = (message as { result: { content: { text: string }[] } }).result.content[0].text;
   assertStringIncludes(text, "Total thoughts: 2");
   assertEquals(store.calls.some((c) => c.method === "stats"), true);
+});
+
+Deno.test("U193 productionDeps reads Deno.env, uses globalThis.fetch and builds the store from the Supabase settings", async () => {
+  const saved = { fetch: globalThis.fetch, url: Deno.env.get("SUPABASE_URL"), key: Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") };
+  const seen: Request[] = [];
+  const stub: typeof fetch = (input, init) => {
+    seen.push(input instanceof Request ? input : new Request(input, init));
+    return Promise.resolve(new Response("[]", { status: 200, headers: { "content-type": "application/json", "content-range": "*/7" } }));
+  };
+  try {
+    globalThis.fetch = stub;
+    Deno.env.set("SUPABASE_URL", "http://db.test");
+    Deno.env.set("SUPABASE_SERVICE_ROLE_KEY", "service-role-secret");
+    Deno.env.set("SHL_U193_PROBE", "probe-value");
+    const deps = productionDeps();
+    assertEquals(deps.getEnv("SHL_U193_PROBE"), "probe-value");
+    assertEquals(deps.getEnv("SHL_U193_ABSENT"), undefined);
+    assert(deps.modelFetch === stub, "modelFetch is globalThis.fetch");
+    await deps.store.countAll();
+    assert(seen.length > 0, "the store made a request through fetch");
+    assert(seen[0].url.startsWith("http://db.test/"), seen[0].url);
+    assertEquals(seen[0].headers.get("apikey"), "service-role-secret");
+  } finally {
+    globalThis.fetch = saved.fetch;
+    Deno.env.delete("SHL_U193_PROBE");
+    for (const [name, v] of [["SUPABASE_URL", saved.url], ["SUPABASE_SERVICE_ROLE_KEY", saved.key]] as const) {
+      if (v === undefined) Deno.env.delete(name);
+      else Deno.env.set(name, v);
+    }
+  }
 });

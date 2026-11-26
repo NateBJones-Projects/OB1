@@ -1,5 +1,6 @@
 import { StreamableHTTPTransport } from "npm:@hono/mcp@0.1.1";
 import { Hono } from "npm:hono@4.9.2";
+import { createSupabaseThoughtStore } from "./thought_store.ts";
 import { buildServer } from "./tools.ts";
 import type { Deps, FetchApp } from "./types.ts";
 
@@ -83,5 +84,10 @@ export function createApp(deps: Deps): FetchApp {
 }
 
 export function productionDeps(): Deps {
-  throw new Error("not implemented");
+  const getEnv = (name: string) => Deno.env.get(name);
+  return {
+    getEnv,
+    modelFetch: globalThis.fetch,
+    store: createSupabaseThoughtStore(getEnv("SUPABASE_URL") ?? "", getEnv("SUPABASE_SERVICE_ROLE_KEY") ?? "", globalThis.fetch),
+  };
 }
