@@ -28,3 +28,18 @@ Deno.test("U28 parseUsableMetadata is unusable for a JSON array, number, string 
     assertEquals(parseUsableMetadata(reply), null, reply);
   }
 });
+
+Deno.test("U29 parseUsableMetadata is unusable for non-JSON, empty, fenced non-JSON, prose around a fence, or two fences", () => {
+  const replies = [
+    "not json at all",
+    "",
+    "   \n ",
+    "{ broken",
+    "```json\nnot json\n```",
+    'Here you go:\n```json\n{"topics":["a"]}\n```',
+    '```json\n{"topics":["a"]}\n```\nHope that helps!',
+    '```json\n{"a":1}\n```\n```json\n{"b":2}\n```',
+    '```json\n{"a":1}\n```\n\n```\n{"b":2}\n```',
+  ];
+  for (const reply of replies) assertEquals(parseUsableMetadata(reply), null, JSON.stringify(reply));
+});
