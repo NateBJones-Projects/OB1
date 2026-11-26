@@ -308,7 +308,7 @@ Deno.test("A16 a FETCH_TIMEOUT_MS larger than the server delay lets the capture 
   assertEquals(store.rows.length, 1);
 });
 
-todo("A17 with no chat settings besides CHAT_MODEL the chat request goes to the embedding base", async () => {
+Deno.test("A17 with no chat settings besides CHAT_MODEL the chat request goes to the embedding base", async () => {
   const fake = healthy();
   const app = createApp(makeDeps(baseEnv(), fake));
   const r = await callTool(app, "capture_thought", { content: "inherit the base" });
