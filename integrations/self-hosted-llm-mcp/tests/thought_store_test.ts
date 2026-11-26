@@ -105,3 +105,12 @@ Deno.test("U74 listThoughts with no filters requests core's columns ordered crea
     ["select", "content,metadata,created_at"],
   ]);
 });
+
+Deno.test("U75 listThoughts adds a metadata contains {type} filter only when type is given", async () => {
+  const { ff, store } = setup();
+  ff.on("GET", `${REST}/thoughts`, { body: [] });
+  await store.listThoughts({ limit: 5, type: "idea" });
+  await store.listThoughts({ limit: 5 });
+  assertEquals(params(ff.requests[0]).getAll("metadata"), ['cs.{"type":"idea"}']);
+  assertEquals(params(ff.requests[1]).has("metadata"), false);
+});

@@ -34,11 +34,13 @@ export function createSupabaseThoughtStore(
       return { data: data as ThoughtMatch[] };
     },
     async listThoughts(filters: ListFilters): Promise<StoreResult<ListRow[]>> {
-      const { data } = await supabase
+      let q = supabase
         .from("thoughts")
         .select("content, metadata, created_at")
         .order("created_at", { ascending: false })
         .limit(filters.limit);
+      if (filters.type) q = q.contains("metadata", { type: filters.type });
+      const { data } = await q;
       return { data: data as ListRow[] };
     },
     stats: notImplemented,
