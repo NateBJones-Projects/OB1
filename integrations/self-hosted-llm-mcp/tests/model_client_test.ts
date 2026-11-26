@@ -95,3 +95,21 @@ Deno.test("U39 a role with no key sends no Authorization header at all", async (
   assertEquals(ff.requests.length, 3);
   for (const r of ff.requests) assert(!("authorization" in r.headers));
 });
+
+Deno.test("U40 each role sends its own key when the two keys differ", async () => {
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${CHAT}/chat/completions`, chatReply("{}"))
+    .on("GET", `${EMB}/models`, modelsReply([]));
+  const c = createModelClient(cfg({ embKey: "sk-emb", chatKey: "sk-chat" }), ff.fetch);
+  await c.embed("a");
+  await c.chat("a");
+  await c.listModels("embedding");
+  await c.listModels("chat");
+  assertEquals(ff.requests.map((r) => r.headers["authorization"]), [
+    "Bearer sk-emb",
+    "Bearer sk-chat",
+    "Bearer sk-emb",
+    "Bearer sk-chat",
+  ]);
+});
