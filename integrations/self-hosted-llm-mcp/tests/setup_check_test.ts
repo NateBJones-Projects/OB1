@@ -353,22 +353,25 @@ Deno.test("U170 when chat inherits the embedding base, both roles are reported s
   assert(fake.requests.some((r) => r.url === `${BASE}/chat/completions`));
 });
 
-Deno.test("U171 one run sends one embedding call, one chat call and one /models request per role", async () => {
-  for (const env of [BASE_ENV, SPLIT_ENV]) {
-    const fake = env === BASE_ENV ? healthyFake() : splitFake();
-    await runSetupCheck(setup(env, fake).deps);
-    const count = (method: string, url: string) => fake.requests.filter((r) => r.method === method && r.url === url).length;
-    const chatBase = env === BASE_ENV ? BASE : CHAT_BASE;
-    assertEquals(count("POST", `${BASE}/embeddings`), 1);
-    assertEquals(count("POST", `${chatBase}/chat/completions`), 1);
-    if (chatBase === BASE) {
-      assertEquals(count("GET", `${BASE}/models`), 2);
-    } else {
-      assertEquals(count("GET", `${BASE}/models`), 1);
-      assertEquals(count("GET", `${chatBase}/models`), 1);
-    }
-    assertEquals(fake.requests.length, 4);
-  }
+Deno.test("U171 shared base: one embedding call, one chat call and two /models requests on the one base", async () => {
+  const fake = healthyFake();
+  await runSetupCheck(setup(BASE_ENV, fake).deps);
+  const count = (method: string, url: string) => fake.requests.filter((r) => r.method === method && r.url === url).length;
+  assertEquals(count("POST", `${BASE}/embeddings`), 1);
+  assertEquals(count("POST", `${BASE}/chat/completions`), 1);
+  assertEquals(count("GET", `${BASE}/models`), 2);
+  assertEquals(fake.requests.length, 4);
+});
+
+Deno.test("U171 split bases: one embedding call, one chat call and one /models request per base", async () => {
+  const fake = splitFake();
+  await runSetupCheck(setup(SPLIT_ENV, fake).deps);
+  const count = (method: string, url: string) => fake.requests.filter((r) => r.method === method && r.url === url).length;
+  assertEquals(count("POST", `${BASE}/embeddings`), 1);
+  assertEquals(count("POST", `${CHAT_BASE}/chat/completions`), 1);
+  assertEquals(count("GET", `${BASE}/models`), 1);
+  assertEquals(count("GET", `${CHAT_BASE}/models`), 1);
+  assertEquals(fake.requests.length, 4);
 });
 
 Deno.test("U172 a key_over_http warning is reported and leaves ok true", async () => {
