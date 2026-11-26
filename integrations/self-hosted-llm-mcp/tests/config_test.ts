@@ -129,3 +129,9 @@ Deno.test("U13 a base without a scheme is invalid, names its setting, and is not
   assertEquals(r.invalid[0].setting, "EMBEDDING_API_BASE");
   assert(r.invalid[0].reason.includes("http://") && r.invalid[0].reason.includes("https://"));
 });
+
+Deno.test("U14 an ftp:// base is invalid and names its setting", () => {
+  const r = resolveConfig(envOf({ ...MIN, EMBEDDING_API_BASE: "ftp://host/v1" }));
+  assert(!r.ok);
+  assertEquals(r.invalid.map((i) => i.setting), ["EMBEDDING_API_BASE"]);
+});
