@@ -224,9 +224,12 @@ export function buildServer(deps: Deps): McpServer {
       if (Array.isArray(meta.action_items) && meta.action_items.length) {
         confirmation += ` | Actions: ${(meta.action_items as string[]).join("; ")}`;
       }
-      if (!chatted.ok) {
-        confirmation += `\nMetadata extraction skipped: ${chatted.message.replace(/\.$/, "")}. Saved with default metadata.`;
-      }
+      const skipReason = !chatted.ok
+        ? chatted.message.replace(/\.$/, "")
+        : extracted === null
+        ? `the chat model's reply was not a JSON object`
+        : null;
+      if (skipReason !== null) confirmation += `\nMetadata extraction skipped: ${skipReason}. Saved with default metadata.`;
       return text(confirmation);
     } catch (err) {
       return errorText(err);

@@ -530,3 +530,16 @@ Deno.test("U132 capture with a chat 5xx or missing choices stores the fallback r
     assert(t.endsWith(". Saved with default metadata."), t);
   }
 });
+
+Deno.test("U133 capture with chat content that is not a JSON object stores the fallback row with the skip line", async () => {
+  for (const content of ["Sure! Here is the metadata.", "[1,2]", "42", "null"]) {
+    const { client, store } = await rig(GOOD_ENV, { chat: chatReply(content) });
+    const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+    assert(!result.isError, content);
+    assertEquals(store.rows[0].metadata, FALLBACK_META, content);
+    const t = textOf(result);
+    assert(t.startsWith("Captured as observation — uncategorized\nMetadata extraction skipped: "), t);
+    assert(t.endsWith(". Saved with default metadata."), t);
+    assertStringIncludes(t, "JSON object");
+  }
+});
