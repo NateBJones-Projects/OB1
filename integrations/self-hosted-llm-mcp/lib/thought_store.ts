@@ -100,14 +100,16 @@ export function createSupabaseThoughtStore(
       return { data: { deleted: (data?.length ?? 0) > 0 } };
     },
     async countAll(): Promise<StoreResult<number>> {
-      const { count } = await supabase.from("thoughts").select("*", { count: "exact", head: true });
+      const { count, error } = await supabase.from("thoughts").select("*", { count: "exact", head: true });
+      if (error) return { error: error.message };
       return { data: count as number };
     },
     async countWithModel(model: string): Promise<StoreResult<number>> {
-      const { count } = await supabase
+      const { count, error } = await supabase
         .from("thoughts")
         .select("*", { count: "exact", head: true })
         .eq("metadata->>embedding_model", model);
+      if (error) return { error: error.message };
       return { data: count as number };
     },
   };

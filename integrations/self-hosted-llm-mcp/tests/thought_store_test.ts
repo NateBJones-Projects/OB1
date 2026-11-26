@@ -386,3 +386,13 @@ Deno.test("U97 model names reach the request intact (qwen3-embedding:4b, openai/
     assertEquals(params(ff.requests[i]).getAll("metadata->>embedding_model"), [`eq.${name}`]);
   });
 });
+
+Deno.test("U98 both counts return { error } for a database error", async () => {
+  const { ff, store } = setup();
+  ff.on("HEAD", `${REST}/thoughts`, { status: 500 });
+  const all = await store.countAll();
+  assert("error" in all, "countAll must report the failure");
+  const withModel = await store.countWithModel("m");
+  assert("error" in withModel, "countWithModel must report the failure");
+  assertEquals(typeof (withModel as { error: string }).error, "string");
+});
