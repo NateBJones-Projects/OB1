@@ -75,3 +75,11 @@ Deno.test("U149 no key value appears anywhere in the report", async () => {
   const text = JSON.stringify(await runSetupCheck(setup(env, fake).deps));
   assert(!text.includes("SECRET"), text);
 });
+
+Deno.test("U150 a missing setting fails config with a reason naming each missing setting", async () => {
+  const { deps } = setup({});
+  const report = await runSetupCheck(deps);
+  const c = check(report.checks, "config");
+  assertEquals(c.ok, false);
+  for (const name of ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"]) assertStringIncludes(c.reason ?? "", name);
+});

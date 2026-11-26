@@ -12,7 +12,10 @@ function configBlock(c: OkConfig): SetupConfigBlock {
 
 export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
   const config = resolveConfig(deps.getEnv);
-  if (!config.ok) throw new Error("not implemented");
+  if (!config.ok) {
+    const reason = `Missing required settings: ${config.missing.join(", ")}.`;
+    return { ok: false, checks: [{ id: "config", ok: false, reason }], warnings: [], thoughts: { other_model: null }, config: null };
+  }
   const client = createModelClient(config, deps.modelFetch);
   const [embedding, chat] = await Promise.all([client.embed("sample"), client.chat("sample")]);
   const checks: CheckResult[] = [
