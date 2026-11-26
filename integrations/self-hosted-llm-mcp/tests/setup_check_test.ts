@@ -181,3 +181,13 @@ Deno.test("U157 role reachable fails with auth_rejected on a 401 or 403", async 
     assertEquals(check(checks, "chat_reachable").ok, true);
   }
 });
+
+Deno.test("U158 role reachable fails as unreachable, naming the base, on a network error", async () => {
+  const fake = splitFake({ chatModels: { networkError: "connection refused" } });
+  const { checks } = await runSetupCheck(setup(SPLIT_ENV, fake).deps);
+  const c = check(checks, "chat_reachable");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", CHAT_BASE);
+  assertStringIncludes(c.reason ?? "", "could not be reached");
+  assertEquals(check(checks, "embedding_reachable").ok, true);
+});
