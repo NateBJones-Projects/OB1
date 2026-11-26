@@ -162,3 +162,14 @@ Deno.test("U18 FETCH_TIMEOUT_MS \"0\", \"-5\", \"60s\", \"1.5\", \"abc\" are inv
     assertEquals(r.missing, []);
   }
 });
+
+Deno.test("U19 missing and invalid settings are reported together", () => {
+  const r = resolveConfig(envOf({
+    EMBEDDING_API_BASE: "ollama:11434",
+    CHAT_API_BASE: "ftp://c/v1",
+    FETCH_TIMEOUT_MS: "abc",
+  }));
+  assert(!r.ok);
+  assertEquals(r.missing, ["EMBEDDING_MODEL", "CHAT_MODEL"]);
+  assertEquals(r.invalid.map((i) => i.setting), ["EMBEDDING_API_BASE", "CHAT_API_BASE", "FETCH_TIMEOUT_MS"]);
+});
