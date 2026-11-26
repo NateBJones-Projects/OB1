@@ -183,3 +183,21 @@ Deno.test("U20 two calls with different environments each return their own value
   assert(!bad.ok);
   assert(ok(MIN).ok);
 });
+
+Deno.test("U21 no missing, invalid or reason text contains a key value", () => {
+  const EK = "sk-embed-SECRET-123";
+  const CK = "sk-chat-SECRET-456";
+  const envs: Record<string, string>[] = [
+    { EMBEDDING_API_KEY: EK, CHAT_API_KEY: CK },
+    { EMBEDDING_API_KEY: EK, CHAT_API_KEY: CK, EMBEDDING_API_BASE: "ollama:11434", EMBEDDING_MODEL: "m", CHAT_MODEL: "c" },
+    { ...MIN, EMBEDDING_API_KEY: EK, CHAT_API_KEY: CK, CHAT_API_BASE: "ftp://x", FETCH_TIMEOUT_MS: "abc" },
+    // a key value that looks like a bad base or timeout must still not be echoed
+    { ...MIN, EMBEDDING_API_BASE: EK, CHAT_API_KEY: CK, FETCH_TIMEOUT_MS: CK },
+  ];
+  for (const vars of envs) {
+    const r = resolveConfig(envOf(vars));
+    assert(!r.ok);
+    const text = JSON.stringify([r.missing, r.invalid]);
+    assert(!text.includes(EK) && !text.includes(CK), text);
+  }
+});
