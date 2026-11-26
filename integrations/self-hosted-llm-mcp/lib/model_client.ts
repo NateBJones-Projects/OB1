@@ -4,12 +4,13 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
   return {
     async embed(text: string): Promise<ModelResult<number[]>> {
       const ep = config.embedding;
-      await doFetch(`${ep.base}/embeddings`, {
+      const res = await doFetch(`${ep.base}/embeddings`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ model: ep.model, input: text, dimensions: 1536 }),
       });
-      return { ok: false, kind: "bad_response", message: "not implemented" };
+      const json = await res.json();
+      return { ok: true, value: json.data[0].embedding };
     },
     chat(): Promise<ModelResult<string>> {
       throw new Error("not implemented");

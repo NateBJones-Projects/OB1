@@ -27,3 +27,10 @@ Deno.test("U33 embed sends one POST /embeddings with model, input, dimensions 15
   assertEquals(r.body, { model: "qwen3-embedding:4b", input: "hello", dimensions: 1536 });
   assertEquals(r.headers["content-type"], "application/json");
 });
+
+Deno.test("U34 embed returns ok with the vector for a 2xx 1536-number reply", async () => {
+  const v = axisVector(7);
+  const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(v));
+  const r = await createModelClient(cfg(), ff.fetch).embed("hello");
+  assertEquals(r, { ok: true, value: v });
+});
