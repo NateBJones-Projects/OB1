@@ -212,3 +212,13 @@ Deno.test("U160 role model passes when the model is listed", async () => {
   assertEquals(check(checks, "embedding_model").ok, true);
   assertEquals(check(checks, "chat_model").ok, true);
 });
+
+Deno.test("U161 role model passes when the model is not listed but the real call succeeded", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["something-else"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  assertEquals(check(checks, "embedding_model").ok, true);
+  assertEquals(check(checks, "chat_model").ok, true);
+});
