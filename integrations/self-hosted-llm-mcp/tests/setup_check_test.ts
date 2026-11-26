@@ -222,3 +222,17 @@ Deno.test("U161 role model passes when the model is not listed but the real call
   assertEquals(check(checks, "embedding_model").ok, true);
   assertEquals(check(checks, "chat_model").ok, true);
 });
+
+Deno.test("U162 role model fails with model_not_found naming the model when unlisted and the real call reports it unknown", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["something-else"]))
+    .on("POST", `${BASE}/embeddings`, { status: 404, body: "no such model" })
+    .on("POST", `${BASE}/chat/completions`, { status: 404, body: "no such model" });
+  const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  for (const [id, model] of [["embedding_model", "emb-m"], ["chat_model", "chat-m"]]) {
+    const c = check(checks, id);
+    assertEquals(c.ok, false, id);
+    assertStringIncludes(c.reason ?? "", `"${model}"`);
+    assertStringIncludes(c.reason ?? "", "not found");
+  }
+});

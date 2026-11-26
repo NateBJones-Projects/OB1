@@ -21,6 +21,19 @@ function reachable(role: Role, listing: ModelResult<string[] | null>): CheckResu
   return { id, role, ok: true };
 }
 
+/** Passes when the server lists the model, or the role's real call worked; otherwise the real call's failure. */
+function modelCheck(
+  role: Role,
+  model: string,
+  listing: ModelResult<string[] | null>,
+  call: ModelResult<unknown>,
+): CheckResult {
+  const id = role === "embedding" ? "embedding_model" : "chat_model";
+  if (listing.ok && listing.value?.includes(model)) return { id, role, ok: true };
+  if (call.ok) return { id, role, ok: true };
+  return { id, role, ok: false, reason: call.message };
+}
+
 function configBlock(c: OkConfig): SetupConfigBlock {
   return {
     embedding: { base: c.embedding.base, model: c.embedding.model, key_set: c.embedding.key !== undefined },
@@ -53,10 +66,10 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
   const checks: CheckResult[] = [
     { id: "config", ok: true },
     reachable("embedding", embeddingModels),
-    { id: "embedding_model", role: "embedding", ok: true },
+    modelCheck("embedding", config.embedding.model, embeddingModels, embedding),
     { id: "embedding_dimension", role: "embedding", ok: embedding.ok },
     reachable("chat", chatModels),
-    { id: "chat_model", role: "chat", ok: true },
+    modelCheck("chat", config.chat.model, chatModels, chat),
     { id: "chat_metadata", role: "chat", ok: chat.ok && parseUsableMetadata(chat.value) !== null },
   ];
   return { ok: checks.every((c) => c.ok), checks, warnings: [], thoughts: { other_model: null }, config: configBlock(config) };
