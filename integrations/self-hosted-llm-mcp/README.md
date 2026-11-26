@@ -258,6 +258,21 @@ Other fields:
 **Issue: A tool or the setup check says "Model endpoint not configured: missing ..."**
 Solution: Set each setting the message names (see [Configure](#configure)). The same message appears for a base URL without `http://` or `https://` and for a `FETCH_TIMEOUT_MS` that is not a positive integer. On Supabase Cloud, new secrets apply after the next request. On a self-hosted stack, restart the `functions` service.
 
+**Reference: exact message shapes**
+Missing settings:
+
+```text
+Model endpoint not configured: missing EMBEDDING_API_BASE, EMBEDDING_MODEL. Set these as function secrets (see README → Configure).
+```
+
+Invalid settings (the setting name, then the reason in parentheses):
+
+```text
+Model endpoint not configured: invalid EMBEDDING_API_BASE (must start with http:// or https://), invalid FETCH_TIMEOUT_MS (must be a positive whole number of milliseconds). Set these as function secrets (see README → Configure).
+```
+
+When both kinds are present, the two parts are joined with a semicolon and a space, missing first: `missing A; invalid B (reason)`. A tool whose embedding call fails returns the word Error, a colon and a space, then the cause, the same prefix core Open Brain uses.
+
 **Issue: The server could not be reached (`embedding_reachable` or `chat_reachable` fails, or a capture names the base URL as unreachable)**
 Solution: Check from where the function runs, not from your laptop. On Supabase Cloud, the model server must be public over HTTPS behind a key; see [Supabase Cloud reachability](#supabase-cloud-reachability). On a self-hosted stack, use an address the `functions` container can resolve, such as a Compose service name. Nothing is stored when the embedding server is unreachable.
 
