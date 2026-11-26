@@ -132,7 +132,7 @@ Deno.test("A4 list_thoughts and thought_stats return core's output text for the 
   assertStringIncludes(stats.text, "  Ana: 1");
 });
 
-todo("A5 capture, search, list and stats succeed with every model request on the configured base", async () => {
+Deno.test("A5 capture, search, list and stats succeed with every model request on the configured base", async () => {
   const fake = healthy();
   const app = createApp(makeDeps(baseEnv(), fake));
   for (
