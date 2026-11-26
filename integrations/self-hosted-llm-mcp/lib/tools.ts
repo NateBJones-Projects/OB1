@@ -3,7 +3,7 @@ import { z } from "npm:zod@4.1.13";
 import { resolveConfig } from "./config.ts";
 import { buildCaptureMetadata, parseUsableMetadata } from "./metadata.ts";
 import { createModelClient } from "./model_client.ts";
-import type { Deps, ModelClient } from "./types.ts";
+import type { Deps, ModelClient, OkConfig } from "./types.ts";
 
 type ToolReply = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -20,6 +20,21 @@ const notYet = (): Promise<ToolReply> => Promise.resolve({ content: [{ type: "te
 
 export function buildServer(deps: Deps): McpServer {
   const { store } = deps;
+  /** The configuration gate: every tool resolves the configuration on each call and refuses under a bad one. */
+  const gate = <A>(run: (args: A, ctx: { config: OkConfig; client: ModelClient }) => Promise<ToolReply>) =>
+  async (args: A): Promise<ToolReply> => {
+    const config = resolveConfig(deps.getEnv);
+    if (!config.ok) {
+      const parts: string[] = [];
+      if (config.missing.length) parts.push(`missing ${config.missing.join(", ")}`);
+      if (config.invalid.length) parts.push(`invalid ${config.invalid.map((i) => `${i.setting} (${i.reason})`).join(", ")}`);
+      return text(
+        `Model endpoint not configured: ${parts.join("; ")}. Set these as function secrets (see README → Configure).`,
+        true,
+      );
+    }
+    return await run(args, { config, client: createModelClient(config, deps.modelFetch) });
+  };
   /** Resolves the configuration for this call and builds the model client. */
   const models = (): ModelClient => {
     const config = resolveConfig(deps.getEnv);
@@ -198,14 +213,12 @@ export function buildServer(deps: Deps): McpServer {
         "The thought to capture — a clear, standalone statement that will make sense when retrieved later by any AI",
       ),
     },
-  }, async ({ content }) => {
+  }, gate(async ({ content }: { content: string }, { config, client }) => {
     try {
-      const client = models();
       const [embedded, chatted] = await Promise.all([client.embed(content), client.chat(content)]);
       if (!embedded.ok) throw new Error(embedded.message);
-      const config = resolveConfig(deps.getEnv);
       const extracted = chatted.ok ? parseUsableMetadata(chatted.value) : null;
-      const metadata = buildCaptureMetadata(extracted, config.ok ? config.embedding.model : "");
+      const metadata = buildCaptureMetadata(extracted, config.embedding.model);
       const upserted = await store.upsertThought(content, metadata);
       if ("error" in upserted) return text(`Failed to capture: ${upserted.error}`, true);
       const saved = await store.setEmbedding(upserted.data.id, embedded.value);
@@ -221,6 +234,6 @@ export function buildServer(deps: Deps): McpServer {
     } catch (err) {
       return errorText(err);
     }
-  });
+  }));
   return server;
 }

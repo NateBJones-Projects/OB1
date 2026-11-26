@@ -336,3 +336,13 @@ Deno.test("U118 every model request in a capture and a search goes to a configur
   for (const r of fake.requests) assert(r.url.startsWith(BASE) || r.url.startsWith(CHAT_BASE), r.url);
   assertEquals(fake.requests.filter((r) => r.url.startsWith(CHAT_BASE)).length, 1);
 });
+
+const GATE_TAIL = "Set these as function secrets (see README → Configure).";
+
+Deno.test("U119 config gate: with EMBEDDING_API_BASE unset, capture returns the exact not-configured text", async () => {
+  const { EMBEDDING_API_BASE: _drop, ...env } = GOOD_ENV;
+  const { client } = await rig(env);
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), `Model endpoint not configured: missing EMBEDDING_API_BASE. ${GATE_TAIL}`);
+});
