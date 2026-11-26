@@ -9,3 +9,8 @@ Deno.test("U25 EXTRACTION_PROMPT equals core's extractMetadata system prompt ver
   assert(m[1].length > 100);
   assertEquals(EXTRACTION_PROMPT, m[1]);
 });
+
+Deno.test("U26 parseUsableMetadata returns the object for a raw JSON object reply, including {}", () => {
+  assertEquals(parseUsableMetadata('{"topics":["a"],"type":"idea"}'), { topics: ["a"], type: "idea" });
+  assertEquals(parseUsableMetadata("  \n{}\n "), {});
+});

@@ -7,8 +7,8 @@ export const EXTRACTION_PROMPT: string = `Extract metadata from the user's captu
 - "type": one of "observation", "task", "idea", "reference", "person_note"
 Only extract what's explicitly there.`;
 
-export function parseUsableMetadata(_text: string): Record<string, unknown> | null {
-  throw new Error("not implemented");
+export function parseUsableMetadata(text: string): Record<string, unknown> | null {
+  return JSON.parse(text.trim());
 }
 
 export function buildCaptureMetadata(
