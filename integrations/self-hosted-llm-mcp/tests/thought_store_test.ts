@@ -232,3 +232,15 @@ Deno.test("U84 upsertThought returns { id } from the reply, or { error } for an 
   assertEquals(await store.upsertThought("c", {}), { data: { id: "t-9" } });
   assertEquals(await store.upsertThought("c", {}), { error: "upsert refused" });
 });
+
+Deno.test("U85 setEmbedding updates embedding on id=eq.<id>", async () => {
+  const { ff, store } = setup();
+  ff.on("PATCH", `${REST}/thoughts`, { status: 204 });
+  await store.setEmbedding("t-9", [0.5, 0.25]);
+  assertEquals(ff.requests.length, 1);
+  const req = ff.requests[0];
+  assertEquals(req.method, "PATCH");
+  assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
+  assertEquals(listParams(req), [["id", "eq.t-9"]]);
+  assertEquals(req.body, { embedding: [0.5, 0.25] });
+});
