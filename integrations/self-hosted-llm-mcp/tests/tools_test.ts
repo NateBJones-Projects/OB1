@@ -499,3 +499,17 @@ Deno.test("U130 capture with chat unreachable stores the row with its embedding 
   assertEquals(store.rows[0].embedding, axisVector(0));
   assertEquals(store.rows[0].metadata, FALLBACK_META);
 });
+
+Deno.test("U131 capture with chat timing out stores the fallback row and ends the reply with the skip line naming the timeout", async () => {
+  const { client, store } = await rig({ ...GOOD_ENV, FETCH_TIMEOUT_MS: "30" }, { chat: { hang: true } });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assert(!result.isError);
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.rows[0].metadata, FALLBACK_META);
+  const t = textOf(result);
+  const m = t.match(/^Captured as observation — uncategorized\nMetadata extraction skipped: (.+)\. Saved with default metadata\.$/);
+  assert(m, t);
+  assertStringIncludes(m[1], "FETCH_TIMEOUT_MS");
+  assertStringIncludes(m[1], "chat");
+  assertStringIncludes(m[1], "30 ms");
+});

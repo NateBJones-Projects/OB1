@@ -224,6 +224,9 @@ export function buildServer(deps: Deps): McpServer {
       if (Array.isArray(meta.action_items) && meta.action_items.length) {
         confirmation += ` | Actions: ${(meta.action_items as string[]).join("; ")}`;
       }
+      if (!chatted.ok) {
+        confirmation += `\nMetadata extraction skipped: ${chatted.message.replace(/\.$/, "")}. Saved with default metadata.`;
+      }
       return text(confirmation);
     } catch (err) {
       return errorText(err);
