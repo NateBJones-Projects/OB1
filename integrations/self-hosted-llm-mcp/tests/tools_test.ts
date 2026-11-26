@@ -557,3 +557,12 @@ Deno.test("U134 capture with chat content in one fenced JSON block stores enrich
     enrichment_status: "complete",
   });
 });
+
+Deno.test("U135 a fallback reply keeps core's Captured as observation — uncategorized text before the skip line", async () => {
+  const { client } = await rig(GOOD_ENV, { chat: { networkError: "down" } });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  const lines = textOf(result).split("\n");
+  assertEquals(lines.length, 2);
+  assertEquals(lines[0], "Captured as observation — uncategorized");
+  assert(lines[1].startsWith("Metadata extraction skipped: "));
+});
