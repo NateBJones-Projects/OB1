@@ -66,3 +66,9 @@ Deno.test("U6 nothing set: missing lists the three required settings in order", 
   assert(!r.ok);
   assertEquals(r.missing, ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"]);
 });
+
+Deno.test("U7 CHAT_MODEL unset with EMBEDDING_MODEL set: only CHAT_MODEL is missing", () => {
+  const r = resolveConfig(envOf({ EMBEDDING_API_BASE: "http://e/v1", EMBEDDING_MODEL: "em" }));
+  assert(!r.ok);
+  assertEquals(r.missing, ["CHAT_MODEL"]);
+});
