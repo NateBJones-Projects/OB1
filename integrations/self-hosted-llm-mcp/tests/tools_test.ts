@@ -384,3 +384,19 @@ Deno.test("U122 config gate: tools/list still returns the six tools under a bad 
     ["capture_thought", "fetch", "list_thoughts", "search", "search_thoughts", "thought_stats"],
   );
 });
+
+Deno.test("U123 config gate: an invalid setting is named with the missing ones", async () => {
+  const { CHAT_MODEL: _drop, ...rest } = GOOD_ENV;
+  const { client, fake, store } = await rig({ ...rest, EMBEDDING_API_BASE: "model.test/v1", FETCH_TIMEOUT_MS: "soon" });
+  for (const [name, args] of SIX_CALLS) {
+    const result = await client.callTool({ name, arguments: args });
+    assertEquals(result.isError, true, name);
+    const t = textOf(result);
+    assert(t.startsWith("Model endpoint not configured: missing CHAT_MODEL"), t);
+    assertStringIncludes(t, "EMBEDDING_API_BASE (must start with http:// or https://)");
+    assertStringIncludes(t, "FETCH_TIMEOUT_MS (must be a positive whole number of milliseconds)");
+    assert(t.endsWith(GATE_TAIL), t);
+  }
+  assertEquals(fake.requests, []);
+  assertEquals(store.calls, []);
+});
