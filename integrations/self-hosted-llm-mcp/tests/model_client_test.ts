@@ -401,3 +401,33 @@ Deno.test("U59 a retry returning a 768-length vector gives wrong_dimension", asy
   assertEquals(r.kind, "wrong_dimension");
   assertStringIncludes(r.message, "768");
 });
+
+Deno.test("U60 the retry gets its own timeoutMs, and a hanging retry gives timeout", async () => {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  // each reply is held 30 ms against a 50 ms limit: the pair outlasts one limit but each request is inside its own
+  const slow = new FakeFetch().on(
+    "POST",
+    `${EMB}/embeddings`,
+    { hold: { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } } },
+    { hold: embeddingReply(axisVector(0)) },
+  );
+  const pending = createModelClient(cfg({ timeoutMs: 50 }), slow.fetch).embed("a");
+  await wait(30);
+  slow.release();
+  await wait(30);
+  slow.release();
+  const ok = await pending;
+  assert(ok.ok);
+  assertEquals(slow.requests.length, 2);
+
+  const hang = new FakeFetch().on(
+    "POST",
+    `${EMB}/embeddings`,
+    { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } },
+    { hang: true },
+  );
+  const r = await createModelClient(cfg({ timeoutMs: 20 }), hang.fetch).embed("a");
+  assertEquals(hang.requests.length, 2);
+  assert(!r.ok);
+  assertEquals(r.kind, "timeout");
+});
