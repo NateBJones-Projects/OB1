@@ -269,3 +269,11 @@ Deno.test("U112 search returns core's results JSON using threshold 0.5 and count
   });
   assertEquals(store.calls.find((c) => c.method === "matchThoughts")?.args, [axisVector(0), 0.5, 10]);
 });
+
+Deno.test("U113 search with a store error returns core's Search error text", async () => {
+  const { client, store } = await rig();
+  store.fail.matchThoughts = "rpc exploded";
+  const result = await client.callTool({ name: "search", arguments: { query: "milk" } });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), "Search error: rpc exploded");
+});
