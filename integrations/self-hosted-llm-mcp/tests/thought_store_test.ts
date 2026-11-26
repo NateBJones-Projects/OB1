@@ -280,3 +280,22 @@ Deno.test("U88 readBack reports embeddingIsNull true for a null embedding and fa
   const setCase = await store.readBack("t-9");
   assert("data" in setCase && setCase.data.embeddingIsNull === false);
 });
+
+Deno.test("U89 readBack returns both timestamps as the exact strings received, equal or differing", async () => {
+  const { ff, store } = setup();
+  const t1 = "2026-03-04T05:06:07.123456+00:00";
+  const t2 = "2026-03-04T05:06:07.1234+00:00";
+  const t3 = "2026-03-04T05:06:09.987654+00:00";
+  ff.on(
+    "GET",
+    `${REST}/thoughts`,
+    { body: { created_at: t1, updated_at: t1, embedding: null } },
+    { body: { created_at: t2, updated_at: t3, embedding: null } },
+  );
+  const equal = await store.readBack("t-9");
+  assert("data" in equal);
+  assertEquals([equal.data.createdAt, equal.data.updatedAt], [t1, t1]);
+  const differing = await store.readBack("t-9");
+  assert("data" in differing);
+  assertEquals([differing.data.createdAt, differing.data.updatedAt], [t2, t3]);
+});
