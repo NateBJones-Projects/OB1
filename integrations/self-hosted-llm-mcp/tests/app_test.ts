@@ -122,8 +122,16 @@ Deno.test("U187 a non-empty header wins over the query; an empty header falls th
   const app = createApp(makeDeps());
   const q = (k: string) => `${FUNCTION_URL}?key=${k}`;
   assert(await isRefused(await app.fetch(toolsList(q(KEY), { "x-brain-key": "wrong" }))), "wrong header + right query");
-  assert(!(await isRefused(await app.fetch(toolsList(q("wrong"), { "x-brain-key": KEY })))), "right header + wrong query");
-  assert(!(await isRefused(await app.fetch(toolsList(q(KEY), { "x-brain-key": "" })))), "empty header falls through");
+  const CORE_TOOLS = ["search", "fetch", "search_thoughts", "list_thoughts", "thought_stats", "capture_thought"];
+  for (const [label, req] of [
+    ["right header + wrong query", toolsList(q("wrong"), { "x-brain-key": KEY })],
+    ["empty header falls through", toolsList(q(KEY), { "x-brain-key": "" })],
+  ] as const) {
+    const res = await app.fetch(req);
+    assertEquals(res.status, 200, label);
+    const message = await parseMessage(res);
+    assertEquals(toolNames(message).slice().sort(), CORE_TOOLS.slice().sort(), label);
+  }
 });
 
 Deno.test("U188 with MCP_ACCESS_KEY unset or empty, every request is refused whatever key it presents", async () => {
