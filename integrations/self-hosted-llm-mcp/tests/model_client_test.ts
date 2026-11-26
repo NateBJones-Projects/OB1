@@ -82,3 +82,16 @@ Deno.test("U38 a role with a key sends Bearer on embed, chat and listModels", as
   assertEquals(ff.requests.length, 3);
   for (const r of ff.requests) assertEquals(r.headers["authorization"], "Bearer sk-emb");
 });
+
+Deno.test("U39 a role with no key sends no Authorization header at all", async () => {
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${CHAT}/chat/completions`, chatReply("{}"))
+    .on("GET", `${EMB}/models`, modelsReply([]));
+  const c = createModelClient(cfg(), ff.fetch);
+  await c.embed("a");
+  await c.chat("a");
+  await c.listModels("embedding");
+  assertEquals(ff.requests.length, 3);
+  for (const r of ff.requests) assert(!("authorization" in r.headers));
+});
