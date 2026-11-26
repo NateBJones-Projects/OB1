@@ -582,3 +582,18 @@ Deno.test("U136 capturing existing text with chat failing marks the one existing
   assertEquals(store.rows[0].id, "old-1");
   assertEquals(store.rows[0].metadata.enrichment_status, "fallback");
 });
+
+Deno.test("U137 recapturing that text with chat working marks the same row complete", async () => {
+  const { client, store } = await rig(GOOD_ENV, {
+    chat: [{ networkError: "down" }, chatReply('{"topics":["good"],"type":"idea"}')],
+  });
+  await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.rows[0].metadata.enrichment_status, "fallback");
+  const id = store.rows[0].id;
+  await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.rows[0].id, id);
+  assertEquals(store.rows[0].metadata.enrichment_status, "complete");
+  assertEquals(store.rows[0].metadata.type, "idea");
+});
