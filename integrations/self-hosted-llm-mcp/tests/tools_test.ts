@@ -286,3 +286,14 @@ Deno.test("U114 a successful capture replies with core's Captured as confirmatio
   assert(!result.isError);
   assertEquals(textOf(result), "Captured as task — alpha, beta | People: Ada | Actions: call; write");
 });
+
+Deno.test("U115 a successful capture stores extracted metadata plus source, embedding_model and enrichment_status complete", async () => {
+  const { client, store } = await rig(GOOD_ENV, { chat: chatReply('{"topics":["alpha"],"type":"idea","people":["Ada"],"source":"model","embedding_model":"evil"}') });
+  await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  const up = store.calls.filter((c) => c.method === "upsertThought");
+  assertEquals(up.length, 1);
+  assertEquals(up[0].args, [
+    "An idea",
+    { topics: ["alpha"], type: "idea", people: ["Ada"], source: "mcp", embedding_model: "embed-1", enrichment_status: "complete" },
+  ]);
+});
