@@ -281,7 +281,7 @@ todo("A14 setup-check counts 3 thoughts without embedding_model and both capture
   for (const r of fresh) assertEquals(r.metadata.embedding_model, EMB_MODEL);
 });
 
-todo("A15 a model server that never answers fails capture with a timeout naming FETCH_TIMEOUT_MS", async () => {
+Deno.test("A15 a model server that never answers fails capture with a timeout naming FETCH_TIMEOUT_MS", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, { hang: true })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
