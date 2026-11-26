@@ -654,3 +654,13 @@ Deno.test("U142 setEmbedding failing with the delete erroring returns the may-be
   assertEquals(textOf(result), MAY);
   assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall").length, 1);
 });
+
+Deno.test("U143 setEmbedding failing with the delete reporting deleted: false returns the may-be-saved text", async () => {
+  const { client, store } = await rig();
+  store.fail.setEmbedding = EMB_FAIL;
+  store.override.deleteIfInsertedByCall = () => Promise.resolve({ data: { deleted: false } });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), MAY);
+  assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall").length, 1);
+});
