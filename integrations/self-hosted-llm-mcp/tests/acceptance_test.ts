@@ -372,7 +372,7 @@ Deno.test("A21 an MCP client using only ?key= lists exactly the six tools", asyn
   assertEquals(tools, ["capture_thought", "fetch", "list_thoughts", "search", "search_thoughts", "thought_stats"]);
 });
 
-todo("A22 an MCP request with a wrong key gets the JSON-RPC unauthorized error", async () => {
+Deno.test("A22 an MCP request with a wrong key gets the JSON-RPC unauthorized error", async () => {
   const app = createApp(makeDeps(baseEnv(), healthy()));
   const { status, message } = await mcpCall(app.fetch, "tools/list", {}, { key: "wrong-key", id: 7 });
   assertEquals(status, 200);
