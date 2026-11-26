@@ -380,7 +380,7 @@ Deno.test("A22 an MCP request with a wrong key gets the JSON-RPC unauthorized er
   assertEquals(message?.error, { code: -32001, message: "Unauthorized: missing or invalid authentication." });
 });
 
-todo("A23 with both roles on a cloud-style https base capture and search succeed on that base only", async () => {
+Deno.test("A23 with both roles on a cloud-style https base capture and search succeed on that base only", async () => {
   const cloud = "https://api.cloud.test/v1";
   const fake = new FakeFetch()
     .on("POST", `${cloud}/embeddings`, perTextEmbeddings())
