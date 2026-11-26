@@ -448,3 +448,16 @@ Deno.test("U177 all thoughts matching, and an empty brain, each give other_model
   assertEquals((await runSetupCheck(setup(BASE_ENV, healthyFake(), all).deps)).thoughts, { other_model: 0 });
   assertEquals((await runSetupCheck(setup(BASE_ENV, healthyFake(), new FakeStore()).deps)).thoughts, { other_model: 0 });
 });
+
+Deno.test("U178 a failing count gives other_model null with a thoughts_count warning carrying the database message", async () => {
+  for (const method of ["countAll", "countWithModel"] as const) {
+    const store = new FakeStore();
+    store.seed({ content: "a" });
+    store.fail[method] = "permission denied for table thoughts";
+    const report = await runSetupCheck(setup(BASE_ENV, healthyFake(), store).deps);
+    assertEquals(report.thoughts, { other_model: null }, method);
+    const warning = report.warnings.find((w) => w.id === "thoughts_count");
+    assert(warning, `${method}: no thoughts_count warning`);
+    assertStringIncludes(warning.message, "permission denied for table thoughts");
+  }
+});

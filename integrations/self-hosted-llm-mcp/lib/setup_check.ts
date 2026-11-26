@@ -72,7 +72,14 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     deps.store.countAll(),
     deps.store.countWithModel(config.embedding.model),
   ]);
-  const otherModel = "data" in all && "data" in matching ? all.data - matching.data : null;
+  const warnings = keyOverHttpWarnings(config);
+  let otherModel: number | null = null;
+  if ("data" in all && "data" in matching) {
+    otherModel = all.data - matching.data;
+  } else {
+    const failure = "error" in all ? all.error : (matching as { error: string }).error;
+    warnings.push({ id: "thoughts_count", message: `Could not count thoughts from other embedding models: ${failure}` });
+  }
   const checks: CheckResult[] = [
     { id: "config", ok: true },
     reachable("embedding", embeddingModels),
@@ -84,5 +91,5 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     modelCheck("chat", config.chat.model, chatModels, chat),
     chatMetadata(chat),
   ];
-  return { ok: checks.every((c) => c.ok), checks, warnings: keyOverHttpWarnings(config), thoughts: { other_model: otherModel }, config: configBlock(config) };
+  return { ok: checks.every((c) => c.ok), checks, warnings, thoughts: { other_model: otherModel }, config: configBlock(config) };
 }
