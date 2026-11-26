@@ -52,13 +52,15 @@ export function createSupabaseThoughtStore(
       return { data: data as ListRow[] };
     },
     async stats(): Promise<StoreResult<{ count: number | null; rows: StatsRow[] }>> {
-      const { count } = await supabase
+      const { count, error: countError } = await supabase
         .from("thoughts")
         .select("*", { count: "exact", head: true });
-      const { data } = await supabase
+      if (countError) return { error: countError.message };
+      const { data, error } = await supabase
         .from("thoughts")
         .select("metadata, created_at")
         .order("created_at", { ascending: false });
+      if (error) return { error: error.message };
       return { data: { count, rows: data as StatsRow[] } };
     },
     upsertThought: notImplemented,

@@ -191,3 +191,20 @@ Deno.test("U81 stats returns the count and the rows", async () => {
   ff.on("GET", `${REST}/thoughts`, { body: rows });
   assertEquals(await store.stats(), { data: { count: 2, rows } });
 });
+
+Deno.test("U82 stats returns { error } when either query fails", async () => {
+  const err = (message: string) => ({ status: 500, body: { code: "XX000", details: null, hint: null, message } });
+  {
+    const { ff, store } = setup();
+    ff.on("HEAD", `${REST}/thoughts`, { status: 500 });
+    ff.on("GET", `${REST}/thoughts`, { body: [] });
+    const r = await store.stats();
+    assert("error" in r, "count failure must be an error");
+  }
+  {
+    const { ff, store } = setup();
+    ff.on("HEAD", `${REST}/thoughts`, { headers: { "content-range": "*/2" } });
+    ff.on("GET", `${REST}/thoughts`, err("rows failed"));
+    assertEquals(await store.stats(), { error: "rows failed" });
+  }
+});
