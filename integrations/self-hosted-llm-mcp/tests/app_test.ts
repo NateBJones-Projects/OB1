@@ -212,3 +212,12 @@ Deno.test("U193 productionDeps reads Deno.env, uses globalThis.fetch and builds 
     }
   }
 });
+
+Deno.test("U194 index.ts holds one statement serving createApp(productionDeps()).fetch", async () => {
+  const source = await Deno.readTextFile(new URL("../index.ts", import.meta.url));
+  const code = source.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("//"));
+  const imports = code.filter((l) => l.startsWith("import "));
+  const rest = code.filter((l) => !l.startsWith("import ")).join(" ");
+  assertEquals(imports, ['import { createApp, productionDeps } from "./lib/app.ts";']);
+  assertEquals(rest, "Deno.serve(createApp(productionDeps()).fetch);");
+});
