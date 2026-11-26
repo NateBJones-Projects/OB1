@@ -223,7 +223,7 @@ Deno.test("A10 unusable chat output saves the thought with default metadata and 
   assertEquals(store.rows[0].metadata.type, "observation");
 });
 
-todo("A11 capture_thought with EMBEDDING_API_BASE unset names it and sends no request", async () => {
+Deno.test("A11 capture_thought with EMBEDDING_API_BASE unset names it and sends no request", async () => {
   const env = baseEnv();
   delete env.EMBEDDING_API_BASE;
   const fake = healthy();
