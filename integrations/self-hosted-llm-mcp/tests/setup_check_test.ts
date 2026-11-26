@@ -1,0 +1,559 @@
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@^1";
+import { runSetupCheck } from "../lib/setup_check.ts";
+import type { CheckResult, Deps } from "../lib/types.ts";
+import { axisVector, chatReply, embeddingReply, FakeFetch, type Handler, modelsReply } from "./helpers/fake_fetch.ts";
+import { FakeStore } from "./helpers/fake_store.ts";
+
+const BASE = "http://model.test/v1";
+const BASE_ENV: Record<string, string> = {
+  EMBEDDING_API_BASE: BASE,
+  EMBEDDING_MODEL: "emb-m",
+  CHAT_MODEL: "chat-m",
+};
+
+/** A fake model server answering every route healthily, unless a route is registered first. */
+function healthyFake(base = BASE): FakeFetch {
+  return new FakeFetch()
+    .on("GET", `${base}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${base}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${base}/chat/completions`, chatReply('{"type":"idea"}'));
+}
+
+function setup(env: Record<string, string> = BASE_ENV, fake: FakeFetch = healthyFake(), store = new FakeStore()) {
+  const deps: Deps = { getEnv: (n) => env[n], modelFetch: fake.fetch, store };
+  return { deps, fake, store };
+}
+
+function check(checks: CheckResult[], id: string): CheckResult {
+  const c = checks.find((x) => x.id === id);
+  assert(c, `check ${id} missing`);
+  return c;
+}
+
+Deno.test("U146 a healthy configuration and server give ok true", async () => {
+  const { deps } = setup();
+  const report = await runSetupCheck(deps);
+  assertEquals(report.ok, true);
+});
+
+Deno.test("U147 the report lists the seven checks in the contract's order, role checks carrying role", async () => {
+  const { deps } = setup();
+  const { checks } = await runSetupCheck(deps);
+  assertEquals(checks.map((c) => [c.id, c.role]), [
+    ["config", undefined],
+    ["embedding_reachable", "embedding"],
+    ["embedding_model", "embedding"],
+    ["embedding_dimension", "embedding"],
+    ["chat_reachable", "chat"],
+    ["chat_model", "chat"],
+    ["chat_metadata", "chat"],
+  ]);
+});
+
+Deno.test("U148 config shows each role's base, model and key_set, chat inherits, and timeout_ms", async () => {
+  const { deps } = setup({ ...BASE_ENV, EMBEDDING_API_KEY: "sk-secret", FETCH_TIMEOUT_MS: "5000" });
+  const { config } = await runSetupCheck(deps);
+  assertEquals(config, {
+    embedding: { base: BASE, model: "emb-m", key_set: true },
+    chat: { base: BASE, model: "chat-m", key_set: true, inherits: ["base", "key"] },
+    timeout_ms: 5000,
+  });
+});
+
+Deno.test("U149 no key value appears anywhere in the report", async () => {
+  const env = {
+    ...BASE_ENV,
+    EMBEDDING_API_KEY: "sk-emb-SECRET",
+    CHAT_API_BASE: "http://chat.test/v1",
+    CHAT_API_KEY: "sk-chat-SECRET",
+  };
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, { status: 500, body: "boom sk-emb-SECRET" })
+    .on("POST", `${BASE}/embeddings`, { status: 500, body: "bad key sk-emb-SECRET and sk-chat-SECRET" })
+    .on("GET", "http://chat.test/v1/models", modelsReply(["chat-m"]))
+    .on("POST", "http://chat.test/v1/chat/completions", { status: 500, body: "bad key sk-chat-SECRET" });
+  const text = JSON.stringify(await runSetupCheck(setup(env, fake).deps));
+  assert(!text.includes("SECRET"), text);
+});
+
+Deno.test("U150 a missing setting fails config with a reason naming each missing setting", async () => {
+  const { deps } = setup({});
+  const report = await runSetupCheck(deps);
+  const c = check(report.checks, "config");
+  assertEquals(c.ok, false);
+  for (const name of ["EMBEDDING_API_BASE", "EMBEDDING_MODEL", "CHAT_MODEL"]) assertStringIncludes(c.reason ?? "", name);
+});
+
+Deno.test("U151 an invalid setting fails config naming it with its reason", async () => {
+  const { deps } = setup({ ...BASE_ENV, EMBEDDING_API_BASE: "ollama:11434/v1", FETCH_TIMEOUT_MS: "60s" });
+  const c = check((await runSetupCheck(deps)).checks, "config");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "EMBEDDING_API_BASE");
+  assertStringIncludes(c.reason ?? "", "must start with http:// or https://");
+  assertStringIncludes(c.reason ?? "", "FETCH_TIMEOUT_MS");
+  assertStringIncludes(c.reason ?? "", "positive whole number");
+});
+
+Deno.test("U152 with config failed, every other check reads skipped: configuration incomplete", async () => {
+  const { deps } = setup({});
+  const { checks } = await runSetupCheck(deps);
+  assertEquals(checks.map((c) => c.id), [
+    "config",
+    "embedding_reachable",
+    "embedding_model",
+    "embedding_dimension",
+    "chat_reachable",
+    "chat_model",
+    "chat_metadata",
+  ]);
+  for (const c of checks.slice(1)) {
+    assertEquals(c.ok, false);
+    assertEquals(c.reason, "skipped: configuration incomplete");
+  }
+});
+
+Deno.test("U153 with config failed, no model request is sent", async () => {
+  const { deps, fake } = setup({ CHAT_MODEL: "chat-m" });
+  await runSetupCheck(deps);
+  assertEquals(fake.requests.length, 0);
+  assertEquals(fake.unmatched.length, 0);
+});
+
+Deno.test("U154 with config failed, ok is false and other_model is null with no store call", async () => {
+  const { deps, store } = setup({});
+  const report = await runSetupCheck(deps);
+  assertEquals(report.ok, false);
+  assertEquals(report.thoughts, { other_model: null });
+  assertEquals(report.config, null);
+  assertEquals(store.calls.length, 0);
+});
+
+const CHAT_BASE = "http://chat.test/v1";
+const SPLIT_ENV = { ...BASE_ENV, CHAT_API_BASE: CHAT_BASE };
+
+const UNLISTED_MODELS = modelsReply(["something-else"]);
+const ALL_SEVEN = [
+  "config",
+  "embedding_reachable",
+  "embedding_model",
+  "embedding_dimension",
+  "chat_reachable",
+  "chat_model",
+  "chat_metadata",
+];
+
+/** Embedding and chat on separate bases; each route is healthy unless overridden. */
+function failingFake(over: {
+  embModels?: Handler;
+  embeddings?: Handler;
+  chatModels?: Handler;
+  chat?: Handler;
+}): FakeFetch {
+  return new FakeFetch()
+    .on("GET", `${BASE}/models`, over.embModels ?? modelsReply(["emb-m"]))
+    .on("POST", `${BASE}/embeddings`, over.embeddings ?? embeddingReply(axisVector(0)))
+    .on("GET", `${CHAT_BASE}/models`, over.chatModels ?? modelsReply(["chat-m"]))
+    .on("POST", `${CHAT_BASE}/chat/completions`, over.chat ?? chatReply("{}"));
+}
+
+// Each case breaks one thing. `failed` is the exact set of checks that then fail. A model check cannot fail
+// alone: it fails only when the model is unlisted AND the real call failed, and that same failed call also
+// fails embedding_dimension / chat_metadata. config cannot fail alone either: every other check is skipped.
+const SINGLE_FAILURES: { name: string; env: Record<string, string>; fake: FakeFetch; failed: string[] }[] = [
+  { name: "config", env: { CHAT_MODEL: "chat-m" }, fake: failingFake({}), failed: ALL_SEVEN },
+  {
+    name: "embedding_reachable",
+    env: SPLIT_ENV,
+    fake: failingFake({ embModels: { networkError: "connection refused" } }),
+    failed: ["embedding_reachable"],
+  },
+  {
+    name: "embedding_model",
+    env: SPLIT_ENV,
+    fake: failingFake({ embModels: UNLISTED_MODELS, embeddings: { status: 404, body: "no such model" } }),
+    failed: ["embedding_model", "embedding_dimension"],
+  },
+  {
+    name: "embedding_dimension",
+    env: SPLIT_ENV,
+    fake: failingFake({ embeddings: embeddingReply(axisVector(0, 768)) }),
+    failed: ["embedding_dimension"],
+  },
+  {
+    name: "chat_reachable",
+    env: SPLIT_ENV,
+    fake: failingFake({ chatModels: { networkError: "connection refused" } }),
+    failed: ["chat_reachable"],
+  },
+  {
+    name: "chat_model",
+    env: SPLIT_ENV,
+    fake: failingFake({ chatModels: UNLISTED_MODELS, chat: { status: 404, body: "no such model" } }),
+    failed: ["chat_model", "chat_metadata"],
+  },
+  {
+    name: "chat_metadata",
+    env: SPLIT_ENV,
+    fake: failingFake({ chat: chatReply("not json at all") }),
+    failed: ["chat_metadata"],
+  },
+];
+
+Deno.test("U155 any single failed check makes ok false, for each of the seven checks", async () => {
+  for (const c of SINGLE_FAILURES) {
+    const report = await runSetupCheck(setup(c.env, c.fake).deps);
+    assertEquals(report.checks.filter((x) => !x.ok).map((x) => x.id), c.failed, `${c.name}: failed checks`);
+    assertEquals(report.ok, false, `${c.name}: ok`);
+  }
+});
+
+Deno.test("U156 role reachable passes on a 200 and on a 404 from /models", async () => {
+  for (const status of [200, 404]) {
+    const fake = new FakeFetch()
+      .on("GET", `${BASE}/models`, status === 200 ? modelsReply(["emb-m", "chat-m"]) : { status: 404, body: "nope" })
+      .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+      .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+    const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+    assertEquals(check(checks, "embedding_reachable").ok, true, `status ${status}`);
+    assertEquals(check(checks, "chat_reachable").ok, true, `status ${status}`);
+  }
+});
+
+/** Embedding and chat on separate bases, both healthy; pass overrides to register a failing route first. */
+function splitFake(over: { embModels?: Parameters<FakeFetch["on"]>[2]; chatModels?: Parameters<FakeFetch["on"]>[2] } = {}) {
+  return new FakeFetch()
+    .on("GET", `${BASE}/models`, over.embModels ?? modelsReply(["emb-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("GET", `${CHAT_BASE}/models`, over.chatModels ?? modelsReply(["chat-m"]))
+    .on("POST", `${CHAT_BASE}/chat/completions`, chatReply("{}"));
+}
+
+Deno.test("U157 role reachable fails with auth_rejected on a 401 or 403", async () => {
+  for (const status of [401, 403]) {
+    const fake = splitFake({ embModels: { status, body: "denied" } });
+    const { checks } = await runSetupCheck(setup(SPLIT_ENV, fake).deps);
+    const c = check(checks, "embedding_reachable");
+    assertEquals(c.ok, false, `status ${status}`);
+    assertStringIncludes(c.reason ?? "", `HTTP ${status}`);
+    assertStringIncludes(c.reason ?? "", "rejected");
+    assertEquals(check(checks, "chat_reachable").ok, true);
+  }
+});
+
+Deno.test("U158 role reachable fails as unreachable, naming the base, on a network error", async () => {
+  const fake = splitFake({ chatModels: { networkError: "connection refused" } });
+  const { checks } = await runSetupCheck(setup(SPLIT_ENV, fake).deps);
+  const c = check(checks, "chat_reachable");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", CHAT_BASE);
+  assertStringIncludes(c.reason ?? "", "could not be reached");
+  assertEquals(check(checks, "embedding_reachable").ok, true);
+});
+
+Deno.test("U159 role reachable fails with timeout when /models hangs", async () => {
+  const fake = splitFake({ embModels: { hang: true } });
+  const env = { ...SPLIT_ENV, FETCH_TIMEOUT_MS: "50" };
+  const { checks } = await runSetupCheck(setup(env, fake).deps);
+  const c = check(checks, "embedding_reachable");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "50 ms");
+  assertStringIncludes(c.reason ?? "", "FETCH_TIMEOUT_MS");
+  assertEquals(check(checks, "chat_reachable").ok, true);
+});
+
+Deno.test("U160 role model passes when the model is listed", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["other", "emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, { status: 500, body: "overloaded" })
+    .on("POST", `${BASE}/chat/completions`, { status: 500, body: "overloaded" });
+  const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  assertEquals(check(checks, "embedding_model").ok, true);
+  assertEquals(check(checks, "chat_model").ok, true);
+});
+
+Deno.test("U161 role model passes when the model is not listed but the real call succeeded", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["something-else"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  assertEquals(check(checks, "embedding_model").ok, true);
+  assertEquals(check(checks, "chat_model").ok, true);
+});
+
+Deno.test("U162 role model fails with model_not_found naming the model when unlisted and the real call reports it unknown", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["something-else"]))
+    .on("POST", `${BASE}/embeddings`, { status: 404, body: "no such model" })
+    .on("POST", `${BASE}/chat/completions`, { status: 404, body: "no such model" });
+  const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  for (const [id, model] of [["embedding_model", "emb-m"], ["chat_model", "chat-m"]]) {
+    const c = check(checks, id);
+    assertEquals(c.ok, false, id);
+    assertStringIncludes(c.reason ?? "", `"${model}"`);
+    assertStringIncludes(c.reason ?? "", "not found");
+  }
+});
+
+Deno.test("U163 with a non-JSON /models body, role model follows the real call's outcome", async () => {
+  const good = new FakeFetch()
+    .on("GET", `${BASE}/models`, { status: 200, body: "<html>not a model list</html>" })
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const r1 = await runSetupCheck(setup(BASE_ENV, good).deps);
+  assertEquals(check(r1.checks, "embedding_model").ok, true);
+  assertEquals(check(r1.checks, "chat_model").ok, true);
+  assertEquals(check(r1.checks, "embedding_reachable").ok, true);
+
+  const bad = new FakeFetch()
+    .on("GET", `${BASE}/models`, { status: 200, body: "<html>not a model list</html>" })
+    .on("POST", `${BASE}/embeddings`, { status: 404, body: "no" })
+    .on("POST", `${BASE}/chat/completions`, { status: 500, body: "boom" });
+  const r2 = await runSetupCheck(setup(BASE_ENV, bad).deps);
+  const e = check(r2.checks, "embedding_model");
+  assertEquals(e.ok, false);
+  assertStringIncludes(e.reason ?? "", '"emb-m"');
+  assertStringIncludes(e.reason ?? "", "not found");
+  const c = check(r2.checks, "chat_model");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "HTTP 500");
+});
+
+Deno.test("U164 embedding_dimension passes for a 1536-number vector", async () => {
+  const { checks } = await runSetupCheck(setup().deps);
+  const c = check(checks, "embedding_dimension");
+  assertEquals(c.ok, true);
+  assertEquals(c.reason, undefined);
+});
+
+Deno.test("U165 embedding_dimension fails for 768 numbers with a reason naming 768 and 1536", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "embedding_dimension");
+  assertEquals(c.ok, false);
+  assertEquals(
+    c.reason,
+    'Embedding model "emb-m" returned 768-dimension vectors; this brain stores 1536. Choose a model that can output 1536 dimensions (see README).',
+  );
+});
+
+Deno.test("U166 embedding_dimension carries the embedding call's outcome when the call fails", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, { status: 500, body: "model crashed" })
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "embedding_dimension");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "HTTP 500");
+  assertStringIncludes(c.reason ?? "", "model crashed");
+});
+
+Deno.test("U167 chat_metadata passes for a JSON-object reply", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, chatReply('{"type":"task","topics":["a"]}'));
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "chat_metadata");
+  assertEquals(c.ok, true);
+  assertEquals(c.reason, undefined);
+});
+
+Deno.test("U168 chat_metadata fails with unusable output and the first 120 characters of an unusable reply", async () => {
+  const run = async (reply: string) => {
+    const fake = new FakeFetch()
+      .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+      .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+      .on("POST", `${BASE}/chat/completions`, chatReply(reply));
+    return check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "chat_metadata");
+  };
+  const long = "a".repeat(120) + "ZZZ";
+  const c = await run(long);
+  assertEquals(c.ok, false);
+  assertEquals(c.reason, `unusable output: ${"a".repeat(120)}`);
+  assert(!(c.reason ?? "").includes("Z"));
+
+  const exact = await run("b".repeat(120));
+  assertEquals(exact.reason, `unusable output: ${"b".repeat(120)}`);
+
+  const short = await run("Sure! Here is your metadata.");
+  assertEquals(short.reason, "unusable output: Sure! Here is your metadata.");
+});
+
+Deno.test("U169 chat_metadata carries the chat call's outcome when the call fails", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, { status: 500, body: "template error" });
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "chat_metadata");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "HTTP 500");
+  assertStringIncludes(c.reason ?? "", "template error");
+});
+
+Deno.test("U170 when chat inherits the embedding base, both roles are reported separately and chat requests go to the embedding base", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, { status: 404, body: "no such model" });
+  const report = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  assertEquals(report.config?.chat.inherits, ["base"]);
+  assertEquals(report.checks.length, 7);
+  assertEquals(check(report.checks, "embedding_model").ok, true);
+  const chatModel = check(report.checks, "chat_model");
+  assertEquals(chatModel.ok, false);
+  assertStringIncludes(chatModel.reason ?? "", '"chat-m"');
+  assertEquals(check(report.checks, "chat_reachable").ok, true);
+  assertEquals(check(report.checks, "chat_metadata").ok, false);
+  assertEquals(fake.unmatched.length, 0);
+  assert(fake.requests.every((r) => r.url.startsWith(`${BASE}/`)));
+  assert(fake.requests.some((r) => r.url === `${BASE}/chat/completions`));
+});
+
+Deno.test("U171 shared base: one embedding call, one chat call and two /models requests on the one base", async () => {
+  const fake = healthyFake();
+  await runSetupCheck(setup(BASE_ENV, fake).deps);
+  const count = (method: string, url: string) => fake.requests.filter((r) => r.method === method && r.url === url).length;
+  assertEquals(count("POST", `${BASE}/embeddings`), 1);
+  assertEquals(count("POST", `${BASE}/chat/completions`), 1);
+  assertEquals(count("GET", `${BASE}/models`), 2);
+  assertEquals(fake.requests.length, 4);
+});
+
+Deno.test("U171 split bases: one embedding call, one chat call and one /models request per base", async () => {
+  const fake = splitFake();
+  await runSetupCheck(setup(SPLIT_ENV, fake).deps);
+  const count = (method: string, url: string) => fake.requests.filter((r) => r.method === method && r.url === url).length;
+  assertEquals(count("POST", `${BASE}/embeddings`), 1);
+  assertEquals(count("POST", `${CHAT_BASE}/chat/completions`), 1);
+  assertEquals(count("GET", `${BASE}/models`), 1);
+  assertEquals(count("GET", `${CHAT_BASE}/models`), 1);
+  assertEquals(fake.requests.length, 4);
+});
+
+Deno.test("U172 a key_over_http warning is reported and leaves ok true", async () => {
+  const report = await runSetupCheck(setup({ ...BASE_ENV, EMBEDDING_API_KEY: "sk-secret" }).deps);
+  assertEquals(report.ok, true);
+  assertEquals(report.warnings, [
+    {
+      id: "key_over_http",
+      role: "embedding",
+      message: "An access key is configured for the embedding endpoint, but it uses http://; the key travels unencrypted.",
+    },
+    {
+      id: "key_over_http",
+      role: "chat",
+      message: "An access key is configured for the chat endpoint, but it uses http://; the key travels unencrypted.",
+    },
+  ]);
+});
+
+Deno.test("U173 an unkeyed http base and a keyed https base produce no warning", async () => {
+  const unkeyed = await runSetupCheck(setup(BASE_ENV).deps);
+  assertEquals(unkeyed.warnings, []);
+
+  const secure = "https://secure.test/v1";
+  const fake = healthyFake(secure);
+  const keyed = await runSetupCheck(
+    setup({ ...BASE_ENV, EMBEDDING_API_BASE: secure, EMBEDDING_API_KEY: "sk-secret" }, fake).deps,
+  );
+  assertEquals(keyed.ok, true);
+  assertEquals(keyed.warnings, []);
+});
+
+Deno.test("U174 every model request starts before any reply is released", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, { hold: modelsReply(["emb-m", "chat-m"]) })
+    .on("POST", `${BASE}/embeddings`, { hold: embeddingReply(axisVector(0)) })
+    .on("POST", `${BASE}/chat/completions`, { hold: chatReply("{}") });
+  const running = runSetupCheck(setup({ ...BASE_ENV, FETCH_TIMEOUT_MS: "5000" }, fake).deps);
+  for (let i = 0; i < 100 && fake.heldCount < 4; i++) await new Promise((r) => setTimeout(r, 5));
+  const heldBeforeRelease = fake.heldCount;
+  fake.release();
+  const report = await running;
+  assertEquals(heldBeforeRelease, 4);
+  assertEquals(report.ok, true);
+});
+
+Deno.test("U175 with every model route hanging, the run finishes in about one timeoutMs", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, { hang: true })
+    .on("POST", `${BASE}/embeddings`, { hang: true })
+    .on("POST", `${BASE}/chat/completions`, { hang: true });
+  const TIMEOUT = 300;
+  const MIN_ELAPSED = TIMEOUT * 0.8; // waited for the timeout rather than failing at once
+  const MAX_ELAPSED = TIMEOUT * 2.5; // four sequential timeouts would be 4x; "about one" stays under 2.5x
+  const EVERY_CHECK_BUT_CONFIG = 6;
+  const started = performance.now();
+  const report = await runSetupCheck(setup({ ...BASE_ENV, FETCH_TIMEOUT_MS: String(TIMEOUT) }, fake).deps);
+  const elapsed = performance.now() - started;
+  assert(elapsed >= MIN_ELAPSED, `finished too early: ${elapsed} ms`);
+  assert(elapsed < MAX_ELAPSED, `took ${elapsed} ms, more than about one timeout`);
+  assertEquals(report.ok, false);
+  assertEquals(report.checks.filter((c) => !c.ok).length, EVERY_CHECK_BUT_CONFIG);
+});
+
+Deno.test("U176 5 thoughts, 2 matching EMBEDDING_MODEL, give other_model 3", async () => {
+  const store = new FakeStore();
+  store.seed({ content: "a", metadata: { embedding_model: "emb-m" } });
+  store.seed({ content: "b", metadata: { embedding_model: "emb-m" } });
+  store.seed({ content: "c", metadata: { embedding_model: "old-model" } });
+  store.seed({ content: "d", metadata: {} });
+  store.seed({ content: "e" });
+  const report = await runSetupCheck(setup(BASE_ENV, healthyFake(), store).deps);
+  assertEquals(report.thoughts, { other_model: 3 });
+  assertEquals(store.calls.find((c) => c.method === "countWithModel")?.args, ["emb-m"]);
+});
+
+Deno.test("U177 all thoughts matching, and an empty brain, each give other_model 0", async () => {
+  const all = new FakeStore();
+  all.seed({ content: "a", metadata: { embedding_model: "emb-m" } });
+  all.seed({ content: "b", metadata: { embedding_model: "emb-m" } });
+  assertEquals((await runSetupCheck(setup(BASE_ENV, healthyFake(), all).deps)).thoughts, { other_model: 0 });
+  assertEquals((await runSetupCheck(setup(BASE_ENV, healthyFake(), new FakeStore()).deps)).thoughts, { other_model: 0 });
+});
+
+Deno.test("U178 a failing count gives other_model null with a thoughts_count warning carrying the database message", async () => {
+  for (const method of ["countAll", "countWithModel"] as const) {
+    const store = new FakeStore();
+    store.seed({ content: "a" });
+    store.fail[method] = "permission denied for table thoughts";
+    const report = await runSetupCheck(setup(BASE_ENV, healthyFake(), store).deps);
+    assertEquals(report.thoughts, { other_model: null }, method);
+    const warning = report.warnings.find((w) => w.id === "thoughts_count");
+    assert(warning, `${method}: no thoughts_count warning`);
+    assertStringIncludes(warning.message, "permission denied for table thoughts");
+  }
+});
+
+Deno.test("U207 a failing count with an empty database message still names a cause", async () => {
+  for (const method of ["countAll", "countWithModel"] as const) {
+    const store = new FakeStore();
+    store.seed({ content: "a" });
+    store.fail[method] = "";
+    const report = await runSetupCheck(setup(BASE_ENV, healthyFake(), store).deps);
+    assertEquals(report.thoughts.other_model, null, method);
+    const warning = report.warnings.find((w) => w.id === "thoughts_count");
+    assert(warning, `${method}: no thoughts_count warning`);
+    assertEquals(warning.message, "Could not count thoughts from other embedding models: database returned no error detail", method);
+  }
+});
+
+Deno.test("U179 with a failing count, the model checks still run and decide ok", async () => {
+  const store = new FakeStore();
+  store.fail.countAll = "database unavailable";
+  const healthy = healthyFake();
+  const r1 = await runSetupCheck(setup(BASE_ENV, healthy, store).deps);
+  assertEquals(r1.ok, true);
+  assertEquals(healthy.requests.length, 4);
+
+  const broken = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const r2 = await runSetupCheck(setup(BASE_ENV, broken, store).deps);
+  assertEquals(r2.ok, false);
+  assertEquals(check(r2.checks, "embedding_dimension").ok, false);
+  assertEquals(r2.warnings.some((w) => w.id === "thoughts_count"), true);
+});
