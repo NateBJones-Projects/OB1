@@ -301,3 +301,24 @@ Deno.test("U167 chat_metadata passes for a JSON-object reply", async () => {
   assertEquals(c.ok, true);
   assertEquals(c.reason, undefined);
 });
+
+Deno.test("U168 chat_metadata fails with unusable output and the first 120 characters of an unusable reply", async () => {
+  const run = async (reply: string) => {
+    const fake = new FakeFetch()
+      .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+      .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+      .on("POST", `${BASE}/chat/completions`, chatReply(reply));
+    return check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "chat_metadata");
+  };
+  const long = "a".repeat(120) + "ZZZ";
+  const c = await run(long);
+  assertEquals(c.ok, false);
+  assertEquals(c.reason, `unusable output: ${"a".repeat(120)}`);
+  assert(!(c.reason ?? "").includes("Z"));
+
+  const exact = await run("b".repeat(120));
+  assertEquals(exact.reason, `unusable output: ${"b".repeat(120)}`);
+
+  const short = await run("Sure! Here is your metadata.");
+  assertEquals(short.reason, "unusable output: Sure! Here is your metadata.");
+});

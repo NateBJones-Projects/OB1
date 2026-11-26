@@ -34,6 +34,13 @@ function modelCheck(
   return { id, role, ok: false, reason: call.message };
 }
 
+function chatMetadata(chat: ModelResult<string>): CheckResult {
+  const id = "chat_metadata";
+  if (!chat.ok) return { id, role: "chat", ok: false };
+  if (parseUsableMetadata(chat.value) !== null) return { id, role: "chat", ok: true };
+  return { id, role: "chat", ok: false, reason: `unusable output: ${chat.value.slice(0, 120)}` };
+}
+
 function configBlock(c: OkConfig): SetupConfigBlock {
   return {
     embedding: { base: c.embedding.base, model: c.embedding.model, key_set: c.embedding.key !== undefined },
@@ -72,7 +79,7 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
       : { id: "embedding_dimension", role: "embedding", ok: false, reason: embedding.message },
     reachable("chat", chatModels),
     modelCheck("chat", config.chat.model, chatModels, chat),
-    { id: "chat_metadata", role: "chat", ok: chat.ok && parseUsableMetadata(chat.value) !== null },
+    chatMetadata(chat),
   ];
   return { ok: checks.every((c) => c.ok), checks, warnings: [], thoughts: { other_model: null }, config: configBlock(config) };
 }
