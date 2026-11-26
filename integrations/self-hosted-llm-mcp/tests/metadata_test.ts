@@ -14,3 +14,11 @@ Deno.test("U26 parseUsableMetadata returns the object for a raw JSON object repl
   assertEquals(parseUsableMetadata('{"topics":["a"],"type":"idea"}'), { topics: ["a"], type: "idea" });
   assertEquals(parseUsableMetadata("  \n{}\n "), {});
 });
+
+Deno.test("U27 parseUsableMetadata returns the object when the whole reply is one fenced block", () => {
+  const obj = { topics: ["a"], type: "task" };
+  assertEquals(parseUsableMetadata('```json\n{"topics":["a"],"type":"task"}\n```'), obj);
+  assertEquals(parseUsableMetadata('```\n{"topics":["a"],"type":"task"}\n```'), obj);
+  assertEquals(parseUsableMetadata('\n```json\n{"topics":["a"],"type":"task"}\n```\n'), obj);
+  assertEquals(parseUsableMetadata("```json\n{}\n```"), {});
+});

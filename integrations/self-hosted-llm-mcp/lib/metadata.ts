@@ -8,7 +8,8 @@ export const EXTRACTION_PROMPT: string = `Extract metadata from the user's captu
 Only extract what's explicitly there.`;
 
 export function parseUsableMetadata(text: string): Record<string, unknown> | null {
-  return JSON.parse(text.trim());
+  const fenced = text.trim().match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n?```$/);
+  return JSON.parse(fenced ? fenced[1] : text.trim());
 }
 
 export function buildCaptureMetadata(
