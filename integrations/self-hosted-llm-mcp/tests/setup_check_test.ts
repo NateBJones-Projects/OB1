@@ -260,3 +260,10 @@ Deno.test("U163 with a non-JSON /models body, role model follows the real call's
   assertEquals(c.ok, false);
   assertStringIncludes(c.reason ?? "", "HTTP 500");
 });
+
+Deno.test("U164 embedding_dimension passes for a 1536-number vector", async () => {
+  const { checks } = await runSetupCheck(setup().deps);
+  const c = check(checks, "embedding_dimension");
+  assertEquals(c.ok, true);
+  assertEquals(c.reason, undefined);
+});
