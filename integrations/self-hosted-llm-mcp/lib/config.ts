@@ -1,5 +1,9 @@
 import type { EndpointConfig, GetEnv, OkConfig, ResolvedConfig, Warning } from "./types.ts";
 
+function stripSlash(base: string): string {
+  return base.replace(/\/+$/, "");
+}
+
 export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   // A blank value (empty or whitespace only) counts as unset.
   const getEnv: GetEnv = (name) => {
@@ -10,7 +14,7 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   if (missing.length > 0) return { ok: false, missing, invalid: [] };
   const embedding: EndpointConfig = {
     role: "embedding",
-    base: getEnv("EMBEDDING_API_BASE")!,
+    base: stripSlash(getEnv("EMBEDDING_API_BASE")!),
     key: getEnv("EMBEDDING_API_KEY"),
     model: getEnv("EMBEDDING_MODEL")!,
   };
@@ -21,7 +25,7 @@ export function resolveConfig(rawGetEnv: GetEnv): ResolvedConfig {
   if (chatKey === undefined && chatBase === undefined && embedding.key !== undefined) chatInherits.push("key");
   const chat: EndpointConfig = {
     role: "chat",
-    base: chatBase ?? embedding.base,
+    base: chatBase === undefined ? embedding.base : stripSlash(chatBase),
     key: getEnv("CHAT_API_KEY") ?? (chatBase === undefined ? embedding.key : undefined),
     model: getEnv("CHAT_MODEL")!,
   };

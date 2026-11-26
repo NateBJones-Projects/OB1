@@ -103,3 +103,12 @@ Deno.test("U10 OPENROUTER_API_KEY never substitutes for a missing embedding base
   assertEquals(r.missing, ["EMBEDDING_API_BASE"]);
   assert(!JSON.stringify(r).toLowerCase().includes("openrouter"));
 });
+
+Deno.test("U11 a trailing slash is removed from a base; a base without one is unchanged", () => {
+  const a = ok({ ...MIN, EMBEDDING_API_BASE: "http://e:1/v1/", CHAT_API_BASE: "https://c/v1/" });
+  assertEquals(a.embedding.base, "http://e:1/v1");
+  assertEquals(a.chat.base, "https://c/v1");
+  const b = ok({ ...MIN, EMBEDDING_API_BASE: "http://e:1/v1" });
+  assertEquals(b.embedding.base, "http://e:1/v1");
+  assertEquals(b.chat.base, "http://e:1/v1");
+});
