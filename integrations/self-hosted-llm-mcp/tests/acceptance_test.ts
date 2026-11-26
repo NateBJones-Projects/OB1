@@ -77,7 +77,7 @@ Deno.test("A1 capture_thought stores one row with a 1536-length embedding and ex
   assertEquals(store.rows[0].metadata.source, "mcp");
 });
 
-todo("A2 search_thoughts with the exact text returns that thought first", async () => {
+Deno.test("A2 search_thoughts with the exact text returns that thought first", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, perTextEmbeddings())
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
