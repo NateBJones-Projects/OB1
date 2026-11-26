@@ -67,3 +67,15 @@ Deno.test("U183 a GET with a wrong key gets the envelope with id null", async ()
   assertEquals(res.status, 200);
   assertEquals(await res.json(), { jsonrpc: "2.0", error: { code: -32001, message: UNAUTHORIZED }, id: null });
 });
+
+/** Core's golden unauthorized response at 238df6c (server/index.ts unauthorizedResponse), with request id 7. */
+const GOLDEN_BODY = '{"jsonrpc":"2.0","error":{"code":-32001,"message":"Unauthorized: missing or invalid authentication."},"id":7}';
+
+Deno.test("U184 the unauthorized response's status, body, Content-Type and CORS headers equal core's golden response", async () => {
+  const app = createApp(makeDeps());
+  const res = await app.fetch(post('{"jsonrpc":"2.0","id":7,"method":"tools/list"}'));
+  assertEquals(res.status, 200);
+  assertEquals(await res.text(), GOLDEN_BODY);
+  assertEquals(res.headers.get("content-type"), "application/json");
+  assertCors(res);
+});
