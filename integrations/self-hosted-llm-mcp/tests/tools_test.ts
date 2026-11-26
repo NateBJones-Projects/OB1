@@ -513,3 +513,20 @@ Deno.test("U131 capture with chat timing out stores the fallback row and ends th
   assertStringIncludes(m[1], "chat");
   assertStringIncludes(m[1], "30 ms");
 });
+
+Deno.test("U132 capture with a chat 5xx or missing choices stores the fallback row with the skip line naming the reason", async () => {
+  const cases: [Handler, string][] = [
+    [{ status: 503, body: "overloaded" }, "HTTP 503"],
+    [{ status: 200, body: { object: "chat.completion" } }, "reply lacks"],
+  ];
+  for (const [chat, reason] of cases) {
+    const { client, store } = await rig(GOOD_ENV, { chat });
+    const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+    assert(!result.isError, reason);
+    assertEquals(store.rows[0].metadata, FALLBACK_META, reason);
+    const t = textOf(result);
+    assert(t.startsWith("Captured as observation — uncategorized\nMetadata extraction skipped: "), t);
+    assertStringIncludes(t, reason);
+    assert(t.endsWith(". Saved with default metadata."), t);
+  }
+});
