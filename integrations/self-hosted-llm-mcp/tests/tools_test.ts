@@ -238,3 +238,23 @@ Deno.test("U110 search_thoughts forwards an explicit limit and threshold", async
   assertEquals(match.length, 1);
   assertEquals(match[0].args, [axisVector(0), 0.8, 3]);
 });
+
+Deno.test("U111 search_thoughts returns core's results text, and core's no-match text for none", async () => {
+  const { client, store } = await rig();
+  const row = store.seed({
+    content: "Milk is in the fridge",
+    embedding: axisVector(0),
+    metadata: { type: "task", topics: ["home", "food"], people: ["Ada"], action_items: ["buy milk", "clean"] },
+  });
+  const result = await client.callTool({ name: "search_thoughts", arguments: { query: "milk" } });
+  assert(!result.isError);
+  assertEquals(
+    textOf(result),
+    `Found 1 thought(s):\n\n--- Result 1 (100.0% match) ---\nCaptured: ${new Date(row.created_at).toLocaleDateString()}\n` +
+      `Type: task\nTopics: home, food\nPeople: Ada\nActions: buy milk; clean\n\nMilk is in the fridge`,
+  );
+  store.rows.length = 0;
+  const none = await client.callTool({ name: "search_thoughts", arguments: { query: "milk" } });
+  assert(!none.isError);
+  assertEquals(textOf(none), 'No thoughts found matching "milk".');
+});

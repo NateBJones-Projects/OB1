@@ -74,7 +74,23 @@ export function buildServer(deps: Deps): McpServer {
       if (!embedded.ok) throw new Error(embedded.message);
       const res = await store.matchThoughts(embedded.value, threshold, limit);
       if ("error" in res) return text(`Search error: ${res.error}`, true);
-      return text("");
+      if (!res.data.length) return text(`No thoughts found matching "${query}".`);
+      const results = res.data.map((t, i) => {
+        const m = t.metadata || {};
+        const parts = [
+          `--- Result ${i + 1} (${(t.similarity * 100).toFixed(1)}% match) ---`,
+          `Captured: ${new Date(t.created_at).toLocaleDateString()}`,
+          `Type: ${m.type || "unknown"}`,
+        ];
+        if (Array.isArray(m.topics) && m.topics.length) parts.push(`Topics: ${(m.topics as string[]).join(", ")}`);
+        if (Array.isArray(m.people) && m.people.length) parts.push(`People: ${(m.people as string[]).join(", ")}`);
+        if (Array.isArray(m.action_items) && m.action_items.length) {
+          parts.push(`Actions: ${(m.action_items as string[]).join("; ")}`);
+        }
+        parts.push(`\n${t.content}`);
+        return parts.join("\n");
+      });
+      return text(`Found ${res.data.length} thought(s):\n\n${results.join("\n\n")}`);
     } catch (err) {
       return errorText(err);
     }
