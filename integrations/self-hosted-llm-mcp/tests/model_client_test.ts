@@ -431,3 +431,10 @@ Deno.test("U60 the retry gets its own timeoutMs, and a hanging retry gives timeo
   assert(!r.ok);
   assertEquals(r.kind, "timeout");
 });
+
+Deno.test("U61 a 2xx first reply means exactly one request is sent", async () => {
+  const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0)));
+  const r = await createModelClient(cfg(), ff.fetch).embed("a");
+  assert(r.ok);
+  assertEquals(ff.requests.length, 1);
+});
