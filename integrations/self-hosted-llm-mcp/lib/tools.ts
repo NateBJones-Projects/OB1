@@ -7,6 +7,7 @@ import type { Deps, ModelClient, OkConfig } from "./types.ts";
 
 type ToolReply = { content: { type: "text"; text: string }[]; isError?: boolean };
 
+const MAY_BE_SAVED = "The thought may be saved without its embedding; capture it again to repair.";
 const text = (t: string, isError = false): ToolReply => ({ content: [{ type: "text", text: t }], ...(isError ? { isError: true } : {}) });
 const errorText = (err: unknown): ToolReply => text(`Error: ${(err as Error).message}`, true);
 
@@ -216,7 +217,18 @@ export function buildServer(deps: Deps): McpServer {
       const upserted = await store.upsertThought(content, metadata);
       if ("error" in upserted) return text(`Failed to capture: ${upserted.error}`, true);
       const saved = await store.setEmbedding(upserted.data.id, embedded.value);
-      if ("error" in saved) return text(`Failed to save embedding: ${saved.error}`, true);
+      if ("error" in saved) {
+        const id = upserted.data.id;
+        const prefix = `Embedding could not be saved: ${saved.error}.`;
+        const back = await store.readBack(id);
+        if ("error" in back) return text(`${prefix} ${MAY_BE_SAVED}`, true);
+        if (back.data.createdAt === back.data.updatedAt && back.data.embeddingIsNull) {
+          const removed = await store.deleteIfInsertedByCall(id, back.data.createdAt);
+          if ("error" in removed || !removed.data.deleted) return text(`${prefix} ${MAY_BE_SAVED}`, true);
+          return text(`${prefix} The thought was not kept; capture it again.`, true);
+        }
+        return text(`${prefix} ${MAY_BE_SAVED}`, true);
+      }
       const meta = metadata as Record<string, unknown>;
       let confirmation = `Captured as ${meta.type || "thought"}`;
       if (Array.isArray(meta.topics) && meta.topics.length) confirmation += ` — ${(meta.topics as string[]).join(", ")}`;

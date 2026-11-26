@@ -606,3 +606,14 @@ Deno.test("U138 an upsertThought error returns core's Failed to capture text wit
   assertEquals(textOf(result), "Failed to capture: duplicate key");
   assertEquals(store.calls.filter((c) => c.method === "setEmbedding"), []);
 });
+
+const EMB_FAIL = "db hiccup";
+
+Deno.test("U139 setEmbedding failing on a row this call inserted returns the not-kept text and the row is gone", async () => {
+  const { client, store } = await rig();
+  store.fail.setEmbedding = EMB_FAIL;
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), `Embedding could not be saved: ${EMB_FAIL}. The thought was not kept; capture it again.`);
+  assertEquals(store.rows, []);
+});
