@@ -67,3 +67,14 @@ Deno.test("U71 matchThoughts calls RPC match_thoughts with query_embedding, matc
     filter: {},
   });
 });
+
+Deno.test("U72 matchThoughts returns the rows, and [] for none", async () => {
+  const { ff, store } = setup();
+  const rows = [
+    { id: "a", content: "one", metadata: { type: "idea" }, similarity: 0.91, created_at: "2026-01-01T00:00:00+00:00" },
+    { id: "b", content: "two", metadata: {}, similarity: 0.55, created_at: "2026-01-02T00:00:00+00:00" },
+  ];
+  ff.on("POST", `${REST}/rpc/match_thoughts`, { body: rows }, { body: [] });
+  assertEquals(await store.matchThoughts([1], 0.5, 10), { data: rows });
+  assertEquals(await store.matchThoughts([1], 0.5, 10), { data: [] });
+});
