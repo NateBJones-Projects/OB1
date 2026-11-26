@@ -87,7 +87,17 @@ export function createSupabaseThoughtStore(
         data: { createdAt: data.created_at, updatedAt: data.updated_at, embeddingIsNull: data.embedding == null },
       };
     },
-    deleteIfInsertedByCall: notImplemented,
+    async deleteIfInsertedByCall(id: string, timestamp: string): Promise<StoreResult<{ deleted: boolean }>> {
+      const { data } = await supabase
+        .from("thoughts")
+        .delete()
+        .eq("id", id)
+        .is("embedding", null)
+        .eq("created_at", timestamp)
+        .eq("updated_at", timestamp)
+        .select("id");
+      return { data: { deleted: (data?.length ?? 0) > 0 } };
+    },
     countAll: notImplemented,
     countWithModel: notImplemented,
   };

@@ -311,3 +311,19 @@ Deno.test("U90 readBack returns { error } for a missing row or a database error"
   assertEquals(await store.readBack("gone"), { error: "JSON object requested, multiple (or no) rows returned" });
   assertEquals(await store.readBack("t-9"), { error: "read failed" });
 });
+
+const T = "2026-03-04T05:06:07.123456+00:00";
+
+Deno.test("U91 deleteIfInsertedByCall(id, T) deletes filtered by id, embedding is null, created_at=eq.T and updated_at=eq.T, with T verbatim", async () => {
+  const { ff, store } = setup();
+  ff.on("DELETE", `${REST}/thoughts`, { body: [{ id: "t-9" }] });
+  await store.deleteIfInsertedByCall("t-9", T);
+  assertEquals(ff.requests.length, 1);
+  const req = ff.requests[0];
+  assertEquals(req.method, "DELETE");
+  assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
+  assertEquals(params(req).get("id"), "eq.t-9");
+  assertEquals(params(req).get("embedding"), "is.null");
+  assertEquals(params(req).getAll("created_at"), [`eq.${T}`]);
+  assertEquals(params(req).getAll("updated_at"), [`eq.${T}`]);
+});
