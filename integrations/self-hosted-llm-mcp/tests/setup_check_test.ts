@@ -202,3 +202,13 @@ Deno.test("U159 role reachable fails with timeout when /models hangs", async () 
   assertStringIncludes(c.reason ?? "", "FETCH_TIMEOUT_MS");
   assertEquals(check(checks, "chat_reachable").ok, true);
 });
+
+Deno.test("U160 role model passes when the model is listed", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["other", "emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, { status: 500, body: "overloaded" })
+    .on("POST", `${BASE}/chat/completions`, { status: 500, body: "overloaded" });
+  const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+  assertEquals(check(checks, "embedding_model").ok, true);
+  assertEquals(check(checks, "chat_model").ok, true);
+});
