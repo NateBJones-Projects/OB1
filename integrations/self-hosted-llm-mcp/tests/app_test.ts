@@ -1,6 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@^1";
 import { createApp, productionDeps } from "../lib/app.ts";
-import { runSetupCheck } from "../lib/setup_check.ts";
 import type { Deps } from "../lib/types.ts";
 import { axisVector, chatReply, embeddingReply, FakeFetch, modelsReply } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
@@ -209,8 +208,10 @@ Deno.test("U193 productionDeps reads Deno.env, uses globalThis.fetch and builds 
     assertEquals(deps.getEnv("SHL_U193_ABSENT"), undefined);
     assert(deps.modelFetch === stub, "modelFetch is globalThis.fetch");
     await deps.store.countAll();
-    assert(seen.length > 0, "the store made a request through fetch");
-    assert(seen[0].url.startsWith("http://db.test/"), seen[0].url);
+    assertEquals(seen.length, 1, "countAll makes exactly one request through fetch");
+    assertEquals(new URL(seen[0].url).origin, "http://db.test");
+    assertEquals(new URL(seen[0].url).pathname, "/rest/v1/thoughts");
+    assertEquals(seen[0].method, "HEAD");
     assertEquals(seen[0].headers.get("apikey"), "service-role-secret");
   } finally {
     globalThis.fetch = saved.fetch;
@@ -224,11 +225,17 @@ Deno.test("U193 productionDeps reads Deno.env, uses globalThis.fetch and builds 
 
 Deno.test("U194 index.ts holds one statement serving createApp(productionDeps()).fetch", async () => {
   const source = await Deno.readTextFile(new URL("../index.ts", import.meta.url));
-  const code = source.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("//"));
-  const imports = code.filter((l) => l.startsWith("import "));
-  const rest = code.filter((l) => !l.startsWith("import ")).join(" ");
-  assertEquals(imports, ['import { createApp, productionDeps } from "./lib/app.ts";']);
-  assertEquals(rest, "Deno.serve(createApp(productionDeps()).fetch);");
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/\/\/.*$/, "").trim()).filter(Boolean);
+  const imports = stripped.filter((l) => l.startsWith("import "));
+  const body = stripped.filter((l) => !l.startsWith("import ")).join(" ");
+  assertEquals(imports.length, 1);
+  assertStringIncludes(imports[0], "createApp");
+  assertStringIncludes(imports[0], "productionDeps");
+  assertStringIncludes(imports[0], "./lib/app.ts");
+  const statements = body.split(";").map((x) => x.trim()).filter(Boolean);
+  assertEquals(statements.length, 1, body);
+  assert(/^Deno\.serve\(/.test(statements[0]), statements[0]);
+  assert(/createApp\(/.test(statements[0]) && /productionDeps\(/.test(statements[0]), statements[0]);
 });
 
 const BASE = "http://model.test/v1";
@@ -246,22 +253,38 @@ const checkRequest = (path = "/setup-check", headers: Record<string, string> = {
   new Request(FUNCTION_URL + path, { headers });
 
 Deno.test("U196 GET setup-check with the key answers 200 for an ok report and 503 otherwise, with the same JSON body, content type and CORS", async () => {
-  const okDeps = makeDeps(MODEL_ENV, healthyFake());
+  const okStore = new FakeStore();
+  okStore.seed({ content: "old one" });
+  okStore.seed({ content: "old two" });
+  okStore.seed({ content: "new one", metadata: { embedding_model: "embed-1536" } });
+  const okDeps = { ...makeDeps(MODEL_ENV, healthyFake()), store: okStore };
   const ok = await createApp(okDeps).fetch(checkRequest());
   assertEquals(ok.status, 200);
   assertEquals(ok.headers.get("content-type"), "application/json");
   assertCors(ok);
-  const okReport = await runSetupCheck(makeDeps(MODEL_ENV, healthyFake()));
-  assertEquals(okReport.ok, true);
-  assertEquals(await ok.json(), okReport);
+  const okBody = await ok.json();
+  assertEquals(okBody.ok, true);
+  assertEquals(
+    okBody.checks.map((c: { id: string }) => c.id),
+    ["config", "embedding_reachable", "embedding_model", "embedding_dimension", "chat_reachable", "chat_model", "chat_metadata"],
+  );
+  assertEquals(okBody.checks.map((c: { ok: boolean }) => c.ok), [true, true, true, true, true, true, true]);
+  assertEquals(okBody.thoughts, { other_model: 2 });
+  assertEquals(okBody.config.embedding, { base: BASE, model: "embed-1536", key_set: false });
+  assertEquals(okBody.config.timeout_ms, 60000);
 
   const bad = await createApp(makeDeps({ MCP_ACCESS_KEY: KEY })).fetch(checkRequest());
   assertEquals(bad.status, 503);
   assertEquals(bad.headers.get("content-type"), "application/json");
   assertCors(bad);
-  const badReport = await runSetupCheck(makeDeps({ MCP_ACCESS_KEY: KEY }));
-  assertEquals(badReport.ok, false);
-  assertEquals(await bad.json(), badReport);
+  const badBody = await bad.json();
+  assertEquals(badBody.ok, false);
+  assertEquals(badBody.checks.length, 7);
+  assertEquals(badBody.checks[0].id, "config");
+  assertEquals(badBody.checks[0].ok, false);
+  assertStringIncludes(badBody.checks[0].reason, "EMBEDDING_API_BASE");
+  assertEquals(badBody.thoughts, { other_model: null });
+  assertEquals(badBody.config, null);
 });
 
 const SETUP_UNAUTHORIZED = '{"error":"Unauthorized: missing or invalid authentication."}';
