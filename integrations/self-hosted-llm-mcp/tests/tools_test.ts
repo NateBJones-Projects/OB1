@@ -123,3 +123,25 @@ Deno.test("U101 each tool's title, description, input schema and annotations equ
     assertEquals([...(t.inputSchema.required ?? [])].sort(), [...want.required].sort(), t.name);
   }
 });
+
+/** Core's thoughtTitle, restated for expected values. */
+function title(content: string, createdAt?: string): string {
+  const firstLine = content.replace(/\s+/g, " ").trim().slice(0, 80);
+  const datePrefix = createdAt ? new Date(createdAt).toLocaleDateString() : "Open Brain";
+  return firstLine ? `${datePrefix} - ${firstLine}` : `${datePrefix} thought`;
+}
+
+Deno.test("U102 fetch of an existing id returns core's document text", async () => {
+  const { client, store } = await rig();
+  const row = store.seed({ id: "abc-1", content: "Remember the milk", metadata: { type: "task", topics: ["home"] } });
+  const result = await client.callTool({ name: "fetch", arguments: { id: "abc-1" } });
+  assert(!result.isError);
+  assertEquals(JSON.parse(textOf(result)), {
+    id: "abc-1",
+    title: title(row.content, row.created_at),
+    text: "Remember the milk",
+    url: "https://openbrain.local/thoughts/abc-1",
+    metadata: { type: "task", topics: ["home"], created_at: row.created_at, updated_at: row.updated_at },
+  });
+  assertEquals(store.calls.map((c) => c.method), ["fetchThought"]);
+});

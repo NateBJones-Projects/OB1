@@ -4,9 +4,22 @@ import type { Deps } from "./types.ts";
 
 type ToolReply = { content: { type: "text"; text: string }[]; isError?: boolean };
 
+const text = (t: string, isError = false): ToolReply => ({ content: [{ type: "text", text: t }], ...(isError ? { isError: true } : {}) });
+const errorText = (err: unknown): ToolReply => text(`Error: ${(err as Error).message}`, true);
+
+function thoughtTitle(content: string, createdAt?: string): string {
+  const firstLine = content.replace(/\s+/g, " ").trim().slice(0, 80);
+  const datePrefix = createdAt ? new Date(createdAt).toLocaleDateString() : "Open Brain";
+  return firstLine ? `${datePrefix} - ${firstLine}` : `${datePrefix} thought`;
+}
+
 const notYet = (): Promise<ToolReply> => Promise.resolve({ content: [{ type: "text", text: "not implemented" }] });
 
-export function buildServer(_deps: Deps): McpServer {
+export function buildServer(deps: Deps): McpServer {
+  const { store } = deps;
+  const thoughtUrl = (id: string): string =>
+    `${(deps.getEnv("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts").replace(/\/$/, "")}/${id}`;
+
   const server = new McpServer({ name: "open-brain", version: "1.0.0" });
   server.registerTool("search", {
     title: "Search Open Brain",
@@ -21,7 +34,22 @@ export function buildServer(_deps: Deps): McpServer {
       "Fetch one Open Brain thought by ID after using search. Use this read-only compatibility tool to retrieve the full text and metadata for citation.",
     annotations: { readOnlyHint: true },
     inputSchema: { id: z.string().describe("The Open Brain thought ID returned by the search tool") },
-  }, notYet);
+  }, async ({ id }) => {
+    try {
+      const res = await store.fetchThought(id);
+      if ("error" in res) return text(`Fetch error: ${res.error}`, true);
+      const thought = res.data;
+      return text(JSON.stringify({
+        id: thought.id,
+        title: thoughtTitle(thought.content, thought.created_at),
+        text: thought.content,
+        url: thoughtUrl(thought.id),
+        metadata: { ...thought.metadata, created_at: thought.created_at, updated_at: thought.updated_at },
+      }));
+    } catch (err) {
+      return errorText(err);
+    }
+  });
   server.registerTool("search_thoughts", {
     title: "Search Thoughts",
     description:
