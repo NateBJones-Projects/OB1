@@ -129,6 +129,18 @@ Deno.test("U41 every request goes to one of the two configured bases", async () 
   assertEquals(ff.requests.length, 4);
   assertEquals(ff.unmatched.length, 0);
   for (const r of ff.requests) assert(r.url.startsWith(EMB + "/") || r.url.startsWith(chatBase + "/"), r.url);
+
+  // the dimensions retry stays on the embedding base too
+  const retry = new FakeFetch().on(
+    "POST",
+    `${EMB}/embeddings`,
+    { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } },
+    embeddingReply(axisVector(0)),
+  );
+  await createModelClient(cfg({ chatBase }), retry.fetch).embed("a");
+  assertEquals(retry.requests.length, 2);
+  assertEquals(retry.unmatched.length, 0);
+  for (const r of retry.requests) assertEquals(r.url, `${EMB}/embeddings`);
 });
 
 Deno.test("U42 a rejected fetch gives unreachable naming role, base and 'could not be reached'", async () => {
