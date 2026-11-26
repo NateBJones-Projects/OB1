@@ -68,3 +68,13 @@ Deno.test("U31 buildCaptureMetadata(extracted, m) keeps extracted fields and add
   assertEquals(buildCaptureMetadata({}, "m").enrichment_status, "complete");
   assertEquals(extracted, { people: ["Ann"], dates_mentioned: [] });
 });
+
+Deno.test("U32 extracted source, embedding_model and enrichment_status are overridden by the real values", () => {
+  for (const field of ["source", "embedding_model", "enrichment_status"]) {
+    const out = buildCaptureMetadata({ topics: ["t"], [field]: "model-claimed" }, "real-model");
+    assertEquals(out[field], { source: "mcp", embedding_model: "real-model", enrichment_status: "complete" }[field]);
+    assertEquals(out.topics, ["t"]);
+  }
+  const all = buildCaptureMetadata({ source: "x", embedding_model: "y", enrichment_status: "z" }, "real-model");
+  assertEquals(all, { source: "mcp", embedding_model: "real-model", enrichment_status: "complete" });
+});
