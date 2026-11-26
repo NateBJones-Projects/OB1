@@ -24,12 +24,13 @@ export function createSupabaseThoughtStore(
       return { data: data as ThoughtRecord };
     },
     async matchThoughts(embedding: number[], threshold: number, count: number): Promise<StoreResult<ThoughtMatch[]>> {
-      const { data } = await supabase.rpc("match_thoughts", {
+      const { data, error } = await supabase.rpc("match_thoughts", {
         query_embedding: embedding,
         match_threshold: threshold,
         match_count: count,
         filter: {},
       });
+      if (error) return { error: error.message };
       return { data: data as ThoughtMatch[] };
     },
     listThoughts: notImplemented,

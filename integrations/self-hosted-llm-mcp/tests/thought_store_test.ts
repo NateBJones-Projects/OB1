@@ -78,3 +78,12 @@ Deno.test("U72 matchThoughts returns the rows, and [] for none", async () => {
   assertEquals(await store.matchThoughts([1], 0.5, 10), { data: rows });
   assertEquals(await store.matchThoughts([1], 0.5, 10), { data: [] });
 });
+
+Deno.test("U73 matchThoughts returns { error } for an RPC error", async () => {
+  const { ff, store } = setup();
+  ff.on("POST", `${REST}/rpc/match_thoughts`, {
+    status: 400,
+    body: { code: "22000", details: null, hint: null, message: "expected 1536 dimensions, not 3" },
+  });
+  assertEquals(await store.matchThoughts([1, 2, 3], 0.5, 10), { error: "expected 1536 dimensions, not 3" });
+});
