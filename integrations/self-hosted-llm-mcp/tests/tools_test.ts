@@ -153,3 +153,17 @@ Deno.test("U103 fetch with a store error returns core's isError text", async () 
   assertEquals(result.isError, true);
   assertEquals(textOf(result), "Fetch error: row not found");
 });
+
+Deno.test("U104 list_thoughts returns core's listing text for rows", async () => {
+  const { client, store } = await rig();
+  const a = store.seed({ content: "First thought", metadata: { type: "idea", topics: ["x", "y"] } });
+  const b = store.seed({ content: "Second thought", metadata: {} });
+  const result = await client.callTool({ name: "list_thoughts", arguments: {} });
+  assert(!result.isError);
+  // Newest first (the fake store sorts by created_at descending).
+  assertEquals(
+    textOf(result),
+    `2 recent thought(s):\n\n1. [${new Date(b.created_at).toLocaleDateString()}] (??)\n   Second thought\n\n` +
+      `2. [${new Date(a.created_at).toLocaleDateString()}] (idea - x, y)\n   First thought`,
+  );
+});

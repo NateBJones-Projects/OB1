@@ -72,7 +72,20 @@ export function buildServer(deps: Deps): McpServer {
       person: z.string().optional().describe("Filter by person mentioned"),
       days: z.number().optional().describe("Only thoughts from the last N days"),
     },
-  }, notYet);
+  }, async ({ limit }) => {
+    try {
+      const res = await store.listThoughts({ limit });
+      if ("error" in res) return text(`Error: ${res.error}`, true);
+      const results = res.data.map((t, i) => {
+        const m = t.metadata || {};
+        const tags = Array.isArray(m.topics) ? (m.topics as string[]).join(", ") : "";
+        return `${i + 1}. [${new Date(t.created_at).toLocaleDateString()}] (${m.type || "??"}${tags ? " - " + tags : ""})\n   ${t.content}`;
+      });
+      return text(`${res.data.length} recent thought(s):\n\n${results.join("\n\n")}`);
+    } catch (err) {
+      return errorText(err);
+    }
+  });
   server.registerTool("thought_stats", {
     title: "Thought Statistics",
     description: "Get a summary of all captured thoughts: totals, types, top topics, and people.",
