@@ -22,3 +22,9 @@ Deno.test("U27 parseUsableMetadata returns the object when the whole reply is on
   assertEquals(parseUsableMetadata('\n```json\n{"topics":["a"],"type":"task"}\n```\n'), obj);
   assertEquals(parseUsableMetadata("```json\n{}\n```"), {});
 });
+
+Deno.test("U28 parseUsableMetadata is unusable for a JSON array, number, string or null", () => {
+  for (const reply of ["[1,2]", '[{"a":1}]', "42", '"text"', "null", "true", '```json\n[1]\n```']) {
+    assertEquals(parseUsableMetadata(reply), null, reply);
+  }
+});

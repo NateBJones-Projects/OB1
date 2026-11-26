@@ -9,7 +9,9 @@ Only extract what's explicitly there.`;
 
 export function parseUsableMetadata(text: string): Record<string, unknown> | null {
   const fenced = text.trim().match(/^```(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n?```$/);
-  return JSON.parse(fenced ? fenced[1] : text.trim());
+  const value: unknown = JSON.parse(fenced ? fenced[1] : text.trim());
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
 }
 
 export function buildCaptureMetadata(
