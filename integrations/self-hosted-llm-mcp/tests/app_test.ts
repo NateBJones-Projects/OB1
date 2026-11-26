@@ -170,3 +170,15 @@ Deno.test("U191 an authorized response has no mcp-session-id header and carries 
     assertCors(r.response);
   }
 });
+
+Deno.test("U192 the MCP route serves the tools built from the injected deps", async () => {
+  const store = new FakeStore();
+  store.seed({ content: "one" });
+  store.seed({ content: "two" });
+  const env = { MCP_ACCESS_KEY: KEY, EMBEDDING_API_BASE: "http://model.test/v1", EMBEDDING_MODEL: "e", CHAT_MODEL: "c" };
+  const app = createApp({ ...makeDeps(env), store });
+  const { message } = await mcpCall(app.fetch, "tools/call", { name: "thought_stats", arguments: {} }, { key: KEY });
+  const text = (message as { result: { content: { text: string }[] } }).result.content[0].text;
+  assertStringIncludes(text, "Total thoughts: 2");
+  assertEquals(store.calls.some((c) => c.method === "stats"), true);
+});
