@@ -69,3 +69,16 @@ Deno.test("U37 listModels sends one GET /models on the role's base", async () =>
   await createModelClient(cfg({ chatBase: "http://chat.test/v1" }), ff2.fetch).listModels("chat");
   assertEquals(ff2.requests.map((r) => r.url), ["http://chat.test/v1/models"]);
 });
+
+Deno.test("U38 a role with a key sends Bearer on embed, chat and listModels", async () => {
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${CHAT}/chat/completions`, chatReply("{}"))
+    .on("GET", `${EMB}/models`, modelsReply([]));
+  const c = createModelClient(cfg({ embKey: "sk-emb", chatKey: "sk-emb" }), ff.fetch);
+  await c.embed("a");
+  await c.chat("a");
+  await c.listModels("embedding");
+  assertEquals(ff.requests.length, 3);
+  for (const r of ff.requests) assertEquals(r.headers["authorization"], "Bearer sk-emb");
+});
