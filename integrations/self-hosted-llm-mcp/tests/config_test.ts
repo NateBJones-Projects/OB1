@@ -215,3 +215,15 @@ Deno.test("U22 a keyed http:// embedding role gives exactly one key_over_http wa
     message: "An access key is configured for the embedding endpoint, but it uses http://; the key travels unencrypted.",
   }]);
 });
+
+Deno.test("U23 an unkeyed http:// role and a keyed https:// role give no warning", () => {
+  assertEquals(keyOverHttpWarnings(ok(MIN)), []);
+  const https = ok({
+    ...MIN,
+    EMBEDDING_API_BASE: "https://e/v1",
+    EMBEDDING_API_KEY: "ek",
+    CHAT_API_BASE: "https://c/v1",
+    CHAT_API_KEY: "ck",
+  });
+  assertEquals(keyOverHttpWarnings(https), []);
+});
