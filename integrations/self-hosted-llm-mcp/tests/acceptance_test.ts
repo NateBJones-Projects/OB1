@@ -236,7 +236,7 @@ Deno.test("A11 capture_thought with EMBEDDING_API_BASE unset names it and sends 
   assertEquals(store.rows.length, 0);
 });
 
-todo("A12 setup-check on a correctly configured server answers 200 with every check passed", async () => {
+Deno.test("A12 setup-check on a correctly configured server answers 200 with every check passed", async () => {
   const app = createApp(makeDeps(baseEnv(), healthy()));
   const { status, res, body } = await setupCheck(app);
   assertEquals(status, 200);
