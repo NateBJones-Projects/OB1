@@ -365,3 +365,13 @@ Deno.test("U56 a 422 dimension, a vLLM Matryoshka 400 and an upper-case DIMENSIO
     assert(r.ok, `${status} ${error}`);
   }
 });
+
+Deno.test("U57 a 404, and a 500 whose body mentions dimension, are not retried", async () => {
+  for (const [status, error] of [[404, "dimension not here"], [500, "dimension error inside"]] as const) {
+    const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, { status, body: { error } }, embeddingReply(axisVector(0)));
+    const r = await createModelClient(cfg(), ff.fetch).embed("a");
+    assertEquals(ff.requests.length, 1, `${status}`);
+    assert(!r.ok);
+    assertEquals(r.kind, status === 404 ? "model_not_found" : "http_error");
+  }
+});
