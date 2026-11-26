@@ -4,6 +4,15 @@ import type { EndpointConfig, ModelClient, ModelResult, OkConfig, OutcomeKind, R
 type Failure = { ok: false; kind: OutcomeKind; message: string };
 type Sent = { status: number; text: string } | Failure;
 
+// deno-lint-ignore no-explicit-any
+function parseJson(text: string): any {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
 export function createModelClient(config: OkConfig, doFetch: typeof fetch): ModelClient {
   async function send(ep: EndpointConfig, method: string, path: string, body?: unknown): Promise<Sent> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -56,6 +65,14 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     return body.includes(ep.model.toLowerCase()) && /not found|unknown|does not exist/.test(body);
   }
 
+  function badResponse(ep: EndpointConfig, missing: string): Failure {
+    return {
+      ok: false,
+      kind: "bad_response",
+      message: `The ${ep.role} model server at ${ep.base} answered, but the reply lacks ${missing}.`,
+    };
+  }
+
   function modelNotFound(ep: EndpointConfig): Failure {
     return {
       ok: false,
@@ -70,8 +87,11 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       const sent = await send(ep, "POST", "/embeddings", { model: ep.model, input: text, dimensions: 1536 });
       if (!("status" in sent)) return sent;
       if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status, sent.text);
-      const json = JSON.parse(sent.text);
-      return { ok: true, value: json.data[0].embedding };
+      const vector = parseJson(sent.text)?.data?.[0]?.embedding;
+      if (!Array.isArray(vector) || !vector.every((n) => typeof n === "number")) {
+        return badResponse(ep, "data[0].embedding (an array of numbers)");
+      }
+      return { ok: true, value: vector };
     },
     async chat(text: string): Promise<ModelResult<string>> {
       const ep = config.chat;

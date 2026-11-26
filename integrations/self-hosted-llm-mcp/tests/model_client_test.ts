@@ -249,3 +249,22 @@ Deno.test("U49 a 400 mentioning neither dimensions nor the model gives http_erro
   assertStringIncludes(r.message, "400");
   assertEquals(ff.requests.length, 1);
 });
+
+Deno.test("U50 a 2xx embeddings reply that is malformed gives bad_response", async () => {
+  const bodies: unknown[] = [
+    {},
+    { data: [] },
+    { data: [{}] },
+    { data: [{ embedding: "not an array" }] },
+    { data: [{ embedding: new Array(1536).fill("x") }] },
+    { data: [{ embedding: [...new Array(1535).fill(0), null] }] },
+    "this is not json",
+  ];
+  for (const body of bodies) {
+    const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, { status: 200, body });
+    const r = await createModelClient(cfg(), ff.fetch).embed("a");
+    assert(!r.ok, JSON.stringify(body)?.slice(0, 60));
+    assertEquals(r.kind, "bad_response", JSON.stringify(body)?.slice(0, 60));
+    assertStringIncludes(r.message, "embedding");
+  }
+});
