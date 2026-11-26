@@ -461,3 +461,15 @@ Deno.test("U127 capture with an auth_rejected, model_not_found, bad_response or 
     assertEquals(store.calls.filter((c) => c.method === "upsertThought"), [], label);
   }
 });
+
+Deno.test("U128 capture with a 768-length embedding returns the exact wrong_dimension text and stores nothing", async () => {
+  const { client, store } = await rig(GOOD_ENV, { embedding: embeddingReply(axisVector(0, 768)) });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(
+    textOf(result),
+    'Error: Embedding model "embed-1" returned 768-dimension vectors; this brain stores 1536. Choose a model that can output 1536 dimensions (see README).',
+  );
+  assertEquals(store.calls, []);
+  assertEquals(store.rows, []);
+});
