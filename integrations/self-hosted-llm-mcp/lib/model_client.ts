@@ -8,14 +8,24 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
   async function send(ep: EndpointConfig, method: string, path: string, body?: unknown): Promise<Sent> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (ep.key) headers["Authorization"] = `Bearer ${ep.key}`;
+    const signal = AbortSignal.timeout(config.timeoutMs);
     try {
       const response = await doFetch(`${ep.base}${path}`, {
         method,
         headers,
+        signal,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
       return { response };
     } catch (_err) {
+      if (signal.aborted) {
+        return {
+          ok: false,
+          kind: "timeout",
+          message: `The ${ep.role} model server at ${ep.base} gave no complete response within ${config.timeoutMs} ms. ` +
+            `Raise FETCH_TIMEOUT_MS if the server is slow.`,
+        };
+      }
       return {
         ok: false,
         kind: "unreachable",

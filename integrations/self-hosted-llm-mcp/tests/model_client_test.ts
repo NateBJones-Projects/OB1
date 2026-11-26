@@ -158,3 +158,18 @@ Deno.test("U43 a reply arriving inside timeoutMs is ok", async () => {
   assert((await c.embed("a")).ok);
   assert((await c.chat("a")).ok);
 });
+
+Deno.test("U44 a hanging fetch gives timeout for either role naming role, base, ms and FETCH_TIMEOUT_MS", async () => {
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, { hang: true })
+    .on("POST", `${CHAT}/chat/completions`, { hang: true });
+  const c = createModelClient(cfg({ timeoutMs: 20 }), ff.fetch);
+  for (const [role, r] of [["embedding", await c.embed("a")], ["chat", await c.chat("a")]] as const) {
+    assert(!r.ok);
+    assertEquals(r.kind, "timeout");
+    assertStringIncludes(r.message, role);
+    assertStringIncludes(r.message, "http://model.test/v1");
+    assertStringIncludes(r.message, "20");
+    assertStringIncludes(r.message, "FETCH_TIMEOUT_MS");
+  }
+});
