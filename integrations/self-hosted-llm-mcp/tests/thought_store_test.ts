@@ -149,3 +149,16 @@ Deno.test("U78 listThoughts adds created_at=gte.<now - days> (within a tolerance
   assert(since >= before - 7 * day - slack && since <= after - 7 * day + slack, `unexpected cutoff ${gte[0]}`);
   assertEquals(params(ff.requests[1]).has("created_at"), false);
 });
+
+Deno.test("U79 listThoughts returns the rows, or { error } for a database error", async () => {
+  const { ff, store } = setup();
+  const rows = [{ content: "hello", metadata: { type: "idea" }, created_at: "2026-01-01T00:00:00+00:00" }];
+  ff.on(
+    "GET",
+    `${REST}/thoughts`,
+    { body: rows },
+    { status: 500, body: { code: "XX000", details: null, hint: null, message: "list failed" } },
+  );
+  assertEquals(await store.listThoughts({ limit: 5 }), { data: rows });
+  assertEquals(await store.listThoughts({ limit: 5 }), { error: "list failed" });
+});

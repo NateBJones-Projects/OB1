@@ -47,7 +47,8 @@ export function createSupabaseThoughtStore(
         since.setDate(since.getDate() - filters.days);
         q = q.gte("created_at", since.toISOString());
       }
-      const { data } = await q;
+      const { data, error } = await q;
+      if (error) return { error: error.message };
       return { data: data as ListRow[] };
     },
     stats: notImplemented,
