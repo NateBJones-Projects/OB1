@@ -174,3 +174,11 @@ Deno.test("U105 list_thoughts with no rows returns core's empty text", async () 
   assert(!result.isError);
   assertEquals(textOf(result), "No thoughts found.");
 });
+
+Deno.test("U106 list_thoughts with a store error returns core's isError text", async () => {
+  const { client, store } = await rig();
+  store.fail.listThoughts = "db down";
+  const result = await client.callTool({ name: "list_thoughts", arguments: {} });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), "Error: db down");
+});
