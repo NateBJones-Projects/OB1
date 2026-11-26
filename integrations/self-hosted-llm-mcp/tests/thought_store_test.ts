@@ -333,3 +333,9 @@ Deno.test("U92 deleteIfInsertedByCall reports deleted: true when a row was delet
   ff.on("DELETE", `${REST}/thoughts`, { body: [{ id: "t-9" }] });
   assertEquals(await store.deleteIfInsertedByCall("t-9", T), { data: { deleted: true } });
 });
+
+Deno.test("U93 deleteIfInsertedByCall reports deleted: false with no error when no row matched", async () => {
+  const { ff, store } = setup();
+  ff.on("DELETE", `${REST}/thoughts`, { body: [] });
+  assertEquals(await store.deleteIfInsertedByCall("t-9", T), { data: { deleted: false } });
+});
