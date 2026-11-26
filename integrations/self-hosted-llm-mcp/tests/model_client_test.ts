@@ -113,3 +113,20 @@ Deno.test("U40 each role sends its own key when the two keys differ", async () =
     "Bearer sk-chat",
   ]);
 });
+
+Deno.test("U41 every request goes to one of the two configured bases", async () => {
+  const chatBase = "http://chat.test/v1";
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${chatBase}/chat/completions`, chatReply("{}"))
+    .on("GET", `${EMB}/models`, modelsReply([]))
+    .on("GET", `${chatBase}/models`, modelsReply([]));
+  const c = createModelClient(cfg({ chatBase }), ff.fetch);
+  await c.embed("a");
+  await c.chat("a");
+  await c.listModels("embedding");
+  await c.listModels("chat");
+  assertEquals(ff.requests.length, 4);
+  assertEquals(ff.unmatched.length, 0);
+  for (const r of ff.requests) assert(r.url.startsWith(EMB + "/") || r.url.startsWith(chatBase + "/"), r.url);
+});
