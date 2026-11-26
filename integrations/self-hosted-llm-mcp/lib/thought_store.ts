@@ -40,6 +40,7 @@ export function createSupabaseThoughtStore(
         .order("created_at", { ascending: false })
         .limit(filters.limit);
       if (filters.type) q = q.contains("metadata", { type: filters.type });
+      if (filters.topic) q = q.contains("metadata", { topics: [filters.topic] });
       const { data } = await q;
       return { data: data as ListRow[] };
     },
