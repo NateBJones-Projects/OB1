@@ -461,3 +461,21 @@ Deno.test("U178 a failing count gives other_model null with a thoughts_count war
     assertStringIncludes(warning.message, "permission denied for table thoughts");
   }
 });
+
+Deno.test("U179 with a failing count, the model checks still run and decide ok", async () => {
+  const store = new FakeStore();
+  store.fail.countAll = "database unavailable";
+  const healthy = healthyFake();
+  const r1 = await runSetupCheck(setup(BASE_ENV, healthy, store).deps);
+  assertEquals(r1.ok, true);
+  assertEquals(healthy.requests.length, 4);
+
+  const broken = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const r2 = await runSetupCheck(setup(BASE_ENV, broken, store).deps);
+  assertEquals(r2.ok, false);
+  assertEquals(check(r2.checks, "embedding_dimension").ok, false);
+  assertEquals(r2.warnings.some((w) => w.id === "thoughts_count"), true);
+});
