@@ -93,3 +93,21 @@ Deno.test("U151 an invalid setting fails config naming it with its reason", asyn
   assertStringIncludes(c.reason ?? "", "FETCH_TIMEOUT_MS");
   assertStringIncludes(c.reason ?? "", "positive whole number");
 });
+
+Deno.test("U152 with config failed, every other check reads skipped: configuration incomplete", async () => {
+  const { deps } = setup({});
+  const { checks } = await runSetupCheck(deps);
+  assertEquals(checks.map((c) => c.id), [
+    "config",
+    "embedding_reachable",
+    "embedding_model",
+    "embedding_dimension",
+    "chat_reachable",
+    "chat_model",
+    "chat_metadata",
+  ]);
+  for (const c of checks.slice(1)) {
+    assertEquals(c.ok, false);
+    assertEquals(c.reason, "skipped: configuration incomplete");
+  }
+});

@@ -1,6 +1,15 @@
 import { resolveConfig } from "./config.ts";
 import { createModelClient } from "./model_client.ts";
-import type { CheckResult, Deps, OkConfig, SetupConfigBlock, SetupReport } from "./types.ts";
+import type { CheckResult, Deps, OkConfig, Role, SetupConfigBlock, SetupReport } from "./types.ts";
+
+const CHECK_IDS: [CheckResult["id"], Role][] = [
+  ["embedding_reachable", "embedding"],
+  ["embedding_model", "embedding"],
+  ["embedding_dimension", "embedding"],
+  ["chat_reachable", "chat"],
+  ["chat_model", "chat"],
+  ["chat_metadata", "chat"],
+];
 
 function configBlock(c: OkConfig): SetupConfigBlock {
   return {
@@ -17,7 +26,12 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     if (config.missing.length > 0) parts.push(`Missing required settings: ${config.missing.join(", ")}.`);
     for (const i of config.invalid) parts.push(`${i.setting} is invalid: ${i.reason}.`);
     const reason = parts.join(" ");
-    return { ok: false, checks: [{ id: "config", ok: false, reason }], warnings: [], thoughts: { other_model: null }, config: null };
+    const skipped = "skipped: configuration incomplete";
+    const checks: CheckResult[] = [
+      { id: "config", ok: false, reason },
+      ...CHECK_IDS.map(([id, role]) => ({ id, role, ok: false, reason: skipped })),
+    ];
+    return { ok: false, checks, warnings: [], thoughts: { other_model: null }, config: null };
   }
   const client = createModelClient(config, deps.modelFetch);
   const [embedding, chat] = await Promise.all([client.embed("sample"), client.chat("sample")]);
