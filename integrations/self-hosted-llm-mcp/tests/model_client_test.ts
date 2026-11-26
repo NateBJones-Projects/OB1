@@ -366,6 +366,21 @@ Deno.test("U56 a 422 dimension, a vLLM Matryoshka 400 and an upper-case DIMENSIO
   }
 });
 
+Deno.test("U56 a Matryoshka 400 without the word dimension is retried once without the dimensions key", async () => {
+  const ff = new FakeFetch().on(
+    "POST",
+    `${EMB}/embeddings`,
+    { status: 400, body: { error: "Model 'x' does not support Matryoshka embeddings" } },
+    embeddingReply(axisVector(0)),
+  );
+  const r = await createModelClient(cfg(), ff.fetch).embed("a");
+  assertEquals(ff.requests.length, 2);
+  assert("dimensions" in (ff.requests[0].body as object));
+  assert(!("dimensions" in (ff.requests[1].body as object)));
+  assert(r.ok);
+  assertEquals(r.value.length, 1536);
+});
+
 Deno.test("U57 a 404, and a 500 whose body mentions dimension, are not retried", async () => {
   for (const [status, error] of [[404, "dimension not here"], [500, "dimension error inside"]] as const) {
     const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, { status, body: { error } }, embeddingReply(axisVector(0)));
