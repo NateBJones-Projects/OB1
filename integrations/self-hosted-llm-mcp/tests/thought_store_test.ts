@@ -339,3 +339,12 @@ Deno.test("U93 deleteIfInsertedByCall reports deleted: false with no error when 
   ff.on("DELETE", `${REST}/thoughts`, { body: [] });
   assertEquals(await store.deleteIfInsertedByCall("t-9", T), { data: { deleted: false } });
 });
+
+Deno.test("U94 deleteIfInsertedByCall returns { error } for a database error", async () => {
+  const { ff, store } = setup();
+  ff.on("DELETE", `${REST}/thoughts`, {
+    status: 500,
+    body: { code: "XX000", details: null, hint: null, message: "delete failed" },
+  });
+  assertEquals(await store.deleteIfInsertedByCall("t-9", T), { error: "delete failed" });
+});

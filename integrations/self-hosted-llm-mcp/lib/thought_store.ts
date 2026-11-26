@@ -88,7 +88,7 @@ export function createSupabaseThoughtStore(
       };
     },
     async deleteIfInsertedByCall(id: string, timestamp: string): Promise<StoreResult<{ deleted: boolean }>> {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("thoughts")
         .delete()
         .eq("id", id)
@@ -96,6 +96,7 @@ export function createSupabaseThoughtStore(
         .eq("created_at", timestamp)
         .eq("updated_at", timestamp)
         .select("id");
+      if (error) return { error: error.message };
       return { data: { deleted: (data?.length ?? 0) > 0 } };
     },
     countAll: notImplemented,
