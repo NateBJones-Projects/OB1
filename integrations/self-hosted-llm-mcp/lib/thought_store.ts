@@ -103,6 +103,12 @@ export function createSupabaseThoughtStore(
       const { count } = await supabase.from("thoughts").select("*", { count: "exact", head: true });
       return { data: count as number };
     },
-    countWithModel: notImplemented,
+    async countWithModel(model: string): Promise<StoreResult<number>> {
+      const { count } = await supabase
+        .from("thoughts")
+        .select("*", { count: "exact", head: true })
+        .eq("metadata->>embedding_model", model);
+      return { data: count as number };
+    },
   };
 }

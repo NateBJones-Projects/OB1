@@ -360,3 +360,18 @@ Deno.test("U95 countAll requests an exact head count of thoughts and returns the
   assertEquals(listParams(req), [["select", "*"]]);
   assertMatch(req.headers["prefer"], /count=exact/);
 });
+
+Deno.test("U96 countWithModel(m) adds metadata->>embedding_model=eq.m to the same count", async () => {
+  const { ff, store } = setup();
+  ff.on("HEAD", `${REST}/thoughts`, { headers: { "content-range": "*/5" } });
+  assertEquals(await store.countWithModel("nomic"), { data: 5 });
+  assertEquals(ff.requests.length, 1);
+  const req = ff.requests[0];
+  assertEquals(req.method, "HEAD");
+  assertEquals(new URL(req.url).pathname, "/rest/v1/thoughts");
+  assertMatch(req.headers["prefer"], /count=exact/);
+  assertEquals(listParams(req).sort(), [
+    ["metadata->>embedding_model", "eq.nomic"],
+    ["select", "*"],
+  ]);
+});
