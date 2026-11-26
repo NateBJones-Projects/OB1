@@ -266,3 +266,17 @@ Deno.test("U87 readBack requests created_at, updated_at and whether embedding is
   assertEquals(params(req).get("select")?.split(",").sort(), ["created_at", "embedding", "updated_at"]);
   assertMatch(req.headers["accept"], /application\/vnd\.pgrst\.object\+json/);
 });
+
+Deno.test("U88 readBack reports embeddingIsNull true for a null embedding and false for a set one", async () => {
+  const { ff, store } = setup();
+  ff.on(
+    "GET",
+    `${REST}/thoughts`,
+    { body: { created_at: "T", updated_at: "T", embedding: null } },
+    { body: { created_at: "T", updated_at: "T", embedding: "[0.1,0.2,0.3]" } },
+  );
+  const nullCase = await store.readBack("t-9");
+  assert("data" in nullCase && nullCase.data.embeddingIsNull === true);
+  const setCase = await store.readBack("t-9");
+  assert("data" in setCase && setCase.data.embeddingIsNull === false);
+});
