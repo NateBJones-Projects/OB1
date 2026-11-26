@@ -173,3 +173,19 @@ Deno.test("U44 a hanging fetch gives timeout for either role naming role, base, 
     assertStringIncludes(r.message, "FETCH_TIMEOUT_MS");
   }
 });
+
+Deno.test("U45 HTTP 401 and 403 each give auth_rejected naming role, base and 'access key rejected'", async () => {
+  for (const status of [401, 403]) {
+    const ff = new FakeFetch()
+      .on("POST", `${EMB}/embeddings`, { status, body: { error: "nope" } })
+      .on("POST", `${CHAT}/chat/completions`, { status, body: { error: "nope" } });
+    const c = createModelClient(cfg(), ff.fetch);
+    for (const [role, r] of [["embedding", await c.embed("a")], ["chat", await c.chat("a")]] as const) {
+      assert(!r.ok);
+      assertEquals(r.kind, "auth_rejected");
+      assertStringIncludes(r.message, role);
+      assertStringIncludes(r.message, "http://model.test/v1");
+      assertStringIncludes(r.message, "access key rejected");
+    }
+  }
+});

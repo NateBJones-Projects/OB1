@@ -2,7 +2,7 @@ import { EXTRACTION_PROMPT } from "./metadata.ts";
 import type { EndpointConfig, ModelClient, ModelResult, OkConfig, OutcomeKind, Role } from "./types.ts";
 
 type Failure = { ok: false; kind: OutcomeKind; message: string };
-type Sent = { response: Response } | Failure;
+type Sent = { status: number; text: string } | Failure;
 
 export function createModelClient(config: OkConfig, doFetch: typeof fetch): ModelClient {
   async function send(ep: EndpointConfig, method: string, path: string, body?: unknown): Promise<Sent> {
@@ -16,7 +16,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
         signal,
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
-      return { response };
+      return { status: response.status, text: await response.text() };
     } catch (_err) {
       if (signal.aborted) {
         return {
@@ -34,12 +34,24 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     }
   }
 
+  function httpFailure(ep: EndpointConfig, status: number): Failure {
+    if (status === 401 || status === 403) {
+      return {
+        ok: false,
+        kind: "auth_rejected",
+        message: `The ${ep.role} model server at ${ep.base} access key rejected (HTTP ${status}).`,
+      };
+    }
+    throw new Error("not implemented");
+  }
+
   return {
     async embed(text: string): Promise<ModelResult<number[]>> {
       const ep = config.embedding;
       const sent = await send(ep, "POST", "/embeddings", { model: ep.model, input: text, dimensions: 1536 });
-      if (!("response" in sent)) return sent;
-      const json = await sent.response.json();
+      if (!("status" in sent)) return sent;
+      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status);
+      const json = JSON.parse(sent.text);
       return { ok: true, value: json.data[0].embedding };
     },
     async chat(text: string): Promise<ModelResult<string>> {
@@ -52,13 +64,16 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
           { role: "user", content: text },
         ],
       });
-      if (!("response" in sent)) return sent;
-      const json = await sent.response.json();
+      if (!("status" in sent)) return sent;
+      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status);
+      const json = JSON.parse(sent.text);
       return { ok: true, value: json.choices[0].message.content };
     },
     async listModels(role: Role): Promise<ModelResult<string[] | null>> {
-      const sent = await send(config[role], "GET", "/models");
-      if (!("response" in sent)) return sent;
+      const ep = config[role];
+      const sent = await send(ep, "GET", "/models");
+      if (!("status" in sent)) return sent;
+      if (sent.status < 200 || sent.status > 299) return httpFailure(ep, sent.status);
       return { ok: true, value: null };
     },
   };
