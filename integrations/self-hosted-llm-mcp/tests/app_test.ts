@@ -272,3 +272,33 @@ Deno.test("U197 GET setup-check with no or a wrong key (header or query) answers
     assertCors(res);
   }
 });
+
+Deno.test("U198 GET setup-check accepts a correct ?key= and applies the same header precedence as the MCP route", async () => {
+  const app = createApp(makeDeps(MODEL_ENV, healthyFake()));
+  const status = async (path: string, headers: Record<string, string>) => (await app.fetch(checkRequest(path, headers))).status;
+  assertEquals(await status(`/setup-check?key=${KEY}`, {}), 200);
+  assertEquals(await status(`/setup-check?key=${KEY}`, { "x-brain-key": "wrong" }), 401);
+  assertEquals(await status("/setup-check?key=wrong", { "x-brain-key": KEY }), 200);
+  assertEquals(await status(`/setup-check?key=${KEY}`, { "x-brain-key": "" }), 200);
+});
+
+Deno.test("U199 with MCP_ACCESS_KEY unset, GET setup-check answers 401", async () => {
+  for (const env of [{} as Record<string, string>, { MCP_ACCESS_KEY: "" }]) {
+    const app = createApp(makeDeps({ ...MODEL_ENV, ...env }, healthyFake()));
+    for (const key of ["", "anything"]) {
+      const res = await app.fetch(checkRequest(`/setup-check?key=${key}`, { "x-brain-key": key }));
+      assertEquals(res.status, 401);
+    }
+    assertEquals((await app.fetch(checkRequest("/setup-check", {}))).status, 401);
+  }
+});
+
+Deno.test("U200 an unauthorized setup-check request runs no check and sends no model request", async () => {
+  const fake = healthyFake();
+  const store = new FakeStore();
+  const app = createApp({ ...makeDeps(MODEL_ENV, fake), store });
+  await app.fetch(checkRequest("/setup-check", {}));
+  await app.fetch(checkRequest("/setup-check", { "x-brain-key": "wrong" }));
+  assertEquals(fake.requests.length, 0);
+  assertEquals(store.calls.length, 0);
+});
