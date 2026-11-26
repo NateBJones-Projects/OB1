@@ -3,7 +3,7 @@ import { createApp } from "../lib/app.ts";
 import type { Deps } from "../lib/types.ts";
 import { FakeFetch } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
-import { FUNCTION_URL, mcpCall } from "./helpers/mcp.ts";
+import { FUNCTION_URL, mcpCall, parseMessage } from "./helpers/mcp.ts";
 
 const KEY = "test-key";
 
@@ -140,4 +140,18 @@ Deno.test("U189 Supabase Authorization Bearer or apikey headers without the acce
   assert(await isRefused(await app.fetch(toolsList(FUNCTION_URL, { authorization: `Bearer ${KEY}` }))));
   assert(await isRefused(await app.fetch(toolsList(FUNCTION_URL, { apikey: KEY }))));
   assert(await isRefused(await app.fetch(toolsList(FUNCTION_URL, { authorization: `Bearer ${KEY}`, apikey: KEY }))));
+});
+
+Deno.test("U190 an authorized tools/list succeeds with no Accept header, with application/json only, and with both types", async () => {
+  const app = createApp(makeDeps());
+  const accepts: (string | null)[] = [null, "application/json", "application/json, text/event-stream"];
+  for (const accept of accepts) {
+    const req = toolsList(FUNCTION_URL, { "x-brain-key": KEY });
+    if (accept === null) req.headers.delete("accept");
+    else req.headers.set("accept", accept);
+    const res = await app.fetch(req);
+    assertEquals(res.status, 200, `accept ${accept}`);
+    const message = await parseMessage(res);
+    assert(toolNames(message).includes("search_thoughts"), `accept ${accept}`);
+  }
 });

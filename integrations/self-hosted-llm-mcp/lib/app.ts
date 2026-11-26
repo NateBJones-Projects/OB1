@@ -49,6 +49,18 @@ async function serveMcp(deps: Deps, request: Request): Promise<Response> {
   const server = buildServer(deps);
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
+  // Claude Desktop connectors omit the Accept header the transport requires (issue #33).
+  if (!request.headers.get("accept")?.includes("text/event-stream")) {
+    const headers = new Headers(request.headers);
+    headers.set("Accept", "application/json, text/event-stream");
+    request = new Request(request.url, {
+      method: request.method,
+      headers,
+      body: request.body,
+      // @ts-ignore -- duplex is required for a streaming body in Deno
+      duplex: "half",
+    });
+  }
   const hono = new Hono();
   hono.all("*", (c) => transport.handleRequest(c));
   const response = await hono.fetch(request);
