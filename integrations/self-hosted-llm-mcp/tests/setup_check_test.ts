@@ -280,3 +280,14 @@ Deno.test("U165 embedding_dimension fails for 768 numbers with a reason naming 7
     'Embedding model "emb-m" returned 768-dimension vectors; this brain stores 1536. Choose a model that can output 1536 dimensions (see README).',
   );
 });
+
+Deno.test("U166 embedding_dimension carries the embedding call's outcome when the call fails", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, { status: 500, body: "model crashed" })
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "embedding_dimension");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "HTTP 500");
+  assertStringIncludes(c.reason ?? "", "model crashed");
+});
