@@ -144,3 +144,17 @@ Deno.test("U42 a rejected fetch gives unreachable naming role, base and 'could n
     assertStringIncludes(r.message, "could not be reached");
   }
 });
+
+Deno.test("U43 a reply arriving inside timeoutMs is ok", async () => {
+  const slow = async () => {
+    await new Promise((r) => setTimeout(r, 10));
+    return embeddingReply(axisVector(1));
+  };
+  const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, slow).on("POST", `${CHAT}/chat/completions`, async () => {
+    await new Promise((r) => setTimeout(r, 10));
+    return chatReply("{}");
+  });
+  const c = createModelClient(cfg({ timeoutMs: 1000 }), ff.fetch);
+  assert((await c.embed("a")).ok);
+  assert((await c.chat("a")).ok);
+});
