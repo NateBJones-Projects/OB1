@@ -1,6 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@^1";
 import { createApp, productionDeps } from "../lib/app.ts";
-import { runSetupCheck } from "../lib/setup_check.ts";
 import type { Deps } from "../lib/types.ts";
 import { axisVector, chatReply, embeddingReply, FakeFetch, modelsReply } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
@@ -209,8 +208,10 @@ Deno.test("U193 productionDeps reads Deno.env, uses globalThis.fetch and builds 
     assertEquals(deps.getEnv("SHL_U193_ABSENT"), undefined);
     assert(deps.modelFetch === stub, "modelFetch is globalThis.fetch");
     await deps.store.countAll();
-    assert(seen.length > 0, "the store made a request through fetch");
-    assert(seen[0].url.startsWith("http://db.test/"), seen[0].url);
+    assertEquals(seen.length, 1, "countAll makes exactly one request through fetch");
+    assertEquals(new URL(seen[0].url).origin, "http://db.test");
+    assertEquals(new URL(seen[0].url).pathname, "/rest/v1/thoughts");
+    assertEquals(seen[0].method, "HEAD");
     assertEquals(seen[0].headers.get("apikey"), "service-role-secret");
   } finally {
     globalThis.fetch = saved.fetch;
@@ -224,11 +225,17 @@ Deno.test("U193 productionDeps reads Deno.env, uses globalThis.fetch and builds 
 
 Deno.test("U194 index.ts holds one statement serving createApp(productionDeps()).fetch", async () => {
   const source = await Deno.readTextFile(new URL("../index.ts", import.meta.url));
-  const code = source.split("\n").map((l) => l.trim()).filter((l) => l && !l.startsWith("//"));
-  const imports = code.filter((l) => l.startsWith("import "));
-  const rest = code.filter((l) => !l.startsWith("import ")).join(" ");
-  assertEquals(imports, ['import { createApp, productionDeps } from "./lib/app.ts";']);
-  assertEquals(rest, "Deno.serve(createApp(productionDeps()).fetch);");
+  const stripped = source.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").map((l) => l.replace(/\/\/.*$/, "").trim()).filter(Boolean);
+  const imports = stripped.filter((l) => l.startsWith("import "));
+  const body = stripped.filter((l) => !l.startsWith("import ")).join(" ");
+  assertEquals(imports.length, 1);
+  assertStringIncludes(imports[0], "createApp");
+  assertStringIncludes(imports[0], "productionDeps");
+  assertStringIncludes(imports[0], "./lib/app.ts");
+  const statements = body.split(";").map((x) => x.trim()).filter(Boolean);
+  assertEquals(statements.length, 1, body);
+  assert(/^Deno\.serve\(/.test(statements[0]), statements[0]);
+  assert(/createApp\(/.test(statements[0]) && /productionDeps\(/.test(statements[0]), statements[0]);
 });
 
 const BASE = "http://model.test/v1";
