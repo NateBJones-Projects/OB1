@@ -350,7 +350,7 @@ Deno.test("A19 an unkeyed http base passes the setup check with no warning", asy
   assertEquals((body as SetupReport).warnings, []);
 });
 
-todo("A20 an http base with EMBEDDING_API_KEY passes with a key_over_http warning for the embedding role", async () => {
+Deno.test("A20 an http base with EMBEDDING_API_KEY passes with a key_over_http warning for the embedding role", async () => {
   const base = "http://ollama:11434/v1";
   const env = baseEnv({ EMBEDDING_API_BASE: base, EMBEDDING_API_KEY: "secret-embed-key" });
   const app = createApp(makeDeps(env, healthy(new FakeFetch(), base)));
