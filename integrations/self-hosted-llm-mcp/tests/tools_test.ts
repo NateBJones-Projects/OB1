@@ -412,3 +412,19 @@ Deno.test("U124 config gate: setting a missing variable between two calls lets t
   assert(!second.isError);
   assertEquals(textOf(second), "Captured as idea — alpha");
 });
+
+Deno.test("U125 search_thoughts and search with a failing embedding return isError naming the cause, with no matchThoughts call", async () => {
+  const { client, store } = await rig(GOOD_ENV, { embedding: { networkError: "connection refused" } });
+  store.seed({ content: "Milk", embedding: axisVector(0), metadata: {} });
+  for (const name of ["search_thoughts", "search"]) {
+    const result = await client.callTool({ name, arguments: { query: "milk" } });
+    assertEquals(result.isError, true, name);
+    const t = textOf(result);
+    assert(t.startsWith("Error: "), t);
+    assertStringIncludes(t, "embedding");
+    assertStringIncludes(t, BASE);
+    assertStringIncludes(t, "could not be reached");
+    assert(!t.includes("Milk"), t);
+  }
+  assertEquals(store.calls.filter((c) => c.method === "matchThoughts"), []);
+});
