@@ -295,3 +295,15 @@ Deno.test("U52 a 1536-length vector is ok; 1535 and 1537 each give wrong_dimensi
     if (!r.ok) assertEquals(r.kind, "wrong_dimension", `length ${len}`);
   }
 });
+
+Deno.test("U53 wrong_dimension message is the contract text and no vector is returned", async () => {
+  const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0, 768)));
+  const r = await createModelClient(cfg(), ff.fetch).embed("a");
+  assert(!r.ok);
+  assertEquals(r.kind, "wrong_dimension");
+  assertEquals(
+    r.message,
+    'Embedding model "qwen3-embedding:4b" returned 768-dimension vectors; this brain stores 1536. Choose a model that can output 1536 dimensions (see README).',
+  );
+  assert(!("value" in r));
+});
