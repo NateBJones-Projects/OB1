@@ -304,3 +304,22 @@ Deno.test("U116 a successful capture stores the model's vector as the row's embe
   assertEquals(store.rows.length, 1);
   assertEquals(store.rows[0].embedding, axisVector(7));
 });
+
+Deno.test("U117 both the embedding and chat requests are in flight before either reply is released", async () => {
+  const { client, fake } = await rig(GOOD_ENV, {
+    embedding: { hold: embeddingReply(axisVector(0)) },
+    chat: { hold: chatReply('{"topics":["a"],"type":"idea"}') },
+  });
+  const pending = client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  for (let i = 0; i < 50 && fake.heldCount < 2; i++) await new Promise((r) => setTimeout(r, 10));
+  const held = fake.heldCount;
+  let settled = false;
+  pending.finally(() => (settled = true)).catch(() => {});
+  while (!settled) {
+    fake.release();
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  const result = await pending;
+  assertEquals(held, 2);
+  assert(!result.isError);
+});

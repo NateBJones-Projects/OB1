@@ -201,8 +201,7 @@ export function buildServer(deps: Deps): McpServer {
   }, async ({ content }) => {
     try {
       const client = models();
-      const embedded = await client.embed(content);
-      const chatted = await client.chat(content);
+      const [embedded, chatted] = await Promise.all([client.embed(content), client.chat(content)]);
       if (!embedded.ok) throw new Error(embedded.message);
       const config = resolveConfig(deps.getEnv);
       const extracted = chatted.ok ? parseUsableMetadata(chatted.value) : null;
