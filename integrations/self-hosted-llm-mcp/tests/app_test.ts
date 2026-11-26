@@ -291,9 +291,11 @@ Deno.test("U198 GET setup-check accepts a correct ?key= and applies the same hea
 });
 
 Deno.test("U199 with MCP_ACCESS_KEY unset, GET setup-check answers 401", async () => {
-  for (const env of [{} as Record<string, string>, { MCP_ACCESS_KEY: "" }]) {
-    const app = createApp(makeDeps({ ...MODEL_ENV, ...env }, healthyFake()));
-    for (const key of ["", "anything"]) {
+  const { MCP_ACCESS_KEY: _unset, ...unsetEnv } = MODEL_ENV;
+  assert(!("MCP_ACCESS_KEY" in unsetEnv));
+  for (const env of [unsetEnv, { ...MODEL_ENV, MCP_ACCESS_KEY: "" }]) {
+    const app = createApp(makeDeps(env, healthyFake()));
+    for (const key of ["", "anything", "undefined"]) {
       const res = await app.fetch(checkRequest(`/setup-check?key=${key}`, { "x-brain-key": key }));
       assertEquals(res.status, 401);
     }
