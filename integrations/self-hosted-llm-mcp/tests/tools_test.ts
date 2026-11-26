@@ -323,3 +323,16 @@ Deno.test("U117 both the embedding and chat requests are in flight before either
   assertEquals(held, 2);
   assert(!result.isError);
 });
+
+Deno.test("U118 every model request in a capture and a search goes to a configured base", async () => {
+  const CHAT_BASE = "http://chat.test:8080/v1";
+  const { client, fake } = await rig({ ...GOOD_ENV, CHAT_API_BASE: CHAT_BASE });
+  fake.on("POST", `${CHAT_BASE}/chat/completions`, chatReply('{"topics":["a"],"type":"idea"}'));
+  await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  await client.callTool({ name: "search_thoughts", arguments: { query: "idea" } });
+  await client.callTool({ name: "search", arguments: { query: "idea" } });
+  assert(fake.requests.length >= 4);
+  assertEquals(fake.unmatched, []);
+  for (const r of fake.requests) assert(r.url.startsWith(BASE) || r.url.startsWith(CHAT_BASE), r.url);
+  assertEquals(fake.requests.filter((r) => r.url.startsWith(CHAT_BASE)).length, 1);
+});
