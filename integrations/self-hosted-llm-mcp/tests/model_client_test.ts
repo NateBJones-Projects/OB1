@@ -321,3 +321,21 @@ Deno.test("U54 an Ollama dimensions 400 is retried once to the same URL without 
   assert("dimensions" in (ff.requests[0].body as object));
   assert(!("dimensions" in (ff.requests[1].body as object)));
 });
+
+Deno.test("U55 the retry is otherwise identical and its 1536-length reply is ok", async () => {
+  const v = axisVector(3);
+  const ff = new FakeFetch().on(
+    "POST",
+    `${EMB}/embeddings`,
+    { status: 400, body: { error: "dimensions 1536 exceeds embedding length 768" } },
+    embeddingReply(v),
+  );
+  const r = await createModelClient(cfg({ embKey: "sk-emb" }), ff.fetch).embed("hello");
+  assertEquals(r, { ok: true, value: v });
+  assertEquals(ff.requests.length, 2);
+  const { dimensions: _d, ...first } = ff.requests[0].body as Record<string, unknown>;
+  assertEquals(ff.requests[1].body, first);
+  assertEquals(ff.requests[1].body, { model: "qwen3-embedding:4b", input: "hello" });
+  assertEquals(ff.requests[1].headers, ff.requests[0].headers);
+  assertEquals(ff.requests[1].headers["authorization"], "Bearer sk-emb");
+});
