@@ -1,6 +1,8 @@
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.24.3/server/mcp.js";
 import { z } from "npm:zod@4.1.13";
-import type { Deps } from "./types.ts";
+import { resolveConfig } from "./config.ts";
+import { createModelClient } from "./model_client.ts";
+import type { Deps, ModelClient } from "./types.ts";
 
 type ToolReply = { content: { type: "text"; text: string }[]; isError?: boolean };
 
@@ -17,6 +19,12 @@ const notYet = (): Promise<ToolReply> => Promise.resolve({ content: [{ type: "te
 
 export function buildServer(deps: Deps): McpServer {
   const { store } = deps;
+  /** Resolves the configuration for this call and builds the model client. */
+  const models = (): ModelClient => {
+    const config = resolveConfig(deps.getEnv);
+    if (!config.ok) throw new Error("configuration incomplete");
+    return createModelClient(config, deps.modelFetch);
+  };
   const thoughtUrl = (id: string): string =>
     `${(deps.getEnv("OPEN_BRAIN_CITATION_BASE_URL") || "https://openbrain.local/thoughts").replace(/\/$/, "")}/${id}`;
 
@@ -60,7 +68,17 @@ export function buildServer(deps: Deps): McpServer {
       limit: z.number().optional().default(10),
       threshold: z.number().optional().default(0.5),
     },
-  }, notYet);
+  }, async ({ query, limit, threshold }) => {
+    try {
+      const embedded = await models().embed(query);
+      if (!embedded.ok) throw new Error(embedded.message);
+      const res = await store.matchThoughts(embedded.value, 0.5, 10);
+      if ("error" in res) return text(`Search error: ${res.error}`, true);
+      return text("");
+    } catch (err) {
+      return errorText(err);
+    }
+  });
   server.registerTool("list_thoughts", {
     title: "List Recent Thoughts",
     description: "List recently captured thoughts with optional filters by type, topic, person, or time range.",

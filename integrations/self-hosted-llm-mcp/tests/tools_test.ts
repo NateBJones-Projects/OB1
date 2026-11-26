@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@^1";
 import { buildServer } from "../lib/tools.ts";
-import { chatReply, embeddingReply, axisVector, FakeFetch } from "./helpers/fake_fetch.ts";
+import { axisVector, chatReply, embeddingReply, FakeFetch, type Handler } from "./helpers/fake_fetch.ts";
 import { FakeStore } from "./helpers/fake_store.ts";
 import { inMemoryClient } from "./helpers/mcp.ts";
 
@@ -20,13 +20,14 @@ interface Rig {
 }
 
 /** A server over the real config, client and metadata modules; only the model server and database are fake. */
-async function rig(env: Record<string, string | undefined> = GOOD_ENV, script = true): Promise<Rig> {
+async function rig(
+  env: Record<string, string | undefined> = GOOD_ENV,
+  opts: { embedding?: Handler; chat?: Handler } = {},
+): Promise<Rig> {
   const e = { ...env };
   const fake = new FakeFetch();
-  if (script) {
-    fake.on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)));
-    fake.on("POST", `${BASE}/chat/completions`, chatReply('{"topics":["alpha"],"type":"idea"}'));
-  }
+  fake.on("POST", `${BASE}/embeddings`, opts.embedding ?? embeddingReply(axisVector(0)));
+  fake.on("POST", `${BASE}/chat/completions`, opts.chat ?? chatReply('{"topics":["alpha"],"type":"idea"}'));
   const store = new FakeStore();
   const client = await inMemoryClient(buildServer({ getEnv: (n) => e[n], modelFetch: fake.fetch, store }));
   return { env: e, fake, store, client };
@@ -218,4 +219,14 @@ Deno.test("U108 thought_stats returns core's stats text", async () => {
       "  Ada: 1",
     ].join("\n"),
   );
+});
+
+Deno.test("U109 search_thoughts embeds the query and matches with that vector, threshold 0.5 and count 10", async () => {
+  const { client, fake, store } = await rig(GOOD_ENV, { embedding: embeddingReply(axisVector(3)) });
+  await client.callTool({ name: "search_thoughts", arguments: { query: "where is the milk" } });
+  const embedReq = fake.requests.find((r) => r.url === `${BASE}/embeddings`);
+  assertEquals((embedReq?.body as { input: string }).input, "where is the milk");
+  const match = store.calls.filter((c) => c.method === "matchThoughts");
+  assertEquals(match.length, 1);
+  assertEquals(match[0].args, [axisVector(3), 0.5, 10]);
 });
