@@ -223,3 +223,20 @@ Deno.test("U47 a 400 or 422 body naming the model as unknown gives model_not_fou
     }
   }
 });
+
+Deno.test("U48 HTTP 500 gives http_error naming role, status and server text", async () => {
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, { status: 500, body: "kaboom in the embedder" })
+    .on("POST", `${CHAT}/chat/completions`, { status: 500, body: "kaboom in the chatter" });
+  const c = createModelClient(cfg(), ff.fetch);
+  for (const [role, text, r] of [
+    ["embedding", "kaboom in the embedder", await c.embed("a")],
+    ["chat", "kaboom in the chatter", await c.chat("a")],
+  ] as const) {
+    assert(!r.ok);
+    assertEquals(r.kind, "http_error");
+    assertStringIncludes(r.message, role);
+    assertStringIncludes(r.message, "500");
+    assertStringIncludes(r.message, text);
+  }
+});

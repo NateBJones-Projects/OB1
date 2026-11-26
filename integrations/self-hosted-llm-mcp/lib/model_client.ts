@@ -44,7 +44,11 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     }
     if (status === 404) return modelNotFound(ep);
     if ((status === 400 || status === 422) && namesModelAsUnknown(ep, text)) return modelNotFound(ep);
-    throw new Error("not implemented");
+    return {
+      ok: false,
+      kind: "http_error",
+      message: `The ${ep.role} model server at ${ep.base} answered HTTP ${status}: ${text}`,
+    };
   }
 
   function namesModelAsUnknown(ep: EndpointConfig, text: string): boolean {
