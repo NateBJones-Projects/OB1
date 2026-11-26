@@ -327,3 +327,9 @@ Deno.test("U91 deleteIfInsertedByCall(id, T) deletes filtered by id, embedding i
   assertEquals(params(req).getAll("created_at"), [`eq.${T}`]);
   assertEquals(params(req).getAll("updated_at"), [`eq.${T}`]);
 });
+
+Deno.test("U92 deleteIfInsertedByCall reports deleted: true when a row was deleted", async () => {
+  const { ff, store } = setup();
+  ff.on("DELETE", `${REST}/thoughts`, { body: [{ id: "t-9" }] });
+  assertEquals(await store.deleteIfInsertedByCall("t-9", T), { data: { deleted: true } });
+});
