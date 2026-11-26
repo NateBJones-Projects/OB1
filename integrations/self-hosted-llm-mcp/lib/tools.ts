@@ -72,9 +72,15 @@ export function buildServer(deps: Deps): McpServer {
       person: z.string().optional().describe("Filter by person mentioned"),
       days: z.number().optional().describe("Only thoughts from the last N days"),
     },
-  }, async ({ limit }) => {
+  }, async ({ limit, type, topic, person, days }) => {
     try {
-      const res = await store.listThoughts({ limit });
+      const res = await store.listThoughts({
+        limit,
+        ...(type ? { type } : {}),
+        ...(topic ? { topic } : {}),
+        ...(person ? { person } : {}),
+        ...(days ? { days } : {}),
+      });
       if ("error" in res) return text(`Error: ${res.error}`, true);
       if (!res.data.length) return text("No thoughts found.");
       const results = res.data.map((t, i) => {

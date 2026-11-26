@@ -182,3 +182,12 @@ Deno.test("U106 list_thoughts with a store error returns core's isError text", a
   assertEquals(result.isError, true);
   assertEquals(textOf(result), "Error: db down");
 });
+
+Deno.test("U107 list_thoughts forwards limit, type, topic, person and days to the store", async () => {
+  const { client, store } = await rig();
+  await client.callTool({ name: "list_thoughts", arguments: { limit: 3, type: "idea", topic: "ai", person: "Ada", days: 7 } });
+  assertEquals(store.calls.length, 1);
+  assertEquals(store.calls[0].args, [{ limit: 3, type: "idea", topic: "ai", person: "Ada", days: 7 }]);
+  await client.callTool({ name: "list_thoughts", arguments: {} });
+  assertEquals(store.calls[1].args, [{ limit: 10 }]);
+});
