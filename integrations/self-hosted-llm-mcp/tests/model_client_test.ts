@@ -506,3 +506,16 @@ Deno.test("U66 listModels returns ok null for a 2xx non-JSON body or one without
     assertEquals(await createModelClient(cfg(), ff.fetch).listModels("embedding"), { ok: true, value: null });
   }
 });
+
+Deno.test("U67 listModels maps 401 to auth_rejected and a rejected fetch to unreachable", async () => {
+  const denied = new FakeFetch().on("GET", `${CHAT}/models`, { status: 401, body: { error: "no" } });
+  const a = await createModelClient(cfg(), denied.fetch).listModels("chat");
+  assert(!a.ok);
+  assertEquals(a.kind, "auth_rejected");
+  assertStringIncludes(a.message, "chat");
+  const down = new FakeFetch().on("GET", `${EMB}/models`, { networkError: "refused" });
+  const u = await createModelClient(cfg(), down.fetch).listModels("embedding");
+  assert(!u.ok);
+  assertEquals(u.kind, "unreachable");
+  assertStringIncludes(u.message, "embedding");
+});
