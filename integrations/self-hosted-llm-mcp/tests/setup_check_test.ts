@@ -267,3 +267,16 @@ Deno.test("U164 embedding_dimension passes for a 1536-number vector", async () =
   assertEquals(c.ok, true);
   assertEquals(c.reason, undefined);
 });
+
+Deno.test("U165 embedding_dimension fails for 768 numbers with a reason naming 768 and 1536", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0, 768)))
+    .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "embedding_dimension");
+  assertEquals(c.ok, false);
+  assertEquals(
+    c.reason,
+    'Embedding model "emb-m" returned 768-dimension vectors; this brain stores 1536. Choose a model that can output 1536 dimensions (see README).',
+  );
+});

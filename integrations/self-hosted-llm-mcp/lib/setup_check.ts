@@ -67,7 +67,9 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     { id: "config", ok: true },
     reachable("embedding", embeddingModels),
     modelCheck("embedding", config.embedding.model, embeddingModels, embedding),
-    { id: "embedding_dimension", role: "embedding", ok: embedding.ok },
+    embedding.ok
+      ? { id: "embedding_dimension", role: "embedding", ok: true }
+      : { id: "embedding_dimension", role: "embedding", ok: false, reason: embedding.message },
     reachable("chat", chatModels),
     modelCheck("chat", config.chat.model, chatModels, chat),
     { id: "chat_metadata", role: "chat", ok: chat.ok && parseUsableMetadata(chat.value) !== null },
