@@ -318,7 +318,7 @@ Deno.test("A17 with no chat settings besides CHAT_MODEL the chat request goes to
   assertEquals(chat[0].url, `${BASE}/chat/completions`);
 });
 
-todo("A18 with CHAT_MODEL unset all six tools fail naming CHAT_MODEL and send no request", async () => {
+Deno.test("A18 with CHAT_MODEL unset all six tools fail naming CHAT_MODEL and send no request", async () => {
   const env = baseEnv();
   delete env.CHAT_MODEL;
   const fake = healthy();
