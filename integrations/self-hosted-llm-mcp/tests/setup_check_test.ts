@@ -145,3 +145,15 @@ Deno.test("U155 any single failed check makes ok false", async () => {
   assertEquals(r2.checks.filter((c) => !c.ok).map((c) => c.id), ["chat_metadata"]);
   assertEquals(r2.ok, false);
 });
+
+Deno.test("U156 role reachable passes on a 200 and on a 404 from /models", async () => {
+  for (const status of [200, 404]) {
+    const fake = new FakeFetch()
+      .on("GET", `${BASE}/models`, status === 200 ? modelsReply(["emb-m", "chat-m"]) : { status: 404, body: "nope" })
+      .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+      .on("POST", `${BASE}/chat/completions`, chatReply("{}"));
+    const { checks } = await runSetupCheck(setup(BASE_ENV, fake).deps);
+    assertEquals(check(checks, "embedding_reachable").ok, true, `status ${status}`);
+    assertEquals(check(checks, "chat_reachable").ok, true, `status ${status}`);
+  }
+});
