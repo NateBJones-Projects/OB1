@@ -36,7 +36,7 @@ function modelCheck(
 
 function chatMetadata(chat: ModelResult<string>): CheckResult {
   const id = "chat_metadata";
-  if (!chat.ok) return { id, role: "chat", ok: false };
+  if (!chat.ok) return { id, role: "chat", ok: false, reason: chat.message };
   if (parseUsableMetadata(chat.value) !== null) return { id, role: "chat", ok: true };
   return { id, role: "chat", ok: false, reason: `unusable output: ${chat.value.slice(0, 120)}` };
 }

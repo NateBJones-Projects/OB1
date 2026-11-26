@@ -322,3 +322,14 @@ Deno.test("U168 chat_metadata fails with unusable output and the first 120 chara
   const short = await run("Sure! Here is your metadata.");
   assertEquals(short.reason, "unusable output: Sure! Here is your metadata.");
 });
+
+Deno.test("U169 chat_metadata carries the chat call's outcome when the call fails", async () => {
+  const fake = new FakeFetch()
+    .on("GET", `${BASE}/models`, modelsReply(["emb-m", "chat-m"]))
+    .on("POST", `${BASE}/embeddings`, embeddingReply(axisVector(0)))
+    .on("POST", `${BASE}/chat/completions`, { status: 500, body: "template error" });
+  const c = check((await runSetupCheck(setup(BASE_ENV, fake).deps)).checks, "chat_metadata");
+  assertEquals(c.ok, false);
+  assertStringIncludes(c.reason ?? "", "HTTP 500");
+  assertStringIncludes(c.reason ?? "", "template error");
+});
