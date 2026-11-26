@@ -35,3 +35,17 @@ Deno.test("U146 a healthy configuration and server give ok true", async () => {
   const report = await runSetupCheck(deps);
   assertEquals(report.ok, true);
 });
+
+Deno.test("U147 the report lists the seven checks in the contract's order, role checks carrying role", async () => {
+  const { deps } = setup();
+  const { checks } = await runSetupCheck(deps);
+  assertEquals(checks.map((c) => [c.id, c.role]), [
+    ["config", undefined],
+    ["embedding_reachable", "embedding"],
+    ["embedding_model", "embedding"],
+    ["embedding_dimension", "embedding"],
+    ["chat_reachable", "chat"],
+    ["chat_model", "chat"],
+    ["chat_metadata", "chat"],
+  ]);
+});
