@@ -438,3 +438,18 @@ Deno.test("U61 a 2xx first reply means exactly one request is sent", async () =>
   assert(r.ok);
   assertEquals(ff.requests.length, 1);
 });
+
+Deno.test("U62 a key value of either role inside a server error body appears as [redacted]", async () => {
+  const keys = { embKey: "sk-emb-1234567", chatKey: "sk-chat-7654321" };
+  const ff = new FakeFetch()
+    .on("POST", `${EMB}/embeddings`, { status: 500, body: `bad key ${keys.embKey} and ${keys.chatKey} again ${keys.embKey}` })
+    .on("POST", `${CHAT}/chat/completions`, { status: 500, body: `bad key ${keys.chatKey} and ${keys.embKey}` });
+  const c = createModelClient(cfg(keys), ff.fetch);
+  for (const r of [await c.embed("a"), await c.chat("a")]) {
+    assert(!r.ok);
+    assertEquals(r.kind, "http_error");
+    assertStringIncludes(r.message, "[redacted]");
+    assert(!r.message.includes(keys.embKey));
+    assert(!r.message.includes(keys.chatKey));
+  }
+});

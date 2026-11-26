@@ -45,6 +45,14 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     }
   }
 
+  /** Replaces every key value of either role (longest first, so no key can survive inside another). */
+  function redact(text: string): string {
+    const keys = [config.embedding.key, config.chat.key]
+      .filter((k): k is string => !!k)
+      .sort((a, b) => b.length - a.length);
+    return keys.reduce((out, key) => out.split(key).join("[redacted]"), text);
+  }
+
   function httpFailure(ep: EndpointConfig, status: number, text: string): Failure {
     if (status === 401 || status === 403) {
       return {
@@ -58,7 +66,7 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
     return {
       ok: false,
       kind: "http_error",
-      message: `The ${ep.role} model server at ${ep.base} answered HTTP ${status}: ${text}`,
+      message: `The ${ep.role} model server at ${ep.base} answered HTTP ${status}: ${redact(text)}`,
     };
   }
 
