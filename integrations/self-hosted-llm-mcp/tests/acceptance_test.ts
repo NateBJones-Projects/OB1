@@ -151,7 +151,7 @@ Deno.test("A5 capture, search, list and stats succeed with every model request o
   assertEquals(fake.unmatched.length, 0);
 });
 
-todo("A6 capture_thought with the embedding base unreachable names the base and stores nothing", async () => {
+Deno.test("A6 capture_thought with the embedding base unreachable names the base and stores nothing", async () => {
   const fake = new FakeFetch()
     .on("POST", `${BASE}/embeddings`, { networkError: "connection refused" })
     .on("POST", `${BASE}/chat/completions`, chatReply(GOOD_META));
