@@ -299,3 +299,15 @@ Deno.test("U89 readBack returns both timestamps as the exact strings received, e
   assert("data" in differing);
   assertEquals([differing.data.createdAt, differing.data.updatedAt], [t2, t3]);
 });
+
+Deno.test("U90 readBack returns { error } for a missing row or a database error", async () => {
+  const { ff, store } = setup();
+  ff.on(
+    "GET",
+    `${REST}/thoughts`,
+    { status: 406, body: { code: "PGRST116", details: "The result contains 0 rows", hint: null, message: "JSON object requested, multiple (or no) rows returned" } },
+    { status: 500, body: { code: "XX000", details: null, hint: null, message: "read failed" } },
+  );
+  assertEquals(await store.readBack("gone"), { error: "JSON object requested, multiple (or no) rows returned" });
+  assertEquals(await store.readBack("t-9"), { error: "read failed" });
+});

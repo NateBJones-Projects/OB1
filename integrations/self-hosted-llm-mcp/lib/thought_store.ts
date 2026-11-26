@@ -77,13 +77,14 @@ export function createSupabaseThoughtStore(
       return { data: null };
     },
     async readBack(id: string): Promise<StoreResult<ReadBack>> {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("thoughts")
         .select("created_at, updated_at, embedding")
         .eq("id", id)
         .single();
+      if (error) return { error: error.message };
       return {
-        data: { createdAt: data?.created_at, updatedAt: data?.updated_at, embeddingIsNull: data?.embedding == null },
+        data: { createdAt: data.created_at, updatedAt: data.updated_at, embeddingIsNull: data.embedding == null },
       };
     },
     deleteIfInsertedByCall: notImplemented,
