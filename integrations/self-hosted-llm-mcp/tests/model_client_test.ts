@@ -34,3 +34,21 @@ Deno.test("U34 embed returns ok with the vector for a 2xx 1536-number reply", as
   const r = await createModelClient(cfg(), ff.fetch).embed("hello");
   assertEquals(r, { ok: true, value: v });
 });
+
+Deno.test("U35 chat sends one POST /chat/completions with model, json_object format and system+user messages", async () => {
+  const ff = new FakeFetch().on("POST", `${CHAT}/chat/completions`, chatReply("{}"));
+  await createModelClient(cfg(), ff.fetch).chat("my thought");
+  assertEquals(ff.requests.length, 1);
+  const r = ff.requests[0];
+  assertEquals(r.method, "POST");
+  assertEquals(r.url, `${CHAT}/chat/completions`);
+  assertEquals(r.body, {
+    model: "qwen3:4b",
+    response_format: { type: "json_object" },
+    messages: [
+      { role: "system", content: EXTRACTION_PROMPT },
+      { role: "user", content: "my thought" },
+    ],
+  });
+  assertEquals(r.headers["content-type"], "application/json");
+});
