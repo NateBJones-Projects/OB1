@@ -325,3 +325,27 @@ Deno.test("U202 /fn/setup-check/extra, /fn/setup-checker, /fn/xsetup-check and /
     assert(toolNames(message).includes("capture_thought"), path);
   }
 });
+
+Deno.test("U203 POST setup-check goes to the MCP route (no key gives the 200 envelope, not 401)", async () => {
+  const app = createApp(makeDeps(MODEL_ENV, healthyFake()));
+  const res = await app.fetch(new Request(FUNCTION_URL + "/setup-check", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: '{"jsonrpc":"2.0","id":5,"method":"tools/list"}',
+  }));
+  assertEquals(res.status, 200);
+  assertEquals(await res.json(), { jsonrpc: "2.0", error: { code: -32001, message: UNAUTHORIZED }, id: 5 });
+  const { message } = await mcpCall(app.fetch, "tools/list", {}, { key: KEY, url: FUNCTION_URL + "/setup-check" });
+  assert(toolNames(message).includes("capture_thought"));
+});
+
+Deno.test("U204 a wrong key on any non-setup-check path gets the 200 envelope, never 401", async () => {
+  const app = createApp(makeDeps(MODEL_ENV, healthyFake()));
+  for (const path of ["", "/", "/fn", "/fn/tools", "/setup-check/fn"]) {
+    for (const method of ["POST", "GET", "DELETE"]) {
+      const res = await app.fetch(new Request(FUNCTION_URL + path, { method, headers: { "x-brain-key": "wrong" } }));
+      assertEquals(res.status, 200, `${method} ${path}`);
+      assertEquals((await res.json()).error.code, -32001, `${method} ${path}`);
+    }
+  }
+});
