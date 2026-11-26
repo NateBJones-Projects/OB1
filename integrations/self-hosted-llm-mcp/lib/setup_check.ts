@@ -1,6 +1,14 @@
 import { resolveConfig } from "./config.ts";
 import { createModelClient } from "./model_client.ts";
-import type { CheckResult, Deps, SetupReport } from "./types.ts";
+import type { CheckResult, Deps, OkConfig, SetupConfigBlock, SetupReport } from "./types.ts";
+
+function configBlock(c: OkConfig): SetupConfigBlock {
+  return {
+    embedding: { base: c.embedding.base, model: c.embedding.model, key_set: c.embedding.key !== undefined },
+    chat: { base: c.chat.base, model: c.chat.model, key_set: c.chat.key !== undefined, inherits: c.chatInherits },
+    timeout_ms: c.timeoutMs,
+  };
+}
 
 export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
   const config = resolveConfig(deps.getEnv);
@@ -16,5 +24,5 @@ export async function runSetupCheck(deps: Deps): Promise<SetupReport> {
     { id: "chat_model", role: "chat", ok: true },
     { id: "chat_metadata", role: "chat", ok: chat.ok },
   ];
-  return { ok: checks.every((c) => c.ok), checks, warnings: [], thoughts: { other_model: null }, config: null };
+  return { ok: checks.every((c) => c.ok), checks, warnings: [], thoughts: { other_model: null }, config: configBlock(config) };
 }

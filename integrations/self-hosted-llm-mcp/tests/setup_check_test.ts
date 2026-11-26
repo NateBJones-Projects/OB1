@@ -49,3 +49,13 @@ Deno.test("U147 the report lists the seven checks in the contract's order, role 
     ["chat_metadata", "chat"],
   ]);
 });
+
+Deno.test("U148 config shows each role's base, model and key_set, chat inherits, and timeout_ms", async () => {
+  const { deps } = setup({ ...BASE_ENV, EMBEDDING_API_KEY: "sk-secret", FETCH_TIMEOUT_MS: "5000" });
+  const { config } = await runSetupCheck(deps);
+  assertEquals(config, {
+    embedding: { base: BASE, model: "emb-m", key_set: true },
+    chat: { base: BASE, model: "chat-m", key_set: true, inherits: ["base", "key"] },
+    timeout_ms: 5000,
+  });
+});
