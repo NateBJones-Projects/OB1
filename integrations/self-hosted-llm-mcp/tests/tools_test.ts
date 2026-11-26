@@ -22,12 +22,13 @@ interface Rig {
 /** A server over the real config, client and metadata modules; only the model server and database are fake. */
 async function rig(
   env: Record<string, string | undefined> = GOOD_ENV,
-  opts: { embedding?: Handler; chat?: Handler } = {},
+  opts: { embedding?: Handler; chat?: Handler | Handler[] } = {},
 ): Promise<Rig> {
   const e = { ...env };
   const fake = new FakeFetch();
   fake.on("POST", `${BASE}/embeddings`, opts.embedding ?? embeddingReply(axisVector(0)));
-  fake.on("POST", `${BASE}/chat/completions`, opts.chat ?? chatReply('{"topics":["alpha"],"type":"idea"}'));
+  const chat = opts.chat ?? chatReply('{"topics":["alpha"],"type":"idea"}');
+  fake.on("POST", `${BASE}/chat/completions`, ...(Array.isArray(chat) ? chat : [chat]));
   const store = new FakeStore();
   const client = await inMemoryClient(buildServer({ getEnv: (n) => e[n], modelFetch: fake.fetch, store }));
   return { env: e, fake, store, client };
@@ -565,4 +566,19 @@ Deno.test("U135 a fallback reply keeps core's Captured as observation — uncate
   assertEquals(lines.length, 2);
   assertEquals(lines[0], "Captured as observation — uncategorized");
   assert(lines[1].startsWith("Metadata extraction skipped: "));
+});
+
+Deno.test("U136 capturing existing text with chat failing marks the one existing row fallback", async () => {
+  const { client, store } = await rig(GOOD_ENV, { chat: { networkError: "down" } });
+  store.seed({
+    id: "old-1",
+    content: "An idea",
+    embedding: axisVector(5),
+    metadata: { type: "idea", topics: ["good"], enrichment_status: "complete", embedding_model: "embed-1" },
+  });
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assert(!result.isError);
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.rows[0].id, "old-1");
+  assertEquals(store.rows[0].metadata.enrichment_status, "fallback");
 });
