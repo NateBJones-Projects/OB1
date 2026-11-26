@@ -86,6 +86,8 @@ Your Open Brain database stores 1536-dimension vectors. The function asks the mo
 
 Smaller models do not work for this: `qwen3-embedding:0.6b` is native 1024 and cannot produce 1536. A model that natively returns 1536 dimensions also works.
 
+**The `dimensions` retry.** Every embedding request asks for `dimensions: 1536`. If the server answers HTTP 400 or 422 with a body that mentions "dimension" or "matryoshka" (for example Ollama's `dimensions ... exceeds embedding length`, or vLLM's "does not support Matryoshka embeddings"), the function retries once without the field. Whatever comes back must still be exactly 1536 numbers, or the capture is refused and the message names both sizes. In practice, vLLM owners must start the server with `--hf-overrides '{"is_matryoshka": true}'` for a Matryoshka model such as Qwen3-Embedding, so the field is accepted. Otherwise the retry returns the native size and the capture is refused. llama.cpp ignores the field, so it always returns its native size.
+
 These findings come from server documentation and source code, not from a live run. See the table below for what has been checked on real hardware.
 
 ### Tested with (known good, not a minimum)
