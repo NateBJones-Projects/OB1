@@ -300,12 +300,19 @@ Deno.test("U51 a 2xx chat reply lacking choices[0].message.content or non-JSON g
 });
 
 Deno.test("U52 a 1536-length vector is ok; 1535 and 1537 each give wrong_dimension", async () => {
-  for (const [len, ok] of [[1536, true], [1535, false], [1537, false]] as const) {
-    const ff = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0, len)));
-    const r = await createModelClient(cfg(), ff.fetch).embed("a");
-    assertEquals(r.ok, ok, `length ${len}`);
-    if (!r.ok) assertEquals(r.kind, "wrong_dimension", `length ${len}`);
-  }
+  const sent = axisVector(0, 1536);
+  const okReply = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(sent));
+  assertEquals(await createModelClient(cfg(), okReply.fetch).embed("a"), { ok: true, value: sent });
+
+  const short = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0, 1535)));
+  const rShort = await createModelClient(cfg(), short.fetch).embed("a");
+  assertEquals(rShort.ok, false);
+  assertEquals((rShort as { kind?: string }).kind, "wrong_dimension");
+
+  const long = new FakeFetch().on("POST", `${EMB}/embeddings`, embeddingReply(axisVector(0, 1537)));
+  const rLong = await createModelClient(cfg(), long.fetch).embed("a");
+  assertEquals(rLong.ok, false);
+  assertEquals((rLong as { kind?: string }).kind, "wrong_dimension");
 });
 
 Deno.test("U53 wrong_dimension message is the contract text and no vector is returned", async () => {
