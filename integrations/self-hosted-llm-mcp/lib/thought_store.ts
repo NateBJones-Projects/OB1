@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2.47.10";
 import type { ListFilters, ListRow, StatsRow, ReadBack, StoreResult, ThoughtMatch, ThoughtRecord, ThoughtStore } from "./types.ts";
 
 export function createSupabaseThoughtStore(
