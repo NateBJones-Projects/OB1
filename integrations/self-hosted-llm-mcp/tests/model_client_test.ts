@@ -58,3 +58,14 @@ Deno.test("U36 chat returns ok with choices[0].message.content for a 2xx reply",
   const r = await createModelClient(cfg(), ff.fetch).chat("x");
   assertEquals(r, { ok: true, value: '{"type":"idea"}' });
 });
+
+Deno.test("U37 listModels sends one GET /models on the role's base", async () => {
+  const ff = new FakeFetch().on("GET", `${EMB}/models`, modelsReply(["a"]));
+  await createModelClient(cfg(), ff.fetch).listModels("embedding");
+  assertEquals(ff.requests.length, 1);
+  assertEquals(ff.requests[0].method, "GET");
+  assertEquals(ff.requests[0].url, `${EMB}/models`);
+  const ff2 = new FakeFetch().on("GET", "http://chat.test/v1/models", modelsReply(["a"]));
+  await createModelClient(cfg({ chatBase: "http://chat.test/v1" }), ff2.fetch).listModels("chat");
+  assertEquals(ff2.requests.map((r) => r.url), ["http://chat.test/v1/models"]);
+});

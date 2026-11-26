@@ -1,5 +1,5 @@
 import { EXTRACTION_PROMPT } from "./metadata.ts";
-import type { ModelClient, ModelResult, OkConfig } from "./types.ts";
+import type { ModelClient, ModelResult, OkConfig, Role } from "./types.ts";
 
 export function createModelClient(config: OkConfig, doFetch: typeof fetch): ModelClient {
   return {
@@ -30,8 +30,10 @@ export function createModelClient(config: OkConfig, doFetch: typeof fetch): Mode
       const json = await res.json();
       return { ok: true, value: json.choices[0].message.content };
     },
-    listModels(): Promise<ModelResult<string[] | null>> {
-      throw new Error("not implemented");
+    async listModels(role: Role): Promise<ModelResult<string[] | null>> {
+      const ep = config[role];
+      await doFetch(`${ep.base}/models`, { method: "GET" });
+      return { ok: true, value: null };
     },
   };
 }
