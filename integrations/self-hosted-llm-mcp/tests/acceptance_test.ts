@@ -91,7 +91,7 @@ Deno.test("A2 search_thoughts with the exact text returns that thought first", a
   assertStringIncludes(r.text, "--- Result 1 ");
 });
 
-todo("A3 search_thoughts with a paraphrase near the original returns that thought", async () => {
+Deno.test("A3 search_thoughts with a paraphrase near the original returns that thought", async () => {
   const original = "The quarterly review moved to Thursday";
   const paraphrase = "When is the review meeting now";
   const mix = axisVector(0).map((v, i) => (i === 0 ? 0.8 : i === 1 ? 0.6 : v));
