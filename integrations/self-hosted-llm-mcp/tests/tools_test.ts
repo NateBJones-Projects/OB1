@@ -365,3 +365,13 @@ Deno.test("U120 config gate: with CHAT_MODEL unset, each of the six tools return
     assertEquals(textOf(result), `Model endpoint not configured: missing CHAT_MODEL. ${GATE_TAIL}`, name);
   }
 });
+
+Deno.test("U121 config gate: no model request and no store call happen under a bad configuration", async () => {
+  const { client, fake, store } = await rig({});
+  for (const [name, args] of SIX_CALLS) {
+    const result = await client.callTool({ name, arguments: args });
+    assertEquals(result.isError, true, name);
+  }
+  assertEquals(fake.requests, []);
+  assertEquals(store.calls, []);
+});
