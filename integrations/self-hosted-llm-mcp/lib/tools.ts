@@ -227,7 +227,10 @@ export function buildServer(deps: Deps): McpServer {
           if ("error" in removed || !removed.data.deleted) return text(`${prefix} ${MAY_BE_SAVED}`, true);
           return text(`${prefix} The thought was not kept; capture it again.`, true);
         }
-        return text(`${prefix} ${MAY_BE_SAVED}`, true);
+        return text(
+          `${prefix} This text was already in your brain; its metadata was updated but its embedding was not. Capture it again to repair.`,
+          true,
+        );
       }
       const meta = metadata as Record<string, unknown>;
       let confirmation = `Captured as ${meta.type || "thought"}`;

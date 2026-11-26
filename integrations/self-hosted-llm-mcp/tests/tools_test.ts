@@ -617,3 +617,18 @@ Deno.test("U139 setEmbedding failing on a row this call inserted returns the not
   assertEquals(textOf(result), `Embedding could not be saved: ${EMB_FAIL}. The thought was not kept; capture it again.`);
   assertEquals(store.rows, []);
 });
+
+Deno.test("U140 setEmbedding failing on a merged duplicate returns the already-in-your-brain text, keeps the row and makes no delete call", async () => {
+  const { client, store } = await rig();
+  store.seed({ id: "old-1", content: "An idea", embedding: axisVector(5), metadata: { type: "idea" } });
+  store.fail.setEmbedding = EMB_FAIL;
+  const result = await client.callTool({ name: "capture_thought", arguments: { content: "An idea" } });
+  assertEquals(result.isError, true);
+  assertEquals(
+    textOf(result),
+    `Embedding could not be saved: ${EMB_FAIL}. This text was already in your brain; its metadata was updated but its embedding was not. Capture it again to repair.`,
+  );
+  assertEquals(store.rows.length, 1);
+  assertEquals(store.rows[0].embedding, axisVector(5));
+  assertEquals(store.calls.filter((c) => c.method === "deleteIfInsertedByCall"), []);
+});
