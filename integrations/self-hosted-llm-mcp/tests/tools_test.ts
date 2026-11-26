@@ -145,3 +145,11 @@ Deno.test("U102 fetch of an existing id returns core's document text", async () 
   });
   assertEquals(store.calls.map((c) => c.method), ["fetchThought"]);
 });
+
+Deno.test("U103 fetch with a store error returns core's isError text", async () => {
+  const { client, store } = await rig();
+  store.fail.fetchThought = "row not found";
+  const result = await client.callTool({ name: "fetch", arguments: { id: "nope" } });
+  assertEquals(result.isError, true);
+  assertEquals(textOf(result), "Fetch error: row not found");
+});
