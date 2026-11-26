@@ -180,3 +180,14 @@ Deno.test("U80 stats sends core's two thought_stats queries (exact count head; m
     ["select", "metadata,created_at"],
   ]);
 });
+
+Deno.test("U81 stats returns the count and the rows", async () => {
+  const { ff, store } = setup();
+  const rows = [
+    { metadata: { type: "idea" }, created_at: "2026-01-02T00:00:00+00:00" },
+    { metadata: {}, created_at: "2026-01-01T00:00:00+00:00" },
+  ];
+  ff.on("HEAD", `${REST}/thoughts`, { headers: { "content-range": "*/2" } });
+  ff.on("GET", `${REST}/thoughts`, { body: rows });
+  assertEquals(await store.stats(), { data: { count: 2, rows } });
+});
