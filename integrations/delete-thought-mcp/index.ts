@@ -41,78 +41,89 @@ const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // --- MCP Server Setup ---
+//
+// One McpServer per request. A module-level server re-connected to a new
+// StreamableHTTPTransport on every request routes an in-flight request's
+// response to whichever transport connected last, so two overlapping
+// requests in one isolate lose a response and that request hangs forever
+// (seen with Antigravity's agy CLI, which sends `server/discover` and a
+// notification at the same time). Same pattern as server/index.ts (#261).
 
-const server = new McpServer({
-  name: "open-brain-delete-thought",
-  version: "1.0.0",
-});
+function buildServer(): McpServer {
+  const server = new McpServer({
+    name: "open-brain-delete-thought",
+    version: "1.0.0",
+  });
 
-server.registerTool(
-  "delete_thought",
-  {
-    title: "Delete Thought",
-    description:
-      "Permanently delete a thought by UUID. The row is hard-deleted — recovery depends on your database backups. Returns a confirmation including the prior content length so the caller can log what was removed.",
-    inputSchema: {
-      id: z.string().uuid().describe("UUID of the thought to delete"),
+  server.registerTool(
+    "delete_thought",
+    {
+      title: "Delete Thought",
+      description:
+        "Permanently delete a thought by UUID. The row is hard-deleted — recovery depends on your database backups. Returns a confirmation including the prior content length so the caller can log what was removed.",
+      inputSchema: {
+        id: z.string().uuid().describe("UUID of the thought to delete"),
+      },
     },
-  },
-  async ({ id }) => {
-    try {
-      // Pre-flight fetch so "not found" is a clear, distinct outcome.
-      const { data: existing, error: fetchError } = await supabase
-        .from("thoughts")
-        .select("id, content")
-        .eq("id", id)
-        .single();
+    async ({ id }) => {
+      try {
+        // Pre-flight fetch so "not found" is a clear, distinct outcome.
+        const { data: existing, error: fetchError } = await supabase
+          .from("thoughts")
+          .select("id, content")
+          .eq("id", id)
+          .single();
 
-      if (fetchError || !existing) {
+        if (fetchError || !existing) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Thought not found: ${id}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const { error } = await supabase.from("thoughts").delete().eq("id", id);
+
+        if (error) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `delete_thought error: ${error.message}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const priorLength =
+          typeof existing.content === "string" ? existing.content.length : 0;
+
         return {
           content: [
             {
               type: "text" as const,
-              text: `Thought not found: ${id}`,
+              text: `Deleted thought ${id} (prior content length: ${priorLength} chars).`,
             },
           ],
-          isError: true,
         };
-      }
-
-      const { error } = await supabase.from("thoughts").delete().eq("id", id);
-
-      if (error) {
+      } catch (err: unknown) {
         return {
           content: [
-            {
-              type: "text" as const,
-              text: `delete_thought error: ${error.message}`,
-            },
+            { type: "text" as const, text: `Error: ${(err as Error).message}` },
           ],
           isError: true,
         };
       }
+    },
+  );
 
-      const priorLength =
-        typeof existing.content === "string" ? existing.content.length : 0;
-
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Deleted thought ${id} (prior content length: ${priorLength} chars).`,
-          },
-        ],
-      };
-    } catch (err: unknown) {
-      return {
-        content: [
-          { type: "text" as const, text: `Error: ${(err as Error).message}` },
-        ],
-        isError: true,
-      };
-    }
-  },
-);
+  return server;
+}
 
 // --- Hono app with auth + CORS ---
 
@@ -158,6 +169,7 @@ app.all("*", async (c) => {
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
+  const server = buildServer();
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);

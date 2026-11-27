@@ -66,167 +66,178 @@ async function getEmbedding(text: string): Promise<number[]> {
 }
 
 // --- MCP Server Setup ---
+//
+// One McpServer per request. A module-level server re-connected to a new
+// StreamableHTTPTransport on every request routes an in-flight request's
+// response to whichever transport connected last, so two overlapping
+// requests in one isolate lose a response and that request hangs forever
+// (seen with Antigravity's agy CLI, which sends `server/discover` and a
+// notification at the same time). Same pattern as server/index.ts (#261).
 
-const server = new McpServer({
-  name: "open-brain-update-thought",
-  version: "1.0.0",
-});
+function buildServer(): McpServer {
+  const server = new McpServer({
+    name: "open-brain-update-thought",
+    version: "1.0.0",
+  });
 
-server.registerTool(
-  "update_thought",
-  {
-    title: "Update Thought",
-    description:
-      "Update an existing thought by ID. Provide `content` to overwrite the text and regenerate its embedding, `metadata_patch` to shallow-merge changes into the existing metadata, or both. Keys not mentioned in `metadata_patch` are left unchanged. Pass `if_unchanged_since` (ISO 8601 timestamp from your last read) for optimistic concurrency — the update is rejected with STALE_READ if another writer has touched the row since then.",
-    inputSchema: {
-      id: z.string().uuid().describe("UUID of the thought to update"),
-      content: z
-        .string()
-        .min(1)
-        .max(50_000)
-        .optional()
-        .describe("New text content — triggers re-embedding when provided"),
-      metadata_patch: z
-        .record(z.string(), z.unknown())
-        .optional()
-        .describe(
-          "Partial metadata to shallow-merge into the existing metadata JSONB. New keys are added; existing keys are overwritten; keys not mentioned are left alone.",
-        ),
-      if_unchanged_since: z
-        .string()
-        .datetime({ offset: true })
-        .optional()
-        .describe(
-          "Optional ISO 8601 timestamp (with timezone). When provided, the update is rejected with STALE_READ if the stored updated_at has advanced past this reference. Pass the updated_at value from your most recent read to guard against lost-update conflicts. Omit to keep last-write-wins behavior.",
-        ),
+  server.registerTool(
+    "update_thought",
+    {
+      title: "Update Thought",
+      description:
+        "Update an existing thought by ID. Provide `content` to overwrite the text and regenerate its embedding, `metadata_patch` to shallow-merge changes into the existing metadata, or both. Keys not mentioned in `metadata_patch` are left unchanged. Pass `if_unchanged_since` (ISO 8601 timestamp from your last read) for optimistic concurrency — the update is rejected with STALE_READ if another writer has touched the row since then.",
+      inputSchema: {
+        id: z.string().uuid().describe("UUID of the thought to update"),
+        content: z
+          .string()
+          .min(1)
+          .max(50_000)
+          .optional()
+          .describe("New text content — triggers re-embedding when provided"),
+        metadata_patch: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe(
+            "Partial metadata to shallow-merge into the existing metadata JSONB. New keys are added; existing keys are overwritten; keys not mentioned are left alone.",
+          ),
+        if_unchanged_since: z
+          .string()
+          .datetime({ offset: true })
+          .optional()
+          .describe(
+            "Optional ISO 8601 timestamp (with timezone). When provided, the update is rejected with STALE_READ if the stored updated_at has advanced past this reference. Pass the updated_at value from your most recent read to guard against lost-update conflicts. Omit to keep last-write-wins behavior.",
+          ),
+      },
     },
-  },
-  async ({ id, content, metadata_patch, if_unchanged_since }) => {
-    try {
-      // Fetch existing row. We need updated_at for the concurrency check and
-      // metadata for the shallow-merge.
-      const { data: existing, error: fetchError } = await supabase
-        .from("thoughts")
-        .select("id, content, metadata, created_at, updated_at")
-        .eq("id", id)
-        .single();
+    async ({ id, content, metadata_patch, if_unchanged_since }) => {
+      try {
+        // Fetch existing row. We need updated_at for the concurrency check and
+        // metadata for the shallow-merge.
+        const { data: existing, error: fetchError } = await supabase
+          .from("thoughts")
+          .select("id, content, metadata, created_at, updated_at")
+          .eq("id", id)
+          .single();
 
-      if (fetchError || !existing) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `Thought not found: ${id}`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      // Optimistic concurrency check. Reject if stored updated_at is strictly
-      // newer than the caller's reference timestamp.
-      if (if_unchanged_since) {
-        const storedMs = new Date(
-          (existing.updated_at as string) ?? (existing.created_at as string),
-        ).getTime();
-        const clientMs = new Date(if_unchanged_since).getTime();
-        if (
-          Number.isFinite(storedMs) &&
-          Number.isFinite(clientMs) &&
-          storedMs > clientMs
-        ) {
+        if (fetchError || !existing) {
           return {
             content: [
               {
                 type: "text" as const,
-                text:
-                  `STALE_READ: thought has been modified since ${if_unchanged_since}. ` +
-                  `Current updated_at: ${existing.updated_at}. Re-fetch and retry.`,
+                text: `Thought not found: ${id}`,
               },
             ],
             isError: true,
           };
         }
-      }
 
-      const updates: Record<string, unknown> = {};
+        // Optimistic concurrency check. Reject if stored updated_at is strictly
+        // newer than the caller's reference timestamp.
+        if (if_unchanged_since) {
+          const storedMs = new Date(
+            (existing.updated_at as string) ?? (existing.created_at as string),
+          ).getTime();
+          const clientMs = new Date(if_unchanged_since).getTime();
+          if (
+            Number.isFinite(storedMs) &&
+            Number.isFinite(clientMs) &&
+            storedMs > clientMs
+          ) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text:
+                    `STALE_READ: thought has been modified since ${if_unchanged_since}. ` +
+                    `Current updated_at: ${existing.updated_at}. Re-fetch and retry.`,
+                },
+              ],
+              isError: true,
+            };
+          }
+        }
 
-      if (content !== undefined) {
-        if (!OPENROUTER_API_KEY) {
+        const updates: Record<string, unknown> = {};
+
+        if (content !== undefined) {
+          if (!OPENROUTER_API_KEY) {
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text:
+                    "OPENROUTER_API_KEY is not set on this Edge Function; content updates cannot re-embed.",
+                },
+              ],
+              isError: true,
+            };
+          }
+          const embedding = await getEmbedding(content);
+          updates.content = content;
+          updates.embedding = `[${embedding.join(",")}]`;
+        }
+
+        if (metadata_patch !== undefined) {
+          const merged = {
+            ...((existing.metadata as Record<string, unknown>) || {}),
+            ...metadata_patch,
+          };
+          updates.metadata = merged;
+        }
+
+        if (Object.keys(updates).length === 0) {
           return {
             content: [
               {
                 type: "text" as const,
-                text:
-                  "OPENROUTER_API_KEY is not set on this Edge Function; content updates cannot re-embed.",
+                text: `No changes supplied; thought ${id} unchanged.`,
+              },
+            ],
+          };
+        }
+
+        const { data, error } = await supabase
+          .from("thoughts")
+          .update(updates)
+          .eq("id", id)
+          .select("id, content, metadata, created_at, updated_at")
+          .single();
+
+        if (error) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `update_thought error: ${error.message}`,
               },
             ],
             isError: true,
           };
         }
-        const embedding = await getEmbedding(content);
-        updates.content = content;
-        updates.embedding = `[${embedding.join(",")}]`;
-      }
 
-      if (metadata_patch !== undefined) {
-        const merged = {
-          ...((existing.metadata as Record<string, unknown>) || {}),
-          ...metadata_patch,
+        const parts = [
+          `Updated thought ${data.id}`,
+          content !== undefined ? "  · content replaced and re-embedded" : null,
+          metadata_patch !== undefined ? "  · metadata merged" : null,
+          `  · updated_at: ${data.updated_at}`,
+        ].filter(Boolean);
+
+        return {
+          content: [{ type: "text" as const, text: parts.join("\n") }],
         };
-        updates.metadata = merged;
-      }
-
-      if (Object.keys(updates).length === 0) {
+      } catch (err: unknown) {
         return {
           content: [
-            {
-              type: "text" as const,
-              text: `No changes supplied; thought ${id} unchanged.`,
-            },
-          ],
-        };
-      }
-
-      const { data, error } = await supabase
-        .from("thoughts")
-        .update(updates)
-        .eq("id", id)
-        .select("id, content, metadata, created_at, updated_at")
-        .single();
-
-      if (error) {
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: `update_thought error: ${error.message}`,
-            },
+            { type: "text" as const, text: `Error: ${(err as Error).message}` },
           ],
           isError: true,
         };
       }
+    },
+  );
 
-      const parts = [
-        `Updated thought ${data.id}`,
-        content !== undefined ? "  · content replaced and re-embedded" : null,
-        metadata_patch !== undefined ? "  · metadata merged" : null,
-        `  · updated_at: ${data.updated_at}`,
-      ].filter(Boolean);
-
-      return {
-        content: [{ type: "text" as const, text: parts.join("\n") }],
-      };
-    } catch (err: unknown) {
-      return {
-        content: [
-          { type: "text" as const, text: `Error: ${(err as Error).message}` },
-        ],
-        isError: true,
-      };
-    }
-  },
-);
+  return server;
+}
 
 // --- Hono app with auth + CORS ---
 
@@ -274,6 +285,7 @@ app.all("*", async (c) => {
     Object.defineProperty(c.req, "raw", { value: patched, writable: true });
   }
 
+  const server = buildServer();
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);
