@@ -157,11 +157,6 @@ const layerDetailValidators: Record<Layer, z.ZodTypeAny> = {
   }),
 };
 
-const server = new McpServer({
-  name: "work-operating-model-activation",
-  version: "1.0.0",
-});
-
 function jsonText(payload: unknown) {
   return JSON.stringify(payload, null, 2);
 }
@@ -549,283 +544,302 @@ async function resolveVersion(userId: string, requestedVersion?: number): Promis
   return { profile, session: latestSession, version: latestSession?.profile_version ?? null };
 }
 
-server.tool(
-  "start_operating_model_session",
-  "Start the work operating model interview or resume the latest in-progress session. Use this before asking layer questions so the agent knows whether it is resuming or beginning fresh.",
-  {
-    session_name: z.string().optional().describe("Optional label for this run, such as 'April 2026 operating model refresh'."),
-  },
-  async ({ session_name }) => {
-    try {
-      const { data, error } = await supabase.rpc("operating_model_start_session", {
-        p_user_id: DEFAULT_USER_ID,
-        p_session_name: session_name ?? null,
-      });
+// --- MCP Server ---
+//
+// One McpServer per request. A module-level server re-connected to a new
+// StreamableHTTPTransport on every request routes an in-flight request's
+// response to whichever transport connected last, so two overlapping
+// requests in one isolate lose a response and that request hangs forever.
+// Same pattern as server/index.ts (#261). An arrow function, not a function
+// declaration: a declaration is hoisted, so TypeScript would no longer apply
+// the env-var guard above and DEFAULT_USER_ID would type as string | undefined.
 
-      if (error) {
-        throw new Error(`Failed to start or resume session: ${error.message}`);
-      }
+const buildServer = (): McpServer => {
+  const server = new McpServer({
+    name: "work-operating-model-activation",
+    version: "1.0.0",
+  });
 
-      return {
-        content: [{ type: "text", text: jsonText(data) }],
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        content: [{ type: "text", text: jsonText({ error: message }) }],
-        isError: true,
-      };
-    }
-  }
-);
+  server.tool(
+    "start_operating_model_session",
+    "Start the work operating model interview or resume the latest in-progress session. Use this before asking layer questions so the agent knows whether it is resuming or beginning fresh.",
+    {
+      session_name: z.string().optional().describe("Optional label for this run, such as 'April 2026 operating model refresh'."),
+    },
+    async ({ session_name }) => {
+      try {
+        const { data, error } = await supabase.rpc("operating_model_start_session", {
+          p_user_id: DEFAULT_USER_ID,
+          p_session_name: session_name ?? null,
+        });
 
-server.tool(
-  "save_operating_model_layer",
-  "Persist an approved layer checkpoint after the user confirms it. Use this only after you have shown a checkpoint summary, received explicit confirmation, and normalized the layer into canonical entries.",
-  {
-    session_id: z.string().uuid().describe("The active operating-model session ID returned by start_operating_model_session."),
-    layer: z.enum(LAYERS).describe("Which of the five layers you are saving."),
-    checkpoint_summary: z.string().min(20).describe("Approved layer summary shown to the user before saving."),
-    entries: z.array(baseEntrySchema).min(1).describe("Canonical structured entries for this layer."),
-  },
-  async ({ session_id, layer, checkpoint_summary, entries }) => {
-    try {
-      const normalizedEntries = entries.map((entry) => normalizeEntry(layer, entry));
+        if (error) {
+          throw new Error(`Failed to start or resume session: ${error.message}`);
+        }
 
-      const { data, error } = await supabase.rpc("operating_model_save_layer", {
-        p_session_id: session_id,
-        p_layer: layer,
-        p_checkpoint_summary: checkpoint_summary.trim(),
-        p_entries: normalizedEntries,
-      });
-
-      if (error) {
-        throw new Error(`Failed to save layer: ${error.message}`);
-      }
-
-      return {
-        content: [{ type: "text", text: jsonText(data) }],
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        content: [{ type: "text", text: jsonText({ error: message }) }],
-        isError: true,
-      };
-    }
-  }
-);
-
-server.tool(
-  "query_operating_model",
-  "Read the current operating model or a filtered slice of it. Use this during contradiction checks, resume flows, or when you need the latest structured profile by layer, keyword, cadence, stakeholder, unresolved status, or friction priority.",
-  {
-    layer: z.enum(LAYERS).optional().describe("Restrict results to one layer."),
-    keyword: z.string().optional().describe("Keyword to match against title, summary, trigger, arrays, and detail text."),
-    cadence: z.string().optional().describe("Filter to entries whose cadence mentions this text."),
-    stakeholder: z.string().optional().describe("Filter to entries that involve this stakeholder."),
-    unresolved_only: z.boolean().optional().describe("Only return unresolved entries."),
-    friction_priority: z.enum(["low", "medium", "high"]).optional().describe("Only meaningful for the friction layer. Filters on details.priority."),
-    profile_version: z.number().int().positive().optional().describe("Read a specific version instead of the latest available version."),
-  },
-  async ({ layer, keyword, cadence, stakeholder, unresolved_only, friction_priority, profile_version }) => {
-    try {
-      const resolved = await resolveVersion(DEFAULT_USER_ID, profile_version);
-
-      if (!resolved.session || !resolved.version) {
         return {
-          content: [{ type: "text", text: jsonText({ message: "No operating model profile has been started yet." }) }],
+          content: [{ type: "text", text: jsonText(data) }],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text", text: jsonText({ error: message }) }],
+          isError: true,
         };
       }
+    }
+  );
 
-      const checkpoints = await getCheckpoints(resolved.session.id);
-      const entries = await getEntries(resolved.session.id);
+  server.tool(
+    "save_operating_model_layer",
+    "Persist an approved layer checkpoint after the user confirms it. Use this only after you have shown a checkpoint summary, received explicit confirmation, and normalized the layer into canonical entries.",
+    {
+      session_id: z.string().uuid().describe("The active operating-model session ID returned by start_operating_model_session."),
+      layer: z.enum(LAYERS).describe("Which of the five layers you are saving."),
+      checkpoint_summary: z.string().min(20).describe("Approved layer summary shown to the user before saving."),
+      entries: z.array(baseEntrySchema).min(1).describe("Canonical structured entries for this layer."),
+    },
+    async ({ session_id, layer, checkpoint_summary, entries }) => {
+      try {
+        const normalizedEntries = entries.map((entry) => normalizeEntry(layer, entry));
 
-      let filtered = entries;
-
-      if (layer) {
-        filtered = filtered.filter((entry) => entry.layer === layer);
-      }
-
-      if (cadence) {
-        const needle = cadence.toLowerCase();
-        filtered = filtered.filter((entry) => (entry.cadence ?? "").toLowerCase().includes(needle));
-      }
-
-      if (stakeholder) {
-        const needle = stakeholder.toLowerCase();
-        filtered = filtered.filter((entry) =>
-          (entry.stakeholders ?? []).some((item) => item.toLowerCase().includes(needle))
-        );
-      }
-
-      if (unresolved_only) {
-        filtered = filtered.filter((entry) => entry.status === "unresolved");
-      }
-
-      if (friction_priority) {
-        filtered = filtered.filter(
-          (entry) =>
-            entry.layer === "friction" &&
-            String((entry.details ?? {}).priority ?? "").toLowerCase() === friction_priority
-        );
-      }
-
-      if (keyword) {
-        const needle = keyword.toLowerCase();
-        filtered = filtered.filter((entry) => {
-          const haystack = [
-            entry.title,
-            entry.summary,
-            entry.cadence ?? "",
-            entry.trigger ?? "",
-            ...(entry.inputs ?? []),
-            ...(entry.stakeholders ?? []),
-            ...(entry.constraints ?? []),
-            JSON.stringify(entry.details ?? {}),
-          ]
-            .join(" ")
-            .toLowerCase();
-
-          return haystack.includes(needle);
+        const { data, error } = await supabase.rpc("operating_model_save_layer", {
+          p_session_id: session_id,
+          p_layer: layer,
+          p_checkpoint_summary: checkpoint_summary.trim(),
+          p_entries: normalizedEntries,
         });
+
+        if (error) {
+          throw new Error(`Failed to save layer: ${error.message}`);
+        }
+
+        return {
+          content: [{ type: "text", text: jsonText(data) }],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text", text: jsonText({ error: message }) }],
+          isError: true,
+        };
       }
-
-      const response = {
-        profile_status: resolved.profile?.status ?? "draft",
-        profile_version: resolved.version,
-        session_id: resolved.session.id,
-        session_status: resolved.session.status,
-        completed_layers: resolved.session.completed_layers ?? [],
-        pending_layer: resolved.session.current_layer,
-        checkpoint_count: checkpoints.length,
-        entry_count: filtered.length,
-        checkpoints,
-        entries: filtered,
-      };
-
-      return {
-        content: [{ type: "text", text: jsonText(response) }],
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        content: [{ type: "text", text: jsonText({ error: message }) }],
-        isError: true,
-      };
     }
-  }
-);
+  );
 
-server.tool(
-  "generate_operating_model_exports",
-  "Render and store the canonical operating-model exports after all five layers are approved and contradictions are resolved. Use this at the end of the workflow to return JSON and markdown artifacts.",
-  {
-    session_id: z.string().uuid().optional().describe("Optional session ID to export. Defaults to the latest active or completed session."),
-    final_review_notes: z.string().optional().describe("Optional notes from the final contradiction pass to store with the export metadata."),
-  },
-  async ({ session_id, final_review_notes }) => {
-    try {
-      const session = session_id
-        ? await getSessionById(session_id)
-        : (await resolveVersion(DEFAULT_USER_ID)).session;
+  server.tool(
+    "query_operating_model",
+    "Read the current operating model or a filtered slice of it. Use this during contradiction checks, resume flows, or when you need the latest structured profile by layer, keyword, cadence, stakeholder, unresolved status, or friction priority.",
+    {
+      layer: z.enum(LAYERS).optional().describe("Restrict results to one layer."),
+      keyword: z.string().optional().describe("Keyword to match against title, summary, trigger, arrays, and detail text."),
+      cadence: z.string().optional().describe("Filter to entries whose cadence mentions this text."),
+      stakeholder: z.string().optional().describe("Filter to entries that involve this stakeholder."),
+      unresolved_only: z.boolean().optional().describe("Only return unresolved entries."),
+      friction_priority: z.enum(["low", "medium", "high"]).optional().describe("Only meaningful for the friction layer. Filters on details.priority."),
+      profile_version: z.number().int().positive().optional().describe("Read a specific version instead of the latest available version."),
+    },
+    async ({ layer, keyword, cadence, stakeholder, unresolved_only, friction_priority, profile_version }) => {
+      try {
+        const resolved = await resolveVersion(DEFAULT_USER_ID, profile_version);
 
-      if (!session) {
-        throw new Error("No operating-model session is available to export.");
+        if (!resolved.session || !resolved.version) {
+          return {
+            content: [{ type: "text", text: jsonText({ message: "No operating model profile has been started yet." }) }],
+          };
+        }
+
+        const checkpoints = await getCheckpoints(resolved.session.id);
+        const entries = await getEntries(resolved.session.id);
+
+        let filtered = entries;
+
+        if (layer) {
+          filtered = filtered.filter((entry) => entry.layer === layer);
+        }
+
+        if (cadence) {
+          const needle = cadence.toLowerCase();
+          filtered = filtered.filter((entry) => (entry.cadence ?? "").toLowerCase().includes(needle));
+        }
+
+        if (stakeholder) {
+          const needle = stakeholder.toLowerCase();
+          filtered = filtered.filter((entry) =>
+            (entry.stakeholders ?? []).some((item) => item.toLowerCase().includes(needle))
+          );
+        }
+
+        if (unresolved_only) {
+          filtered = filtered.filter((entry) => entry.status === "unresolved");
+        }
+
+        if (friction_priority) {
+          filtered = filtered.filter(
+            (entry) =>
+              entry.layer === "friction" &&
+              String((entry.details ?? {}).priority ?? "").toLowerCase() === friction_priority
+          );
+        }
+
+        if (keyword) {
+          const needle = keyword.toLowerCase();
+          filtered = filtered.filter((entry) => {
+            const haystack = [
+              entry.title,
+              entry.summary,
+              entry.cadence ?? "",
+              entry.trigger ?? "",
+              ...(entry.inputs ?? []),
+              ...(entry.stakeholders ?? []),
+              ...(entry.constraints ?? []),
+              JSON.stringify(entry.details ?? {}),
+            ]
+              .join(" ")
+              .toLowerCase();
+
+            return haystack.includes(needle);
+          });
+        }
+
+        const response = {
+          profile_status: resolved.profile?.status ?? "draft",
+          profile_version: resolved.version,
+          session_id: resolved.session.id,
+          session_status: resolved.session.status,
+          completed_layers: resolved.session.completed_layers ?? [],
+          pending_layer: resolved.session.current_layer,
+          checkpoint_count: checkpoints.length,
+          entry_count: filtered.length,
+          checkpoints,
+          entries: filtered,
+        };
+
+        return {
+          content: [{ type: "text", text: jsonText(response) }],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text", text: jsonText({ error: message }) }],
+          isError: true,
+        };
       }
+    }
+  );
 
-      const profile = await getProfile(DEFAULT_USER_ID);
-      if (!profile) {
-        throw new Error("No operating-model profile found.");
-      }
+  server.tool(
+    "generate_operating_model_exports",
+    "Render and store the canonical operating-model exports after all five layers are approved and contradictions are resolved. Use this at the end of the workflow to return JSON and markdown artifacts.",
+    {
+      session_id: z.string().uuid().optional().describe("Optional session ID to export. Defaults to the latest active or completed session."),
+      final_review_notes: z.string().optional().describe("Optional notes from the final contradiction pass to store with the export metadata."),
+    },
+    async ({ session_id, final_review_notes }) => {
+      try {
+        const session = session_id
+          ? await getSessionById(session_id)
+          : (await resolveVersion(DEFAULT_USER_ID)).session;
 
-      const checkpoints = await getCheckpoints(session.id);
-      const completedLayerSet = new Set(checkpoints.map((item) => item.layer));
-      const missingLayers = LAYERS.filter((layer) => !completedLayerSet.has(layer));
-      if (missingLayers.length > 0) {
-        throw new Error(`Cannot generate exports yet. Missing approved layers: ${missingLayers.join(", ")}`);
-      }
+        if (!session) {
+          throw new Error("No operating-model session is available to export.");
+        }
 
-      const entries = await getEntries(session.id);
-      const grouped = groupEntries(entries);
-      const scheduleRecommendations = buildScheduleRecommendations(grouped, session.profile_version, session.id);
-      const operatingModelJson = buildOperatingModelJson(profile, session, checkpoints, grouped);
-      const exportsMap: Record<(typeof ARTIFACTS)[number], string> = {
-        "operating-model.json": jsonText(operatingModelJson),
-        "USER.md": buildUserMarkdown(session, checkpoints, grouped),
-        "SOUL.md": buildSoulMarkdown(checkpoints, grouped),
-        "HEARTBEAT.md": buildHeartbeatMarkdown(grouped, scheduleRecommendations),
-        "schedule-recommendations.json": jsonText(scheduleRecommendations),
-      };
+        const profile = await getProfile(DEFAULT_USER_ID);
+        if (!profile) {
+          throw new Error("No operating-model profile found.");
+        }
 
-      const upsertRows = ARTIFACTS.map((artifactName) => ({
-        profile_id: session.profile_id,
-        session_id: session.id,
-        user_id: DEFAULT_USER_ID,
-        profile_version: session.profile_version,
-        artifact_name: artifactName,
-        content: exportsMap[artifactName],
-        content_type: artifactName.endsWith(".json") ? "application/json" : "text/markdown",
-        metadata: {
-          generated_at: new Date().toISOString(),
-          final_review_notes: final_review_notes ?? null,
-        },
-      }));
+        const checkpoints = await getCheckpoints(session.id);
+        const completedLayerSet = new Set(checkpoints.map((item) => item.layer));
+        const missingLayers = LAYERS.filter((layer) => !completedLayerSet.has(layer));
+        if (missingLayers.length > 0) {
+          throw new Error(`Cannot generate exports yet. Missing approved layers: ${missingLayers.join(", ")}`);
+        }
 
-      const { error: exportError } = await supabase
-        .from("operating_model_exports")
-        .upsert(upsertRows, { onConflict: "session_id,artifact_name" });
+        const entries = await getEntries(session.id);
+        const grouped = groupEntries(entries);
+        const scheduleRecommendations = buildScheduleRecommendations(grouped, session.profile_version, session.id);
+        const operatingModelJson = buildOperatingModelJson(profile, session, checkpoints, grouped);
+        const exportsMap: Record<(typeof ARTIFACTS)[number], string> = {
+          "operating-model.json": jsonText(operatingModelJson),
+          "USER.md": buildUserMarkdown(session, checkpoints, grouped),
+          "SOUL.md": buildSoulMarkdown(checkpoints, grouped),
+          "HEARTBEAT.md": buildHeartbeatMarkdown(grouped, scheduleRecommendations),
+          "schedule-recommendations.json": jsonText(scheduleRecommendations),
+        };
 
-      if (exportError) {
-        throw new Error(`Failed to store exports: ${exportError.message}`);
-      }
-
-      const { error: sessionError } = await supabase
-        .from("operating_model_sessions")
-        .update({
-          status: "completed",
-          current_layer: "complete",
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", session.id);
-
-      if (sessionError) {
-        throw new Error(`Failed to finalize session: ${sessionError.message}`);
-      }
-
-      const { error: profileError } = await supabase
-        .from("operating_model_profiles")
-        .update({
-          current_version: session.profile_version,
-          status: "active",
-        })
-        .eq("id", profile.id);
-
-      if (profileError) {
-        throw new Error(`Failed to update profile version: ${profileError.message}`);
-      }
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: jsonText({
-              session_id: session.id,
-              profile_version: session.profile_version,
-              exports: exportsMap,
-            }),
+        const upsertRows = ARTIFACTS.map((artifactName) => ({
+          profile_id: session.profile_id,
+          session_id: session.id,
+          user_id: DEFAULT_USER_ID,
+          profile_version: session.profile_version,
+          artifact_name: artifactName,
+          content: exportsMap[artifactName],
+          content_type: artifactName.endsWith(".json") ? "application/json" : "text/markdown",
+          metadata: {
+            generated_at: new Date().toISOString(),
+            final_review_notes: final_review_notes ?? null,
           },
-        ],
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        content: [{ type: "text", text: jsonText({ error: message }) }],
-        isError: true,
-      };
+        }));
+
+        const { error: exportError } = await supabase
+          .from("operating_model_exports")
+          .upsert(upsertRows, { onConflict: "session_id,artifact_name" });
+
+        if (exportError) {
+          throw new Error(`Failed to store exports: ${exportError.message}`);
+        }
+
+        const { error: sessionError } = await supabase
+          .from("operating_model_sessions")
+          .update({
+            status: "completed",
+            current_layer: "complete",
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", session.id);
+
+        if (sessionError) {
+          throw new Error(`Failed to finalize session: ${sessionError.message}`);
+        }
+
+        const { error: profileError } = await supabase
+          .from("operating_model_profiles")
+          .update({
+            current_version: session.profile_version,
+            status: "active",
+          })
+          .eq("id", profile.id);
+
+        if (profileError) {
+          throw new Error(`Failed to update profile version: ${profileError.message}`);
+        }
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: jsonText({
+                session_id: session.id,
+                profile_version: session.profile_version,
+                exports: exportsMap,
+              }),
+            },
+          ],
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return {
+          content: [{ type: "text", text: jsonText({ error: message }) }],
+          isError: true,
+        };
+      }
     }
-  }
-);
+  );
+
+  return server;
+};
 
 app.get("/health", (c) =>
   c.json({ status: "ok", service: "Work Operating Model Activation MCP", version: "1.0.0" })
@@ -862,6 +876,7 @@ app.all("*", async (c) => {
     return c.json({ error: "Unauthorized" }, 401);
   }
 
+  const server = buildServer();
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);
