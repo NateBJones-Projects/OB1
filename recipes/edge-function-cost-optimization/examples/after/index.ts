@@ -1,8 +1,9 @@
 // ✅ Unified edge function with Mcp-Session-Id reuse.
 //
 // Key elements:
-//  - Singleton McpServer + Supabase client at module scope (no per-request
-//    reconstruction)
+//  - Supabase client at module scope; one McpServer per MCP session, built
+//    when the session is minted (no per-request reconstruction, and no
+//    module-scope server shared between clients' sessions)
 //  - app.options("*") returns CORS preflights cheaply BEFORE auth
 //  - Mcp-Session-Id header is minted on first request and reused on
 //    subsequent ones, collapsing the 4-step MCP handshake
@@ -12,12 +13,13 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { Hono } from "hono";
 import { StreamableHTTPTransport } from "@hono/mcp";
-import { server } from "./server.ts";
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { buildServer } from "./server.ts";
 
 const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 
 // ── Session reuse ──────────────────────────────────────────────────────────
-type Session = { transport: StreamableHTTPTransport; lastSeen: number };
+type Session = { server: McpServer; transport: StreamableHTTPTransport; lastSeen: number };
 const sessions = new Map<string, Session>();
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
@@ -86,9 +88,12 @@ app.all("*", async (c) => {
 
   if (!session) {
     id = crypto.randomUUID();
+    // A server of its own for each session: a shared server re-connected here
+    // would send every other session's responses to this new transport.
+    const server = buildServer();
     const transport = new StreamableHTTPTransport();
     await server.connect(transport); // bind once per session, not per request
-    session = { transport, lastSeen: Date.now() };
+    session = { server, transport, lastSeen: Date.now() };
     sessions.set(id, session);
   } else {
     session.lastSeen = Date.now();

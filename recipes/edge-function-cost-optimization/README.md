@@ -25,7 +25,7 @@ Multiply that by **4 connectors** at session startup → **16 invocations** befo
 
 ### 1. Consolidate N edge functions into 1
 
-Tools are uniquely named across extensions. There's no technical reason they need separate functions — splitting them only multiplies the per-session handshake cost. One Hono app + one `McpServer` + N `register(server)` calls covers all extensions and exposes them via a single connector URL.
+Tools are uniquely named across extensions. There's no technical reason they need separate functions — splitting them only multiplies the per-session handshake cost. One Hono app + one `buildServer()` that makes N `register(server)` calls covers all extensions and exposes them via a single connector URL.
 
 ```
 4 connectors × 4-step handshake = 16 invocations per session start
@@ -38,7 +38,7 @@ Tools are uniquely named across extensions. There's no technical reason they nee
 
 The MCP spec includes a `Mcp-Session-Id` header for stateful sessions, but `@hono/mcp`'s `StreamableHTTPTransport` doesn't issue or honor one by default. Add a tiny module-scope `Map<sid, Session>`:
 
-- First request from a client → mint a UUID, create a `StreamableHTTPTransport`, `await server.connect(transport)`, return `Mcp-Session-Id` in the response
+- First request from a client → mint a UUID, build that session's `McpServer` with `buildServer()`, create a `StreamableHTTPTransport`, `await server.connect(transport)`, return `Mcp-Session-Id` in the response
 - Subsequent requests with the same header → reuse the warm transport
 - 30-min TTL with opportunistic sweep
 
@@ -90,7 +90,7 @@ Convert your N MCP functions into **one** function with the structure shown in [
 ```
 supabase/functions/open-brain-mcp/
   index.ts            # Hono app, auth, CORS, session map, transport wiring
-  server.ts           # module-scope McpServer; calls register() per tool module
+  server.ts           # buildServer(): one McpServer per session; calls register() per tool module
   lib/
     cache.ts          # TTL Map with tag-based invalidation
     supabase.ts       # createClient() singleton
@@ -102,14 +102,14 @@ supabase/functions/open-brain-mcp/
     ...
 ```
 
-Each extension's tools live in their own module, exporting a `register(server)` function called once at module load. **Move tool implementations verbatim** from the old per-extension files; only the wrapper changes.
+Each extension's tools live in their own module, exporting a `register(server)` function that `buildServer()` calls (once per session, not once per request). **Move tool implementations verbatim** from the old per-extension files; only the wrapper changes.
 
 ### Step 3 — Add session reuse to `index.ts`
 
 The minimal pattern (full version in [`examples/after/index.ts`](./examples/after/index.ts)):
 
 ```ts
-type Session = { transport: StreamableHTTPTransport; lastSeen: number };
+type Session = { server: McpServer; transport: StreamableHTTPTransport; lastSeen: number };
 const sessions = new Map<string, Session>();
 const SESSION_TTL_MS = 30 * 60 * 1000;
 
@@ -133,9 +133,10 @@ app.all("*", async (c) => {
 
   if (!session) {
     id = crypto.randomUUID();
+    const server = buildServer(); // one server per session, never shared
     const transport = new StreamableHTTPTransport();
     await server.connect(transport);
-    session = { transport, lastSeen: Date.now() };
+    session = { server, transport, lastSeen: Date.now() };
     sessions.set(id, session);
   } else {
     session.lastSeen = Date.now();
@@ -188,6 +189,10 @@ If the rate is still high after 24h, check per-function logs to find which tool 
 ### Why session reuse works on Edge Functions
 
 Supabase Edge Functions run in Deno isolates. Under steady traffic an isolate stays warm anywhere from minutes to hours; cold starts are measured in tens of milliseconds. Module-scope state (like the `Map<sid, Session>`) survives the entire warm window. When the isolate eventually recycles, the next request mints a new session ID transparently — Claude Desktop silently re-initializes and continues. Zero behavior change to the user.
+
+### Why each session gets its own `McpServer`
+
+`McpServer.connect(transport)` makes that transport the one the server answers on. A single module-scope server connected again for a second session therefore answers on the second session's transport only: the first client's next request is handled, but its response goes to the other transport, and the first client waits until it times out. It takes no concurrency, just two clients on one warm isolate (Claude Desktop and Claude Code, say). Building the server in `buildServer()` when a session is minted keeps every session's responses on its own transport. Registering the tools costs a little CPU once per session, not an invocation.
 
 ### Why CORS needs `Expose-Headers`
 
