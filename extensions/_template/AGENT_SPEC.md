@@ -136,13 +136,21 @@ const MCP_ACCESS_KEY = Deno.env.get("MCP_ACCESS_KEY")!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 // --- MCP Server ---
-const server = new McpServer({
-  name: "extension-slug",
-  version: "1.0.0",
-});
+// Build a fresh McpServer for every request. Never keep one at module level and
+// re-connect it: connect() hands the server to the newest transport, so when two
+// requests overlap the first one's response goes to the wrong request and the
+// first request hangs forever.
+function buildServer(): McpServer {
+  const server = new McpServer({
+    name: "extension-slug",
+    version: "1.0.0",
+  });
 
-// --- Tools ---
-// Register tools here using server.registerTool()
+  // --- Tools ---
+  // Register tools here using server.registerTool()
+
+  return server;
+}
 
 // --- Hono App with Auth ---
 const app = new Hono();
@@ -153,6 +161,7 @@ app.all("*", async (c) => {
     return c.json({ error: "Invalid or missing access key" }, 401);
   }
 
+  const server = buildServer();
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);
@@ -163,7 +172,7 @@ Deno.serve(app.fetch);
 
 ### Tool Registration Pattern
 
-Every tool follows this pattern:
+Every tool follows this pattern, inside `buildServer()`:
 
 ```typescript
 server.registerTool(
